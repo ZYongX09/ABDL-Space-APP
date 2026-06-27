@@ -1,0 +1,2 @@
+// SDK 模块配置 - 仅作为本地库引用，不需要构建脚本
+// buildscript 和 allprojects 配置已移除（仅主项目需要）

@@ -1,0 +1,29 @@
+// Included into build.gradle when running in a CI pipeline
+
+android{
+	signingConfigs{
+		release{
+			keyAlias "key0"
+			keyPassword System.getenv("KEYSTORE_PASSWORD")
+			storeFile file(System.getenv("KEYSTORE_FILE"))
+			storePassword System.getenv("KEYSTORE_PASSWORD")
+		}
+		nightly{
+			keyAlias "key0"
+			keyPassword System.getenv("KEYSTORE_PASSWORD")
+			storeFile file(System.getenv("KEYSTORE_FILE"))
+			storePassword System.getenv("KEYSTORE_PASSWORD")
+		}
+
+	buildTypes{
+		release{
+			signingConfig signingConfigs.release
+		}
+		nightly{
+			signingConfig signingConfigs.nightly
+		}
+		githubRelease{
+			signingConfig signingConfigs.release
+		}
+	}
+}

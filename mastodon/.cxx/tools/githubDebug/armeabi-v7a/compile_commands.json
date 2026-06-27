@@ -1,0 +1,7 @@
+[
+{
+  "directory": "/home/ZYongX/projects/moshidon-test/mastodon/.cxx/Debug/3n9543k2/armeabi-v7a",
+  "command": "/home/ZYongX/Android/Sdk/ndk/26.1.10909125/toolchains/llvm/prebuilt/linux-x86_64/bin/clang --target=armv7-none-linux-androideabi24 --sysroot=/home/ZYongX/Android/Sdk/ndk/26.1.10909125/toolchains/llvm/prebuilt/linux-x86_64/sysroot -Dintro_EXPORTS -I/home/ZYongX/projects/moshidon-test/mastodon/src/main/jni/intro -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -march=armv7-a -mthumb -Wformat -Werror=format-security  -fno-limit-debug-info  -fPIC -o CMakeFiles/intro.dir/intro/IntroRenderer.c.o -c /home/ZYongX/projects/moshidon-test/mastodon/src/main/jni/intro/IntroRenderer.c",
+  "file": "/home/ZYongX/projects/moshidon-test/mastodon/src/main/jni/intro/IntroRenderer.c"
+}
+]

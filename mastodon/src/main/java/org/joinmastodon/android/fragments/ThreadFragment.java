@@ -1,0 +1,576 @@
+package org.joinmastodon.android.fragments;
+
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
+import android.animation.ObjectAnimator;
+import android.app.assist.AssistContent;
+import android.content.res.ColorStateList;
+import android.graphics.Canvas;
+import android.graphics.Paint;
+import android.graphics.Rect;
+import android.net.Uri;
+import android.os.Bundle;
+import android.text.SpannableStringBuilder;
+import android.text.TextUtils;
+import android.util.Property;
+import android.view.Menu;
+import android.view.MenuInflater;
+import android.view.MenuItem;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.WindowInsets;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import org.joinmastodon.android.BuildConfig;
+import org.joinmastodon.android.GlobalUserPreferences;
+import org.joinmastodon.android.R;
+import org.joinmastodon.android.api.requests.statuses.GetStatusContext;
+import org.joinmastodon.android.api.session.AccountSessionManager;
+import org.joinmastodon.android.model.Account;
+import org.joinmastodon.android.model.AsyncRefresh;
+import org.joinmastodon.android.model.FilterContext;
+import org.joinmastodon.android.model.Status;
+import org.joinmastodon.android.model.StatusContext;
+import org.joinmastodon.android.ui.OutlineProviders;
+import org.joinmastodon.android.ui.Snackbar;
+import org.joinmastodon.android.ui.displayitems.ExtendedFooterStatusDisplayItem;
+import org.joinmastodon.android.ui.displayitems.FooterStatusDisplayItem;
+import org.joinmastodon.android.ui.displayitems.HeaderStatusDisplayItem;
+import org.joinmastodon.android.ui.displayitems.SpoilerStatusDisplayItem;
+import org.joinmastodon.android.ui.displayitems.StatusDisplayItem;
+import org.joinmastodon.android.ui.displayitems.TextStatusDisplayItem;
+import org.joinmastodon.android.ui.text.HtmlParser;
+import org.joinmastodon.android.ui.utils.UiUtils;
+import org.parceler.Parcels;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.Consumer;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.recyclerview.widget.DiffUtil;
+import androidx.recyclerview.widget.ListUpdateCallback;
+import androidx.recyclerview.widget.RecyclerView;
+import me.grishka.appkit.Nav;
+import me.grishka.appkit.api.SimpleCallback;
+import me.grishka.appkit.imageloader.ViewImageLoader;
+import me.grishka.appkit.imageloader.requests.UrlImageLoaderRequest;
+import me.grishka.appkit.utils.CubicBezierInterpolator;
+import me.grishka.appkit.utils.MergeRecyclerAdapter;
+import me.grishka.appkit.utils.SingleViewRecyclerAdapter;
+import me.grishka.appkit.utils.V;
+
+public class ThreadFragment extends StatusListFragment implements AssistContentProviderFragment{
+	private Status mainStatus;
+	private ImageView endMark;
+	private FrameLayout replyContainer;
+	private LinearLayout replyButton;
+	private ImageView replyButtonAva;
+	private TextView replyButtonText;
+	private String asyncRefreshID;
+	private Consumer<AsyncRefresh> asyncRefreshCallback=this::onAsyncRefreshFinished;
+	private Snackbar moreRepliesSnackbar;
+	private Runnable asyncRefreshPartialRunnable=this::checkAsyncRefreshAndMaybeShowSnackbar;
+	private int prevNewRepliesCount;
+	private HashSet<String> newReplyIDs=new HashSet<>();
+	private boolean highlightDecorationAdded=false;
+	private NewRepliesHighlightDecoration highlightDecoration=new NewRepliesHighlightDecoration();
+	private float highlightAlpha=0;
+	private Animator highlightAlphaAnimator;
+	private final Property<Void, Float> newRepliesHighlightProperty=new Property<>(Float.class, "fdsafdsa"){
+		@Override
+		public Float get(Void object){
+			return highlightAlpha;
+		}
+
+		@Override
+		public void set(Void object, Float value){
+			highlightAlpha=value;
+			list.invalidate();
+		}
+	};
+
+	@Override
+	public void onCreate(Bundle savedInstanceState){
+		super.onCreate(savedInstanceState);
+		setLayout(R.layout.fragment_thread);
+		mainStatus=Parcels.unwrap(getArguments().getParcelable("status"));
+		Account inReplyToAccount=Parcels.unwrap(getArguments().getParcelable("inReplyToAccount"));
+		if(inReplyToAccount!=null)
+			knownAccounts.put(inReplyToAccount.id, inReplyToAccount);
+		data.add(mainStatus);
+		onAppendItems(Collections.singletonList(mainStatus));
+		if(GlobalUserPreferences.customEmojiInNames)
+			setTitle(HtmlParser.parseCustomEmoji(getString(R.string.post_from_user, mainStatus.account.displayName), mainStatus.account.emojis));
+		else
+			setTitle(getString(R.string.post_from_user, mainStatus.account.displayName));
+		setRefreshEnabled(false);
+		setHasOptionsMenu(true);
+	}
+
+	@Override
+	public void onDestroy(){
+		if(asyncRefreshID!=null){
+			AccountSessionManager.get(accountID).getApiController().cancelPollingAsyncRefresh(asyncRefreshID, asyncRefreshCallback);
+		}
+		super.onDestroy();
+	}
+
+	@Override
+	public void onDestroyView(){
+		moreRepliesSnackbar=null;
+		if(asyncRefreshID!=null){
+			contentView.removeCallbacks(asyncRefreshPartialRunnable);
+		}
+		if(highlightAlphaAnimator!=null){
+			highlightAlphaAnimator.cancel();
+		}
+		super.onDestroyView();
+	}
+
+	@Override
+	protected List<StatusDisplayItem> buildDisplayItems(Status s){
+		List<StatusDisplayItem> items=StatusDisplayItem.buildItems(this, getActivity(), s, accountID, s, knownAccounts, StatusDisplayItem.FLAG_NO_IN_REPLY_TO);
+		if(s.id.equals(mainStatus.id)){
+			for(StatusDisplayItem item:items){
+				item.fullWidth=true;
+				if(item instanceof TextStatusDisplayItem text){
+					text.textSelectable=!item.isQuote;
+					text.largerFont=true;
+				}
+				else if(item instanceof FooterStatusDisplayItem footer)
+					footer.hideCounts=true;
+				else if(item instanceof SpoilerStatusDisplayItem spoiler){
+					for(StatusDisplayItem subItem:spoiler.contentItems){
+						if(subItem instanceof TextStatusDisplayItem text)
+							text.textSelectable=!subItem.isQuote;
+					}
+				}
+			}
+			items.add(items.size()-1, new ExtendedFooterStatusDisplayItem(s.id, this, getActivity(), s.getContentStatus(), accountID));
+		}
+		return items;
+	}
+
+	@Override
+	protected void doLoadData(int offset, int count){
+		currentRequest=new GetStatusContext(mainStatus.id)
+				.setCallback(new SimpleCallback<>(this){
+					@Override
+					public void onSuccess(StatusContext result){
+						currentRequest=null;
+						if(getActivity()==null)
+							return;
+						final ArrayList<StatusDisplayItem> prevDisplayItems;
+						if(refreshing){
+							prevDisplayItems=new ArrayList<>(displayItems);
+							data.clear();
+							displayItems.clear();
+							data.add(mainStatus);
+							onAppendItems(Collections.singletonList(mainStatus));
+						}else if(result.asyncRefresh!=null){
+							prevDisplayItems=null;
+							if(BuildConfig.DEBUG)
+								Toast.makeText(getActivity(), "Starting async refresh", Toast.LENGTH_SHORT).show();
+							asyncRefreshID=result.asyncRefresh.id;
+							AccountSessionManager.get(accountID).getApiController().startPollingAsyncRefresh(result.asyncRefresh, asyncRefreshCallback);
+							contentView.postDelayed(asyncRefreshPartialRunnable, 10_000);
+						}else{
+							prevDisplayItems=null;
+						}
+						filterStatuses(result.descendants);
+						filterStatuses(result.ancestors);
+						if(footerProgress!=null)
+							footerProgress.setVisibility(View.GONE);
+						data.addAll(result.descendants);
+						int prevCount=displayItems.size();
+						onAppendItems(result.descendants);
+						int count=displayItems.size();
+						if(!refreshing)
+							adapter.notifyItemRangeInserted(prevCount, count-prevCount);
+						prependItems(result.ancestors, !refreshing);
+						dataLoaded();
+						if(refreshing){
+							refreshDone();
+							DiffUtil.DiffResult diff=DiffUtil.calculateDiff(new DiffUtil.Callback(){
+								@Override
+								public int getOldListSize(){
+									return prevDisplayItems.size();
+								}
+
+								@Override
+								public int getNewListSize(){
+									return displayItems.size();
+								}
+
+								@Override
+								public boolean areItemsTheSame(int oldItemPosition, int newItemPosition){
+									StatusDisplayItem oldItem=prevDisplayItems.get(oldItemPosition);
+									StatusDisplayItem newItem=displayItems.get(newItemPosition);
+									return oldItem.parentID.equals(newItem.parentID) && oldItem.index==newItem.index && oldItem.getType()==newItem.getType();
+								}
+
+								@Override
+								public boolean areContentsTheSame(int oldItemPosition, int newItemPosition){
+									return true;
+								}
+							});
+							newReplyIDs.clear();
+							diff.dispatchUpdatesTo(new ListUpdateCallback(){
+								@Override
+								public void onInserted(int position, int count){
+									if(position<displayItems.size()) // TODO figure out how this could possibly be a thing
+										newReplyIDs.add(displayItems.get(position).parentID);
+									else if(BuildConfig.DEBUG)
+										throw new IllegalStateException("onInserted called with position="+position+" count="+count+", but list size is "+displayItems.size());
+								}
+
+								@Override
+								public void onRemoved(int position, int count){}
+
+								@Override
+								public void onMoved(int fromPosition, int toPosition){}
+
+								@Override
+								public void onChanged(int position, int count, @Nullable Object payload){}
+							});
+							diff.dispatchUpdatesTo(adapter);
+							if(!newReplyIDs.isEmpty()){
+								if(highlightAlphaAnimator!=null)
+									highlightAlphaAnimator.cancel();
+								if(!highlightDecorationAdded){
+									highlightDecorationAdded=true;
+									list.addItemDecoration(highlightDecoration, 0);
+								}
+								highlightAlpha=0.25f;
+								highlightAlphaAnimator=ObjectAnimator.ofFloat(null, newRepliesHighlightProperty, 0.25f, 0f);
+								highlightAlphaAnimator.setDuration(2000);
+								highlightAlphaAnimator.setStartDelay(500);
+								highlightAlphaAnimator.setInterpolator(CubicBezierInterpolator.DEFAULT);
+								highlightAlphaAnimator.addListener(new AnimatorListenerAdapter(){
+									@Override
+									public void onAnimationEnd(Animator animation){
+										highlightAlphaAnimator=null;
+										highlightDecorationAdded=false;
+										list.removeItemDecoration(highlightDecoration);
+									}
+								});
+								highlightAlphaAnimator.start();
+							}
+						}else{
+							list.scrollToPosition(displayItems.size()-count);
+						}
+						setRefreshEnabled(true);
+					}
+				})
+				.exec(accountID);
+	}
+
+	private void filterStatuses(List<Status> statuses){
+		AccountSessionManager.get(accountID).filterStatuses(statuses, FilterContext.THREAD);
+	}
+
+	@Override
+	protected void onShown(){
+		super.onShown();
+		if(!getArguments().getBoolean("noAutoLoad") && !loaded && !dataLoading){
+			dataLoading=true;
+			doLoadData();
+		}
+	}
+
+	@Override
+	public void onViewCreated(View view, Bundle savedInstanceState){
+		super.onViewCreated(view, savedInstanceState);
+		replyContainer=view.findViewById(R.id.reply_button_wrapper);
+		replyButton=replyContainer.findViewById(R.id.reply_button);
+		replyButtonText=replyButton.findViewById(R.id.reply_btn_text);
+		replyButtonAva=replyButton.findViewById(R.id.avatar);
+		replyButton.setOutlineProvider(OutlineProviders.roundedRect(20));
+		replyButton.setClipToOutline(true);
+		if(GlobalUserPreferences.customEmojiInNames){
+			SpannableStringBuilder ssb=new SpannableStringBuilder(getString(R.string.reply_to_user, "{name}"));
+			SpannableStringBuilder name=HtmlParser.parseCustomEmoji(mainStatus.account.displayName, mainStatus.account.emojis);
+			int index=ssb.toString().indexOf("{name}");
+			ssb.replace(index, index+6, name);
+			replyButtonText.setText(ssb);
+			UiUtils.loadCustomEmojiInTextView(replyButtonText);
+		}else{
+			replyButtonText.setText(getString(R.string.reply_to_user, mainStatus.account.displayName));
+		}
+		replyButtonAva.setOutlineProvider(OutlineProviders.OVAL);
+		replyButtonAva.setClipToOutline(true);
+		replyButton.setOnClickListener(v->openReply());
+		Account self=AccountSessionManager.get(accountID).self;
+		if(!TextUtils.isEmpty(self.avatar)){
+			ViewImageLoader.loadWithoutAnimation(replyButtonAva, getResources().getDrawable(R.drawable.image_placeholder, getActivity().getTheme()), new UrlImageLoaderRequest(self.avatar, V.dp(24), V.dp(24)));
+		}
+		UiUtils.loadCustomEmojiInTextView(toolbarTitleView);
+		showContent();
+		if(!loaded)
+			footerProgress.setVisibility(View.VISIBLE);
+
+		list.addItemDecoration(new ReplyLinesItemDecoration());
+	}
+
+	protected void onStatusCreated(Status status){
+		if(status.inReplyToId!=null && getStatusByID(status.inReplyToId)!=null){
+			onAppendItems(Collections.singletonList(status));
+			data.add(status);
+		}
+	}
+
+	@Override
+	public boolean isItemEnabled(StatusDisplayItem item){
+		return item.isQuote || !item.parentID.equals(mainStatus.id);
+	}
+
+	@Override
+	protected RecyclerView.Adapter getAdapter(){
+		MergeRecyclerAdapter a=new MergeRecyclerAdapter();
+		a.addAdapter(super.getAdapter());
+
+		endMark=new ImageView(getActivity());
+		endMark.setScaleType(ImageView.ScaleType.CENTER);
+		endMark.setImageTintList(ColorStateList.valueOf(UiUtils.getThemeColor(getActivity(), R.attr.colorM3OutlineVariant)));
+		endMark.setLayoutParams(new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, V.dp(25)));
+		endMark.setImageResource(R.drawable.thread_end_mark);
+		a.addAdapter(new SingleViewRecyclerAdapter(endMark));
+
+		return a;
+	}
+
+	@Override
+	protected boolean needDividerForExtraItem(View child, View bottomSibling, RecyclerView.ViewHolder holder, RecyclerView.ViewHolder siblingHolder){
+		return bottomSibling==endMark;
+	}
+
+	@Override
+	protected void onErrorRetryClick(){
+		if(preloadingFailed){
+			preloadingFailed=false;
+			V.setVisibilityAnimated(footerProgress, View.VISIBLE);
+			V.setVisibilityAnimated(footerError, View.GONE);
+			doLoadData();
+			return;
+		}
+		super.onErrorRetryClick();
+	}
+
+	@Override
+	public void onApplyWindowInsets(WindowInsets insets){
+		super.onApplyWindowInsets(UiUtils.applyBottomInsetToFixedView(replyContainer, insets));
+	}
+
+	@Override
+	public void onCreateOptionsMenu(Menu menu, MenuInflater inflater){
+		if(BuildConfig.DEBUG){
+			menu.add("Simulate new replies");
+		}
+	}
+
+	@Override
+	public boolean onOptionsItemSelected(MenuItem item){
+		if(BuildConfig.DEBUG){
+			ArrayList<Status> toRemove=new ArrayList<>();
+			Random r=ThreadLocalRandom.current();
+			for(Status s:data){
+				if(s!=mainStatus && r.nextBoolean())
+					toRemove.add(s);
+			}
+			for(Status s:toRemove)
+				removeStatus(s);
+			showMoreRepliesSnackbar();
+		}
+		return true;
+	}
+
+	private void openReply(){
+		maybeShowPreReplySheet(mainStatus, ()->{
+			Bundle args=new Bundle();
+			args.putString("account", accountID);
+			args.putParcelable("replyTo", Parcels.wrap(mainStatus));
+			args.putBoolean("fromThreadFragment", true);
+			Nav.go(getActivity(), ComposeFragment.class, args);
+		});
+	}
+
+	@Override
+	protected void drawDivider(View child, View bottomSibling, RecyclerView.ViewHolder holder, RecyclerView.ViewHolder siblingHolder, RecyclerView parent, Canvas c, Paint paint){
+		if(holder instanceof StatusDisplayItem.Holder<?> statusHolder && siblingHolder instanceof StatusDisplayItem.Holder<?> siblingStatusHolder){
+			Status siblingStatus=getStatusByID(siblingStatusHolder.getItemID());
+			if(siblingStatus==null)
+				return;
+			if(statusHolder.getItemID().equals(siblingStatus.inReplyToId) && siblingStatus!=mainStatus && !statusHolder.getItemID().equals(mainStatus.id))
+				return;
+		}
+		super.drawDivider(child, bottomSibling, holder, siblingHolder, parent, c, paint);
+	}
+
+	private Status findPreviousStatus(String id){
+		for(int i=0;i<data.size();i++){
+			if(data.get(i).id.equals(id))
+				return i>0 ? data.get(i-1) : null;
+		}
+		return null;
+	}
+
+	private Status findNextStatus(String id){
+		for(int i=0;i<data.size();i++){
+			if(data.get(i).id.equals(id))
+				return i<data.size()-1 ? data.get(i+1) : null;
+		}
+		return null;
+	}
+
+	@Override
+	public void onProvideAssistContent(AssistContent content){
+		content.setWebUri(Uri.parse(mainStatus.url));
+	}
+
+	@Override
+	public void navigateToStatus(Status status){
+		if(status.id.equals(mainStatus.id)){
+			shakeListView();
+			return;
+		}
+		super.navigateToStatus(status);
+	}
+
+	private void onAsyncRefreshFinished(AsyncRefresh ar){
+		asyncRefreshID=null;
+		if(getActivity()==null)
+			return;
+		contentView.removeCallbacks(asyncRefreshPartialRunnable);
+		if(ar.resultCount>prevNewRepliesCount){
+			showMoreRepliesSnackbar();
+		}else if(BuildConfig.DEBUG && ar.resultCount==0){
+			Toast.makeText(getActivity(), "Async refresh finished without any results", Toast.LENGTH_SHORT).show();
+		}
+	}
+
+	private void checkAsyncRefreshAndMaybeShowSnackbar(){
+		int results=AccountSessionManager.get(accountID).getApiController().getAsyncRefreshResultCount(asyncRefreshID);
+		if(results>0){
+			showMoreRepliesSnackbar();
+			prevNewRepliesCount=results;
+		}
+	}
+
+	private void showMoreRepliesSnackbar(){
+		if(moreRepliesSnackbar!=null || getActivity()==null)
+			return;
+		moreRepliesSnackbar=new Snackbar.Builder(getActivity())
+				.setText(R.string.more_replies_found)
+				.setAction(R.string.show, ()->{
+					moreRepliesSnackbar.dismiss();
+					refresh();
+				})
+				.setPersistent()
+				.create();
+		moreRepliesSnackbar.setDismissListener(()->moreRepliesSnackbar=null);
+		showSnackbar(moreRepliesSnackbar);
+	}
+
+	public void showSnackbar(Snackbar sb){
+		sb.showInView(contentWrap);
+	}
+
+	private class ReplyLinesItemDecoration extends RecyclerView.ItemDecoration{
+		private Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
+		private Rect tmpRect=new Rect();
+
+		@Override
+		public void onDraw(@NonNull Canvas c, @NonNull RecyclerView parent, @NonNull RecyclerView.State state){
+			String currentID=null;
+			boolean connectUp=false, connectToRoot=false, connectReply=false;
+			paint.setColor(UiUtils.getThemeColor(getActivity(), R.attr.colorM3OutlineVariant));
+			paint.setStyle(Paint.Style.STROKE);
+			paint.setStrokeWidth(V.dp(2));
+			paint.setStrokeCap(Paint.Cap.ROUND);
+			for(int i=0;i<parent.getChildCount();i++){
+				View child=parent.getChildAt(i);
+				if(!(parent.getChildViewHolder(child) instanceof StatusDisplayItem.Holder<?> holder) || holder.getItemID().equals(mainStatus.id))
+					continue;
+				String itemID=holder.getItemID();
+				if(!Objects.equals(currentID, itemID)){
+					currentID=itemID;
+					Status current=getStatusByID(currentID);
+					Status previous=findPreviousStatus(currentID);
+					Status next=findNextStatus(currentID);
+					if(current==null)
+						continue;
+
+					connectUp=previous!=null && previous.id.equals(current.inReplyToId);
+					connectToRoot=mainStatus.id.equals(current.inReplyToId);
+					connectReply=next!=null && itemID.equals(next.inReplyToId);
+				}
+
+				if(!connectUp && !connectToRoot && !connectReply)
+					continue;
+
+				float lineX=V.dp(36);
+				paint.setAlpha(Math.round(255*child.getAlpha()));
+				c.save();
+				parent.getDecoratedBoundsWithMargins(child, tmpRect);
+				int topMargin=child.getTop()-tmpRect.top;
+				int bottomMargin=tmpRect.bottom-child.getBottom();
+				float top=child.getY()-topMargin;
+				float bottom=child.getY()+child.getHeight()+bottomMargin;
+				c.clipRect(child.getX(), top, child.getX()+child.getWidth(), bottom);
+				if(holder instanceof HeaderStatusDisplayItem.Holder){
+					if(connectUp || connectToRoot){
+						c.drawLine(lineX, top-V.dp(2), lineX, top+V.dp(14), paint);
+					}
+					if(connectReply){
+						c.drawLine(lineX, top+V.dp(62), lineX, bottom+V.dp(2), paint);
+					}
+				}else if(connectReply){
+					c.drawLine(lineX, top, lineX, bottom, paint);
+				}
+				c.restore();
+			}
+		}
+	}
+
+	private class NewRepliesHighlightDecoration extends RecyclerView.ItemDecoration{
+		private final Paint paint=new Paint();
+
+		@Override
+		public void onDraw(@NonNull Canvas c, @NonNull RecyclerView parent, @NonNull RecyclerView.State state){
+			paint.setColor(UiUtils.getThemeColor(getActivity(), R.attr.colorM3Primary));
+			for(int i=0;i<parent.getChildCount();i++){
+				View child=parent.getChildAt(i);
+				if(!(parent.getChildViewHolder(child) instanceof StatusDisplayItem.Holder<?> holder))
+					continue;
+				String id=holder.getItemID();
+				if(newReplyIDs.contains(id)){
+					paint.setAlpha(Math.round(highlightAlpha*child.getAlpha()*255));
+					parent.getDecoratedBoundsWithMargins(child, tmpRect);
+					c.drawRect(tmpRect, paint);
+				}
+			}
+		}
+	}
+
+	// MOSHIDON:
+	@Override
+	protected FilterContext getFilterContext() {
+		return FilterContext.THREAD;
+	}
+
+	@Override
+	public Uri getWebUri(Uri.Builder base) {
+		return Uri.parse(mainStatus.url);
+	}
+}

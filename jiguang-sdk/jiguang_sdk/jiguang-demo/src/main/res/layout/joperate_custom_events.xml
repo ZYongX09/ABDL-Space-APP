@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@android:color/white">
+
+    <LinearLayout
+        android:layout_marginTop="16dp"
+        android:id="@+id/linearLayout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <ImageView
+            android:id="@+id/custom_image"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="16dp"
+            android:background="@mipmap/joperate_custom_logo" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="3dp"
+            android:text="自定义行为事件"
+            android:textColor="#ff253044"
+            android:textSize="16dp" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/linearLayout_all"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="16dp"
+        android:layout_marginTop="14dp"
+        android:layout_marginRight="16dp"
+        android:background="@drawable/joperate_custom_grid_background"
+        android:orientation="vertical"
+        android:paddingTop="16dp"
+        android:layout_below="@+id/linearLayout">
+
+       <include layout="@layout/joperate_custom_events_list"/>
+       <include layout="@layout/joperate_custom_events_list"/>
+<!--       <include layout="@layout/custom_events_empty"/>-->
+
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/linearLayout_bottom"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:gravity="center_horizontal"
+        android:paddingBottom="20dp"
+        android:layout_below="@+id/linearLayout_all">
+
+        <ImageView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:src="@mipmap/joperate_exclamation" />
+
+        <TextView
+            android:layout_width="332dp"
+            android:layout_height="34dp"
+            android:text="显示事件列表前8个自定义事件，点击上报相应事件至运营增长-调试数据"
+            android:textColor="#ff8d939d"
+            android:textSize="12dp" />
+    </LinearLayout>
+</RelativeLayout>

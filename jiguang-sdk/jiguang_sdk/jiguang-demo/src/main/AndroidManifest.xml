@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    package="cn.jiguang.demo">
+
+    <!--joperate_permission_start-->
+    <permission android:name="${applicationId}.permission.JOPERATE_MESSAGE" android:protectionLevel="signature"/>
+    <uses-permission android:name="${applicationId}.permission.JOPERATE_MESSAGE" />
+    <uses-permission android:name="android.permission.CAMERA"/>
+<!--    <uses-permission android:name="android.permission.FLASHLIGHT" />-->
+
+<!--    <uses-permission android:name="android.permission.READ_PHONE_STATE"/>-->
+<!--    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>-->
+<!--    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>-->
+<!--    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"/>-->
+<!--    <uses-permission android:name="android.permission.BLUETOOTH"/>-->
+    <!--joperate_permission_end-->
+
+    <uses-permission android:name="android.permission.GET_ACCOUNTS" />
+    <uses-permission android:name="android.permission.READ_PROFILE" />
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
+    <application
+        android:name=".App"
+        android:allowBackup="true"
+        android:hardwareAccelerated="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:requestLegacyExternalStorage="true"
+        android:supportsRtl="true"
+        android:theme="@style/AppTheme"
+        android:usesCleartextTraffic="true"
+        tools:ignore="GoogleAppIndexingWarning"
+        tools:replace="android:label">
+        <uses-library
+            android:name="org.apache.http.legacy"
+            android:required="false" />
+
+        <activity
+            android:name=".MainActivity"
+            android:screenOrientation="portrait"
+            android:theme="@style/AppTheme"
+            android:exported="false">
+        </activity>
+        <activity
+            android:name=".PrivacyActivity"
+            android:screenOrientation="portrait"
+            android:theme="@style/AppTheme"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!--(jpush|jad)_config_start，jpush和jad公用的组件-->
+        <!-- 可配置android:process参数将PushService放在其他进程中 -->
+        <!--User defined.  For test only 继承自cn.jpush.android.service.JCommonService-->
+        <service
+            android:name=".common.UserService"
+            android:process=":pushcore"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="cn.jiguang.user.service.action" />
+            </intent-filter>
+        </service>
+        <!--(jpush|jad)_config_end-->
+
+        <!--jpush_config_start-->
+        <!-- For test only JPush 测试的主程序-->
+        <activity
+            android:name=".jpush.PushActivity"
+            android:label="@string/app_name"
+            android:exported="false"/>
+        <!-- For test only 测试高级功能 -->
+        <activity
+            android:name=".jpush.AdvActivity"
+            android:configChanges="orientation|keyboardHidden" android:screenOrientation="portrait"
+            android:exported="false"/>
+
+        <!-- For test only 测试状态通知栏，需要打开的Activity -->
+        <activity android:name=".jpush.TestActivity" android:exported="false">
+            <intent-filter>
+                <action android:name="jpush.testAction" />
+                <category android:name="jpush.testCategory" />
+            </intent-filter>
+        </activity>
+
+        <!-- User defined.  For test only  用户自定义接收消息器,3.0.7开始支持,目前新tag/alias接口设置结果会在该广播接收器对应的方法中回调-->
+        <!--since 5.2.0 接收JPush相关事件-->
+        <receiver android:name=".jpush.PushMessageService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="cn.jpush.android.intent.SERVICE_MESSAGE" />
+                <category android:name="${applicationId}"></category>
+            </intent-filter>
+        </receiver>
+        <!-- 点击通知时，要打开的 activity -->
+        <activity
+            android:name=".jpush.OpenClickActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <action android:name="com.example.jpushdemo.OpenClickActivity" />
+            </intent-filter>
+        </activity>
+        <!-- since 3.3.0 Required SDK 核心功能-->
+
+        <!--jpush_config_end-->
+
+
+
+
+
+
+
+
+        <!--joperate_config_start-->
+        <activity android:name="cn.jiguang.demo.joperate.MainActivity">
+            <!-- 协议部分，随便设置 -->
+            <intent-filter>
+                <!--协议部分，随便设置-->
+                <data android:scheme="jg6aa46fed3b8f49a6d26ad1a1" />
+                <!--下面这几行也必须得设置-->
+                <category android:name="android.intent.category.DEFAULT"/>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+            </intent-filter>
+        </activity>
+
+        <activity android:name="cn.jiguang.demo.joperate.MyCaptureActivity"
+            android:screenOrientation="portrait">
+        </activity>
+        <!--joperate_config_end-->
+    </application>
+
+</manifest>

@@ -1,0 +1,568 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
+	<string name="log_in">Oanmelde</string>
+	<string name="next">Folgjende</string>
+	<string name="loading_instance">Serverynformaasje ophelje…</string>
+	<string name="error">Flater</string>
+	<string name="not_a_mastodon_instance">%s liket gjin ABDL Space-server te wêzen.</string>
+	<string name="ok">OK</string>
+	<string name="preparing_auth">Ferifikaasje tariede…</string>
+	<string name="finishing_auth">Ferifikaasje foltôgje…</string>
+	<string name="user_boosted">%s boostte</string>
+	<string name="in_reply_to">as reaksje op %s</string>
+	<string name="notifications">Meldingen</string>
+	<string name="user_followed_you">%s folget jo no</string>
+	<string name="user_sent_follow_request">%s wol jo graach folgje</string>
+	<string name="user_favorited">%s markearre as favoryt:</string>
+	<string name="notification_boosted">%s boostte:</string>
+	<string name="share_toot_title">Diele</string>
+	<string name="settings">Ynstellingen</string>
+	<string name="publish">Publisearje</string>
+	<string name="discard_draft">Konsept fuortsmite?</string>
+	<string name="discard">Fuortsmite</string>
+	<string name="cancel">Annulearje</string>
+	<plurals name="followers">
+		<item quantity="one">folger</item>
+		<item quantity="other">folgers</item>
+	</plurals>
+	<plurals name="following">
+		<item quantity="one">folgjend</item>
+		<item quantity="other">folgjend</item>
+	</plurals>
+	<string name="posts">Berjochten</string>
+	<string name="posts_and_replies">Berjochten en reaksjes</string>
+	<string name="media">Media</string>
+	<string name="profile_about">Oer</string>
+	<string name="button_follow">Folgje</string>
+	<string name="button_following">Folgjend</string>
+	<string name="edit_profile">Profyl bewurkje</string>
+	<string name="share_user">Profyl diele fia…</string>
+	<string name="mute_user">%s negearje</string>
+	<string name="unmute_user">%s net langer negearje</string>
+	<string name="block_user">%s blokkearje</string>
+	<string name="unblock_user">%s deblokkearje</string>
+	<string name="report_user">%s rapportearje</string>
+	<string name="block_domain">%s blokkearje</string>
+	<string name="unblock_domain">%s deblokkearje</string>
+	<plurals name="x_posts">
+		<item quantity="one">%,d berjocht</item>
+		<item quantity="other">%,d berjochten</item>
+	</plurals>
+	<string name="profile_joined">Registrearre</string>
+	<string name="done">Klear</string>
+	<string name="loading">Lade…</string>
+	<string name="field_label">Label</string>
+	<string name="field_content">Ynhâld</string>
+	<string name="saving">Bewarje…</string>
+	<string name="post_from_user">Berjocht fan %s</string>
+	<string name="poll_option_hint">Opsje %d</string>
+	<plurals name="x_minutes">
+		<item quantity="one">%d minút</item>
+		<item quantity="other">%d minuten</item>
+	</plurals>
+	<plurals name="x_hours">
+		<item quantity="one">%d oere</item>
+		<item quantity="other">%d oeren</item>
+	</plurals>
+	<plurals name="x_days">
+		<item quantity="one">%d dei</item>
+		<item quantity="other">%d dagen</item>
+	</plurals>
+	<plurals name="x_seconds_left">
+		<item quantity="one">%d sekonde restearjend</item>
+		<item quantity="other">%d sekonden restearjend</item>
+	</plurals>
+	<plurals name="x_minutes_left">
+		<item quantity="one">%d minút restearjend</item>
+		<item quantity="other">%d minuten restearjend</item>
+	</plurals>
+	<plurals name="x_hours_left">
+		<item quantity="one">%d oere restearjend</item>
+		<item quantity="other">%d oeren restearjend</item>
+	</plurals>
+	<plurals name="x_days_left">
+		<item quantity="one">%d dei restearjend</item>
+		<item quantity="other">%d dagen restearjend</item>
+	</plurals>
+	<plurals name="x_votes">
+		<item quantity="one">%,d stim</item>
+		<item quantity="other">%,d stimmen</item>
+	</plurals>
+	<string name="poll_closed">Sluten</string>
+	<string name="do_mute">Negearje</string>
+	<string name="do_block">Blokkearje</string>
+	<string name="button_blocked">Blokkearre</string>
+	<string name="action_vote">Stimme</string>
+	<string name="confirm">Befêstigje</string>
+	<string name="delete">Fuortsmite</string>
+	<string name="confirm_delete_title">Berjocht fuortsmite</string>
+	<string name="confirm_delete">Binne jo wis dat jo dit berjocht fuortsmite wolle?</string>
+	<string name="deleting">Fuortsmite…</string>
+	<string name="notification_channel_audio_player">Lûd ôfspylje</string>
+	<string name="play">Ofspylje</string>
+	<string name="pause">Skoft</string>
+	<string name="log_out">Ofmelde</string>
+	<string name="add_account">Account tafoegje</string>
+	<string name="search_hint">Sykje</string>
+	<string name="hashtags">Hashtags</string>
+	<string name="news">Nijs</string>
+	<string name="for_you">Foar jo</string>
+	<string name="all_notifications">Alles</string>
+	<string name="mentions">Fermeldingen</string>
+	<plurals name="x_people_talking">
+		<item quantity="one">%d persoan praat hjiroer</item>
+		<item quantity="other">%d persoanen prate hjiroer</item>
+	</plurals>
+	<string name="report_title">%s rapportearje</string>
+	<string name="report_choose_reason">Wat is der mis mei dit berjocht?</string>
+	<string name="report_choose_reason_account">Wat is der mis mei %s?</string>
+	<string name="report_choose_reason_subtitle">Kies wat it bêste past</string>
+	<string name="report_reason_personal">Ik fyn der neat oan</string>
+	<string name="report_reason_personal_subtitle">It is net eat wat jo sjen wolle</string>
+	<string name="report_reason_spam">It is spam</string>
+	<string name="report_reason_spam_subtitle">Skeadlike keppelingen, reklame, mislieding of werheljende antwurden</string>
+	<string name="report_reason_violation">It skeint de serverregels</string>
+	<string name="report_reason_violation_subtitle">Jo witte dat it spesifike regels skeint</string>
+	<string name="report_reason_other">It is wat oars</string>
+	<string name="report_reason_other_subtitle">It probleem stiet der net tusken</string>
+	<string name="report_choose_rule">Hokker regels wurde skeind?</string>
+	<string name="report_choose_rule_subtitle">Selektearje wat fan tapassing is</string>
+	<string name="report_choose_posts">Binne der berjochten dy’t dizze rapportaazje stypje?</string>
+	<string name="report_choose_posts_subtitle">Selektearje wat fan tapassing is</string>
+	<string name="report_comment_title">Tinke jo dat wy noch mear witte moatte?</string>
+	<string name="report_comment_hint">Type or paste additional comments</string>
+	<string name="sending_report">Rapport ferstjoere…</string>
+	<string name="report_sent_title">Tank foar it rapportearjen, wy sille der nei sjen.</string>
+	<string name="report_sent_subtitle">Wylst wy dit beoardiele, kinne jo dizze aksjes tsjin %s nimme:</string>
+	<string name="unfollow_user">%s ûntfolgje</string>
+	<string name="unfollow">Untfolgje</string>
+	<string name="mute_user_explain">Jo kinne harren berjochten net sjen. Jo kinne noch wol folge wurde en jo berjochten binne noch sichtber, mar dyjinge kin net sjen dat dy negearre wurdt.</string>
+	<string name="block_user_explain">Jo sille harren berjochten net sjen kinne. Se sille jo berjochten net sjen kinne en jo net folgje kinne. Se sille wol sjen kinne dat se blokkearre binne.</string>
+	<string name="report_personal_title">Wolle jo dit net sjen?</string>
+	<string name="report_personal_subtitle">Hjir binne jo opsjes wêrmei’t jo bepale kinne wat jo yn ABDL Space sjen wolle:</string>
+	<string name="back">Tebek</string>
+	<string name="search_communities">Servernamme of URL</string>
+	<string name="instance_rules_title">Serverrigels</string>
+	<string name="instance_rules_subtitle">Troch fierder te gean geane jo akkoard mei it folgjen fan de rigels, dy’t troch de moderatoaren fan %s hantearre wurde.</string>
+	<string name="signup_title">Account registrearje</string>
+	<string name="display_name">Namme</string>
+	<string name="username">Brûkersnamme</string>
+	<string name="email">E-mailadres</string>
+	<string name="password">Wachtwurd</string>
+	<string name="confirm_password">Wachtwurd befêstigje</string>
+	<string name="category_general">Algemien</string>
+	<string name="confirm_email_title">Kontrolearje jo Postfek YN</string>
+	<!-- %s is the email address -->
+	<string name="confirm_email_subtitle">Klik op de keppeling dy’t wy jo stjoerd hawwe om %s te ferifiearjen. Wy wachtsje wol even.</string>
+	<string name="confirm_email_didnt_get">Gjin keppeling krigen?</string>
+	<string name="resend">Opnij ferstjoere</string>
+	<string name="open_email_app">E-mail-app iepenje</string>
+	<string name="resent_email">Befêstigings-e-mailberjocht ferstjoerd</string>
+	<string name="compose_hint">Wat wolle jo fertelle</string>
+	<string name="content_warning">Ynhâldswarskôging</string>
+	<string name="save">Bewarje</string>
+	<string name="add_alt_text">Alt-tekst tafoegje</string>
+	<string name="visibility_public">Iepenbier</string>
+	<string name="visibility_followers_only">Folgers</string>
+	<string name="recent_searches">Resint socht</string>
+	<string name="notification_type_follow">Nije folgers</string>
+	<string name="notification_type_favorite">Favoriten</string>
+	<string name="notification_type_reblog">Boosts</string>
+	<string name="notification_type_mention">Fermeldingen</string>
+	<string name="notification_type_poll">Peilingen</string>
+	<string name="choose_account">Account kieze</string>
+	<string name="err_not_logged_in">Earst op ABDL Space oanmelde</string>
+	<plurals name="cant_add_more_than_x_attachments">
+		<item quantity="one">Jo kinne net mear as %d mediabestân tafoegje</item>
+		<item quantity="other">Jo kinne net mear as %d mediabestannen tafoegje</item>
+	</plurals>
+	<string name="media_attachment_unsupported_type">It bestân %s wurdt net stipe</string>
+	<string name="media_attachment_too_big">It bestân %1$s is grutter as de maksimale grutte fan %2$s MB</string>
+	<string name="settings_theme">Werjefte</string>
+	<string name="theme_auto">Systeemstandert</string>
+	<string name="theme_light">Ljocht</string>
+	<string name="theme_dark">Donker</string>
+	<string name="settings_behavior">Gedrach</string>
+	<string name="settings_gif">Animearre profylfoto’s en emoji ôfspylje</string>
+	<string name="settings_custom_tabs">Keppelingen iepenje yn</string>
+	<string name="settings_notifications">Meldingen</string>
+	<string name="settings_contribute">Draach by oan ABDL Space</string>
+	<string name="settings_tos">Tsjinstbetingsten</string>
+	<string name="settings_privacy_policy">Privacybelied</string>
+	<string name="settings_clear_cache">Mediabuffer leechmeitsje</string>
+	<string name="settings_app_version">ABDL Space foar Android v%1$s (%2$d)</string>
+	<string name="media_cache_cleared">Mediabuffer leechmakke</string>
+	<string name="confirm_log_out">Ofmelde fan %s?</string>
+	<string name="sensitive_content_explain">De brûker hat dizze media as gefoelich markearre.</string>
+	<string name="avatar_description">Gean nei it profyl fan %s</string>
+	<string name="more_options">Mear opsjes</string>
+	<string name="new_post">Nij berjocht</string>
+	<string name="button_reply">Beäntwurdzje</string>
+	<string name="button_reblog">Booste</string>
+	<string name="button_favorite">Favoryt meitsje</string>
+	<string name="button_share">Diele</string>
+	<string name="media_no_description">Media sûnder beskriuwing</string>
+	<string name="add_media">Media tafoegje</string>
+	<string name="add_poll">Poll tafoegje</string>
+	<string name="emoji">Emoji</string>
+	<string name="home_timeline">Starttiidline</string>
+	<string name="my_profile">Myn profyl</string>
+	<string name="media_viewer">Mediaviewer</string>
+	<string name="follow_user">%s folgje</string>
+	<string name="unfollowed_user">%s ûntfolgje</string>
+	<string name="followed_user">Jo folgje %s no</string>
+	<string name="following_user_requested">Jo folchfersyk is oan %s ferstjoerd</string>
+	<string name="open_in_browser">Yn browser iepenje</string>
+	<string name="hide_boosts_from_user">Boosts ferstopje</string>
+	<string name="show_boosts_from_user">Boosts toane</string>
+	<string name="signup_reason">Wêrom wolle jo jo hjir registrearje?</string>
+	<string name="signup_reason_note">Dit helpt ús om jo oanfraach te beoardielen.</string>
+	<string name="clear">Wiskje</string>
+	<string name="profile_header">Omslachfoto</string>
+	<string name="profile_picture">Profylfoto</string>
+	<string name="reorder">Opnij sortearje</string>
+	<string name="download">Downloade</string>
+	<string name="permission_required">Tastimming fereaske</string>
+	<string name="storage_permission_to_download">De app hat tagong ta jo ûnthâld nedich om dit bestân te bewarjen.</string>
+	<string name="open_settings">Ynstellingen iepenje</string>
+	<string name="error_saving_file">Flater by it bewarjen fan it bestân</string>
+	<string name="downloading">Downloade…</string>
+	<string name="no_app_to_handle_action">Koe gjin app fine om dizze aksje út te fieren</string>
+	<string name="local_timeline">Livefeed</string>
+	<string name="trending_posts_info_banner">Dit binne berjochten dy’t populêr binne op ABDL Space.</string>
+	<string name="trending_links_info_banner">Dit is it nijs wêroer op ABDL Space sprutsen wurdt.</string>
+	<!-- %s is the server domain -->
+	<string name="local_timeline_info_banner">Dit binne alle berjochten fan alle brûkers op jo server (%s).</string>
+	<string name="recommended_accounts_info_banner">Mooglik fine jo dizze accounts aardich op basis fan oare accounts dy’t jo folgje.</string>
+	<string name="see_new_posts">Nije berjochten</string>
+	<string name="follow_back">Weromfolgje</string>
+	<string name="button_follow_pending">Yn ôfwachting</string>
+	<string name="follows_you">Folget jo</string>
+	<string name="manually_approves_followers">Hânmjittich folgers goedkarre</string>
+	<!-- translators: %,d is a valid placeholder, it formats the number with locale-dependent grouping separators -->
+	<plurals name="x_followers">
+		<item quantity="one">%,d folger</item>
+		<item quantity="other">%,d folgers</item>
+	</plurals>
+	<plurals name="x_following">
+		<item quantity="one">%,d folgjend</item>
+		<item quantity="other">%,d folgjend</item>
+	</plurals>
+	<plurals name="x_favorites">
+		<item quantity="one">%,d favoryt</item>
+		<item quantity="other">%,d favoriten</item>
+	</plurals>
+	<plurals name="x_reblogs">
+		<item quantity="one">%,d boost</item>
+		<item quantity="other">%,d boosts</item>
+	</plurals>
+	<string name="time_now">no</string>
+	<string name="edit_history">Bewurkingsskiednis</string>
+	<string name="last_edit_at_x">Lêst bywurke op %s</string>
+	<string name="time_just_now">sakrekt</string>
+	<plurals name="x_seconds_ago">
+		<item quantity="one">%d sekonde lyn</item>
+		<item quantity="other">%d sekonden lyn</item>
+	</plurals>
+	<plurals name="x_minutes_ago">
+		<item quantity="one">%d minút lyn</item>
+		<item quantity="other">%d minuten lyn</item>
+	</plurals>
+	<string name="edited_timestamp">bewurke op %s</string>
+	<string name="edit_original_post">Oarspronklik berjocht</string>
+	<string name="edit_text_edited">Tekst bewurke</string>
+	<string name="edit_spoiler_added">Ynhâldswarskôging tafoege</string>
+	<string name="edit_spoiler_edited">Ynhâldswarskôging bewurke</string>
+	<string name="edit_spoiler_removed">Ynhâldswarskôging fuortsmiten</string>
+	<string name="edit_poll_added">Peiling tafoege</string>
+	<string name="edit_poll_edited">Peiling bewurke</string>
+	<string name="edit_poll_removed">Peiling fuortsmiten</string>
+	<string name="edit_media_added">Media tafoege</string>
+	<string name="edit_media_removed">Media fuortsmiten</string>
+	<string name="edit_media_reordered">Media sortearre</string>
+	<string name="edit_marked_sensitive">As gefoelich markearre</string>
+	<string name="edit_marked_not_sensitive">Net as gefoelich markearre</string>
+	<string name="edit_multiple_changed">Berjocht bewurke</string>
+	<string name="edit">Bewurkje</string>
+	<string name="discard_changes">Wizigingen ferwerpe?</string>
+	<string name="upload_failed">Opladen mislearre</string>
+	<string name="file_size_bytes">%d bytes</string>
+	<string name="file_size_kb">%.2f KB</string>
+	<string name="file_size_mb">%.2f MB</string>
+	<string name="file_size_gb">%.2f GB</string>
+	<string name="upload_processing">Dwaande…</string>
+	<!-- %s is file size -->
+	<string name="download_update">Downloade (%s)</string>
+	<string name="install_update">Ynstallearje</string>
+	<string name="privacy_policy_title">Jo privacy</string>
+	<string name="privacy_policy_subtitle">Hoewol de ABDL Space-app gjin gegevens sammelet, kin de server dêr’t jo jo oanmelde in oar belied hawwe.\n\nAs jo net akkoard gean mei it belied foar %s, kinne jo weromgean en in oare server kieze.</string>
+	<string name="i_agree">Ik gean akkoard</string>
+	<string name="empty_list">Dizze list is leech</string>
+	<string name="instance_signup_closed">Dizze server akseptearret gjin nije registraasjes.</string>
+	<string name="text_copied">Nei klamboerd kopiearre</string>
+	<string name="add_bookmark">Blêdwizer tafoegje</string>
+	<string name="remove_bookmark">Blêdwizer fuortsmite</string>
+	<string name="bookmarks">Blêdwizers</string>
+	<string name="your_favorites">Favoriten</string>
+	<string name="login_title">Wolkom werom</string>
+	<string name="login_subtitle">Oanmelde by de server dêr’t jo jo account oanmakke hawwe.</string>
+	<string name="server_url">Server-URL</string>
+	<string name="server_filter_any_language">Elke taal</string>
+	<string name="server_filter_instant_signup">Daliks registrearje</string>
+	<string name="server_filter_manual_review">Hânmjittige beoardieling nedich</string>
+	<string name="server_filter_any_signup_speed">Elke registraasjesnelheid</string>
+	<string name="server_filter_region_europe">Europa</string>
+	<string name="server_filter_region_north_america">Noard-Amearika</string>
+	<string name="server_filter_region_south_america">Súd-Amearika</string>
+	<string name="server_filter_region_africa">Afrika</string>
+	<string name="server_filter_region_asia">Azië</string>
+	<string name="server_filter_region_oceania">Oseanië</string>
+	<string name="not_accepting_new_members">Lit gjin nije brûkers ta</string>
+	<string name="category_special_interests">Spesjale ynteressen</string>
+	<string name="signup_passwords_dont_match">Wachtwurden binne net lyk</string>
+	<string name="profile_add_row">Rige tafoegje</string>
+	<string name="profile_setup">Profyl ynstelle</string>
+	<string name="profile_setup_subtitle">Jo kinne dit letter altyd oanfolje op it ljepblêd Profyl.</string>
+	<string name="follow_all">Allen folgje</string>
+	<string name="server_rules_disagree">Ik gean net akkoard</string>
+	<string name="privacy_policy_explanation">TL;DR: Wy sammelje of ferwurkje neat.</string>
+	<!-- %s is server domain -->
+	<string name="server_policy_disagree">Net akkoard mei %s</string>
+	<string name="profile_bio">Biografy</string>
+	<!-- Shown in a progress dialog when you tap "follow all" -->
+	<string name="sending_follows">Folge brûkers…</string>
+	<!-- %1$s is server domain, %2$s is email domain. You can reorder these placeholders to fit your language better. -->
+	<string name="signup_email_domain_blocked">%1$s stiet gjin registraasjes ta fan %2$s. Probearje it mei in oare e-mailprovider of &lt;a&gt;kies in oare server&lt;/a&gt;.</string>
+	<string name="spoiler_show">Dochs toane</string>
+	<string name="spoiler_hide">Opnij ferstopje</string>
+	<string name="poll_multiple_choice">Meitsje ien of mear karren</string>
+	<string name="save_changes">Wizigingen bewarje</string>
+	<string name="profile_featured">Oanrekommandearre</string>
+	<string name="profile_timeline">Tiidline</string>
+	<string name="view_all">Alles werjaan</string>
+	<string name="profile_endorsed_accounts">Accounts</string>
+	<string name="verified_link">Ferifiearre keppeling</string>
+	<string name="show">Toane</string>
+	<string name="hide">Ferstopje</string>
+	<string name="join_default_server">Registrearje op %s</string>
+	<string name="pick_server">Kies in oare server</string>
+	<string name="signup_or_login">of</string>
+	<string name="learn_more">Mear ynfo</string>
+	<string name="welcome_to_mastodon">Wolkom by ABDL Space</string>
+	<string name="welcome_paragraph1">ABDL Space is in desintralisearre sosjaal netwurk, wat betsjut dat gjin inkeld bedriuw it kontrolearret. It bestiet út in protte ûnôfhinklik operearjende servers, allegearre mei inoar ferbûn.</string>
+	<string name="what_are_servers">Wat binne servers?</string>
+	<string name="welcome_paragraph2">Elk ABDL Space-account wurdt host op in server – elk mei harren eigen wearden, rigels en behearders. It makket net út hokker server jo kieze, jo kinne minsken op elke server folgje en dêrmei kommunisearje.</string>
+	<string name="opening_link">Keppeling iepenje…</string>
+	<string name="link_not_supported">Dizze keppeling wurdt troch de app stipe</string>
+	<string name="log_out_all_accounts">By alle accounts ôfmelde</string>
+	<string name="confirm_log_out_all_accounts">By alle accounts ôfmelde?</string>
+	<string name="retry">Opnij probearje</string>
+	<string name="post_failed">Kin berjocht net ferstjoere</string>
+	<!-- %s is formatted file size ("467 KB image") -->
+	<string name="attachment_description_image">%s ôfbylding</string>
+	<string name="attachment_description_video">%s fideo</string>
+	<string name="attachment_description_audio">%s lûdsbestân</string>
+	<string name="attachment_description_unknown">%s bestân</string>
+	<string name="attachment_type_image">Ofbylding</string>
+	<string name="attachment_type_video">Fideo</string>
+	<string name="attachment_type_audio">Audio</string>
+	<string name="attachment_type_gif">GIF</string>
+	<string name="attachment_type_unknown">Bestân</string>
+	<string name="attachment_x_percent_uploaded">%d%% oplaad</string>
+	<string name="add_poll_option">Opsje tafoegje</string>
+	<string name="poll_length">Tiid</string>
+	<string name="poll_style">Styl</string>
+	<string name="compose_poll_single_choice">Kies ien</string>
+	<string name="compose_poll_multiple_choice">Mearkar</string>
+	<string name="delete_poll_option">Opsje fuortsmite</string>
+	<string name="poll_style_title">Pollstyl</string>
+	<string name="alt_text">Alternative tekst</string>
+	<string name="help">Help</string>
+	<string name="what_is_alt_text">Wat is alternative tekst?</string>
+	<string name="alt_text_help">Alt-tekst biedt ôfbyldingsbeskriuwingen foar minsken mei in fisuele beheining en ferbiningen mei in lege bânbreedte of foar minsken dy’t nei ekstra kontekst sykje.\n\nJo kinne de tagonklikheid en de begryplikheid foar elkenien ferbetterje troch dúdlik, koart en objektyf te skriuwen.\n\n<ul><li>Beskriuw wichtige eleminten</li>\n<li>Fetsje tekst yn ôfbyldingen gear</li>\n<li>Brûk in normale sinsbou</li>\n<li>Mij oertallige ynformaasje</li>\n<li>Fokusje op trends en wichtige befiningen yn komplekse bylden (lykas diagrammen of kaarten)</li></ul> \n</string>
+	<string name="edit_post">Berjocht bewurkje</string>
+	<string name="no_verified_link">Gjin ferifiearre keppeling</string>
+	<string name="compose_autocomplete_emoji_empty">Emoji trochsykje</string>
+	<string name="compose_autocomplete_users_empty">Fyn wa’t jo sykje</string>
+	<string name="no_search_results">Dizze syktermen leverje gjin resultaat op</string>
+	<string name="language">Taal</string>
+	<string name="language_default">Standert</string>
+	<string name="language_system">Systeem</string>
+	<string name="language_detecting">Taal detektearje</string>
+	<string name="language_cant_detect">Kin taal net detektearje</string>
+	<string name="language_detected">Detektearre</string>
+	<string name="media_hidden">Media ferstoppe</string>
+	<string name="post_hidden">Berjocht ferstoppe</string>
+	<string name="report_title_post">Berjocht rapportearje</string>
+	<string name="forward_report_explanation">De account stiet op in oare server. Wolle jo dêr ek in anonimisearre kopy fan dit rapport nei ta stjoere?</string>
+	<!-- %s is the server domain -->
+	<string name="forward_report_to_server">Nei %s trochstjoere</string>
+	<!-- Shown on the "stamp" on the screen that appears after you report a post/user. Please keep the translation short, preferably a single word -->
+	<string name="reported">Rapportearre</string>
+	<string name="report_unfollow_explanation">As jo harren berjochten net mear op jo starttiidline sjen wolle, moatte jo dizze persoan net mear folgje.</string>
+	<string name="muted_user">%s negearje</string>
+	<string name="report_sent_already_blocked">Jo hawwe dizze brûker al blokkearre, dus jo hoege neat mear te dwaan wylst wy jo rapport beoardiele.</string>
+	<string name="report_personal_already_blocked">Jo hawwe dizze brûker al blokkearre, dus der is neat oars dat jo hoege te dwaan.\n\nTank foar jo help om ABDL Space foar elkenien feilich te hâlden!</string>
+	<string name="blocked_user">%s blokkearre</string>
+	<string name="mark_all_notifications_read">Alles as lêzen markearje</string>
+	<string name="settings_display">Werjefte</string>
+	<string name="settings_filters">Filters</string>
+	<string name="settings_server_explanation">Oersjoch, rigels, moderators</string>
+	<!-- %s is the app name (ABDL Space, key app_name). I made it a placeholder so everything Just Works™ with forks -->
+	<string name="about_app">Oer %s</string>
+	<string name="settings_alt_text_reminders">Alt-tekst-omtinken tafoegje</string>
+	<string name="settings_confirm_unfollow">Eardat jo ien ûntfolgje om befêstiging freegje</string>
+	<string name="settings_confirm_boost">Eardat jo in berjocht booste om befêstiging freegje</string>
+	<string name="settings_confirm_delete_post">Eardat jo in berjocht fuortsmite om befêstiging freegje</string>
+	<string name="pause_all_notifications">Alles pauzearje</string>
+	<string name="pause_notifications_off">Ut</string>
+	<string name="notifications_policy_anyone">Elkenien</string>
+	<string name="notifications_policy_followed">Minsken dy’t jo folgje</string>
+	<string name="notifications_policy_follower">Minsken dy’t josels folgje</string>
+	<string name="notifications_policy_no_one">Net ien</string>
+	<string name="settings_notifications_policy">Meldingen ûntfange fan</string>
+	<string name="notification_type_mentions_and_replies">Fermeldingen en reaksjes</string>
+	<string name="pause_all_notifications_title">Alle meldingen pauzearje</string>
+	<plurals name="x_weeks">
+		<item quantity="one">%d wike</item>
+		<item quantity="other">%d wiken</item>
+	</plurals>
+	<!-- %1$s is the date (may be relative, e.g. "today" or "yesterday"), %2$s is the time. You can reorder these placeholders if that works better for your language -->
+	<string name="date_at_time">%1$s om %2$s</string>
+	<string name="today">hjoed</string>
+	<string name="yesterday">juster</string>
+	<string name="tomorrow">moarn</string>
+	<!-- %s is the timestamp ("tomorrow at 12:34") -->
+	<string name="pause_notifications_ends">Einiget om %s</string>
+	<!-- %s is the timestamp ("tomorrow at 12:34") -->
+	<string name="pause_notifications_banner">Meldingen wurde om %s ferfette.</string>
+	<string name="resume_notifications_now">No ferfetsje</string>
+	<string name="open_system_notification_settings">Gean nei meldingsynstellingen</string>
+	<string name="about_server">Oer</string>
+	<string name="server_rules">Regels</string>
+	<string name="server_administrator">Behearder</string>
+	<string name="send_email_to_server_admin">Berjocht oan behearder</string>
+	<string name="notifications_disabled_in_system">Meldingen yn jo apparaatynstellingen ynskeakelje om oeral fernijingen sjen te kinnen.</string>
+	<string name="settings_even_more">Noch mear ynstellingen</string>
+	<string name="settings_show_cws">Ynhâldswarskôgingen toane</string>
+	<string name="settings_hide_sensitive_media">As gefoelich markearre media ferstopje</string>
+	<string name="settings_show_interaction_counts">Oantal berjochtynteraksjes</string>
+	<string name="settings_show_emoji_in_names">Oanpaste emoji yn werjeftenammen</string>
+	<plurals name="in_x_seconds">
+		<item quantity="one">yn %d sekonde</item>
+		<item quantity="other">yn %d sekonden</item>
+	</plurals>
+	<plurals name="in_x_minutes">
+		<item quantity="one">yn %d minút</item>
+		<item quantity="other">yn %d minuten</item>
+	</plurals>
+	<plurals name="in_x_hours">
+		<item quantity="one">yn %d oere</item>
+		<item quantity="other">yn %d oeren</item>
+	</plurals>
+	<plurals name="x_hours_ago">
+		<item quantity="one">%d oere lyn</item>
+		<item quantity="other">%d oeren lyn</item>
+	</plurals>
+	<string name="alt_text_reminder_title">Media sûnder alt-tekst</string>
+	<plurals name="alt_text_reminder_x_images">
+		<item quantity="one">%s fan jo ôfbyldingen mist alt-tekst. Dochs pleatse?</item>
+		<item quantity="other">%s fan jo ôfbyldingen misse alt-tekst. Dochs pleatse?</item>
+	</plurals>
+	<plurals name="alt_text_reminder_x_attachments">
+		<item quantity="one">%s fan jo mediabylagen mist alt-tekst. Dochs pleatse?</item>
+		<item quantity="other">%s fan jo mediabylagen misse alt-tekst. Dochs pleatse?</item>
+	</plurals>
+	<string name="count_one">Ien</string>
+	<string name="count_two">Twa</string>
+	<string name="count_three">Trije</string>
+	<string name="count_four">Fjouwer</string>
+	<string name="alt_text_reminder_post_anyway">Ferstjoere</string>
+	<!-- %s is the username -->
+	<string name="unfollow_confirmation">%s ûntfolgje?</string>
+	<string name="filter_active">Aktyf</string>
+	<string name="filter_inactive">Ynaktyf</string>
+	<string name="settings_add_filter">Filter tafoegje</string>
+	<string name="settings_edit_filter">Filter bewurkje</string>
+	<string name="settings_filter_duration">Doer</string>
+	<string name="settings_filter_muted_words">Negearre wurden</string>
+	<string name="settings_filter_context">Negearre op</string>
+	<string name="settings_filter_show_cw">Mei ynhâldswarskôging toane</string>
+	<string name="settings_filter_show_cw_explanation">Berjochten dy’t mei dit filter oerienkomme, mar efter in ynhâldswarskôging sitte dochs toane</string>
+	<string name="settings_delete_filter">Filter fuortsmite</string>
+	<string name="filter_duration_forever">Foar altyd</string>
+	<!-- %s is the timestamp ("tomorrow at 12:34") -->
+	<string name="settings_filter_ends">Einiget %s</string>
+	<plurals name="settings_x_muted_words">
+		<item quantity="one">%d negearre wurd of sin</item>
+		<item quantity="other">%d negearre wurden of sinnen</item>
+	</plurals>
+	<string name="selection_2_options">%1$s en %2$s</string>
+	<string name="selection_3_options">%1$s, %2$s en %3$s</string>
+	<string name="selection_4_or_more">%1$s, %2$s en %3$d mear</string>
+	<string name="filter_context_home_lists">Starttiidline en listen</string>
+	<string name="filter_context_notifications">Meldingen</string>
+	<string name="filter_context_public_timelines">Iepenbiere tiidlinen</string>
+	<string name="filter_context_threads_replies">Petearen en reaksjes</string>
+	<string name="filter_context_profiles">Profilen</string>
+	<string name="settings_filter_title">Titel</string>
+	<string name="settings_delete_filter_title">Filter ‘%s’ fuortsmite?</string>
+	<string name="settings_delete_filter_confirmation">Dit filter wurdt op al jo apparaten út jo account fuortsmiten.</string>
+	<string name="add_muted_word">Negearre wurd tafoegje</string>
+	<string name="edit_muted_word">Negearre wurd bewurkje</string>
+	<string name="add">Tafoegje</string>
+	<string name="filter_word_or_phrase">Wurd of sindiel</string>
+	<string name="filter_add_word_help">Wurden binne net haadlettergefoelich en komme allinnich oerien mei folsleine wurden.\n\nWannear’t jo op de term ‘Appel’ filterje, wurde berjochten dy’t ‘appel’ of ‘aPpEl’ befetsje ferstoppe, mar ‘sinaasappel’ net.</string>
+	<string name="settings_delete_filter_word">‘%s’ fuortsmite?</string>
+	<string name="enter_selection_mode">Selektearje</string>
+	<string name="select_all">Alles selektearje</string>
+	<string name="settings_filter_duration_title">Tiidsdoer filter</string>
+	<string name="filter_duration_custom">Oanpast</string>
+	<plurals name="settings_delete_x_filter_words">
+		<item quantity="one">%d wurd fuortsmite?</item>
+		<item quantity="other">%d wurden fuortsmite?</item>
+	</plurals>
+	<plurals name="x_items_selected">
+		<item quantity="one">%d selektearre</item>
+		<item quantity="other">%d selektearre</item>
+	</plurals>
+	<string name="required_form_field_blank">Mei net leech wêze</string>
+	<string name="filter_word_already_in_list">Al yn de list</string>
+	<string name="app_update_ready">App-fernijing foltôge</string>
+	<string name="app_update_version">Ferzje %s</string>
+	<string name="downloading_update">Downloade (%d%%)</string>
+	<!-- Shown like a content warning, %s is the name of the filter -->
+	<string name="post_matches_filter_x">Komt oerien mei filter ‘%s’</string>
+	<string name="search_mastodon">ABDL Space trochsykje</string>
+	<string name="clear_all">Alles wiskje</string>
+	<string name="search_open_url">URL yn ABDL Space iepenje</string>
+	<string name="posts_matching_hashtag">Berjochten mei ‘%s’</string>
+	<string name="search_go_to_account">Gean nei %s</string>
+	<string name="posts_matching_string">Berjochten mei ‘%s’</string>
+	<string name="accounts_matching_string">Persoanen mei ‘%s’</string>
+	<!-- Shown in the post header. Please keep it short -->
+	<string name="time_seconds_ago_short">%ds lyn</string>
+	<string name="time_minutes_ago_short">%dm lyn</string>
+	<string name="time_hours_ago_short">%dh lyn</string>
+	<string name="time_days_ago_short">%dd lyn</string>
+	<!-- %s is the name of the post language -->
+	<string name="translate_post">Fan it %s út oersette</string>
+	<!-- %1$s is the language, %2$s is the name of the translation service -->
+	<string name="post_translated">Fan it %1$s út oersetten mei %2$s</string>
+	<string name="translation_show_original">Orizjineel besjen</string>
+	<!-- Screen reader description for the menu on the home timeline screen -->
+	<!-- %s is the name of the list -->
+	<!-- %s is a username -->
+	<!-- %s is a time interval ("5 months") -->
+	<!-- Shown on a button that saves a file, after it was successfully saved -->
+	<!-- %s is the username -->
+	<!-- %1$s is your server domain, %2$s is the domain that was blocked, %3$,d is the follower count, %4$s is the `x_accounts` plural string -->
+	<!-- %1$s is the domain that was blocked, %2$,d is the follower count, %3$s is the `x_accounts` plural string -->
+	<!-- appears when you're about to block a server -->
+	<!-- The complete string will look like "You will lose X followers and Y people you follow". See will_lose_x_followers and will_lose_x_following -->
+	<!-- The complete string will look like "You will lose X people you follow". See will_lose_x_following -->
+	<!-- %s is `at_least_x_years_old`. Some languages, unlike English, may require the word "years" here. -->
+	<!-- Substituted into `date_of_birth_explanation` -->
+	<!-- %s is a username, i.e. @Gargron -->
+	<!-- %s is current user's full username, e.g. @example@mastodon.social -->
+</resources>

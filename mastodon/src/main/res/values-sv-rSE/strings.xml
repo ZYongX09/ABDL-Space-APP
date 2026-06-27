@@ -1,0 +1,736 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
+	<string name="log_in">Logga in</string>
+	<string name="next">Nästa</string>
+	<string name="loading_instance">Hämtar serverinfo…</string>
+	<string name="error">Fel</string>
+	<string name="not_a_mastodon_instance">%s verkar inte vara en mastodonserver.</string>
+	<string name="ok">OK</string>
+	<string name="preparing_auth">Förbereder för autentisering…</string>
+	<string name="finishing_auth">Slutför autentisering…</string>
+	<string name="user_boosted">%s förstärkte</string>
+	<string name="in_reply_to">som svar på %s</string>
+	<string name="notifications">Aviseringar</string>
+	<string name="user_followed_you">%s följde dig</string>
+	<string name="user_sent_follow_request">%s skickade en förfrågan om att följa dig</string>
+	<string name="user_favorited">%s favoritmarkerade:</string>
+	<string name="notification_boosted">%s förstärktes:</string>
+	<string name="share_toot_title">Dela</string>
+	<string name="settings">Inställningar</string>
+	<string name="publish">Publicera</string>
+	<string name="discard_draft">Släng utkast?</string>
+	<string name="discard">Släng</string>
+	<string name="cancel">Avbryt</string>
+	<plurals name="followers">
+		<item quantity="one">följare</item>
+		<item quantity="other">följare</item>
+	</plurals>
+	<plurals name="following">
+		<item quantity="one">följer</item>
+		<item quantity="other">följer</item>
+	</plurals>
+	<string name="posts">Inlägg</string>
+	<string name="posts_and_replies">Inlägg och svar</string>
+	<string name="media">Media</string>
+	<string name="profile_about">Om</string>
+	<string name="button_follow">Följ</string>
+	<string name="button_following">Följer</string>
+	<string name="edit_profile">Redigera profil</string>
+	<string name="share_user">Dela profil via…</string>
+	<string name="mute_user">Tysta %s</string>
+	<string name="unmute_user">Avtysta %s</string>
+	<string name="block_user">Blockera %s</string>
+	<string name="unblock_user">Avblockera %s</string>
+	<string name="report_user">Rapportera %s</string>
+	<string name="block_domain">Blockera %s</string>
+	<string name="unblock_domain">Avblockera %s</string>
+	<plurals name="x_posts">
+		<item quantity="one">%,d inlägg</item>
+		<item quantity="other">%,d inlägg</item>
+	</plurals>
+	<string name="profile_joined">Gick med</string>
+	<string name="done">Klar</string>
+	<string name="loading">Laddar…</string>
+	<string name="field_label">Etikett</string>
+	<string name="field_content">Innehåll</string>
+	<string name="saving">Sparar…</string>
+	<string name="post_from_user">Inlägg från %s</string>
+	<string name="poll_option_hint">Alternativ %d</string>
+	<plurals name="x_minutes">
+		<item quantity="one">%d minut</item>
+		<item quantity="other">%d minuter</item>
+	</plurals>
+	<plurals name="x_hours">
+		<item quantity="one">%d timme</item>
+		<item quantity="other">%d timmar</item>
+	</plurals>
+	<plurals name="x_days">
+		<item quantity="one">%d dag</item>
+		<item quantity="other">%d dagar</item>
+	</plurals>
+	<plurals name="x_seconds_left">
+		<item quantity="one">%d sekund kvar</item>
+		<item quantity="other">%d sekunder kvar</item>
+	</plurals>
+	<plurals name="x_minutes_left">
+		<item quantity="one">%d minut kvar</item>
+		<item quantity="other">%d minuter kvar</item>
+	</plurals>
+	<plurals name="x_hours_left">
+		<item quantity="one">%d timme kvar</item>
+		<item quantity="other">%d timmar kvar</item>
+	</plurals>
+	<plurals name="x_days_left">
+		<item quantity="one">%d dag kvar</item>
+		<item quantity="other">%d dagar kvar</item>
+	</plurals>
+	<plurals name="x_votes">
+		<item quantity="one">%,d röst</item>
+		<item quantity="other">%,d röster</item>
+	</plurals>
+	<string name="poll_closed">Stängd</string>
+	<string name="do_mute">Tysta</string>
+	<string name="do_block">Blockera</string>
+	<string name="button_blocked">Blockerad</string>
+	<string name="action_vote">Rösta</string>
+	<string name="confirm">Bekräfta</string>
+	<string name="delete">Ta bort</string>
+	<string name="confirm_delete_title">Radera inlägg</string>
+	<string name="confirm_delete">Är du säker på att du vill radera detta inlägg?</string>
+	<string name="deleting">Raderar…</string>
+	<string name="notification_channel_audio_player">Ljuduppspelning</string>
+	<string name="play">Spela</string>
+	<string name="pause">Pausa</string>
+	<string name="log_out">Logga ut</string>
+	<string name="add_account">Lägg till konto</string>
+	<string name="search_hint">Sök</string>
+	<string name="hashtags">Hashtaggar</string>
+	<string name="news">Nyheter</string>
+	<string name="for_you">För dig</string>
+	<string name="all_notifications">Alla</string>
+	<string name="mentions">Omnämningar</string>
+	<plurals name="x_people_talking">
+		<item quantity="one">%d person pratar</item>
+		<item quantity="other">%d personer pratar</item>
+	</plurals>
+	<string name="report_title">Rapportera %s</string>
+	<string name="report_choose_reason">Vad är fel med det här inlägget?</string>
+	<string name="report_choose_reason_account">Vad är fel med %s?</string>
+	<string name="report_choose_reason_subtitle">Välj den bästa träffen</string>
+	<string name="report_reason_personal">Jag gillar det inte</string>
+	<string name="report_reason_personal_subtitle">Det är inget som du vill se</string>
+	<string name="report_reason_spam">Det är skräppost</string>
+	<string name="report_reason_spam_subtitle">Skadliga länkar, bedrägligt beteende eller repetitiva svar</string>
+	<string name="report_reason_violation">Det bryter mot serverns regler</string>
+	<string name="report_reason_violation_subtitle">Du är medveten om att det bryter mot specifika regler</string>
+	<string name="report_reason_other">Det är något annat</string>
+	<string name="report_reason_other_subtitle">Frågan passar inte in i andra kategorier</string>
+	<string name="report_choose_rule">Vilka regler överträds?</string>
+	<string name="report_choose_rule_subtitle">Välj alla som stämmer</string>
+	<string name="report_choose_posts">Finns det några inlägg som stöder denna rapport?</string>
+	<string name="report_choose_posts_subtitle">Välj alla som stämmer</string>
+	<string name="report_comment_title">Finns det något annat vi borde veta?</string>
+	<string name="report_comment_hint">Ytterligare kommentarer</string>
+	<string name="sending_report">Skickar rapport…</string>
+	<string name="report_sent_title">Tack för att du rapporterar, vi kommer att titta på detta.</string>
+	<string name="report_sent_subtitle">Medan vi granskar detta kan du vidta åtgärder mot %s:</string>
+	<string name="unfollow_user">Avfölj %s</string>
+	<string name="unfollow">Avfölj</string>
+	<string name="mute_user_explain">Du kommer inte se deras inlägg. De kan fortfarande följa dig och se dina inlägg. De kommer inte veta att de är tystade.</string>
+	<string name="block_user_explain">Du kommer inte se deras inlägg. De kommer inte kunna se dina inlägg eller följa dig. De kommer kunna se att de är blockerade.</string>
+	<string name="report_personal_title">Vill du inte se detta?</string>
+	<string name="report_personal_subtitle">Här är dina alternativ för att bestämma vad du ser på ABDL Space:</string>
+	<string name="back">Tillbaka</string>
+	<string name="search_communities">Servernamn eller URL</string>
+	<string name="instance_rules_title">Serverregler</string>
+	<string name="instance_rules_subtitle">Genom att fortsätta, samtycker du till att följa följande regler som fastställts och verkställs av %s moderatorer.</string>
+	<string name="signup_title">Skapa konto</string>
+	<string name="display_name">Namn</string>
+	<string name="username">Användarnamn</string>
+	<string name="email">E-post</string>
+	<string name="password">Lösenord</string>
+	<string name="confirm_password">Bekräfta lösenord</string>
+	<string name="category_general">Allmänt</string>
+	<string name="confirm_email_title">Kontrollera din inkorg</string>
+	<!-- %s is the email address -->
+	<string name="confirm_email_subtitle">Klicka på länken som vi har skickat till dig för att bekräfta %s. Vi väntar här.</string>
+	<string name="confirm_email_didnt_get">Fick du ingen länk?</string>
+	<string name="resend">Skicka igen</string>
+	<string name="open_email_app">Öppna e-postappen</string>
+	<string name="resent_email">Bekräftelse via e-post skickad</string>
+	<string name="compose_hint">Skriv eller klistra in vad du har på hjärtat</string>
+	<string name="content_warning">Innehållsvarning</string>
+	<string name="save">Spara</string>
+	<string name="add_alt_text">Lägg till alternativtext</string>
+	<string name="visibility_public">Offentlig</string>
+	<string name="visibility_followers_only">Följare</string>
+	<string name="recent_searches">Nyligen</string>
+	<string name="notification_type_follow">Nya följare</string>
+	<string name="notification_type_favorite">Favoriter</string>
+	<string name="notification_type_reblog">Förstärkningar</string>
+	<string name="notification_type_mention">Omnämningar</string>
+	<string name="notification_type_poll">Omröstningar</string>
+	<string name="choose_account">Välj konto</string>
+	<string name="err_not_logged_in">Logga in på ABDL Space först</string>
+	<plurals name="cant_add_more_than_x_attachments">
+		<item quantity="one">Du kan inte lägga till fler än %d mediabilaga</item>
+		<item quantity="other">Du kan inte lägga till fler än %d mediabilagor</item>
+	</plurals>
+	<string name="media_attachment_unsupported_type">Filen %s är av en typ som inte stöds</string>
+	<string name="media_attachment_too_big">Filen %1$s överskrider storleksgränsen på %2$s MB</string>
+	<string name="settings_theme">Utseende</string>
+	<string name="theme_auto">Använd systeminställning</string>
+	<string name="theme_light">Ljust</string>
+	<string name="theme_dark">Mörkt</string>
+	<string name="settings_behavior">Beteende</string>
+	<string name="settings_gif">Spela animerade avatarer och emojis</string>
+	<string name="settings_custom_tabs">Öppna länkar i</string>
+	<string name="settings_notifications">Aviseringar</string>
+	<string name="settings_contribute">Bidra till ABDL Space</string>
+	<string name="settings_tos">Användarvillkor</string>
+	<string name="settings_privacy_policy">Integritetspolicy</string>
+	<string name="settings_clear_cache">Rensa mediacache</string>
+	<string name="settings_app_version">ABDL Space för Android v%1$s (%2$d)</string>
+	<string name="media_cache_cleared">Mediacache rensad</string>
+	<string name="confirm_log_out">Logga ut från %s?</string>
+	<string name="sensitive_content_explain">Författaren markerade detta medium som känsligt.</string>
+	<string name="avatar_description">Gå till %ss profil</string>
+	<string name="more_options">Fler alternativ</string>
+	<string name="new_post">Nytt inlägg</string>
+	<string name="button_reply">Svara</string>
+	<string name="button_reblog">Förstärk</string>
+	<string name="button_favorite">Favoritmarkera</string>
+	<string name="button_share">Dela</string>
+	<string name="media_no_description">Media utan beskrivning</string>
+	<string name="add_media">Lägg till media</string>
+	<string name="add_poll">Lägg till en omröstning</string>
+	<string name="emoji">Emoji</string>
+	<string name="home_timeline">Hemtidslinje</string>
+	<string name="my_profile">Min profil</string>
+	<string name="media_viewer">Mediavisare</string>
+	<string name="follow_user">Följ %s</string>
+	<string name="unfollowed_user">Avföljde %s</string>
+	<string name="followed_user">Du följer nu %s</string>
+	<string name="following_user_requested">Begär att följa %s</string>
+	<string name="open_in_browser">Öppna i webbläsare</string>
+	<string name="hide_boosts_from_user">Dölj förstärkningar</string>
+	<string name="show_boosts_from_user">Visa förstärkningar</string>
+	<string name="signup_reason">Varför vill du gå med?</string>
+	<string name="signup_reason_note">Detta kommer hjälpa oss att granska din ansökan.</string>
+	<string name="clear">Rensa</string>
+	<string name="profile_header">Bild för sidhuvud</string>
+	<string name="profile_picture">Profilbild</string>
+	<string name="reorder">Omordna</string>
+	<string name="download">Ladda ner</string>
+	<string name="permission_required">Behörighet krävs</string>
+	<string name="storage_permission_to_download">Appen behöver åtkomst till din lagring för att spara filen.</string>
+	<string name="open_settings">Öppna inställningarna</string>
+	<string name="error_saving_file">Fel vid sparande av fil</string>
+	<string name="downloading">Laddar ner…</string>
+	<string name="no_app_to_handle_action">Det finns ingen app för att hantera denna åtgärd</string>
+	<string name="local_timeline">Liveflöde</string>
+	<string name="trending_posts_info_banner">Detta är de inlägg som engagerar på ABDL Space.</string>
+	<string name="trending_links_info_banner">Det här är nyheterna som det talas om på ABDL Space.</string>
+	<!-- %s is the server domain -->
+	<string name="local_timeline_info_banner">Detta är alla inlägg från alla användare på din server (%s).</string>
+	<string name="recommended_accounts_info_banner">Du kanske gillar dessa konton baserat på andra konton du följer.</string>
+	<string name="see_new_posts">Nya inlägg</string>
+	<string name="follow_back">Följ tillbaka</string>
+	<string name="button_follow_pending">Väntande</string>
+	<string name="follows_you">Följer dig</string>
+	<string name="manually_approves_followers">Godkänner följare manuellt</string>
+	<!-- translators: %,d is a valid placeholder, it formats the number with locale-dependent grouping separators -->
+	<plurals name="x_followers">
+		<item quantity="one">%,d följare</item>
+		<item quantity="other">%,d följare</item>
+	</plurals>
+	<plurals name="x_following">
+		<item quantity="one">%,d följer</item>
+		<item quantity="other">%,d följer</item>
+	</plurals>
+	<plurals name="x_favorites">
+		<item quantity="one">%,d favorit</item>
+		<item quantity="other">%,d favoriter</item>
+	</plurals>
+	<plurals name="x_reblogs">
+		<item quantity="one">%,d boost</item>
+		<item quantity="other">%,d boostar</item>
+	</plurals>
+	<string name="time_now">nu</string>
+	<string name="edit_history">Redigera historik</string>
+	<string name="last_edit_at_x">Senaste redigering %s</string>
+	<string name="time_just_now">just nu</string>
+	<plurals name="x_seconds_ago">
+		<item quantity="one">%d sekund sedan</item>
+		<item quantity="other">%d sekunder sedan</item>
+	</plurals>
+	<plurals name="x_minutes_ago">
+		<item quantity="one">%d minut sedan</item>
+		<item quantity="other">%d minuter sedan</item>
+	</plurals>
+	<string name="edited_timestamp">ändrad %s</string>
+	<string name="edit_original_post">Ursprungligt inlägg</string>
+	<string name="edit_text_edited">Text ändrad</string>
+	<string name="edit_spoiler_added">Innehållsvarning tillagd</string>
+	<string name="edit_spoiler_edited">Innehållsvarning ändrad</string>
+	<string name="edit_spoiler_removed">Innehållsvarning borttagen</string>
+	<string name="edit_poll_added">Omröstning tillagd</string>
+	<string name="edit_poll_edited">Omröstning ändrad</string>
+	<string name="edit_poll_removed">Omröstning borttagen</string>
+	<string name="edit_media_added">Media tillagd</string>
+	<string name="edit_media_removed">Media borttagen</string>
+	<string name="edit_media_reordered">Media omsorterad</string>
+	<string name="edit_marked_sensitive">Markerad som känsligt</string>
+	<string name="edit_marked_not_sensitive">Markerad som ej känslig</string>
+	<string name="edit_multiple_changed">Inlägg ändrat</string>
+	<string name="edit">Redigera</string>
+	<string name="discard_changes">Förkasta ändringarna?</string>
+	<string name="upload_failed">Uppladdningen misslyckades</string>
+	<string name="file_size_bytes">%d bytes</string>
+	<string name="file_size_kb">%.2f KB</string>
+	<string name="file_size_mb">%.2f MB</string>
+	<string name="file_size_gb">%.2f GB</string>
+	<string name="upload_processing">Bearbetar…</string>
+	<!-- %s is file size -->
+	<string name="download_update">Ladda ner (%s)</string>
+	<string name="install_update">Installera</string>
+	<string name="privacy_policy_title">Din integritet</string>
+	<string name="privacy_policy_subtitle">Även om ABDL Space-appen inte samlar in några data, kan servern du registrerar dig genom ha en annan policy.\n\nOm du inte håller med policyn för %skan du gå tillbaka och välja en annan server.</string>
+	<string name="i_agree">Jag godkänner</string>
+	<string name="empty_list">Den här listan är tom</string>
+	<string name="instance_signup_closed">Denna server accepterar inte nyregistreringar.</string>
+	<string name="text_copied">Kopierat till urklipp</string>
+	<string name="add_bookmark">Bokmärk</string>
+	<string name="remove_bookmark">Ta bort bokmärke</string>
+	<string name="bookmarks">Bokmärken</string>
+	<string name="your_favorites">Favoriter</string>
+	<string name="login_title">Välkommen tillbaka</string>
+	<string name="login_subtitle">Logga in på den server där du skapade ditt konto.</string>
+	<string name="server_url">Server-URL</string>
+	<string name="server_filter_any_language">Alla språk</string>
+	<string name="server_filter_instant_signup">Omedelbar registrering</string>
+	<string name="server_filter_manual_review">Manuell granskning</string>
+	<string name="server_filter_region_europe">Europa</string>
+	<string name="server_filter_region_north_america">Nordamerika</string>
+	<string name="server_filter_region_south_america">Sydamerika</string>
+	<string name="server_filter_region_africa">Afrika</string>
+	<string name="server_filter_region_asia">Asien</string>
+	<string name="server_filter_region_oceania">Oceanien</string>
+	<string name="not_accepting_new_members">Accepterar inte nya medlemmar</string>
+	<string name="category_special_interests">Specialintressen</string>
+	<string name="signup_passwords_dont_match">Lösenorden matchar inte</string>
+	<string name="profile_add_row">Lägg till rad</string>
+	<string name="profile_setup">Konfiguration av profil</string>
+	<string name="profile_setup_subtitle">Du kan alltid fylla i detta senare i fliken Profil.</string>
+	<string name="follow_all">Följ alla</string>
+	<string name="server_rules_disagree">Instämmer inte alls</string>
+	<string name="privacy_policy_explanation">TL;DR: Vi samlar inte in eller bearbetar något.</string>
+	<!-- %s is server domain -->
+	<string name="server_policy_disagree">Håller inte med %s</string>
+	<string name="profile_bio">Biografi</string>
+	<!-- Shown in a progress dialog when you tap "follow all" -->
+	<string name="sending_follows">Följer användare…</string>
+	<!-- %1$s is server domain, %2$s is email domain. You can reorder these placeholders to fit your language better. -->
+	<string name="signup_email_domain_blocked">%1$s tillåter inte registrering från %2$s. Prova en annan eller &lt;a&gt;välj en annan server&lt;/a&gt;.</string>
+	<string name="spoiler_show">Visa ändå</string>
+	<string name="spoiler_hide">Dölj igen</string>
+	<string name="poll_multiple_choice">Välj en eller flera</string>
+	<string name="save_changes">Spara ändringar</string>
+	<string name="profile_timeline">Tidslinje</string>
+	<string name="view_all">Visa alla</string>
+	<string name="profile_endorsed_accounts">Konton</string>
+	<string name="verified_link">Verifierad länk</string>
+	<string name="show">Visa</string>
+	<string name="hide">Dölj</string>
+	<string name="join_default_server">Gå med %s</string>
+	<string name="pick_server">Välj en annan server</string>
+	<string name="signup_or_login">eller</string>
+	<string name="learn_more">Läs mer</string>
+	<string name="welcome_to_mastodon">Välkommen till ABDL Space</string>
+	<string name="welcome_paragraph1">ABDL Space är ett decentraliserat socialt nätverk, vilket innebär att inget enskilt företag kontrollerar det. Det består av många oberoende servrar, alla sammankopplade.</string>
+	<string name="what_are_servers">Vad är servrar?</string>
+	<string name="opening_link">Öppnar länk…</string>
+	<string name="link_not_supported">Denna länk stöds inte i appen</string>
+	<string name="log_out_all_accounts">Logga ut från alla konton</string>
+	<string name="confirm_log_out_all_accounts">Logga ut från alla konton?</string>
+	<string name="retry">Försök igen</string>
+	<string name="post_failed">Misslyckades att skapa inlägg</string>
+	<!-- %s is formatted file size ("467 KB image") -->
+	<string name="attachment_description_image">%s bild</string>
+	<string name="attachment_description_video">%s video</string>
+	<string name="attachment_description_audio">%s ljud</string>
+	<string name="attachment_description_unknown">%s fil</string>
+	<string name="attachment_type_image">Bild</string>
+	<string name="attachment_type_video">Video</string>
+	<string name="attachment_type_audio">Ljud</string>
+	<string name="attachment_type_gif">GIF</string>
+	<string name="attachment_type_unknown">Fil</string>
+	<string name="add_poll_option">Lägg till röstningsalternativ</string>
+	<string name="poll_length">Undersökningens längd</string>
+	<string name="poll_style">Stil</string>
+	<string name="compose_poll_single_choice">Välj en</string>
+	<string name="compose_poll_multiple_choice">Flera val</string>
+	<string name="delete_poll_option">Ta bort röstningsalternativ</string>
+	<string name="poll_style_title">Undersökningsstil</string>
+	<string name="alt_text">Alt-Text</string>
+	<string name="help">Hjälp</string>
+	<string name="what_is_alt_text">Vad är alt-text?</string>
+	<string name="edit_post">Redigera inlägg</string>
+	<string name="no_verified_link">Ingen verifierad länk</string>
+	<string name="compose_autocomplete_emoji_empty">Bläddra bland emoji</string>
+	<string name="compose_autocomplete_users_empty">Hitta den du söker efter</string>
+	<string name="no_search_results">Kunde inte hitta något för dessa söktermer</string>
+	<string name="language">Språk</string>
+	<string name="language_default">Standard</string>
+	<string name="language_system">System</string>
+	<string name="language_detecting">Identifiera språk</string>
+	<string name="language_cant_detect">Det gick inte att identifiera språk</string>
+	<string name="language_detected">Identifierat</string>
+	<string name="media_hidden">Dold media</string>
+	<string name="post_hidden">Inlägg dolt</string>
+	<string name="report_title_post">Rapportera inlägg</string>
+	<string name="forward_report_explanation">Kontot kommer från en annan server. Vill du skicka en anonymiserad kopia av rapporten dit också?</string>
+	<!-- %s is the server domain -->
+	<string name="forward_report_to_server">Vidarebefordra till %s</string>
+	<!-- Shown on the "stamp" on the screen that appears after you report a post/user. Please keep the translation short, preferably a single word -->
+	<string name="reported">Rapporterad</string>
+	<string name="muted_user">Tystade %s</string>
+	<string name="report_sent_already_blocked">Du har redan blockerat den här användaren, så det finns inget annat du behöver göra medan vi granskar din rapport.</string>
+	<string name="report_personal_already_blocked">Du har redan blockerat den här användaren, så det finns inget annat du behöver göra.\n\nTack för att du hjälper till att hålla ABDL Space en säker plats för alla!</string>
+	<string name="blocked_user">Blockerade %s</string>
+	<string name="mark_all_notifications_read">Markera alla som lästa</string>
+	<string name="settings_display">Skärm</string>
+	<string name="settings_filters">Filter</string>
+	<string name="settings_server_explanation">Översikt, regler och moderatorer</string>
+	<!-- %s is the app name (ABDL Space, key app_name). I made it a placeholder so everything Just Works™ with forks -->
+	<string name="about_app">Om %s</string>
+	<string name="settings_alt_text_reminders">Lägg till alt-textpåminnelser</string>
+	<string name="settings_confirm_unfollow">Fråga innan du avföljer någon</string>
+	<string name="settings_confirm_boost">Fråga innan du förstärker</string>
+	<string name="settings_confirm_delete_post">Fråga innan du raderar inlägg</string>
+	<string name="pause_all_notifications">Pausa alla</string>
+	<string name="pause_notifications_off">Av</string>
+	<string name="notifications_policy_anyone">Alla</string>
+	<string name="notifications_policy_followed">Personer som följer dig</string>
+	<string name="notifications_policy_follower">Personer du följer</string>
+	<string name="notifications_policy_no_one">Ingen</string>
+	<string name="settings_notifications_policy">Få aviseringar från</string>
+	<string name="notification_type_mentions_and_replies">Omnämningar och svar</string>
+	<string name="pause_all_notifications_title">Pausa alla aviseringar</string>
+	<plurals name="x_weeks">
+		<item quantity="one">%d vecka</item>
+		<item quantity="other">%d veckor</item>
+	</plurals>
+	<!-- %1$s is the date (may be relative, e.g. "today" or "yesterday"), %2$s is the time. You can reorder these placeholders if that works better for your language -->
+	<string name="today">idag</string>
+	<string name="yesterday">igår</string>
+	<string name="tomorrow">i morgon</string>
+	<!-- %s is the timestamp ("tomorrow at 12:34") -->
+	<string name="pause_notifications_ends">Slutar %s</string>
+	<!-- %s is the timestamp ("tomorrow at 12:34") -->
+	<string name="pause_notifications_banner">Aviseringar kommer att återupptas %s.</string>
+	<string name="resume_notifications_now">Återuppta nu</string>
+	<string name="open_system_notification_settings">Gå till aviseringsinställningar</string>
+	<string name="about_server">Om</string>
+	<string name="server_rules">Regler</string>
+	<string name="server_administrator">Administratör</string>
+	<string name="send_email_to_server_admin">Meddela administratör</string>
+	<string name="settings_even_more">Ännu fler inställningar</string>
+	<string name="settings_show_cws">Visa innehållsvarningar</string>
+	<string name="settings_hide_sensitive_media">Dölj media markerad som känsligt</string>
+	<string name="settings_show_interaction_counts">Antal inläggsinteraktioner</string>
+	<string name="settings_show_emoji_in_names">Anpassad emoji i visningsnamn</string>
+	<plurals name="in_x_seconds">
+		<item quantity="one">om %d sekund</item>
+		<item quantity="other">om %d sekunder</item>
+	</plurals>
+	<plurals name="in_x_minutes">
+		<item quantity="one">om %d minut</item>
+		<item quantity="other">om %d minuter</item>
+	</plurals>
+	<plurals name="in_x_hours">
+		<item quantity="one">om %d timme</item>
+		<item quantity="other">om %d timmar</item>
+	</plurals>
+	<plurals name="x_hours_ago">
+		<item quantity="one">%d timme sedan</item>
+		<item quantity="other">%d timmar sedan</item>
+	</plurals>
+	<string name="count_one">En</string>
+	<string name="count_two">Två</string>
+	<string name="count_three">Tre</string>
+	<string name="count_four">Fyra</string>
+	<string name="alt_text_reminder_post_anyway">Inlägg</string>
+	<!-- %s is the username -->
+	<string name="unfollow_confirmation">Avfölj %s?</string>
+	<string name="filter_active">Aktiv</string>
+	<string name="filter_inactive">Inaktiv</string>
+	<string name="settings_add_filter">Lägg till filter</string>
+	<string name="settings_edit_filter">Redigera filter</string>
+	<string name="settings_filter_duration">Varaktighet</string>
+	<string name="settings_filter_muted_words">Tystade ord</string>
+	<string name="settings_filter_context">Tysta från</string>
+	<string name="settings_filter_show_cw">Visa med innehållsvarning</string>
+	<string name="settings_delete_filter">Radera filter</string>
+	<string name="filter_duration_forever">För alltid</string>
+	<!-- %s is the timestamp ("tomorrow at 12:34") -->
+	<string name="settings_filter_ends">Slutar %s</string>
+	<plurals name="settings_x_muted_words">
+		<item quantity="one">%d tystat ord eller fras</item>
+		<item quantity="other">%d tystade ord eller fraser</item>
+	</plurals>
+	<string name="selection_2_options">%1$s och %2$s</string>
+	<string name="selection_3_options">%1$s, %2$s och %3$s</string>
+	<string name="filter_context_home_lists">Hem &amp; listor</string>
+	<string name="filter_context_notifications">Aviseringar</string>
+	<string name="filter_context_public_timelines">Publika tidslinjer</string>
+	<string name="filter_context_threads_replies">Trådar &amp; svar</string>
+	<string name="filter_context_profiles">Profiler</string>
+	<string name="settings_filter_title">Rubrik</string>
+	<string name="settings_delete_filter_title">Ta bort filter ”%s”?</string>
+	<string name="settings_delete_filter_confirmation">Detta filter kommer raderas från ditt konto på alla dina enheter.</string>
+	<string name="add_muted_word">Lägg till tystat ord</string>
+	<string name="edit_muted_word">Redigera tystat ord</string>
+	<string name="add">Lägg till</string>
+	<string name="filter_word_or_phrase">Ord eller fras</string>
+	<string name="settings_delete_filter_word">Ta bort ordet ”%s”?</string>
+	<string name="enter_selection_mode">Välj</string>
+	<string name="select_all">Välj alla</string>
+	<string name="settings_filter_duration_title">Filtervaraktighet</string>
+	<string name="filter_duration_custom">Anpassad</string>
+	<plurals name="settings_delete_x_filter_words">
+		<item quantity="one">Radera %d ord?</item>
+		<item quantity="other">Radera %d ord?</item>
+	</plurals>
+	<plurals name="x_items_selected">
+		<item quantity="one">%d vald</item>
+		<item quantity="other">%d valda</item>
+	</plurals>
+	<string name="required_form_field_blank">Får inte vara tomt</string>
+	<string name="filter_word_already_in_list">Redan finns i listan</string>
+	<string name="app_update_ready">Appuppdateringen är redo</string>
+	<string name="app_update_version">Version %s</string>
+	<string name="downloading_update">Ladda ner (%d%%)</string>
+	<!-- Shown like a content warning, %s is the name of the filter -->
+	<string name="post_matches_filter_x">Matchar filter \"%s\"</string>
+	<string name="search_mastodon">Sök i ABDL Space</string>
+	<string name="clear_all">Rensa alla</string>
+	<string name="search_open_url">Öppna URL i ABDL Space</string>
+	<string name="posts_matching_hashtag">Inlägg med \"%s\"</string>
+	<string name="search_go_to_account">Gå till %s</string>
+	<string name="posts_matching_string">Inlägg med \"%s\"</string>
+	<string name="accounts_matching_string">Personer med ”%s”</string>
+	<!-- Shown in the post header. Please keep it short -->
+	<string name="time_seconds_ago_short">%ds sedan</string>
+	<string name="time_minutes_ago_short">%dm sedan</string>
+	<string name="time_hours_ago_short">%dt sedan</string>
+	<string name="time_days_ago_short">%dd sedan</string>
+	<!-- %s is the name of the post language -->
+	<string name="translate_post">Översätt från %s</string>
+	<!-- %1$s is the language, %2$s is the name of the translation service -->
+	<string name="post_translated">Översatt från %1$s med %2$s</string>
+	<string name="translation_show_original">Visa original</string>
+	<string name="translation_failed">Översättningen misslyckades. Det kan hända att administratören inte har aktiverat översättningar på den här servern eller att servern kör en äldre version av ABDL Space som inte har stöd för översättningar ännu.</string>
+	<string name="settings_privacy">Integritet och räckvidd</string>
+	<string name="settings_indexable">Inkludera offentliga inlägg i sökresultaten</string>
+	<plurals name="x_participants">
+		<item quantity="one">%,d deltagare</item>
+		<item quantity="other">%,d deltagare</item>
+	</plurals>
+	<plurals name="x_posts_today">
+		<item quantity="one">%,d inlägg idag</item>
+		<item quantity="other">%,d inlägg idag</item>
+	</plurals>
+	<string name="error_playing_video">Fel vid videouppspelning</string>
+	<string name="timeline_following">Hem</string>
+	<string name="lists">Listor</string>
+	<string name="followed_hashtags">Följda hashtaggar</string>
+	<string name="manage_lists">Hantera listor</string>
+	<string name="manage_hashtags">Hantera hashtaggar</string>
+	<!-- Screen reader description for the menu on the home timeline screen -->
+	<string name="dropdown_menu">Nedrullningsmeny</string>
+	<string name="edit_list">Redigera lista</string>
+	<string name="list_members">Listmedlemmar</string>
+	<string name="delete_list">Ta bort lista</string>
+	<!-- %s is the name of the list -->
+	<string name="delete_list_confirm">Ta bort “%s”?</string>
+	<string name="list_exclusive">Dölj medlemmar i Följer</string>
+	<string name="list_name">Listnamn</string>
+	<string name="list_show_replies_to">Visa svar till</string>
+	<string name="list_replies_no_one">Ingen</string>
+	<string name="list_replies_members">Listmedlemmar</string>
+	<string name="list_replies_anyone">Alla jag följer</string>
+	<string name="confirm_remove_list_members">Ta bort medlemmar?</string>
+	<string name="remove">Ta bort</string>
+	<string name="add_list_member">Lägg till medlem</string>
+	<string name="search_among_people_you_follow">Sök bland personer du följer</string>
+	<string name="add_user_to_list">Lägg till/ta bort från listor…</string>
+	<string name="add_user_to_list_title">Lägg till i lista</string>
+	<!-- %s is a username -->
+	<string name="manage_user_lists">Hantera listorna %s visas på</string>
+	<string name="remove_from_list">Ta bort från lista</string>
+	<string name="confirm_remove_list_member">Ta bort medlem?</string>
+	<string name="no_lists_title">Organisera ditt hemflöde med listor</string>
+	<string name="manage_accounts">Lägg till eller byt konto</string>
+	<string name="create_list">Skapa lista</string>
+	<string name="step_x_of_y">Steg %1$d av %2$d</string>
+	<string name="create">Skapa</string>
+	<string name="manage_list_members">Hantera listmedlemmar</string>
+	<string name="list_no_members">Inga medlemmar än</string>
+	<string name="list_find_users">Hitta användare att lägga till</string>
+	<string name="reply_to_user">Svara till %s</string>
+	<string name="non_mutual_sheet_title">Hej, ny anslutning!</string>
+	<string name="got_it">Jag förstår</string>
+	<string name="dont_remind_again">Påminn mig inte igen</string>
+	<!-- %s is a time interval ("5 months") -->
+	<string name="old_post_sheet_title">Detta inlägg är %s gammalt</string>
+	<string name="old_post_sheet_text">Du kan fortfarande svara, men det kanske inte längre är relevant.</string>
+	<plurals name="x_months">
+		<item quantity="one">%,d månad</item>
+		<item quantity="other">%,d månader</item>
+	</plurals>
+	<string name="more_than_two_years">mer än 2 år</string>
+	<string name="non_mutual_title1">Håll dig respektfull &amp; relevant</string>
+	<string name="non_mutual_title2">Omfamna vänlighet</string>
+	<string name="non_mutual_text2">En positiv ton är alltid uppskattad.</string>
+	<string name="non_mutual_title3">Var öppen</string>
+	<string name="make_profile_discoverable">Gör min profil upptäckningsbar</string>
+	<string name="discoverability">Upptäckbarhet</string>
+	<string name="app_version_copied">Versionsnummer kopierat till urklipp</string>
+	<string name="onboarding_recommendations_title">Anpassa ditt hemflöde</string>
+	<string name="article_by_author">Av %s</string>
+	<string name="button_reblogged">Förstärkte</string>
+	<string name="button_favorited">Favoritiserade</string>
+	<string name="join_server_x_with_invite">Gå med %s med inbjudan</string>
+	<string name="expired_invite_link">Förfallen inbjudningslänk</string>
+	<string name="invalid_invite_link">Ogiltig inbjudningslänk</string>
+	<string name="use_invite_link">Använd inbjudningslänk</string>
+	<string name="enter_invite_link">Ange inbjudningslänk</string>
+	<string name="this_invite_is_invalid">Ogiltig inbjudningslänk.</string>
+	<string name="this_invite_has_expired">Denna inbjudningslänk har förfallit.</string>
+	<string name="invite_link_pasted">Länk kopierades från ditt urklipp.</string>
+	<string name="mute_user_confirm_title">Tysta användare?</string>
+	<string name="user_wont_know_muted">De kommer inte att veta att de blivit tystade.</string>
+	<string name="you_wont_see_user_mentions">Du kommer inte se inlägg som nämner dem.</string>
+	<string name="block_user_confirm_title">Blockera användare?</string>
+	<string name="user_can_see_blocked">Hen kan se att hen är blockerad.</string>
+	<string name="user_cant_see_each_other_posts">De kan inte se dina inlägg och du kommer inte att se deras.</string>
+	<string name="user_cant_mention_or_follow_you">De kan inte nämna eller följa dig.</string>
+	<string name="block_domain_confirm_title">Blockera domän?</string>
+	<string name="do_block_server">Blockera server</string>
+	<string name="block_user_x_instead">Blockera %s istället</string>
+	<string name="server">Server</string>
+	<string name="what_is_activitypub_title">Vad är ActivityPub?</string>
+	<string name="qr_code">QR-kod</string>
+	<string name="scan_qr_code">Skanna QR-kod</string>
+	<!-- Shown on a button that saves a file, after it was successfully saved -->
+	<string name="saved">Sparad</string>
+	<string name="image_saved">Bild sparad.</string>
+	<string name="video_saved">Video sparad.</string>
+	<string name="view_file">Visa</string>
+	<string name="share_sheet_preview_profile">%s på ABDL Space</string>
+	<string name="share_sheet_preview_post">%1$s på ABDL Space: “%2$s”</string>
+	<string name="copy_profile_link">Kopiera länk till profil</string>
+	<string name="add_muted_word_short">Lägg till ord</string>
+	<string name="tab_home">Hem</string>
+	<string name="tab_search">Utforska</string>
+	<string name="tab_profile">Profil</string>
+	<!-- %s is the username -->
+	<string name="mute_conversation">Tysta konversation</string>
+	<string name="notification_filter_following">Personer du inte följer</string>
+	<string name="notification_filter_new_accounts">Nya konton</string>
+	<string name="notification_filter_new_accounts_explanation">Skapad inom de senaste 30 dagarna</string>
+	<plurals name="x_people_you_may_know">
+		<item quantity="one">%,d person du kanske känner</item>
+		<item quantity="other">%,d personer du kanske känner</item>
+	</plurals>
+	<string name="visibility_subtitle_public">Alla på och utanför ABDL Space</string>
+	<string name="visibility_subtitle_followers">Endast dina följare</string>
+	<string name="view_boosts">Visa förstärkningar</string>
+	<string name="view_favorites">Visa favoriter</string>
+	<string name="undo_reblog">Ånga förstärkning</string>
+	<string name="undo_favorite">Ångra favorit</string>
+	<string name="donation_once">Bara en gång</string>
+	<string name="donation_monthly">Månadsvis</string>
+	<string name="donation_yearly">Årlig</string>
+	<string name="currency">Valuta</string>
+	<string name="donation_success_share">Sprid ordet</string>
+	<string name="donation_success_title">Tack för ditt bidrag!</string>
+	<string name="donation_success_subtitle">Du kommer snart att få ett e-postmeddelande som bekräftar din donation.</string>
+	<string name="settings_donate">Donera till ABDL Space</string>
+	<string name="settings_manage_donations">Hantera donationer</string>
+	<string name="cant_load_image">Kunde inte ladda bild</string>
+	<string name="poll_see_results">Visa resultat</string>
+	<string name="poll_hide_results">Dölj resultat</string>
+	<plurals name="x_attachments">
+		<item quantity="one">%d bilaga</item>
+		<item quantity="other">%d bilagor</item>
+	</plurals>
+	<!-- %1$s is your server domain, %2$s is the domain that was blocked, %3$,d is the follower count, %4$s is the `x_accounts` plural string -->
+	<plurals name="x_accounts">
+		<item quantity="one">%,d konto</item>
+		<item quantity="other">%,d konton</item>
+	</plurals>
+	<!-- %1$s is the domain that was blocked, %2$,d is the follower count, %3$s is the `x_accounts` plural string -->
+	<string name="relationship_severance_learn_more">Läs mer</string>
+	<string name="moderation_warning_action_disable">Ditt konto har inaktiverats.</string>
+	<string name="moderation_warning_action_mark_statuses_as_sensitive">Några av dina inlägg har markerats som känsliga.</string>
+	<string name="moderation_warning_action_delete_statuses">Några av dina inlägg har tagits bort.</string>
+	<string name="moderation_warning_action_silence">Ditt konto har begränsats.</string>
+	<string name="moderation_warning_learn_more">Läs mer</string>
+	<string name="text_show_more">Mer</string>
+	<string name="avatar_move_and_scale">Flytta och skala</string>
+	<string name="confirm_avatar_crop">Välj</string>
+	<string name="settings_accounts">Konton</string>
+	<string name="settings_add_account">Lägg till konto...</string>
+	<string name="settings_app_settings">Appinställningar</string>
+	<string name="account_settings">Kontoinställningar</string>
+	<string name="settings_about_this_server">Om denna server</string>
+	<string name="manage_account">Hantera konto</string>
+	<string name="switch_to_this_account">Byt till detta konto</string>
+	<string name="delete_account">Radera konto</string>
+	<string name="notification_type_status">Nya inlägg</string>
+	<string name="profile_saved_posts">Sparad</string>
+	<string name="profile_saved_posts_explanation">Dina sparade inlägg är bara synliga för dig.</string>
+	<string name="search_people">Personer</string>
+	<!-- appears when you're about to block a server -->
+	<plurals name="server_x_followers_will_be_removed">
+		<item quantity="one">%,d följare från denna server kommer tas bort.</item>
+		<item quantity="other">%,d följare från denna server kommer tas bort.</item>
+	</plurals>
+	<!-- The complete string will look like "You will lose X followers and Y people you follow". See will_lose_x_followers and will_lose_x_following -->
+	<string name="server_x_followers_and_following_will_be_removed">Du kommer att förlora %1$s och %2$s.</string>
+	<plurals name="will_lose_x_followers">
+		<item quantity="one">%,d följare</item>
+		<item quantity="other">%,d följare</item>
+	</plurals>
+	<plurals name="will_lose_x_following">
+		<item quantity="one">%,d person du följer</item>
+		<item quantity="other">%,d personer du följer</item>
+	</plurals>
+	<!-- The complete string will look like "You will lose X people you follow". See will_lose_x_following -->
+	<string name="server_x_following_will_be_removed">Du kommer att förlora %s.</string>
+	<string name="private_reply">Privat svar</string>
+	<string name="post_header_reply">Svara</string>
+	<string name="post_header_mention">Nämn</string>
+	<string name="report_reason_legal">Det är olagligt</string>
+	<string name="date_of_birth">Födelsedatum</string>
+	<!-- %s is `at_least_x_years_old`. Some languages, unlike English, may require the word "years" here. -->
+	<string name="open_link">Öppna</string>
+	<string name="copy">Kopiera</string>
+	<!-- Substituted into `date_of_birth_explanation` -->
+	<plurals name="at_least_x_years_old">
+		<item quantity="one">%d</item>
+		<item quantity="other">%d</item>
+	</plurals>
+	<!-- %s is a username, i.e. @Gargron -->
+	<string name="compose_visibility_title">Synlighet och interaktion</string>
+	<!-- %s is current user's full username, e.g. @example@mastodon.social -->
+	<string name="compose_visibility">Synlighet</string>
+	<string name="quote_policy_followers">Endast följare</string>
+	<string name="quote_policy_nobody">Bara jag</string>
+	<string name="remove_quote_confirm_title">Ta bort inlägg?</string>
+	<string name="remove_quote_button">Ta bort inlägg</string>
+	<string name="quote_followers_only_publish">Publicera inlägg</string>
+	<string name="quote_followers_only_cancel">Tillbaka till redigering</string>
+</resources>

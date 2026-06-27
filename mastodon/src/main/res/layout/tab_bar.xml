@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+	xmlns:tools="http://schemas.android.com/tools"
+	android:id="@+id/tabbar_wrap"
+	android:layout_width="match_parent"
+	android:layout_height="wrap_content"
+	android:background="@drawable/bg_tabbar"
+	android:elevation="3dp"
+	android:outlineProvider="bounds"
+	android:clipChildren="false">
+
+	<org.joinmastodon.android.ui.views.TabBar
+		android:id="@+id/tabbar"
+		android:layout_width="match_parent"
+		android:layout_height="56dp"
+		tools:ignore="RtlHardcoded,RtlSymmetry">
+
+		<FrameLayout
+			android:id="@+id/tab_home"
+			android:layout_width="0dp"
+			android:layout_height="match_parent"
+			android:layout_weight="1"
+			android:paddingHorizontal="4dp"
+			android:contentDescription="@string/home_timeline">
+
+			<ImageView
+				android:layout_width="28dp"
+				android:layout_height="28dp"
+				android:layout_gravity="center"
+				android:scaleType="center"
+				android:importantForAccessibility="no"
+				android:tint="@color/tab_bar_icon"
+				android:src="@drawable/ic_tab_home"/>
+		</FrameLayout>
+
+		<FrameLayout
+			android:id="@+id/tab_search"
+			android:layout_width="0dp"
+			android:layout_height="match_parent"
+			android:layout_weight="1"
+			android:paddingHorizontal="4dp"
+			android:contentDescription="@string/search_hint">
+
+			<ImageView
+				android:layout_width="28dp"
+				android:layout_height="28dp"
+				android:layout_gravity="center"
+				android:scaleType="center"
+				android:importantForAccessibility="no"
+				android:tint="@color/tab_bar_icon"
+				android:src="@drawable/ic_tab_search"/>
+		</FrameLayout>
+
+		<FrameLayout
+			android:id="@+id/tab_notifications"
+			android:layout_width="0dp"
+			android:layout_height="match_parent"
+			android:layout_weight="1"
+			android:paddingHorizontal="4dp"
+			android:contentDescription="@string/notifications">
+
+			<ImageView
+				android:layout_width="28dp"
+				android:layout_height="28dp"
+				android:layout_gravity="center"
+				android:scaleType="center"
+				android:importantForAccessibility="no"
+				android:tint="@color/tab_bar_icon"
+				android:src="@drawable/ic_tab_notifications"/>
+
+			<TextView
+				android:id="@+id/notifications_badge"
+				android:layout_width="wrap_content"
+				android:layout_height="16dp"
+				android:layout_gravity="top|end"
+				android:layout_marginTop="6dp"
+				android:layout_marginEnd="4dp"
+				android:background="@drawable/bg_tabbar_badge"
+				android:textColor="?colorM3OnPrimary"
+				android:gravity="center"
+				android:includeFontPadding="false"
+				android:textAppearance="@style/m3_label_small"
+				android:minWidth="16dp"
+				android:paddingHorizontal="4dp"
+				tools:text="222"/>
+		</FrameLayout>
+
+		<FrameLayout
+			android:id="@+id/tab_profile"
+			android:layout_width="0dp"
+			android:layout_height="match_parent"
+			android:layout_weight="1"
+			android:paddingHorizontal="4dp"
+			android:contentDescription="@string/my_profile">
+
+			<ImageView
+				android:id="@+id/tab_profile_ava"
+				android:layout_width="28dp"
+				android:layout_height="28dp"
+				android:layout_gravity="center"
+				android:scaleType="centerCrop"
+				android:importantForAccessibility="no"
+				android:src="@null"/>
+		</FrameLayout>
+	</org.joinmastodon.android.ui.views.TabBar>
+
+</FrameLayout>

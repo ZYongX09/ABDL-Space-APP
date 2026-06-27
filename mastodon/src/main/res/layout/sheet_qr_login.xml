@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<org.joinmastodon.android.ui.views.CustomScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+	xmlns:tools="http://schemas.android.com/tools"
+	android:layout_width="match_parent"
+	android:layout_height="wrap_content"
+	xmlns:app="http://schemas.android.com/apk/res-auto"
+	android:background="@drawable/bg_bottom_sheet"
+	android:outlineProvider="background"
+	android:elevation="1dp">
+	<LinearLayout
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:orientation="vertical">
+
+		<View
+			android:layout_width="match_parent"
+			android:layout_height="36dp"
+			android:background="@drawable/bg_bottom_sheet_handle"/>
+
+		<LinearLayout
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:layout_marginHorizontal="16dp"
+			android:orientation="horizontal"
+			android:gravity="center_vertical">
+			<ImageView
+				android:layout_width="40dp"
+				android:layout_height="40dp"
+				android:layout_marginEnd="16dp"
+				android:background="@drawable/white_circle"
+				android:backgroundTint="?colorM3SecondaryContainer"
+				android:scaleType="center"
+				android:tint="?colorM3OnSecondaryContainer"
+				android:src="@drawable/ic_qr_code_scanner_24px"
+				android:importantForAccessibility="no"/>
+
+			<TextView
+				android:id="@+id/sheet_title"
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:textAppearance="@style/m3_title_large"
+				android:fontFamily="sans-serif"
+				android:textColor="?colorM3OnSurface"
+				android:text="扫码登录确认"/>
+		</LinearLayout>
+
+		<TextView
+			android:id="@+id/qr_session_info"
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:layout_marginTop="16dp"
+			android:layout_marginBottom="8dp"
+			android:layout_marginHorizontal="16dp"
+			android:padding="12dp"
+			android:background="@drawable/bg_handle_help"
+			android:textAppearance="@style/m3_body_medium"
+			android:textColor="?colorM3OnSurfaceVariant"
+			android:text="电脑端请求登录，请确认这是您本人的操作。\n\n点击「授权」后，电脑端将自动完成登录。"/>
+
+		<LinearLayout
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:paddingHorizontal="16dp"
+			android:layout_marginBottom="16dp"
+			android:orientation="horizontal"
+			android:gravity="end">
+
+			<Button
+				android:id="@+id/btn_cancel"
+				android:layout_width="wrap_content"
+				android:layout_height="40dp"
+				android:layout_marginEnd="8dp"
+				style="@style/Widget.Mastodon.M3.Button.Text"
+				android:text="取消"/>
+
+			<Button
+				android:id="@+id/btn_authorize"
+				android:layout_width="wrap_content"
+				android:layout_height="40dp"
+				style="@style/Widget.Mastodon.M3.Button.Filled"
+				android:text="授权"/>
+		</LinearLayout>
+
+	</LinearLayout>
+</org.joinmastodon.android.ui.views.CustomScrollView>

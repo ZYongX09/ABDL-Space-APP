@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="24dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="ABDL Space 是专为 ABDL 群体打造的安全私密社区客户端。"
+        android:textSize="15sp"
+        android:lineSpacingExtra="4dp"
+        android:textColor="?android:textColorPrimary" />
+</LinearLayout>

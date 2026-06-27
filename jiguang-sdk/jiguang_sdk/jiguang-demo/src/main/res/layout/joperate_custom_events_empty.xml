@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="201dp"
+    android:gravity="center_horizontal"
+    android:orientation="vertical">
+
+
+    <ImageView
+        android:layout_marginTop="43dp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:src="@mipmap/joperate_chatu_wubiaoqian" />
+
+    <TextView
+        android:layout_width="260dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:layout_marginBottom="22dp"
+        android:gravity="center"
+        android:text="该项目未创建任一自定义事件，请在「数据中心-事件管理」创建"
+        android:textColor="#ff8d939d"
+        android:textSize="13sp" />
+</LinearLayout>
+
+
+
+

@@ -1,0 +1,27 @@
+{
+  "buildFiles": [
+    "/home/ZYongX/projects/moshidon-test/mastodon/src/main/jni/CMakeLists.txt"
+  ],
+  "cleanCommandsComponents": [
+    [
+      "/home/ZYongX/Android/Sdk/cmake/3.22.1/bin/ninja",
+      "-C",
+      "/home/ZYongX/projects/moshidon-test/mastodon/.cxx/Debug/3n9543k2/x86_64",
+      "clean"
+    ]
+  ],
+  "buildTargetsCommandComponents": [
+    "/home/ZYongX/Android/Sdk/cmake/3.22.1/bin/ninja",
+    "-C",
+    "/home/ZYongX/projects/moshidon-test/mastodon/.cxx/Debug/3n9543k2/x86_64",
+    "{LIST_OF_TARGETS_TO_BUILD}"
+  ],
+  "libraries": {
+    "intro::@6890427a1f51a3e7e1df": {
+      "artifactName": "intro",
+      "abi": "x86_64",
+      "output": "/home/ZYongX/projects/moshidon-test/mastodon/build/intermediates/cxx/Debug/3n9543k2/obj/x86_64/libintro.so",
+      "runtimeFiles": []
+    }
+  }
+}

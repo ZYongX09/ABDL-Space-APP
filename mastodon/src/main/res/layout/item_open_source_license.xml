@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingHorizontal="16dp"
+    android:paddingVertical="12dp"
+    android:background="@drawable/bg_card"
+    android:clickable="true"
+    android:focusable="true"
+    android:foreground="?android:attr/selectableItemBackground">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:id="@+id/lib_name"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textAppearance="@style/m3_title_small"
+            android:textColor="?android:attr/textColorPrimary"
+            android:singleLine="true"
+            android:ellipsize="end"
+            tools:text="Library Name"/>
+
+        <TextView
+            android:id="@+id/lib_license"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="2dp"
+            android:textAppearance="@style/m3_label_small"
+            android:textColor="#2196F3"
+            android:background="@drawable/bg_license_badge"
+            tools:text="Apache 2.0"/>
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/lib_description"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:textAppearance="@style/m3_body_small"
+        android:textColor="?android:attr/textColorSecondary"
+        tools:text="Description text"/>
+
+    <TextView
+        android:id="@+id/lib_url"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:textAppearance="@style/m3_label_small"
+        android:textColor="#2196F3"
+        android:singleLine="true"
+        android:ellipsize="end"
+        tools:text="https://github.com/..."/>
+
+</LinearLayout>

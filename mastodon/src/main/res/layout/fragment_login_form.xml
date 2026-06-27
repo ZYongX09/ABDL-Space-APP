@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="utf-8"?>
+<me.grishka.appkit.views.FragmentRootLinearLayout
+	android:layout_width="match_parent"
+	android:layout_height="match_parent"
+	xmlns:app="http://schemas.android.com/apk/res-auto"
+	android:orientation="vertical"
+	android:id="@+id/appkit_loader_root"
+	xmlns:android="http://schemas.android.com/apk/res/android"
+	android:background="?colorM3Background">
+
+	<include layout="@layout/appkit_toolbar"/>
+
+	<ScrollView
+		android:layout_width="match_parent"
+		android:layout_height="0dp"
+		android:layout_weight="1"
+		android:fillViewport="true">
+
+		<LinearLayout
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:orientation="vertical"
+			android:gravity="center_horizontal"
+			android:paddingStart="28dp"
+			android:paddingEnd="28dp"
+			android:paddingTop="24dp"
+			android:paddingBottom="32dp">
+
+			<ImageView
+				android:id="@+id/logo"
+				android:layout_width="80dp"
+				android:layout_height="80dp"
+				android:layout_marginTop="16dp"
+				android:layout_marginBottom="20dp"
+				android:src="@mipmap/ic_launcher"
+				android:scaleType="fitCenter"
+				android:contentDescription="@string/app_name"
+				android:outlineProvider="background"
+				android:clipToOutline="true"/>
+
+			<TextView
+				android:id="@+id/title"
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:layout_marginBottom="6dp"
+				android:textSize="22sp"
+				android:textStyle="bold"
+				android:textColor="?colorM3OnSurface"
+				android:text="@string/log_in"
+				android:gravity="center"/>
+
+			<TextView
+				android:id="@+id/subtitle"
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:layout_marginBottom="28dp"
+				android:textSize="14sp"
+				android:textColor="?colorM3OnSurfaceVariant"
+				android:text="使用您的 ABDL Space 账户登录"
+				android:gravity="center"/>
+
+			<EditText
+				android:id="@+id/login_edit"
+				android:layout_width="match_parent"
+				android:layout_height="52dp"
+				android:layout_marginBottom="12dp"
+				android:hint="邮箱或用户名"
+				android:inputType="textEmailAddress"
+				android:autofillHints="emailAddress"
+				android:singleLine="true"
+				android:paddingStart="16dp"
+				android:paddingEnd="16dp"
+				android:background="@drawable/bg_m3_outlined_text_field"
+				android:textSize="15sp"/>
+
+			<EditText
+				android:id="@+id/password_edit"
+				android:layout_width="match_parent"
+				android:layout_height="52dp"
+				android:layout_marginBottom="20dp"
+				android:hint="密码"
+				android:inputType="textPassword"
+				android:autofillHints="password"
+				android:singleLine="true"
+				android:paddingStart="16dp"
+				android:paddingEnd="16dp"
+				android:background="@drawable/bg_m3_outlined_text_field"
+				android:textSize="15sp"/>
+
+			<Button
+				android:id="@+id/btn_login"
+				android:layout_width="match_parent"
+				android:layout_height="48dp"
+				style="@style/Widget.Mastodon.M3.Button.Filled"
+				android:text="@string/log_in"
+				android:textSize="15sp"
+				android:enabled="false"/>
+
+			<TextView
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:layout_marginTop="24dp"
+				android:layout_marginBottom="16dp"
+				android:text="或使用第三方授权登录"
+				android:textColor="?colorM3OnSurfaceVariant"
+				android:textSize="12sp"
+				android:gravity="center"/>
+
+			<Button
+				android:id="@+id/btn_oauth"
+				android:layout_width="match_parent"
+				android:layout_height="44dp"
+				style="@style/Widget.Mastodon.M3.Button.Outlined"
+				android:drawableStart="@drawable/ic_abdl_icon"
+				android:drawablePadding="8dp"
+				android:text="使用网页版 ABDL Space 授权登录"
+				android:textAllCaps="false"
+				android:textSize="13sp"/>
+
+			<Button
+				android:id="@+id/btn_nbw"
+				android:layout_width="match_parent"
+				android:layout_height="44dp"
+				android:layout_marginTop="10dp"
+				style="@style/Widget.Mastodon.M3.Button.Outlined"
+				android:drawableStart="@drawable/ic_nbw"
+				android:drawablePadding="8dp"
+				android:text="使用网页版 宝宝新天地 授权登录"
+				android:textAllCaps="false"
+				android:textSize="13sp"/>
+
+		</LinearLayout>
+
+	</ScrollView>
+
+</me.grishka.appkit.views.FragmentRootLinearLayout>

@@ -1,0 +1,402 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
+	<string name="log_in">შესვლა</string>
+	<string name="next">შემდეგი</string>
+	<string name="loading_instance">მიმდინარეობს სერვერის ინფორმაციის მიღება…</string>
+	<string name="error">შეცდომა</string>
+	<string name="not_a_mastodon_instance">როგორც ჩანს, %s არ არის ABDL Space-ის სერვერი.</string>
+	<string name="ok">OK</string>
+	<string name="preparing_auth">მიმდინარეობს ავტორიზაციისთვის მზადება…</string>
+	<string name="finishing_auth">მიმდინარეობს ავტორიზაციის დასრულება…</string>
+	<string name="notifications">შეტყობინებები</string>
+	<string name="user_followed_you">%s-მა გამოგიწერათ</string>
+	<string name="user_sent_follow_request">%s-მა გამოგიგზავნათ გამოწერის მოთხოვნა</string>
+	<string name="share_toot_title">გაზიარება</string>
+	<string name="settings">პარამეტრები</string>
+	<string name="publish">გამოქვეყნება</string>
+	<string name="discard_draft">გსურთ მონახაზის წაშლა?</string>
+	<string name="discard">წაშლა</string>
+	<string name="cancel">გაუქმება</string>
+	<string name="posts">პოსტები</string>
+	<string name="media">მედია</string>
+	<string name="profile_about">ჩემს შესახებ</string>
+	<string name="button_follow">გამოწერა</string>
+	<string name="edit_profile">პროფილის რედაქტირება</string>
+	<string name="share_user">პროფილის გაზიარება…</string>
+	<string name="mute_user">%s-ის იგნორირება</string>
+	<string name="unmute_user">%s-ის ამოღება იგნორირებულთა სიიდან</string>
+	<string name="block_user">%s-ის დაბლოკვა</string>
+	<string name="unblock_user">%s-ის განბლოკვა</string>
+	<string name="report_user">საჩივარი %s-ის შესახებ</string>
+	<string name="block_domain">%s-ის დაბლოკვა</string>
+	<string name="unblock_domain">%s-ის განბლოკვა</string>
+	<plurals name="x_posts">
+		<item quantity="one">%,d პოსტი</item>
+		<item quantity="other">%,d პოსტი</item>
+	</plurals>
+	<string name="profile_joined">რეგისტრაციის თარიღი</string>
+	<string name="done">მზადაა</string>
+	<string name="loading">მიმდინარეობს ჩატვირთვა…</string>
+	<string name="field_label">ლეიბლი</string>
+	<string name="field_content">შინაარსი</string>
+	<string name="saving">მიმდინარეობს შენახვა…</string>
+	<string name="post_from_user">პოსტი %s-ისგან</string>
+	<string name="poll_option_hint">ვარიანტი %d</string>
+	<plurals name="x_minutes">
+		<item quantity="one">%d წუთი</item>
+		<item quantity="other">%d წუთი</item>
+	</plurals>
+	<plurals name="x_hours">
+		<item quantity="one">%d საათი</item>
+		<item quantity="other">%d საათი</item>
+	</plurals>
+	<plurals name="x_days">
+		<item quantity="one">%d დღე</item>
+		<item quantity="other">%d დღე</item>
+	</plurals>
+	<plurals name="x_seconds_left">
+		<item quantity="one">დარჩენილია %d წამი</item>
+		<item quantity="other">დარჩენილია %d წამი</item>
+	</plurals>
+	<plurals name="x_minutes_left">
+		<item quantity="one">დარჩენილია %d წუთი</item>
+		<item quantity="other">დარჩენილია %d წუთი</item>
+	</plurals>
+	<plurals name="x_hours_left">
+		<item quantity="one">დარჩენილია %d საათი</item>
+		<item quantity="other">დარჩენილია %d საათი</item>
+	</plurals>
+	<plurals name="x_days_left">
+		<item quantity="one">დარჩენილია %d დღე</item>
+		<item quantity="other">დარჩენილია %d დღე</item>
+	</plurals>
+	<plurals name="x_votes">
+		<item quantity="one">%,d ხმა</item>
+		<item quantity="other">%,d ხმა</item>
+	</plurals>
+	<string name="poll_closed">დასრულებულია</string>
+	<string name="do_mute">იგნორირება</string>
+	<string name="do_block">დაბლოკვა</string>
+	<string name="button_blocked">დაბლოკილია</string>
+	<string name="action_vote">ხმის მიცემა</string>
+	<string name="delete">წაშლა</string>
+	<string name="confirm_delete_title">პოსტის წაშლა</string>
+	<string name="confirm_delete">დარწმუნებული ხართ, რომ გსურთ ამ პოსტის წაშლა?</string>
+	<string name="deleting">მიმდინარეობს წაშლა…</string>
+	<string name="notification_channel_audio_player">აუდიოს დაკვრა</string>
+	<string name="play">დაკვრა</string>
+	<string name="pause">პაუზა</string>
+	<string name="log_out">გამოსვლა</string>
+	<string name="add_account">ანგარიშის დამატება</string>
+	<string name="search_hint">ძიება</string>
+	<string name="hashtags">ჰეშტეგები</string>
+	<string name="news">სიახლეები</string>
+	<string name="for_you">თქვენთვის</string>
+	<string name="all_notifications">ყველაფერი</string>
+	<string name="mentions">მონიშვნები</string>
+	<string name="report_title">საჩივარი %s-ის შესახებ</string>
+	<string name="report_reason_personal">არ მომწონს</string>
+	<string name="report_reason_spam">ეს არის სპამი</string>
+	<string name="report_choose_rule_subtitle">აირჩიეთ ყველა, რომელიც შეესაბამება</string>
+	<string name="report_comment_hint">დამატებითი კომენტარი</string>
+	<string name="sending_report">მიმდინარეობს საჩივრის გაგზავნა…</string>
+	<string name="back">უკან</string>
+	<string name="search_communities">სერვერის სახელი ან URL მისამართი</string>
+	<string name="instance_rules_title">სერვერის წესები</string>
+	<string name="signup_title">ანგარიშის შექმნა</string>
+	<string name="display_name">სახელი</string>
+	<string name="username">მომხმარებლის სახელი</string>
+	<string name="email">ელექტრონული ფოსტის მისამართი</string>
+	<string name="password">პაროლი</string>
+	<string name="confirm_password">დაადასტურეთ პაროლი</string>
+	<string name="category_general">ზოგადი</string>
+	<string name="confirm_email_title">შეამოწმეთ თქვენი შემოსული წერილები</string>
+	<!-- %s is the email address -->
+	<string name="confirm_email_subtitle">%s-ის დასადასტურებლად, დააწკაპუნეთ ბმულზე, რომელიც გამოგიგზავნეთ. ჩვენ აქ დაგელოდებით.</string>
+	<string name="confirm_email_didnt_get">არ მიგიღიათ ბმული?</string>
+	<string name="resend">ხელახლა გაგზავნა</string>
+	<string name="open_email_app">ელფოსტის აპლიკაციის გახსნა</string>
+	<string name="resent_email">ვერიფიკაციის ელფოსტა გაგზავნილია</string>
+	<string name="compose_hint">ჩაწერეთ ან ჩასვით, რასაც ფიქრობთ</string>
+	<string name="content_warning">გაფრთხილება შინაარსის შესახებ</string>
+	<string name="save">შენახვა</string>
+	<string name="add_alt_text">ალტერნატიული ტექსტის დამატება</string>
+	<string name="visibility_public">საჯარო</string>
+	<string name="recent_searches">ბოლოდროინდელები</string>
+	<string name="notification_type_follow">ახალი გამომწერები</string>
+	<string name="notification_type_favorite">რჩეულები</string>
+	<string name="notification_type_mention">მონიშვნები</string>
+	<string name="notification_type_poll">გამოკითხვები</string>
+	<string name="choose_account">აირჩიეთ ანგარიში</string>
+	<string name="err_not_logged_in">გთხოვთ, თავდაპირველად, გაიარეთ ავტორიზაცია ABDL Space-ში</string>
+	<string name="settings_notifications">შეტყობინებები</string>
+	<string name="settings_tos">მომსახურების პირობები</string>
+	<string name="settings_privacy_policy">კონფიდენციალურობის პოლიტიკა</string>
+	<string name="button_share">გაზიარება</string>
+	<string name="emoji">Emoji</string>
+	<string name="my_profile">ჩემი პროფილი</string>
+	<string name="open_in_browser">ბრაუზერში გახსნა</string>
+	<string name="signup_reason">რატომ გსურთ შემოუერთდეთ?</string>
+	<string name="clear">გასუფთავება</string>
+	<string name="profile_picture">პროფილის სურათი</string>
+	<string name="download">გადმოწერა</string>
+	<string name="permission_required">საჭიროა ნებართვა</string>
+	<string name="open_settings">პარამეტრების გახსნა</string>
+	<string name="error_saving_file">შეცდომა ფაილის შენახვისას</string>
+	<string name="downloading">მიმდინარეობს გადმოწერა…</string>
+	<!-- %s is the server domain -->
+	<string name="see_new_posts">ახალი პოსტები</string>
+	<!-- translators: %,d is a valid placeholder, it formats the number with locale-dependent grouping separators -->
+	<string name="time_just_now">ახლახანს</string>
+	<plurals name="x_seconds_ago">
+		<item quantity="one">%d წამის წინ</item>
+		<item quantity="other">%d წამის წინ</item>
+	</plurals>
+	<plurals name="x_minutes_ago">
+		<item quantity="one">%d წუთის წინ</item>
+		<item quantity="other">%d წუთის წინ</item>
+	</plurals>
+	<string name="edit_original_post">Original post</string>
+	<string name="edit">რედაქტირება</string>
+	<string name="discard_changes">გსურთ ცვლილებების გაუქმება?</string>
+	<string name="upload_failed">ატვირთვა ვერ მოხერხდა</string>
+	<string name="file_size_bytes">%d bytes</string>
+	<string name="file_size_kb">%.2f KB</string>
+	<string name="file_size_mb">%.2f MB</string>
+	<string name="file_size_gb">%.2f GB</string>
+	<string name="upload_processing">მუშავდება…</string>
+	<!-- %s is file size -->
+	<string name="install_update">დაყენება</string>
+	<string name="privacy_policy_title">თქვენი კონფიდენციალურობა</string>
+	<string name="i_agree">ვეთანხმები</string>
+	<string name="empty_list">ეს სია ცარიელია</string>
+	<string name="instance_signup_closed">ეს სერვერი არ იღებს ახალ რეგისტრაციას.</string>
+	<string name="text_copied">დაკოპირებულია ბუფერში</string>
+	<string name="server_url">სერვერის URL მისამართი</string>
+	<string name="server_filter_region_europe">ევროპა</string>
+	<string name="server_filter_region_north_america">ჩრდილოეთ ამერიკა</string>
+	<string name="server_filter_region_south_america">სამხრეთ ამერიკა</string>
+	<string name="server_filter_region_africa">აფრიკა</string>
+	<string name="server_filter_region_asia">აზია</string>
+	<string name="server_filter_region_oceania">ოკეანეთი</string>
+	<string name="not_accepting_new_members">არ იღებს ახალ წევრებს</string>
+	<string name="signup_passwords_dont_match">პაროლები არ ემთხვევა</string>
+	<!-- %s is server domain -->
+	<!-- Shown in a progress dialog when you tap "follow all" -->
+	<!-- %1$s is server domain, %2$s is email domain. You can reorder these placeholders to fit your language better. -->
+	<string name="save_changes">ცვლილებების შენახვა</string>
+	<string name="profile_endorsed_accounts">ანგარიშები</string>
+	<string name="learn_more">გაიგეთ მეტი</string>
+	<string name="welcome_to_mastodon">მოგესალმებათ ABDL Space</string>
+	<string name="what_are_servers">რა არის სერვერები?</string>
+	<string name="log_out_all_accounts">ყველა ანგარიშიდან გამოსვლა</string>
+	<string name="confirm_log_out_all_accounts">გსურთ გამოხვიდეთ ყველა ანგარიშიდან?</string>
+	<string name="retry">ხელახლა ცდა</string>
+	<string name="post_failed">პოსტის გაგზავნა ვერ მოხერხდა</string>
+	<!-- %s is formatted file size ("467 KB image") -->
+	<string name="attachment_type_image">სურათი</string>
+	<string name="attachment_type_video">ვიდეო</string>
+	<string name="attachment_type_audio">აუდიო</string>
+	<string name="attachment_type_gif">GIF</string>
+	<string name="attachment_type_unknown">ფაილი</string>
+	<string name="poll_style">სტილი</string>
+	<string name="help">დახმარება</string>
+	<string name="what_is_alt_text">რა არის ალტერნატიული ტექსტი?</string>
+	<string name="edit_post">პოსტის რედაქტირება</string>
+	<string name="language">ენა</string>
+	<string name="language_default">ნაგულისხმევი</string>
+	<string name="language_system">სისტემის შესაბამისი</string>
+	<string name="language_detecting">მიმდინარეობს ენის ამოცნობა</string>
+	<string name="language_cant_detect">ენის ამოცნობა შეუძლებელია</string>
+	<string name="language_detected">ამოცნობილია</string>
+	<string name="media_hidden">მედია დამალულია</string>
+	<string name="post_hidden">პოსტი დამალულია</string>
+	<string name="report_title_post">საჩივარი პოსტის შესახებ</string>
+	<!-- %s is the server domain -->
+	<!-- Shown on the "stamp" on the screen that appears after you report a post/user. Please keep the translation short, preferably a single word -->
+	<string name="reported">საჩივარი გაგზავნილია</string>
+	<string name="muted_user">%s იგნორირებულია</string>
+	<string name="blocked_user">%s დაბლოკილია</string>
+	<string name="mark_all_notifications_read">ყველას წაკითხულად მონიშვნა</string>
+	<string name="settings_filters">ფილტრები</string>
+	<!-- %s is the app name (ABDL Space, key app_name). I made it a placeholder so everything Just Works™ with forks -->
+	<string name="about_app">%s-ის შესახებ</string>
+	<plurals name="x_weeks">
+		<item quantity="one">%d კვირა</item>
+		<item quantity="other">%d კვირა</item>
+	</plurals>
+	<!-- %1$s is the date (may be relative, e.g. "today" or "yesterday"), %2$s is the time. You can reorder these placeholders if that works better for your language -->
+	<string name="today">დღეს</string>
+	<string name="yesterday">გუშინ</string>
+	<string name="tomorrow">ხვალ</string>
+	<!-- %s is the timestamp ("tomorrow at 12:34") -->
+	<!-- %s is the timestamp ("tomorrow at 12:34") -->
+	<string name="about_server">სერვერის შესახებ</string>
+	<string name="server_rules">წესები</string>
+	<string name="server_administrator">ადმინისტრატორი</string>
+	<string name="send_email_to_server_admin">ადმინისტრატორთან შეტყობინების გაგზავნა</string>
+	<string name="count_one">ერთი</string>
+	<string name="count_two">ორი</string>
+	<string name="count_three">სამი</string>
+	<string name="count_four">ოთხი</string>
+	<!-- %s is the username -->
+	<string name="settings_add_filter">ფილტრის დამატება</string>
+	<string name="settings_edit_filter">ფილტრის რედაქტირება</string>
+	<string name="settings_filter_duration">ხანგრძლივობა</string>
+	<string name="settings_filter_muted_words">იგნორირებული სიტყვები</string>
+	<string name="settings_delete_filter">ფილტრის წაშლა</string>
+	<!-- %s is the timestamp ("tomorrow at 12:34") -->
+	<string name="filter_context_notifications">შეტყობინებები</string>
+	<string name="filter_context_profiles">პროფილები</string>
+	<string name="settings_filter_title">სახელი</string>
+	<string name="settings_delete_filter_title">წაიშალოს “%s” ფილტრი?</string>
+	<string name="settings_delete_filter_confirmation">ეს ფილტრი წაიშლება თქვენი ანგარიშიდან თქვენს ყველა მოწყობილობაზე.</string>
+	<string name="add_muted_word">იგნორირებული სიტყვის დამატება</string>
+	<string name="edit_muted_word">იგნორირებული სიტყვის რედაქტირება</string>
+	<string name="add">დამატება</string>
+	<string name="filter_word_or_phrase">სიტყვა ან ფრაზა</string>
+	<string name="enter_selection_mode">მონიშვნა</string>
+	<string name="select_all">ყველას მონიშვნა</string>
+	<string name="settings_filter_duration_title">ფილტრის ხანგრძლივობა</string>
+	<!-- Shown like a content warning, %s is the name of the filter -->
+	<!-- Shown in the post header. Please keep it short -->
+	<!-- %s is the name of the post language -->
+	<!-- %1$s is the language, %2$s is the name of the translation service -->
+	<!-- Screen reader description for the menu on the home timeline screen -->
+	<!-- %s is the name of the list -->
+	<!-- %s is a username -->
+	<!-- %s is a time interval ("5 months") -->
+	<string name="do_block_server">სერვერის დაბლოკვა</string>
+	<string name="users_cant_see_blocked">ამ სერვერზე მომხმარებლებისგან პოსტებსა და შეტყობინებებს ვერ ნახავთ.</string>
+	<string name="server">სერვერი</string>
+	<string name="qr_code">QR code</string>
+	<string name="scan_qr_code">QR კოდის დასკანერება</string>
+	<!-- Shown on a button that saves a file, after it was successfully saved -->
+	<string name="saved">შენახულია</string>
+	<string name="image_saved">სურათი შენახულია.</string>
+	<string name="video_saved">ვიდეო შენახულია.</string>
+	<string name="copy_profile_link">პროფილის ბმულის დაკოპირება</string>
+	<string name="in_app_browser">აპლიკაციის ბრაუზერი</string>
+	<string name="system_browser">სისტემური ბრაუზერი</string>
+	<string name="tab_home">მთავარი</string>
+	<string name="tab_search">დათვალიერება</string>
+	<string name="tab_profile">პროფილი</string>
+	<string name="pin_post">პროფილზე მიმაგრება</string>
+	<string name="unpin_post">პროფილიდან მოხსნა</string>
+	<string name="post_pinned">პოსტი მიმაგრებულია</string>
+	<string name="post_unpinned">პოსტი მოხსნილია</string>
+	<!-- %s is the username -->
+	<string name="enable_new_post_notifications">შემატყობინე, როდესაც %s დაპოსტავს</string>
+	<string name="disable_new_post_notifications">აღარ შემატყობინო, როდესაც %s დაპოსტავს</string>
+	<string name="new_post_notifications_enabled">თქვენ მიიღებთ შეტყობინებებს ახალი პოსტის შესახებ.</string>
+	<string name="new_post_notifications_disabled">თქვენ აღარ მიიღებთ შეტყობინებებს ახალი პოსტის შესახებ.</string>
+	<plurals name="x_new_notifications">
+		<item quantity="one">%,d ახალი შეტყობინება</item>
+		<item quantity="other">%,d ახალი შეტყობინება</item>
+	</plurals>
+	<string name="dismiss">გაუქმება</string>
+	<string name="donation_once">ერთხელ</string>
+	<string name="donation_monthly">ყოველთვიურად</string>
+	<string name="donation_yearly">ყოველწლიურად</string>
+	<string name="currency">ვალუტა</string>
+	<string name="donation_success_title">გმადლობთ თქვენი წვლილისთვის!</string>
+	<string name="donation_success_subtitle">მალე უნდა მიიღოთ თქვენი შემოწირულობის დამადასტურებელი ელფოსტა.</string>
+	<string name="donation_server_error">ბოდიშს გიხდით, შეცდომა მოხდა და თქვენი შემოწირულობის დამუშავება ვერ შევძელით.\n\nგთხოვთ, რამდენიმე წუთში ხელახლა სცადოთ.</string>
+	<string name="settings_donate">ABDL Space-ისთვის თანხის შემოწირვა</string>
+	<string name="settings_manage_donations">დონაციების მართვა</string>
+	<string name="cant_load_image">სურათის ჩატვირთვა ვერ მოხერხდა</string>
+	<string name="poll_see_results">შედეგების გამოჩენა</string>
+	<string name="poll_hide_results">შედეგების დამალვა</string>
+	<plurals name="x_attachments">
+		<item quantity="one">%d ფაილი</item>
+		<item quantity="other">%d ფაილი</item>
+	</plurals>
+	<!-- %1$s is your server domain, %2$s is the domain that was blocked, %3$,d is the follower count, %4$s is the `x_accounts` plural string -->
+	<plurals name="x_accounts">
+		<item quantity="one">%,d ანგარიში</item>
+		<item quantity="other">%,d ანგარიში</item>
+	</plurals>
+	<!-- %1$s is the domain that was blocked, %2$,d is the follower count, %3$s is the `x_accounts` plural string -->
+	<string name="relationship_severance_user_domain_block">თქვენ დაბლოკეთ %1$s, რითაც წაშალეთ თქვენი %2$,d გამომწერი და %3$s თქვენი გამოწერილი.</string>
+	<string name="relationship_severance_learn_more">გაიგეთ მეტი</string>
+	<string name="moderation_warning_action_none">თქვენს ანგარიშს მოდერაციის გაფრთხილება მიეცა.</string>
+	<string name="moderation_warning_action_disable">თქვენი ანგარიში გათიშულია.</string>
+	<string name="moderation_warning_action_mark_statuses_as_sensitive">თქვენი ზოგიერთი პოსტი მოინიშნა როგორც სენსიტიური.</string>
+	<string name="moderation_warning_action_delete_statuses">თქვენი ზოგიერთი პოსტი წაიშალა.</string>
+	<string name="moderation_warning_action_sensitive">თქვენი პოსტები ამიერიდან მონიშნული იქნება როგორც სენსიტიური.</string>
+	<string name="moderation_warning_action_silence">თქვენი ანგარიში შეზღუდულია.</string>
+	<string name="moderation_warning_action_suspend">თქვენი ანგარიში შეჩერებულია.</string>
+	<string name="moderation_warning_learn_more">გაიგეთ მეტი</string>
+	<string name="text_show_more">მეტი</string>
+	<string name="avatar_move_and_scale">გადაადგილება და მასშტაბირება</string>
+	<string name="confirm_avatar_crop">არჩევა</string>
+	<string name="settings_use_dynamic_colors">სისტემის დინამიური ფერის გამოყენება</string>
+	<string name="settings_accounts">ანგარიშები</string>
+	<string name="settings_add_account">ანგარიშის დამატება...</string>
+	<string name="settings_app_settings">აპლიკაციის პარამეტრები</string>
+	<string name="account_settings">ანგარიშის პარამეტრები</string>
+	<string name="settings_about_this_server">ამ სერვერის შესახებ</string>
+	<string name="manage_account">ანგარიშის მართვა</string>
+	<string name="switch_to_this_account">ამ ანგარიშზე გადასვლა</string>
+	<string name="delete_account">ანგარიშის წაშლა</string>
+	<string name="notification_type_status">ახალი პოსტები</string>
+	<plurals name="user_and_x_more_followed">
+		<item quantity="one">%1$s-მ და %2$,d სხვამ გამოგიწერათ</item>
+		<item quantity="other">%1$s-მ და %2$,d სხვამ გამოგიწერათ</item>
+	</plurals>
+	<string name="familiar_followers_one">გამოწერილი ჰყავს %s-ს</string>
+	<string name="familiar_followers_two">გამოწერილი ჰყავს %s-ს და %s-ს</string>
+	<string name="profile_saved_posts">შენახული</string>
+	<string name="profile_saved_posts_explanation">თქვენს მიერ შენახული პოსტები მხოლოდ თქვენთვისაა ხილული.</string>
+	<string name="search_people">ხალხი</string>
+	<plurals name="familiar_followers_many">
+		<item quantity="one">გამოწერილი ჰყავს %1$s-ს, %2$s-ს, და %3$,d სხვას</item>
+		<item quantity="other">გამოწერილი ჰყავს %1$s-ს, %2$s-ს, და %3$,d სხვას</item>
+	</plurals>
+	<plurals name="x_followers_you_know">
+		<item quantity="one">%,d გამომწერი, რომელიც იცით</item>
+		<item quantity="other">%,d გამომწერი, რომელიც იცით</item>
+	</plurals>
+	<!-- appears when you're about to block a server -->
+	<plurals name="server_x_followers_will_be_removed">
+		<item quantity="one">ამ სერვერიდან %,d გამომწერი წაიშლება.</item>
+		<item quantity="other">ამ სერვერიდან %,d გამომწერი წაიშლება.</item>
+	</plurals>
+	<!-- The complete string will look like "You will lose X followers and Y people you follow". See will_lose_x_followers and will_lose_x_following -->
+	<string name="server_x_followers_and_following_will_be_removed">თქვენ დაკარგავთ %1$s-ს და %2$s-ს.</string>
+	<plurals name="will_lose_x_followers">
+		<item quantity="one">%,d გამომწერი</item>
+		<item quantity="other">%,d გამომწერი</item>
+	</plurals>
+	<plurals name="will_lose_x_following">
+		<item quantity="one">%,d პიროვნება, რომელსაც თვალს ადევნებთ</item>
+		<item quantity="other">%,d ადამიანი, რომელსაც თვალს ადევნებთ</item>
+	</plurals>
+	<!-- The complete string will look like "You will lose X people you follow". See will_lose_x_following -->
+	<string name="server_x_following_will_be_removed">თქვენ დაკარგავთ %s-ს.</string>
+	<string name="load_missing_posts_above">დაკარგული პოსტების ჩატვირთვა ზემოთ</string>
+	<string name="load_missing_posts_below">დაკარგული პოსტების ჩატვირთვა ქვემოთ</string>
+	<string name="signup_password_too_short">პაროლი უნდა იყოს მინიმუმ 8 სიმბოლო.</string>
+	<string name="private_reply">კონფიდენციალური პასუხის გაცემა</string>
+	<string name="private_mention">კონფიდენციალური მონიშვნა</string>
+	<string name="post_header_reply">პასუხის გაცემა</string>
+	<string name="post_header_mention">მონიშვნა</string>
+	<string name="report_reason_legal">არალეგალურია</string>
+	<string name="report_reason_legal_subtitle">თქვენ თვლით, რომ ეს არღვევს თქვენი ან სერვერის ქვეყნის კანონს</string>
+	<string name="date_of_birth">დაბადების თარიღი</string>
+	<!-- %s is `at_least_x_years_old`. Some languages, unlike English, may require the word "years" here. -->
+	<string name="date_of_birth_explanation">ჩვენ უნდა დავრწმუნდეთ, რომ თქვენ მინიმუმ %s-ს ხართ ABDL Space-ის გამოსაყენებლად. ეს მონაცემი რეგისტრაციის შემდეგ არ შეინახება.</string>
+	<string name="open_link">გახსნა</string>
+	<string name="copy">დაკოპირება</string>
+	<!-- Substituted into `date_of_birth_explanation` -->
+	<plurals name="at_least_x_years_old">
+		<item quantity="one">%d</item>
+		<item quantity="other">%d</item>
+	</plurals>
+	<string name="quote_post_unavailable">პოსტი არ არის ხელმისაწვდომი</string>
+	<string name="quote_post_pending">პოსტი განხილვაშია</string>
+	<string name="quote_post_pending_explanation">ABDL Space-ზე შეგიძლიათ აკონტროლოთ, შეუძლია თუ არა ვინმეს თქვენი ციტირება. ეს პოსტი განხილვის პროცესშია, სანამ ორიგინალი ავტორისგან დამტკიცებას არ მივიღებთ.</string>
+	<!-- %s is a username, i.e. @Gargron -->
+	<string name="nested_quote">ციტირებულია %s-ის პოსტი</string>
+	<!-- %s is current user's full username, e.g. @example@mastodon.social -->
+</resources>

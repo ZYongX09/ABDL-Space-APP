@@ -1,0 +1,246 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/main"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context="cn.jiguang.demo.joperate.ui.main.MainFragment">
+
+    <ImageView
+        android:layout_width="match_parent"
+        android:layout_height="360dp"
+        android:background="@mipmap/joperate_banner"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <ImageView
+        android:id="@+id/back"
+        android:layout_width="20dp"
+        android:layout_height="20dp"
+        android:layout_marginLeft="16dp"
+        android:layout_marginTop="39dp"
+        android:visibility="invisible"
+        android:src="@mipmap/joperate_back_white"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <TextView
+        android:id="@+id/text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="21dp"
+        android:text="极光运营增长"
+        android:textColor="#ffffffff"
+        android:textSize="30dp"
+        app:layout_constraintStart_toStartOf="@+id/back"
+        app:layout_constraintTop_toBottomOf="@+id/back" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:text="专注提升运营效果、运营效率"
+        android:textColor="#ffffffff"
+        android:textSize="16dp"
+        app:layout_constraintStart_toStartOf="@+id/text"
+        app:layout_constraintTop_toBottomOf="@+id/text" />
+
+    <View
+        android:id="@+id/view"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="230dp"
+        android:background="@drawable/joperate_main_background"
+        app:layout_constraintBottom_toBottomOf="@+id/view_other"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <TextView
+        android:id="@+id/cuid"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="16dp"
+        android:layout_marginTop="34dp"
+        android:text="CUID"
+        android:textColor="#ff253044"
+        android:textSize="14dp"
+        app:layout_constraintStart_toStartOf="@+id/view"
+        app:layout_constraintTop_toTopOf="@+id/view" />
+
+    <TextView
+        android:id="@+id/cuid_content"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginRight="3dp"
+        android:text="c08dbe24c3b"
+        android:textColor="#ff8d939d"
+        android:textSize="12sp"
+        app:layout_constraintBottom_toBottomOf="@+id/cuid"
+        app:layout_constraintEnd_toStartOf="@+id/cuid_copy"
+        app:layout_constraintTop_toTopOf="@+id/cuid" />
+
+    <ImageView
+        android:id="@+id/cuid_copy"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginRight="16dp"
+        android:src="@mipmap/joperate_copy"
+        app:layout_constraintBottom_toBottomOf="@+id/cuid"
+        app:layout_constraintEnd_toEndOf="@+id/view"
+        app:layout_constraintTop_toTopOf="@+id/cuid" />
+
+    <View
+        android:id="@+id/cuid_view"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginLeft="16dp"
+        android:layout_marginTop="14dp"
+        android:layout_marginRight="16dp"
+        android:background="#ffeeeff7"
+        app:layout_constraintTop_toBottomOf="@+id/cuid" />
+
+
+    <TextView
+        android:id="@+id/text_debug"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:text="数据校验模式"
+        android:textColor="#ff253044"
+        android:textSize="14dp"
+        app:layout_constraintStart_toStartOf="@+id/cuid"
+        app:layout_constraintTop_toBottomOf="@+id/cuid_view" />
+
+
+    <ImageView
+        android:id="@+id/image_debug_dot"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginRight="8dp"
+        android:background="@drawable/joperate_main_dot"
+        app:layout_constraintBottom_toBottomOf="@+id/text_debug_switch"
+        app:layout_constraintRight_toLeftOf="@+id/text_debug_switch"
+        app:layout_constraintTop_toTopOf="@+id/text_debug_switch" />
+
+    <TextView
+        android:id="@+id/text_debug_switch"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginRight="16dp"
+        android:text="未开启"
+        android:textColor="#ff8d939d"
+        android:textSize="13dp"
+        app:layout_constraintBaseline_toBaselineOf="@id/text_debug"
+        app:layout_constraintRight_toRightOf="parent" />
+
+    <View
+        android:id="@+id/view_debug"
+        android:clickable="true"
+        android:layout_width="260dp"
+        android:layout_height="42dp"
+        android:layout_marginTop="31dp"
+        android:background="@drawable/joperate_main_debug_button_background"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/text_debug_switch" />
+
+    <Button
+        android:clickable="false"
+        android:id="@+id/debug_button"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="@android:color/transparent"
+        android:drawableLeft="@mipmap/joperate_scan_code"
+        android:text="扫码进入数据校验模式"
+        android:textColor="#ffffffff"
+        android:textSize="14dp"
+        app:layout_constraintBottom_toBottomOf="@+id/view_debug"
+        app:layout_constraintEnd_toEndOf="@+id/view_debug"
+        app:layout_constraintStart_toStartOf="@+id/view_debug"
+        app:layout_constraintTop_toTopOf="@+id/view_debug" />
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/constraintLayout"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/view_debug">
+
+        <ImageView
+            android:id="@+id/constraintLayout_exclamation_image"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginRight="1dp"
+            android:src="@mipmap/joperate_exclamation"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@+id/constraintLayout_text"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <TextView
+            android:id="@+id/constraintLayout_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="在「数据中心-接入校验」页，点击「扫码获取」弹出二维码"
+            android:textColor="#ff8d939d"
+            android:textSize="12sp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintLeft_toRightOf="@+id/constraintLayout_exclamation_image"
+            app:layout_constraintTop_toTopOf="parent" />
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <View
+        android:id="@+id/view_other"
+        android:layout_width="match_parent"
+        android:layout_height="10dp"
+        android:layout_marginTop="29dp"
+        android:background="#ffeeeff7"
+        app:layout_constraintTop_toBottomOf="@id/constraintLayout" />
+
+    <View
+        android:id="@+id/view_other_background"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:background="#FFFFFF"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/view_other" />
+
+    <Button
+        android:id="@+id/event_button"
+        android:layout_width="260dp"
+        android:layout_height="42dp"
+        android:layout_marginTop="30dp"
+        android:background="@drawable/joperate_main_button_background"
+        android:text="预置事件属性"
+        android:textColor="#ff0084f6"
+        android:textSize="14dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="@+id/view_other_background" />
+
+    <Button
+        android:id="@+id/project_button"
+        android:layout_width="260dp"
+        android:layout_height="42dp"
+        android:layout_marginTop="20dp"
+        android:background="@drawable/joperate_main_button_background"
+        android:text="项目信息"
+        android:textColor="#ff0084f6"
+        android:textSize="14dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/event_button" />
+
+    <ImageView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="23dp"
+        android:src="@mipmap/joperate_logo"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/project_button" />
+</androidx.constraintlayout.widget.ConstraintLayout>

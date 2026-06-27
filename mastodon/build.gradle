@@ -1,0 +1,203 @@
+plugins {
+	id 'com.android.application'
+	id 'com.google.android.libraries.mapsplatform.secrets-gradle-plugin'
+}
+
+android {
+	androidResources {
+		generateLocaleConfig = true
+	}
+	aaptOptions {
+		noCompress "tflite"
+	}
+
+	compileSdk 35
+	defaultConfig {
+		manifestPlaceholders = [oAuthScheme:"abdl-space"]
+		archivesBaseName = "abdl-space-app"
+		applicationId "top.abdl_space.app"
+		minSdk 24
+		targetSdk 35
+		versionCode 5
+		versionName "1.0.4"
+		testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+		testBuildType "screenshotsUiTest"
+
+		// JPush 配置
+		manifestPlaceholders += [
+			JPUSH_PKGNAME : "top.abdl_space.app",
+			JPUSH_APPKEY : "6aa46fed3b8f49a6d26ad1a1",
+			JPUSH_CHANNEL : "developer-default"
+		]
+	}
+
+	signingConfigs {
+		nightly{
+			storeFile = file("keystore/nightly_keystore.jks")
+			storePassword System.getenv("SIGNING_STORE_PASSWORD")
+			if (storePassword == null) {
+				Properties properties = new Properties()
+				properties.load(project.rootProject.file('local.properties').newDataInputStream())
+				storePassword = properties.getProperty('SIGNING_STORE_PASSWORD')
+			}
+			keyAlias System.getenv("SIGNING_KEY_ALIAS")
+			if (keyAlias == null) {
+				Properties properties = new Properties()
+				properties.load(project.rootProject.file('local.properties').newDataInputStream())
+				keyAlias = properties.getProperty('SIGNING_KEY_ALIAS')
+			}
+			keyPassword System.getenv("SIGNING_KEY_PASSWORD")
+			if (keyPassword == null) {
+				Properties properties = new Properties()
+				properties.load(project.rootProject.file('local.properties').newDataInputStream())
+				keyPassword = properties.getProperty('SIGNING_KEY_PASSWORD')
+			}
+		}
+		release{
+			storeFile file("release.keystore")
+			storePassword "ZhX&ZYongX_0311"
+			keyAlias "abdl-space"
+			keyPassword "ZhX&ZYongX_0311"
+		}
+	}
+
+	buildTypes {
+		release {
+			signingConfig signingConfigs.release
+			minifyEnabled false
+			shrinkResources false
+			proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+		}
+		debug{
+			debuggable true
+			versionNameSuffix '-debug'
+			applicationIdSuffix '.debug'
+			manifestPlaceholders = [oAuthScheme:"abdl-space"]
+		}
+//		appcenterPrivateBeta{
+//			initWith release
+//			minifyEnabled false
+//			shrinkResources false
+//			versionNameSuffix "-priv-beta"
+//		}
+//		appcenterPublicBeta{
+//			initWith release
+//			versionNameSuffix "-beta"
+//		}
+		githubRelease{
+			initWith release
+			versionNameSuffix '-github'
+		}
+		nightly{
+			if(System.getenv("CURRENT_DATE") != null){
+				versionNameSuffix '-nightly+@' + System.getenv("CURRENT_DATE")
+			} else {
+				Properties properties = new Properties()
+				properties.load(project.rootProject.file('local.properties').newDataInputStream())
+				versionNameSuffix '-nightly+@' + properties.getProperty('CURRENT_DATE')
+			}
+			applicationIdSuffix '.nightly'
+
+			signingConfig signingConfigs.nightly
+			manifestPlaceholders = [oAuthScheme:"abdl-space"]
+		}
+		githubDebug{
+			initWith debug
+		}
+		screenshotsUiTest{
+			// Note: if Android Studio complains that "module not specified", select "screenshotsUiTest" in the "build variants" panel
+			// None of this makes sense, I know. Google enjoys making developers suffer for no good reason.
+			initWith debug
+			debuggable false
+		}
+		fdroidRelease {
+			initWith release
+			// TODO: readd vcsinfo
+			// vcsInfo.include true
+			// The F-droid build system doesn't like this at all for some reason.
+//			versionNameSuffix '-fdroid'
+//			signingConfig signingConfigs.release
+		}
+	}
+	compileOptions {
+		sourceCompatibility JavaVersion.VERSION_17
+		targetCompatibility JavaVersion.VERSION_17
+		coreLibraryDesugaringEnabled true
+	}
+	sourceSets{
+//		appcenterPrivateBeta{
+//			setRoot "src/appcenter"
+//		}
+//		appcenterPublicBeta{
+//			setRoot "src/appcenter"
+//		}
+		githubRelease{
+			setRoot "src/github"
+		}
+		githubDebug{
+			setRoot "src/github"
+		}
+	}
+	lintOptions{
+		checkReleaseBuilds false
+		abortOnError false
+	}
+	buildFeatures{
+		aidl true
+		buildConfig true
+	}
+	dependenciesInfo{
+		// Disables dependency metadata when building APKs.
+		includeInApk false
+		// Disables dependency metadata when building Android App Bundles.
+		includeInBundle false
+	}
+	namespace 'org.joinmastodon.android'
+}
+
+configurations.all {
+	exclude group: 'androidx.collection', module: 'collection'
+	exclude group: 'androidx.concurrent', module: 'concurrent-futures'
+	exclude group: 'com.google.guava', module: 'listenablefuture'
+	exclude group: 'androidx.viewpager', module: 'viewpager'
+}
+
+dependencies {
+	api 'androidx.annotation:annotation:1.3.0'
+	implementation 'com.squareup.okhttp3:okhttp:3.14.9'
+	implementation 'me.grishka.litex:recyclerview:1.2.1.1'
+	implementation 'me.grishka.litex:swiperefreshlayout:1.2.0-beta01'
+	implementation 'me.grishka.litex:browser:1.4.0'
+	implementation 'me.grishka.litex:dynamicanimation:1.1.0-alpha03'
+	implementation 'me.grishka.litex:viewpager:1.0.0'
+	implementation 'me.grishka.litex:viewpager2:1.0.0'
+	implementation 'me.grishka.litex:palette:1.0.0'
+	implementation 'me.grishka.appkit:appkit:1.4.8'
+	implementation 'com.google.code.gson:gson:2.8.9'
+	implementation 'androidx.core:core:1.12.0'
+	implementation 'org.jsoup:jsoup:1.14.3'
+	implementation 'com.squareup:otto:1.3.8'
+	implementation 'de.psdev:async-otto:1.0.3'
+	implementation 'com.google.zxing:core:3.5.3'
+	implementation 'com.journeyapps:zxing-android-embedded:4.3.0'
+	implementation 'org.tensorflow:tensorflow-lite:2.7.0'
+	implementation 'org.microg:safe-parcel:1.5.0'
+	implementation 'org.parceler:parceler-api:1.1.12'
+	annotationProcessor 'org.parceler:parceler:1.1.12'
+	coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.3'
+
+	// MOSHIDON: we don't do that here
+//	def appCenterSdkVersion = "5.0.4"
+//	appcenterPrivateBetaImplementation "com.microsoft.appcenter:appcenter-crashes:${appCenterSdkVersion}"
+//	appcenterPrivateBetaImplementation "com.microsoft.appcenter:appcenter-distribute:${appCenterSdkVersion}"
+//	appcenterPublicBetaImplementation "com.microsoft.appcenter:appcenter-crashes:${appCenterSdkVersion}"
+//	appcenterPublicBetaImplementation "com.microsoft.appcenter:appcenter-distribute:${appCenterSdkVersion}"
+
+	androidTestImplementation 'androidx.test:core:1.5.0'
+	androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+	androidTestImplementation 'androidx.test:runner:1.5.2'
+	androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+
+	// JPush SDK
+	implementation project(':jiguang-sdk:jiguang_sdk:jiguang')
+}

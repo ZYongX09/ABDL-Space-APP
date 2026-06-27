@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@android:color/white"
+    android:paddingLeft="16dp"
+    android:paddingTop="20dp"
+    android:paddingRight="16dp">
+
+    <TextView
+        android:layout_gravity="center_vertical"
+        android:id="@+id/text_name"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="一级标识-登录ID"
+        android:textColor="#ff6b7381"
+        android:textSize="14dp" />
+
+    <RelativeLayout
+        android:layout_gravity="center_vertical"
+        android:id="@+id/linearLayout_click"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentRight="true"
+        android:layout_marginStart="6dp"
+        android:layout_marginLeft="6dp"
+        android:layout_marginRight="16dp"
+        android:layout_toEndOf="@+id/text_name"
+        android:layout_toRightOf="@+id/text_name">
+
+
+        <TextView
+            android:gravity="end"
+            android:id="@+id/text_value"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_toStartOf="@+id/image"
+            android:layout_toLeftOf="@+id/image"
+            android:ellipsize="marquee"
+            android:layout_marginRight="4dp"
+            android:text="1fsdfaafdsfasdfasdfasdfadfsfsfasdfdsafdsfasfsadfsadfasdf1fsdfaafdsfasdfasdfasdfadfsfsfasdfdsafdsfasfsadfsadfasdf"
+            android:textColor="#ff253044"
+            android:textSize="13sp" />
+
+        <ImageView
+            android:id="@+id/image"
+            android:layout_alignParentRight="true"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@mipmap/joperate_icon_bianji" />
+
+    </RelativeLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_below="@+id/linearLayout_click"
+        android:layout_marginTop="19dp"
+        android:background="#EEEFF7" />
+</RelativeLayout>

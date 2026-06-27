@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+	xmlns:tools="http://schemas.android.com/tools"
+	android:layout_width="match_parent"
+	android:layout_height="match_parent"
+	android:foreground="@drawable/fg_compose_attachment">
+
+	<View
+		android:id="@+id/drag_layer"
+		android:layout_width="match_parent"
+		android:layout_height="match_parent"
+		android:alpha="0"
+		android:visibility="gone"
+		android:background="?colorM3OnSurface"/>
+
+	<ImageView
+		android:id="@+id/thumb"
+		android:layout_width="match_parent"
+		android:layout_height="match_parent"
+		android:layout_above="@id/title"
+		android:scaleType="centerCrop"
+		android:importantForAccessibility="no"
+		tools:src="#0f0"/>
+
+	<TextView
+		android:id="@+id/title"
+		android:layout_width="match_parent"
+		android:layout_height="24dp"
+		android:layout_above="@id/subtitle"
+		android:layout_marginTop="16dp"
+		android:layout_marginLeft="16dp"
+		android:layout_marginRight="16dp"
+		android:textAppearance="@style/m3_body_large"
+		android:textColor="?colorM3OnSurface"
+		android:singleLine="true"
+		android:ellipsize="end"
+		android:gravity="center_vertical"
+		tools:text="Title"/>
+	
+	<TextView
+		android:id="@+id/subtitle"
+		android:layout_width="match_parent"
+		android:layout_height="20dp"
+		android:layout_above="@id/delete"
+		android:layout_marginLeft="16dp"
+		android:layout_marginRight="16dp"
+		android:textAppearance="@style/m3_body_medium"
+		android:singleLine="true"
+		android:ellipsize="end"
+		android:textColor="?colorM3OnSurfaceVariant"
+		android:gravity="center_vertical"
+		tools:text="Subtitle"/>
+	
+	<ImageButton
+		android:id="@+id/delete"
+		android:layout_width="48dp"
+		android:layout_height="48dp"
+		android:layout_alignParentEnd="true"
+		android:layout_alignParentBottom="true"
+		android:layout_marginEnd="16dp"
+		android:layout_marginBottom="8dp"
+		android:src="@drawable/ic_delete_24px"
+		android:tint="?colorM3OnSurfaceVariant"
+		android:backgroundTint="?colorM3OnSurfaceVariant"
+		android:background="@drawable/bg_round_ripple"/>
+
+	<ImageButton
+		android:id="@+id/edit"
+		android:layout_width="48dp"
+		android:layout_height="48dp"
+		android:layout_toStartOf="@id/delete"
+		android:layout_alignParentBottom="true"
+		android:layout_marginEnd="8dp"
+		android:layout_marginBottom="8dp"
+		android:src="@drawable/ic_edit_24px"
+		android:tint="?colorM3OnSurfaceVariant"
+		android:backgroundTint="?colorM3OnSurfaceVariant"
+		android:background="@drawable/bg_round_ripple"/>
+
+	<ProgressBar
+		android:id="@+id/progress"
+		android:layout_width="match_parent"
+		android:layout_height="16dp"
+		android:layout_alignTop="@id/delete"
+		android:layout_toStartOf="@id/delete"
+		android:layout_marginStart="16dp"
+		android:layout_marginEnd="8dp"
+		android:layout_marginTop="16dp"
+		android:progressDrawable="@drawable/m3_progress"
+		style="@android:style/Widget.Material.ProgressBar.Horizontal"/>
+
+	<TextView
+		android:id="@+id/nsfw_badge"
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:layout_alignParentStart="true"
+		android:layout_alignParentTop="true"
+		android:layout_marginStart="8dp"
+		android:layout_marginTop="8dp"
+		android:paddingStart="8dp"
+		android:paddingEnd="8dp"
+		android:paddingTop="2dp"
+		android:paddingBottom="2dp"
+		android:text="疑似敏感"
+		android:textSize="10sp"
+		android:textColor="#FFFFFF"
+		android:background="#CCFF6B35"
+		android:visibility="gone"/>
+
+	<TextView
+		android:id="@+id/nsfw_score"
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:layout_alignParentStart="true"
+		android:layout_alignParentTop="true"
+		android:layout_marginStart="8dp"
+		android:layout_marginTop="30dp"
+		android:paddingStart="4dp"
+		android:paddingEnd="4dp"
+		android:paddingTop="1dp"
+		android:paddingBottom="1dp"
+		android:textSize="8sp"
+		android:textColor="#80FFFFFF"
+		android:visibility="gone"/>
+
+</RelativeLayout>

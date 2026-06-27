@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>ABDL Space</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;overflow:hidden;font-family:-apple-system,sans-serif}
+canvas{display:block}
+.overlay{position:fixed;bottom:40px;left:50%;transform:translateX(-50%);text-align:center;z-index:10;pointer-events:none;width:90%;max-width:600px}
+.overlay h1{font-size:2rem;font-weight:700;color:#fff;opacity:0;transform:translateY(20px);transition:all .8s cubic-bezier(.25,.1,0,1)}
+.overlay h1.show{opacity:1;transform:translateY(0)}
+.overlay p{font-size:.9rem;color:rgba(255,255,255,.5);margin-top:8px;opacity:0;transition:opacity .6s ease .4s}
+.overlay p.show{opacity:1}
+.progress-bar{position:fixed;bottom:0;left:0;height:2px;background:linear-gradient(90deg,#A8D8F0,#FFB7C5);transition:width .1s linear;z-index:10}
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<div class="overlay"><h1 id="title">ABDL Space</h1><p id="subtitle">探索全新世界</p></div>
+<div class="progress-bar" id="progress" style="width:0%"></div>
+<svg id="logoSvg" style="display:none" viewBox="0 0 8669.86 8669.86">
+<path d="M4522.59 1870.45c262.55 -467.54 863.13 -401.98 995.43 -445.46 270.85 -89.04 299.66 -1067.92 896.76 -771.79 590.36 292.83 -200.83 892.29 -30.9 1189.84 134.65 235.78 194.7 212.75 270.93 470.91 47.32 160.28 104.14 368.01 -2.93 563.62 31.45 126.57 -30.24 41.12 65.19 140.5 291.8 136.15 431.56 285.85 429.59 539.69 -2.46 315.8 -227.63 537.73 -432.79 583.38 -280.79 62.45 -1313.45 -506.01 -1652.4 -665.62 -348.75 -164.23 -1431.63 -577.79 -1563.55 -841.24 -93.84 -187.43 -20.2 -521.53 210.01 -707.56 200.41 -161.92 408.26 -115.08 713.07 23.28l101.59 -79.55zm913.08 -743.18c-130.62 113.96 -412.31 -25.58 -856.9 279.58 -83.7 57.47 -171.58 172.15 -259.73 211.39 -133.92 40.57 -550.76 -204.55 -920.26 246.68 -307.31 375.31 -224.62 765.4 -0.03 1011.59 -254.93 165.03 -294 68.5 -556.78 442.33 -160.52 228.42 -325.1 439.93 -485.39 658.09 -602.23 819.7 -1425.28 1728.81 -732.19 2835.6 337.24 538.57 810.38 665.37 1434.46 959.36 613.06 288.81 1016.63 555.8 1638.07 499.41 410.01 -37.19 893.43 -272.9 1208.4 -732.88 292.66 -427.4 545.95 -1754.73 713.6 -2412.26 142.19 -557.64 17.47 -513.91 -4.2 -756.18 332.98 32.84 683.15 -189 773.91 -639.05 122.92 -609.54 -403.99 -827.8 -421.32 -887.96 25.7 -237.63 13.63 -411.65 -46.65 -600 -97.89 -305.73 -229.86 -390.51 -288.41 -519.99 133.55 -294.6 582.83 -974.33 -103.1 -1314.13 -691.2 -342.39 -954.11 422.5 -1093.48 718.42z" fill="#A1D9F7"/>
+<path d="M6651.88 2877.57c-86.76 78.08 -86.04 39.01 -229.87 -32.65l-812.85 -381.49c-365.2 -167.57 -727.71 -337.31 -1105.32 -505.35l18.75 -87.63 -101.59 79.55c-304.81 -138.36 -512.66 -185.2 -713.07 -23.28 -230.21 186.03 -303.85 520.13 -210.01 707.56 131.92 263.45 1214.8 677.01 1563.55 841.24 338.95 159.61 1371.61 728.07 1652.4 665.62 205.16 -45.65 430.33 -267.58 432.79 -583.38 1.97 -253.84 -137.79 -403.54 -429.59 -539.69 -95.43 -99.38 -33.74 -13.93 -65.19 -140.5z" fill="#FFF9B2"/>
+<path d="M4522.59 1870.45l-18.75 87.63c377.61 168.04 740.12 337.78 1105.32 505.35l812.85 381.49c143.83 71.66 143.11 110.73 229.87 32.65 107.07 -195.61 50.25 -403.34 2.93 -563.62 -76.23 -258.16 -136.28 -235.13 -270.93 -470.91 -169.93 -297.55 621.26 -897.01 30.9 -1189.84 -597.1 -296.13 -625.91 682.75 -896.76 771.79 -132.3 43.48 -732.88 -22.08 -995.43 445.46z" fill="#FFF9B2"/>
+<path d="M3041.32 4641.68c-36.95 124.46 5.02 189.39 31.42 270.37l111.2 312.21c8.6 22.51 13.41 39.58 21.62 61.84 9.07 24.64 42.93 101.29 31.88 123.05l-182.53 266.25c-135.97 194.49 -280.22 356.34 -172.97 553.13 45.71 83.9 133.53 149.32 245.78 151.8 74.26 1.64 458.87 -25.31 549.91 -33.06 77.17 -6.56 66.52 -6.46 110.35 55.51 25.74 36.39 54.64 72.06 81.2 109.97 52.33 74.69 108.06 145.29 163.68 223.6 51.12 71.99 107.3 160.6 220.35 190.58 98.49 26.11 196.56 -6.91 261.97 -58.84 93.94 -74.58 110.18 -166.49 142.61 -281.43l129.93 -463.61c7.8 -11.87 223.35 -90.81 245.66 -96.51 40.59 -10.36 335.22 -123.81 366.38 -142.49 184.66 -110.71 201.48 -381.64 47.32 -503.58 -56.54 -44.72 -376.11 -254.26 -476.9 -319.03 -36.85 -23.69 -37.75 -15.92 -37.48 -55.7l-3.17 -556.43c-2.87 -100.16 -23.93 -174.77 -105.15 -245.23 -89.56 -77.69 -202.08 -77.62 -281.21 -53.08 -44.8 13.89 -73.24 35.29 -117.37 71.92l-321.32 266.34c-153.91 131.9 -95.54 109.18 -259.45 63.5 -101.91 -28.41 -209.77 -59.45 -312.51 -91.76 -110.08 -34.63 -203.7 -63.35 -290.1 -29.65 -96.36 37.59 -167.61 97.47 -201.1 210.33z" fill="#FFF9B2"/>
+</svg>
+<script>
+var c=document.getElementById('canvas'),x=c.getContext('2d'),W,H,stars=[],cZ=0,cP=0,aP=0,aA=false,dn=false;
+var SC=1800,LC=500,FD=4000,SP=1500,DP=3000;
+function resize(){W=c.width=innerWidth;H=c.height=innerHeight}
+addEventListener('resize',resize);resize();
+function Star(x,y,z,tx,ty){this.x=x;this.y=y;this.z=z;this.tx=tx;this.ty=ty;this.rx=x;this.ry=y;this.rz=z;this.sz=.5+Math.random()*2;this.br=.3+Math.random()*.7;this.ts=.5+Math.random()*2;this.to=Math.random()*Math.PI*2;this.il=tx!==undefined}
+function getLogoPoints(count){
+  var svg=document.getElementById('logoSvg');
+  var vb=svg.getAttribute('viewBox').split(/[\s,]+/).map(Number);
+  var off=document.createElement('canvas');off.width=500;off.height=500;
+  var oc=off.getContext('2d');oc.clearRect(0,0,500,500);oc.save();
+  oc.scale(500/vb[2],500/vb[3]);
+  var paths=svg.querySelectorAll('path');
+  for(var i=0;i<paths.length;i++){try{oc.fill(new Path2D(paths[i].getAttribute('d')))}catch(e){}}
+  oc.restore();
+  var id=oc.getImageData(0,0,500,500);var filled=new Uint8Array(500*500);
+  for(var y=0;y<500;y++)for(var xx=0;xx<500;xx++)if(id.data[(y*500+xx)*4+3]>64)filled[y*500+xx]=1;
+  var edge=[],fill=[];
+  for(var y=1;y<499;y+=2)for(var xx=1;xx<499;xx+=2){
+    if(!filled[y*500+xx])continue;
+    var isE=!filled[(y-1)*500+xx]||!filled[(y+1)*500+xx]||!filled[y*500+xx-1]||!filled[y*500+xx+1];
+    var px=(xx-250)*.5,py=(y-250)*.5;
+    if(isE)edge.push({x:px,y:py});else fill.push({x:px,y:py})
+  }
+  var result=[],eC=Math.floor(count*.8),fC=count-eC;
+  var eS=Math.max(1,Math.floor(edge.length/eC));
+  for(var i=0;i<edge.length&&result.length<eC;i+=eS)result.push(edge[i]);
+  var fS=Math.max(1,Math.floor(fill.length/fC));
+  for(var i=0;i<fill.length&&result.length<count;i+=fS)result.push(fill[i]);
+  while(result.length<count)result.push(edge[Math.floor(Math.random()*edge.length)]);
+  return result.slice(0,count)
+}
+function init(){stars=[];var lp=getLogoPoints(LC);for(var i=0;i<LC;i++){var p=lp[i];stars.push(new Star((Math.random()-.5)*SP,(Math.random()-.5)*SP,Math.random()*DP,p.x,p.y))}for(var i=0;i<SC-LC;i++)stars.push(new Star((Math.random()-.5)*SP*2,(Math.random()-.5)*SP*2,Math.random()*DP))}
+function fly(){if(aA)return;aA=true;aP=0;cP=0;var st=performance.now();!function ft(){var el=performance.now()-st;cP=Math.min(1,el/FD);cZ=-DP*(1-cP);var m=.4;aP=cP>=m?Math.min(1,(cP-m)/(1-m)):0;document.getElementById('progress').style.width=(cP*100)+'%';if(cP<1)requestAnimationFrame(ft);else{aP=1;dn=true;aA=false;setTimeout(function(){document.getElementById('title').classList.add('show');document.getElementById('subtitle').classList.add('show')},300)}}(requestAnimationFrame(fly))}
+c.addEventListener('click',function(){if(!dn)fly()});
+var raf=null,lt=0;
+function tick(t){if(!raf)return;var d=Math.min(t-lt,50);lt=t;var f=600,tm=t/1000;x.clearRect(0,0,W,H);var g=x.createRadialGradient(W/2,H/2,0,W/2,H/2,Math.max(W,H)*.7);g.addColorStop(0,'#0a0a12');g.addColorStop(1,'#000');x.fillStyle=g;x.fillRect(0,0,W,H);
+var s=stars.map(function(s){if(s.il){var tt=aP;s.rx=s.x+(s.tx-s.x)*tt;s.ry=s.y+(s.ty-s.y)*tt;s.rz=s.z+(0-s.z)*tt+cZ}else{s.rx=s.x;s.ry=s.y;s.rz=s.z+cZ}return s}).sort(function(a,b){return b.rz-a.rz});
+for(var i=0;i<s.length;i++){var st=s[i],z=st.rz;if(z<-f+100)continue;var sc=f/(f+z),sx=W/2+(st.rx)*sc,sy=H/2+(st.ry)*sc;if(sx<-50||sx>W+50||sy<-50||sy>H+50)continue;var tw=.5+.5*Math.sin(tm*st.ts+st.to);var al=st.br*tw*sc;if(st.il&&aP>.3)al=Math.max(al,((aP-.3)/.7)*sc);var sz=st.sz*sc;if(st.il&&aP>.5){var hu=200+(st.tx/150)*140;x.fillStyle='hsla('+hu+',80%,75%,'+Math.min(1,al)+')'}else x.fillStyle='rgba(200,210,240,'+Math.min(1,al)+')';x.beginPath();x.arc(sx,sy,Math.max(.5,sz),0,Math.PI*2);x.fill()}
+if(aP>.6){var la=(aP-.6)/.4*.15;x.strokeStyle='rgba(168,216,240,'+la+')';x.lineWidth=.5;var ls=s.filter(function(s){return s.il&&s.rz>-f+100});for(var i=0;i<ls.length;i++){var a=ls[i],ax=W/2+(a.rx)*(f/(f+a.rz)),ay=H/2+(a.ry)*(f/(f+a.rz));for(var j=i+1;j<Math.min(i+8,ls.length);j++){var b=ls[j],bx=W/2+(b.rx)*(f/(f+b.rz)),by=H/2+(b.ry)*(f/(f+b.rz));if(Math.hypot(ax-bx,ay-by)<40){x.beginPath();x.moveTo(ax,ay);x.lineTo(bx,by);x.stroke()}}}}
+raf=requestAnimationFrame(tick)}
+init();raf=requestAnimationFrame(tick);fly();
+</script>
+</body>
+</html>

@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--	MOSHIDON: we will comment things out here. We have our colors_custom entries already-->
+
+<!--	<color name="primary_700">#431cbb</color>-->
+
+	<color name="navigation_bar_bg_light">#282C37</color>
+	<color name="highlight_over_dark">#30FFFFFF</color>
+
+<!--	<color name="shortcut_icon_background">#FFF</color>-->
+<!--	<color name="shortcut_icon_foreground">@color/m3_sys_light_primary</color>-->
+
+	<!-- M3 dynamic colors -->
+
+	<!-- light theme -->
+	<color name="m3_sys_light_primary">@color/masterialLight_primary</color>
+	<color name="m3_sys_light_on_primary">@color/masterialLight_onPrimary</color>
+	<color name="m3_sys_light_primary_container">@color/masterialLight_primaryContainer</color>
+	<color name="m3_sys_light_on_primary_container">@color/masterialLight_onPrimaryContainer</color>
+	<color name="m3_sys_light_secondary">@color/masterialLight_secondary</color>
+	<color name="m3_sys_light_on_secondary">@color/masterialLight_onSecondary</color>
+	<color name="m3_sys_light_secondary_container">@color/masterialLight_secondaryContainer</color>
+	<color name="m3_sys_light_on_secondary_container">@color/masterialLight_onSecondaryContainer</color>
+	<color name="m3_sys_light_tertiary">@color/masterialLight_tertiary</color>
+	<color name="m3_sys_light_on_tertiary">@color/masterialLight_onTertiary</color>
+	<color name="m3_sys_light_tertiary_container">@color/masterialLight_tertiaryContainer</color>
+	<color name="m3_sys_light_on_tertiary_container">@color/masterialLight_onTertiaryContainer</color>
+	<color name="m3_sys_light_background">@color/masterialLight_background</color>
+	<color name="m3_sys_light_on_background">@color/masterialLight_onBackground</color>
+	<color name="m3_sys_light_surface">@color/masterialLight_surface</color>
+	<color name="m3_sys_light_on_surface">@color/masterialLight_onSurface</color>
+	<color name="m3_sys_light_surface_variant">@color/masterialLight_surfaceVariant</color>
+	<color name="m3_sys_light_on_surface_variant">@color/masterialLight_onSurfaceVariant</color>
+	<color name="m3_sys_light_outline">@color/masterialLight_outline</color>
+	<color name="m3_sys_light_outline_variant">@color/masterialLight_outlineVariant</color>
+	<color name="m3_sys_light_error">@color/masterialLight_error</color>
+	<color name="m3_sys_light_on_error">@color/masterialLight_onError</color>
+	<color name="m3_sys_light_error_container">@color/masterialLight_errorContainer</color>
+	<color name="m3_sys_light_on_error_container">@color/masterialLight_onErrorContainer</color>
+
+	<!-- dark theme -->
+	<color name="m3_sys_dark_primary">@color/masterialDark_primary</color>
+	<color name="m3_sys_dark_on_primary">@color/masterialDark_onPrimary</color>
+	<color name="m3_sys_dark_primary_container">@color/masterialDark_primaryContainer</color>
+	<color name="m3_sys_dark_on_primary_container">@color/masterialDark_onPrimaryContainer</color>
+	<color name="m3_sys_dark_secondary">@color/masterialDark_secondary</color>
+	<color name="m3_sys_dark_on_secondary">@color/masterialDark_onSecondary</color>
+	<color name="m3_sys_dark_secondary_container">@color/masterialDark_secondaryContainer</color>
+	<color name="m3_sys_dark_on_secondary_container">@color/masterialDark_onSecondaryContainer</color>
+	<color name="m3_sys_dark_tertiary">@color/masterialDark_tertiary</color>
+	<color name="m3_sys_dark_on_tertiary">@color/masterialDark_onTertiary</color>
+	<color name="m3_sys_dark_tertiary_container">@color/masterialDark_tertiaryContainer</color>
+	<color name="m3_sys_dark_on_tertiary_container">@color/masterialDark_onTertiaryContainer</color>
+	<color name="m3_sys_dark_background">@color/masterialDark_background</color>
+	<color name="m3_sys_dark_on_background">@color/masterialDark_onBackground</color>
+	<color name="m3_sys_dark_surface">@color/masterialDark_surface</color>
+	<color name="m3_sys_dark_on_surface">@color/masterialDark_onSurface</color>
+	<color name="m3_sys_dark_surface_variant">@color/masterialDark_surfaceVariant</color>
+	<color name="m3_sys_dark_on_surface_variant">@color/masterialDark_onSurfaceVariant</color>
+	<color name="m3_sys_dark_outline">@color/masterialDark_outline</color>
+	<color name="m3_sys_dark_outline_variant">@color/masterialDark_outlineVariant</color>
+	<color name="m3_sys_dark_error">@color/masterialDark_error</color>
+	<color name="m3_sys_dark_on_error">@color/masterialDark_onError</color>
+	<color name="m3_sys_dark_error_container">@color/masterialDark_errorContainer</color>
+	<color name="m3_sys_dark_on_error_container">@color/masterialDark_onErrorContainer</color>
+
+	<!-- extended colors -->
+	<color name="ext_favorite_light">#E89A00</color>
+	<color name="ext_favorite_light_high_contrast">#7B5800</color>
+	<color name="ext_favorite_light_medium_contrast">#CC9200</color>
+	<color name="ext_favorite_dark">#FFB014</color>
+	<color name="ext_on_favorite_light">#FFFFFF</color>
+	<color name="ext_on_favorite_light_high_contrast">#FFFFFF</color>
+	<color name="ext_on_favorite_light_medium_contrast">#FFFFFF</color>
+	<color name="ext_on_favorite_dark">#412D00</color>
+	<color name="ext_favorite_container_light">#FFC758</color>
+	<color name="ext_favorite_container_light_high_contrast">#FFC758</color>
+	<color name="ext_favorite_container_light_medium_contrast">#FFC758</color>
+	<color name="ext_favorite_container_dark">#F9B928</color>
+	<color name="ext_on_favorite_container_light">#503800</color>
+	<color name="ext_on_favorite_container_light_high_contrast">#503800</color>
+	<color name="ext_on_favorite_container_light_medium_contrast">#503800</color>
+	<color name="ext_on_favorite_container_dark">#463100</color>
+	<color name="ext_boost_light">#006C4E</color>
+	<color name="ext_boost_light_high_contrast">#006C4E</color>
+	<color name="ext_boost_light_medium_contrast">#006C4E</color>
+	<color name="ext_boost_dark">#48DEAB</color>
+	<color name="ext_on_boost_light">#FFFFFF</color>
+	<color name="ext_on_boost_light_high_contrast">#FFFFFF</color>
+	<color name="ext_on_boost_light_medium_contrast">#FFFFFF</color>
+	<color name="ext_on_boost_dark">#003827</color>
+	<color name="ext_boost_container_light">#25C896</color>
+	<color name="ext_boost_container_light_high_contrast">#25C896</color>
+	<color name="ext_boost_container_light_medium_contrast">#25C896</color>
+	<color name="ext_boost_container_dark">#00B384</color>
+	<color name="ext_on_boost_container_light">#002C1E</color>
+	<color name="ext_on_boost_container_light_high_contrast">#002C1E</color>
+	<color name="ext_on_boost_container_light_medium_contrast">#002C1E</color>
+	<color name="ext_on_boost_container_dark">#00130B</color>
+	<color name="ext_bookmark_light">#A2003E</color>
+	<color name="ext_bookmark_light_high_contrast">#A2003E</color>
+	<color name="ext_bookmark_light_medium_contrast">#A2003E</color>
+	<color name="ext_bookmark_dark">#FFB2BD</color>
+	<color name="ext_on_bookmark_light">#FFFFFF</color>
+	<color name="ext_on_bookmark_light_high_contrast">#FFFFFF</color>
+	<color name="ext_on_bookmark_light_medium_contrast">#FFFFFF</color>
+	<color name="ext_on_bookmark_dark">#670024</color>
+	<color name="ext_bookmark_container_light">#DF235E</color>
+	<color name="ext_bookmark_container_light_high_contrast">#DF235E</color>
+	<color name="ext_bookmark_container_light_medium_contrast">#DF235E</color>
+	<color name="ext_bookmark_container_dark">#D31656</color>
+	<color name="ext_on_bookmark_container_light">#FFFFFF</color>
+	<color name="ext_on_bookmark_container_light_high_contrast">#FFFFFF</color>
+	<color name="ext_on_bookmark_container_light_medium_contrast">#FFFFFF</color>
+	<color name="ext_on_bookmark_container_dark">#FFFFFF</color>
+
+	<color name="ext_rich_text_text_light">#6C3646</color>
+	<color name="ext_rich_text_container_light">#FFD9E1</color>
+	<color name="ext_rich_text_decoration_light">#FDB2C5</color>
+	<color name="ext_rich_text_text_light_medium_contrast">#6C3646</color>
+	<color name="ext_rich_text_container_light_medium_contrast">#FFD9E1</color>
+	<color name="ext_rich_text_decoration_light_medium_contrast">#FDB2C5</color>
+	<color name="ext_rich_text_text_light_high_contrast">#6C3646</color>
+	<color name="ext_rich_text_container_light_high_contrast">#FFD9E1</color>
+	<color name="ext_rich_text_decoration_light_high_contrast">#FDB2C5</color>
+	<color name="ext_rich_text_text_dark">#FDB2C5</color>
+	<color name="ext_rich_text_container_dark">#512030</color>
+	<color name="ext_rich_text_decoration_dark">#7A4152</color>
+
+	<item name="overlay_ripple_alpha" format="float" type="dimen">0.12</item>
+</resources>

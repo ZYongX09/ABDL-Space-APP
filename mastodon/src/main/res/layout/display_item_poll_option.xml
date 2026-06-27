@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+	xmlns:tools="http://schemas.android.com/tools"
+	android:layout_width="match_parent"
+	android:layout_height="wrap_content"
+	android:paddingEnd="16dp"
+	android:paddingBottom="8dp"
+	android:clipToPadding="false">
+
+	<org.joinmastodon.android.ui.views.CheckableLinearLayout
+		android:id="@+id/button"
+		android:layout_width="match_parent"
+		android:layout_height="44dp"
+		android:paddingHorizontal="12dp"
+		android:background="@drawable/bg_poll_option_clickable"
+		android:layoutDirection="locale">
+
+		<View
+			android:id="@+id/checkbox"
+			android:layout_width="36dp"
+			android:layout_height="36dp"
+			android:layout_marginStart="-8dp"
+			android:layout_gravity="center_vertical"
+			android:duplicateParentState="true"
+			android:foregroundGravity="center"
+			android:foregroundTint="@color/poll_option_checkbox"/>
+
+		<TextView
+			android:id="@+id/text"
+			android:layout_width="0dp"
+			android:layout_height="wrap_content"
+			android:layout_weight="1"
+			android:layout_gravity="center_vertical"
+			android:textAppearance="@style/m3_label_large"
+			android:textColor="?colorM3Primary"
+			android:singleLine="true"
+			android:ellipsize="end"
+			tools:text="scream into void jsfdklfjdalskfjdsalkfjdsalkfjdsalkfdjsalkfdsajlk"/>
+
+		<TextView
+			android:id="@+id/percent"
+			android:layout_width="wrap_content"
+			android:layout_height="wrap_content"
+			android:layout_marginStart="8dp"
+			android:layout_gravity="center_vertical"
+			android:textAppearance="@style/m3_label_small"
+			android:textColor="?colorM3Outline"
+			android:visibility="gone"
+			android:gravity="end"
+			tools:visibility="visible"
+			tools:text="00.0%"/>
+
+	</org.joinmastodon.android.ui.views.CheckableLinearLayout>
+
+</FrameLayout>

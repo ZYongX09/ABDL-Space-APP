@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="221dp"
+    android:gravity="center_horizontal"
+    android:orientation="vertical"
+    android:background="@android:color/white">
+
+
+    <ImageView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:src="@mipmap/joperate_chatu_wubiaoqian" />
+
+    <TextView
+        android:layout_width="261dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:gravity="center"
+        android:text="该项目未创建任一触达通道，请在「数据中心-数据通道连接」创建"
+        android:textColor="#ff8d939d"
+        android:textSize="13sp" />
+</LinearLayout>
+
+
+
+

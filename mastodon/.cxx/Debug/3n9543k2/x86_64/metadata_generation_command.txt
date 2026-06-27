@@ -1,0 +1,18 @@
+                        -H/home/ZYongX/projects/moshidon-test/mastodon/src/main/jni
+-DCMAKE_SYSTEM_NAME=Android
+-DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+-DCMAKE_SYSTEM_VERSION=24
+-DANDROID_PLATFORM=android-24
+-DANDROID_ABI=x86_64
+-DCMAKE_ANDROID_ARCH_ABI=x86_64
+-DANDROID_NDK=/home/ZYongX/Android/Sdk/ndk/26.1.10909125
+-DCMAKE_ANDROID_NDK=/home/ZYongX/Android/Sdk/ndk/26.1.10909125
+-DCMAKE_TOOLCHAIN_FILE=/home/ZYongX/Android/Sdk/ndk/26.1.10909125/build/cmake/android.toolchain.cmake
+-DCMAKE_MAKE_PROGRAM=/home/ZYongX/Android/Sdk/cmake/3.22.1/bin/ninja
+-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=/home/ZYongX/projects/moshidon-test/mastodon/build/intermediates/cxx/Debug/3n9543k2/obj/x86_64
+-DCMAKE_RUNTIME_OUTPUT_DIRECTORY=/home/ZYongX/projects/moshidon-test/mastodon/build/intermediates/cxx/Debug/3n9543k2/obj/x86_64
+-DCMAKE_BUILD_TYPE=Debug
+-B/home/ZYongX/projects/moshidon-test/mastodon/.cxx/Debug/3n9543k2/x86_64
+-GNinja
+                        Build command args: []
+                        Version: 2

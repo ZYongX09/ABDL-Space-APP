@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <declare-styleable name="TitleLayout">
+        <!--是否显示状态栏高度-->
+        <attr name="has_status_bar" format="boolean" />
+        <!--状态栏高度-->
+        <attr name="status_bar_height" format="dimension" />
+        <!--状态栏颜色-->
+        <attr name="status_bar_color" format="color" />
+        <!--是否显示返回图片-->
+        <attr name="show_back_iv" format="boolean" />
+        <!--返回图片-->
+        <attr name="back_iv_drawable" format="reference" />
+
+        <!--标题栏高度，不包括状态栏-->
+        <attr name="title_bar_height" format="dimension" />
+        <!--标题栏颜色-->
+        <attr name="title_bar_color" format="color" />
+
+        <!--整个布局的颜色-->
+        <attr name="title_root_color" format="color" />
+
+        <!--头部标题-->
+        <attr name="title_text" format="string" />
+        <!--头部标题颜色-->
+        <attr name="title_text_color" format="color" />
+        <!--头部标题字体-->
+        <attr name="title_text_size" format="dimension" />
+        <!--标题居左距离左边距-->
+        <attr name="title_left_margin_left" format="dimension" />
+        <!--标题居右距离右边距-->
+        <attr name="title_right_margin_right" format="dimension" />
+        <!--设置标题位置-->
+        <attr name="title_gravity" format="enum">
+            <enum name="center" value="0" />
+            <enum name="left" value="1" />
+            <enum name="right" value="2" />
+        </attr>
+
+        <!--右边布局的padding right-->
+        <attr name="right_layout_padding_right" format="dimension" />
+        <!--左边布局的padding left-->
+        <attr name="left_layout_padding_left" format="dimension" />
+
+        <!--标题横线的高度-->
+        <attr name="divider_height" format="dimension" />
+        <!--标题横线的颜色-->
+        <attr name="divider_color" format="color" />
+        <!--标题横线的margin left-->
+        <attr name="divider_margin_left" format="dimension" />
+        <!--标题横线的margin right-->
+        <attr name="divider_margin_right" format="dimension" />
+    </declare-styleable>
+</resources>

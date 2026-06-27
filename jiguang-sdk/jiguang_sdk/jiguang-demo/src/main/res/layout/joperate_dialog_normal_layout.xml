@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/joperate_dialog_background">
+
+    <View
+        android:id="@+id/view"
+        android:layout_width="0dp"
+        android:layout_height="1dp"
+        android:visibility="gone"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <LinearLayout
+        android:id="@+id/linearLayout_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="16dp"
+        android:layout_marginTop="13dp"
+        android:gravity="center_vertical"
+        app:layout_constraintStart_toStartOf="@+id/view"
+        app:layout_constraintTop_toTopOf="@+id/view"
+        app:layout_goneMarginLeft="6dp"
+        app:layout_goneMarginTop="16dp">
+
+        <ImageView
+            android:id="@+id/image_icon"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@mipmap/joperate_channels_apptz"
+            android:visibility="gone"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <TextView
+            android:id="@+id/text_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="10dp"
+            android:text="设置「极光推送」通道值"
+            android:textColor="#ff253044"
+            android:textSize="18dp" />
+    </LinearLayout>
+
+
+    <EditText
+        android:id="@+id/edit"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="16dp"
+        android:paddingTop="14dp"
+        android:paddingBottom="13dp"
+        android:paddingLeft="14dp"
+        android:paddingRight="15dp"
+        android:layout_marginTop="15dp"
+        android:layout_marginRight="16dp"
+        android:background="@drawable/joperate_edit_background"
+        android:hint="请输入手机号"
+        android:textColor="#485162"
+        android:textColorHint="#8D939D"
+        android:textSize="15dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/linearLayout_title" />
+
+    <TextView
+        android:id="@+id/text_warning"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:text="手机号码格式错误"
+        android:textColor="#ffda1414"
+        android:textSize="12dp"
+        android:visibility="gone"
+        app:layout_constraintStart_toStartOf="@+id/edit"
+        app:layout_constraintTop_toBottomOf="@+id/edit" />
+
+    <View
+        android:id="@+id/view_l"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginTop="39dp"
+        android:background="#D3D6DA"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/edit" />
+
+    <Button
+        android:id="@+id/button_cancel"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:background="@android:color/transparent"
+        android:text="取消"
+        app:layout_constraintEnd_toStartOf="@+id/button_ok"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/view_l" />
+
+    <Button
+        android:id="@+id/button_ok"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:background="@drawable/joperate_dialog_button_ok_background"
+        android:text="确认"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toEndOf="@+id/button_cancel"
+        app:layout_constraintTop_toBottomOf="@+id/view_l" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

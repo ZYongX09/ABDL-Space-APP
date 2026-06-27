@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/toast_relative"
+    android:background="@drawable/joperate_toast_shape"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content">
+    <LinearLayout
+        android:id="@+id/toast_linear"
+        android:padding="10dp"
+        android:orientation="vertical"
+        android:layout_width="138dp"
+        android:layout_height="wrap_content">
+        <ImageView
+            android:layout_marginTop="26dp"
+            android:layout_gravity="center"
+            android:gravity="center"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:src="@mipmap/joperate_icon_toast" />
+
+        <TextView
+            android:id="@+id/text"
+            android:layout_gravity="center"
+            android:gravity="center"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="内容已复制"
+            android:textColor="#e6ffffff"
+            android:textSize="15dp"
+            android:layout_marginBottom="26dp"
+            />
+    </LinearLayout>
+</RelativeLayout>
