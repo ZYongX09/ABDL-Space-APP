@@ -201,7 +201,7 @@ public class SettingsMainFragment extends BaseSettingsFragment<Object>{
 			if(state==GithubSelfUpdater.UpdateState.UPDATE_AVAILABLE){
 				updateButton2.setVisibility(View.GONE);
 				updateButton1.setEnabled(true);
-				updateButton1.setText(getString(R.string.download_update, UiUtils.formatFileSize(getActivity(), GithubSelfUpdater.getInstance().getUpdateInfo().size, true)));
+				updateButton1.setText(R.string.download_update);
 			}else if(state==GithubSelfUpdater.UpdateState.DOWNLOADING){
 				updateButton2.setVisibility(View.VISIBLE);
 				updateButton2.setText(R.string.cancel);
