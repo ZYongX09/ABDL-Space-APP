@@ -1,0 +1,61 @@
+Mastodon je ten nejlepší způsob, jak udržet krok s tím, co se děje. Sledujte kohokoliv napříč fediversem a uvidíte vše v chronologickém pořadí. Bez jakýchkoliv algoritmů, reklam a clickbaitu.
+
+Toto je oficiální Android aplikace pro Mastodon. Je velmi rychlá a neuvěřitelně krásná, navržená tak, aby byla nejen výkonná, ale též snadná na použití. V naší aplikaci můžete:
+
+OBJEVOVAT
+
+■ Objevte nové spisovatele, novináře, umělce, fotografy, vědce a další
+■ Podívejte se, co se děje ve světě
+
+ČÍST
+
+■ Udržujte krok s těmi, o které se zajímáte na chronologickém kanálu bez přerušení
+■ Sledujte hashtagy a udržujte krok se specifickými tématy v reálném čase
+
+VYTVÁŘET
+
+■ Publikujte dotazníky, kvalitní obrázky nebo videa svým sledující nebo celému světu
+■ Účastněte se zajímavých konverzací s ostatními lidmi
+
+ZPROSTŘEDKOVÁVAT
+
+■ Vytvářejte seznamy lidí, abyste nikdy nezmeškali žádný příspěvek
+■ Filtrujte slova nebo fráze a kontrolujte, co chcete a nechcete vidět
+
+A DALŠÍ!
+
+■ Krásný motiv, který se přizpůsobí vaším barevným preferencím, ať už světlým nebo tmavým
+■ Sdílejte a skenujte QR kódy pro rychlou výměnu profilů Mastodon s ostatními
+■ Přihlaste se a přepínejte mezi vícero účty
+■ Dostávejte upozornění, když určitá publikuje, za pomocí zvonečku
+■ Bez spoilerů! Své příspěvky můžete schovat za upozornění na obsah
+
+EFEKTIVNÍ PLATFORMA NA PUBLIKOVÁNÍ
+
+Už se nemusíte snažit vycházet vstříc neprůhlednému algoritmu, který rozhoduje zda vaši přátelé uvidí, co jste publikoval. Pokud vás sledují, uvidí to.
+
+Pokud to publikujete na otevřený web, tak je to na otevřeném webu přístupné. Bez starostí můžete sdílet odkazy na Mastodon s vědomím, že každý je může přečíst bez toho aniž by se musel přihlašovat.
+
+S vlákny, dotazníky, vysoce kvalitními obrázky, videi, audiem a upozorněními na obsah, Mastodon nabízí hromadu způsobů, jak se vyjádřit podle toho, jak se vám to hodí.
+
+EFEKTIVNÍ PLATFORMA NA ČTENÍ
+
+Nemusíme vám zobrazovat reklamy, takže vás nemusíme držet v naší aplikaci. Mastodon má nejbohatší výběr aplikací třetích stran, takže si můžete vybrat zážitek, který vám nejlépe vyhovuje. 
+
+Díky chronologickému domácímu kanálu je snadné říct, když už jste viděli všechny novinky a můžete se přesunout na něco jiného.
+
+Nemusíte se obávat, že klik vedle vám navždy zkazí vaše doporučení. My nehádáme, co chcete vidět, necháváme to na vás.
+
+PROTOKOLY, NE PLATFORMY
+
+Mastodon není vytvořena, jako tradiční sociální platforma, ale je postaven na decentralizovaném protokolu. Můžete se přihlásit na náš oficiální server, nebo vybrat třetí stranu, která bude ukládat vaše data a moderovat vaše zážitky.
+
+Díky společnému protokolu, bez ohledu na to, co si vyberete, můžete bezproblémově komunikovat s lidmi na jiných Mastodon serverech. To ale ještě není vše: S jedním účtem můžete komunikovat s lidmi z jiných platform na fediversu.
+
+Nejste spokojeni s vaším výběrem? Vždy můžete přejít k jinému Mastodon server a s vámi si vezmete i vaše sledující. Pokročilí uživatelé mohou dokonce mít svá data na vlastní infrastruktuře, protože Mastodon je open-source.
+
+NEZISKOVÁ OD ZÁKLADŮ
+
+Mastodon je registrovaná nezisková organizace v USA a Německu. Nemotivuje nás extrakce peněz z naší platformy, ale to, co je pro ni nejlepší.
+
+MOHLI JSTE VIDĚT NA: TIME, Forbes, Wired, The Guardian, CNN, The Verge, TechCrunch, Financial Times, Gizmodo, PCMAG.com a více.

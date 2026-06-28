@@ -1,0 +1,61 @@
+Mastodon เป็นวิธีที่ดีที่สุดที่จะติดตามสิ่งที่กำลังเกิดขึ้น ติดตามใครก็ตามทั่วทั้งจักรวาลสหพันธ์และดูจักรวาลสหพันธ์ทั้งหมดตามลำดับเวลา ไม่มีอัลกอริทึม, โฆษณา หรือคลิกเบตอยู่ในสายตา
+
+นี่คือแอป Android อย่างเป็นทางการสำหรับ Mastodon แอปรวดเร็วมากและสวยงามอย่างน่าทึ่ง ได้รับการออกแบบให้ไม่ใช่แค่ทรงพลังแต่ยังใช้งานง่ายอีกด้วย ในแอปของเรา คุณสามารถ:
+
+สำรวจ
+
+■ ค้นพบนักเขียน, นักข่าว, ศิลปิน, ช่างภาพ, นักวิทยาศาสตร์ และอื่น ๆ ใหม่ ๆ
+■ ดูสิ่งที่กำลังเกิดขึ้นในโลก
+
+อ่าน
+
+■ ติดตามผู้คนที่คุณห่วงใยในฟีดตามลำดับเวลาโดยไม่มีการขัดจังหวะ
+■ ติดตามแฮชแท็กเพื่อติดตามหัวข้อที่เฉพาะเจาะจงตามเวลาจริง
+
+สร้าง
+
+■ โพสต์ไปยังผู้ติดตามของคุณหรือทั้งโลก พร้อมการสำรวจความคิดเห็น, ภาพคุณภาพสูง และวิดีโอ
+■ มีส่วนร่วมในการสนทนาที่น่าสนใจกับผู้คนอื่น ๆ
+
+เรียบเรียง
+
+■ สร้างรายการผู้คนเพื่อไม่พลาดโพสต์ใด
+■ กรองคำหรือวลีเพื่อควบคุมสิ่งที่คุณต้องการและไม่ต้องการเห็น
+
+และอื่น ๆ!
+
+■ ชุดรูปแบบที่สวยงามที่ปรับให้เข้ากับแบบแผนชุดสีเฉพาะบุคคลของคุณ สว่างหรือมืด
+■ แชร์และสแกนรหัส QR เพื่อแลกเปลี่ยนโปรไฟล์ Mastodon กับผู้อื่นอย่างรวดเร็ว
+■ เข้าสู่ระบบและสลับระหว่างหลายบัญชี
+■ รับการแจ้งเตือนเมื่อบุคคลที่เฉพาะเจาะจงโพสต์ด้วยปุ่มกระดิ่ง
+■ ไม่มีผู้สปอยล์! คุณสามารถนำโพสต์ของคุณไว้หลังคำเตือนเนื้อหา
+
+แพลตฟอร์มการเผยแพร่ที่ทรงพลัง
+
+You no longer have to try and appease an opaque algorithm that decides if your friends are going to see what you posted. If they follow you, they’ll see it.
+
+If you publish it to the open web, it’s accessible on the open web. You can safely share links to Mastodon in the knowledge that anyone will be able to read them without logging in.
+
+Between threads, polls, high quality images, videos, audio, and content warnings, Mastodon offers plenty of ways to express yourself in a way that suits you.
+
+แพลตฟอร์มการอ่านที่ทรงพลัง
+
+We don’t need to show you ads, so we don’t need to keep you in our app. Mastodon has the richest selection of 3rd party apps and integrations so you can choose the experience that fits you best. 
+
+Thanks to the chronological home feed, it’s easy to tell when you’ve caught up on all updates and can move on to something else.
+
+No need to worry that a misclick will ruin your recommendations forever. We don’t guess what you want to see, we let you control it.
+
+โปรโตคอล ไม่ใช่แพลตฟอร์ม
+
+Mastodon is not like a traditional social media platform, but is built on a decentralized protocol. You can sign up on our official server, or choose a 3rd party to host your data and moderate your experience.
+
+Thanks to the common protocol, no matter what you choose, you can communicate seamlessly with people on other Mastodon servers. But there’s more: With just one account, you can communicate with people from other fediverse platforms.
+
+ไม่พอใจกับตัวเลือกของคุณ? คุณสามารถสลับเป็นเซิร์ฟเวอร์ Mastodon อื่นได้เสมอพร้อมนำผู้ติดตามของคุณไปกับคุณ สำหรับผู้ใช้ขั้นสูง คุณยังสามารถโฮสต์ข้อมูลของคุณบนโครงสร้างพื้นฐานของคุณเองได้อีกด้วย เนื่องจาก Mastodon เป็นโอเพนซอร์ส
+
+ไม่แสวงหาผลกำไรโดยธรรมชาติ
+
+Mastodon เป็นองค์กรไม่แสวงหาผลกำไรที่จดทะเบียนในสหรัฐอเมริกาและเยอรมนี We are not motivated by extracting monetary value from the platform, but by what’s best for the platform.
+
+ตามที่นำเสนอใน: TIME, Forbes, Wired, The Guardian, CNN, The Verge, TechCrunch, Financial Times, Gizmodo, PCMAG.com และอื่น ๆ

@@ -1,0 +1,61 @@
+„Mastodon“ – tai geriausias būdas sekti, kas vyksta. Sekite bet kurį asmenį visoje fediversoje ir žiūrėkite viską chronologine tvarka. Jokių algoritmų, reklamų ar tyčinių paspaudimų.
+
+Tai – oficiali „Mastodon“, skirto „Android“ programėlė. Ji yra labai sparti ir nuostabiai graži, sukurta taip, kad būtų ne tik galinga, bet ir paprasta naudoti. Mūsų programėlėje galima:
+
+NARŠYTI
+
+■ Atrask naujų rašytojų, žurnalistų, dailininkų, atlikėjų, fotografų, mokslininkų ir daugiau.
+■ Žiūrėkite, kas vyksta pasaulyje.
+
+SKAITYTI
+
+■ Neatsilikite nuo jums svarbių asmenų chronologiniame sraute be jokių trukdžių.
+■ Sekite saitažodžius, kad tikruoju laiku žinotumėte konkrečias temas.
+
+KURTI
+
+■ Skelbkite savo sekėjams arba visam pasauliui su apklausomis, aukštos kokybės vaizdais ir vaizdo įrašais.
+■ Dalyvaukite įdomiuose pokalbiuose su kitais asmenimis.
+
+KURUOTI
+
+■ Kurkite asmenų sąrašus, kad niekada nepraleistumėte įrašo.
+■ Filtruokite žodžius ar frazes, kad valdytumėte, ką norite ir ko nenorite matyti.
+
+IR DAUGIAU!
+
+■ Graži tema, kuri prisitaiko prie jūsų asmeninės spalvų schemos, šviesios arba tamsios.
+■ Bendrinkite ir nuskenuokite QR kodus, kad galėtumėte greitai keistis „Mastodon“ profiliais su kitais.
+■ Prisijunkite ir perjunkite kelias paskyras.
+■ Gaukite pranešimą, kai tam tikras asmuo paskelbia įrašą, su varpelio mygtuką.
+■ Jokių spoilerių! Savo įrašus galite uždėti už turinio įspėjimų.
+
+GALINGA SKELBIMO PLATFORMA
+
+Jums nebereikia bandyti įtikti neskaidriam algoritmui, kuris sprendžia, ar draugai pamatys tai, ką paskelbėte. Jei jie jus seka, jie tai matys.
+
+Jei ją paskelbsite atvirajame internete, ji prieinama atvirajame internete. Galite drąsiai bendrinti nuorodomis į „Mastodon“, žinodami, kad bet kas galės jas perskaityti neprisijungę.
+
+Tarp gijų, apklausų, aukštos kokybės vaizdų, vaizdo ir garso įrašų bei turinio įspėjimų „Mastodon“ siūlo daugybę būdų išreikšti save tinkamu būdu.
+
+GALINGA SKAITYMO PLATFORMA
+
+Mums nereikia rodyti reklamų, todėl mums nereikia jūsų laikyti savo programėlėje. „Mastodon“ turi gausiausią trečiųjų šalių programėlių ir integracijų pasirinkimą, tad galite pasirinkti tau tinkamiausią patirtį. 
+
+Dėl chronologinio pagrindinio srauto lengva nustatyti, kada jau pasiekėte visas naujienas ir galite pereiti prie ko nors kito.
+
+Nereikia nerimauti, kad neteisingas spustelėjimas sugadins jūsų rekomendacijas visiems laikams. Mes nenuspėjame, ką norite matyti, o leidžiame jums tai valdyti.
+
+PROTOKOLAI, O NE PLATFORMOS
+
+„Mastodon“ nėra panaši į tradicinę socialinės medijos platformą, bet sukurta pagal decentralizuotą protokolą. Galite užsiregistruoti mūsų oficialiame serveryje arba pasirinkti trečiąją šalį, kuri patalpins jūsų duomenis ir palengvins patirtį.
+
+Dėl bendro protokolo, nesvarbu, ką pasirinktumėte, galite sklandžiai bendrauti su asmenimis kituose „Mastodon“ serveriuose. Bet yra ir daugiau: su tik viena paskyra galite bendrauti su asmenimis iš kitų fediversų platformų.
+
+Nepatenkinti savo pasirinkimu? Visada galite pereiti į kitą „Mastodon“ serverį ir kartu su savimi pasiimti sekėjus. Patyrę naudotojai gali net talpinti duomenis savo infrastruktūroje, nes „Mastodon“ yra atvirojo kodo.
+
+NE PELNO SIEKIANTIS POBŪDIS
+
+„Mastodon“ registruota ne pelno siekianti organizacija JAV ir Vokietijoje. Mūsų motyvacija – tai ne išgauti iš platformos piniginę vertę, o tai, kas geriausia platformai.
+
+KAIP PARODYTA: „TIME“, „Forbes“, „Wired“, „The Guardian“, „CNN“, „The Verge“, „TechCrunch“, „Financial Times“, „Gizmodo“, „PCMAG.com“ ir daugiau.

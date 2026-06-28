@@ -1,0 +1,61 @@
+Mastodon er den bedste måde at holde sig ajour med, hvad der sker. Følg enhver på tværs af fediverset og se alt i kronologisk rækkefølge. Ingen algoritmer, annoncer eller clickbait i syne.
+
+Dette er den officielle Android-app til Mastodon. Den er lynhurtigt og forbløffende smuk, designet til at være ikke blot kraftfuld, men også nem at bruge. I vores app kan man:
+
+UDFORSK
+
+● Opdag nye forfattere, journalister, kunstnere, fotografer, forskere med mere
+● Se, hvad der sker i verden
+
+LÆSE
+
+■ Hold dig ajour med personer, du holder af, i et kronologisk feed uden afbrydelser
+■ Følg hashtags for at følge med i specifikke emner i realtid
+
+OPRETTE
+
+● Post til følgere eller hele verden, med meningsmålinger, højkvalitets billeder og videoer
+● Deltag i interessante samtaler med andre mennesker
+
+KURATERE
+
+● Opret lister over personer for aldrig at gå glip af et indlæg
+● Filtrér ord eller sætninger for at styre, hvad man ønsker, og ikke ønsker, at se
+
+OG MERE!
+
+● Et smukt tema, der tilpasser sig den personlige farvesammensætning, lys eller mørk
+● Del og skan QR-koder for hurtigt at udveksle Mastodon-profiler med andre
+● Log ind og skift mellem flere konti
+■ Få besked med klokkeknappen, når en bestemt person laver indlæg
+● Ingen spoilers! Du kan placere dine indlæg bag indholdsadvarsler
+
+EN KRAFTFULD UDGIVELSESPLATFORM
+
+Du behøver ikke længere at forsøge at formilde en uigennemsigtig algoritme, der beslutter, om vennerne vil se, hvad du har slået op. Hvis de følger dig, vil de se det.
+
+Udgiver du det til det åbne net, er det tilgængeligt på det åbne net. Du kan sikkert dele links via Mastodon med den viden, at alle vil være i stand til at læse dem uden at logge ind.
+
+Mellem tråde, afstemninger, højkvalitets billeder, videoer, lyd og indholdsadvarsler, tilbyder Mastodon masser af måder at udtrykke dig på en måde, der passer dig.
+
+EN KRAFTFULD LÆSEPLATFORM
+
+Vi behøver ikke at vise dig annoncer, så vi behøver ikke at holde dig i vores app. Mastodon har det rigeste udvalg af tredjepartsapps og integrationer, så du kan vælge den oplevelse, der passer dig bedst. 
+
+Takket være det kronologiske hjem-feed er det nemt at se, hvornår du har fået alle opdateringer og kan gå videre til noget andet.
+
+Ingen grund til bekymringer over, at du får dine anbefalinger ødelagt for evigt med et fejlklik. Vi gætter ikke, hvad brugerne ønsker at se, vi lader dem styre det.
+
+PROTOKOLLER, IKKE PLATFORME
+
+Mastodon er ikke som en traditionel social medieplatform, men baserer sig på en decentraliseret protokol. Du kan tilmelde dig på vores officielle server eller vælge en tredjepart til at hoste dine data og moderere din oplevelse.
+
+Takket være den fælles protokol, kan du, uanset hvad du vælger, kommunikere problemfrit med folk på andre Mastodon-servere. Der er mere endnu: Med kun én konto kan du kommunikere med folk fra andre fediverse-platforme.
+
+Ikke tilfreds med valget? Du kan altid skifte til en anden Mastodon-server, samtidig med at du tager dine følgere med dig. For avancerede brugere, du kan endda hoste dine data på din egen infrastruktur, da Mastodon er open-source.
+
+NON-PROFIT AF NATUR
+
+Mastodon er registreret som non-profit i USA og Tyskland. Vi er ikke motiveret af at udvinde pengeværdi fra platformen, men ved hvad der er bedst for den.
+
+SOM OMTALT I: TIME, Forbes, Wired, The Guardian, CNN, The Verge, TechCrunch, Financial Times, Gizmodo, PCMAG.com og flere.

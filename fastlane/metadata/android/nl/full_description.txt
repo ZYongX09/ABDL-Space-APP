@@ -1,0 +1,61 @@
+Mastodon is de beste manier om op de hoogte te blijven van wat er gebeurt. Volg iedereen in de fediverse en zie alles in chronologische volgorde. Geen algoritmes, advertenties of clickbait te bekennen.
+
+Dit is de officiële Android-app voor Mastodon. Het is razendsnel en verbluffend mooi. Ontworpen om niet alleen krachtig, maar ook gebruiksvriendelijk te zijn. In onze app kun je:
+
+VERKENNEN
+
+■ Nieuwe schrijvers, journalisten, kunstenaars, fotografen, wetenschappers en meer ontdekken
+■ Zie wat er in de wereld gebeurt
+
+LEZEN
+
+■ Op de hoogte blijven van mensen om wie je geeft, op een chronologische tijdlijn en zonder onderbrekingen
+■ Hashtags in realtime volgen om op de hoogte te blijven van specifieke onderwerpen
+
+CREËREN
+
+■ Berichten naar alleen je volgers sturen of naar de hele wereld, met peilingen, afbeeldingen van hoge kwaliteit en video's
+■ Aan interessante gesprekken met andere mensen deelnemen
+
+CUREREN
+
+■ Lijsten maken met mensen die je volgt, om zo nooit een bericht te missen
+■ Woorden of zinnen filteren om te bepalen wat je wel en niet wilt zien
+
+EN MEER!
+
+■ Een prachtig thema dat zich aanpast aan je persoonlijke kleurenschema, licht of donker
+■ QR-codes scannen om snel Mastodon-profielen met andere mensen te delen
+■ Meerdere accounts gebruiken
+■ Meldingen van specifiek personen ontvangen, wanneer deze berichten plaatsen
+■ Geen spoilers! ■ Je kunt je berichten achter inhoudswaarschuwingen plaatsen
+
+EEN KRACHTIG PUBLICATIEPLATFORM
+
+Je hoeft niet langer te proberen een ondoorzichtig algoritme tevreden te stellen, dat beslist of je vrienden wel of niet mogen zien wat je hebt geplaatst. Als ze je volgen, zullen ze het zien.
+
+Wanneer je het in de fediverse plaatst, is het ook toegankelijk in de fediverse. Je kunt veilig links naar Mastodon delen, in de wetenschap dat iedereen ze kan lezen zonder in te hoeven loggen.
+
+Met gesprekken, peilingen, afbeeldingen van hoge kwaliteit, video's, audio en inhoudswaarschuwingen biedt Mastodon genoeg manieren om jezelf te kunnen uiten, op een manier die bij jou past.
+
+EEN KRACHTIG LEESPLATFORM
+
+We hoeven je geen advertenties te laten zien, dus we hoeven je ook niet voor onze app te behouden. Mastodon heeft de rijkste keuze aan door derden ontwikkelde apps en integraties, zodat je de gebruikerservaring kunt kiezen die het beste bij je past. 
+
+Dankzij de chronologische tijdlijn is het makkelijk om te zien wanneer je alle updates hebt bekeken en met iets anders kunt verder gaan.
+
+Je hoeft niet bang te zijn dat wanneer je op iets verkeerds klikt, je aanbevelingen voor altijd zijn verpest. We gissen niet naar wat je wilt zien, we laten het aan jou over.
+
+PROTOCOLLEN, GEEN PLATFORMS
+
+Mastodon is niet zoals een traditioneel social media platform, maar is gebouwd op een gedecentraliseerd protocol. Je kunt voor onze officiële server of voor eentje van een derde partij kiezen om je gegevens te hosten en gebruikers te modereren.
+
+Dankzij het gemeenschappelijke protocol kun je, ongeacht wat je kiest, naadloos met mensen op andere Mastodon-servers communiceren. Maar er is meer: Met slechts één account kun je met mensen van andere fediverse-platforms communiceren.
+
+Niet tevreden met je keuze? Je kunt altijd naar een andere Mastodon-server overstappen en je volgers meenemen. Gevorderde gebruikers kunnen hun gegevens zelfs op hun eigen infrastructuur hosten, aangezien Mastodon open-source is.
+
+NON-PROFIT VAN AARD
+
+Mastodon is een geregistreerde non-profit organisatie in de Verenigde Staten en Duitsland. We halen onze motivatie niet uit het commercieel uitbuiten van Mastodon, maar uit wat het beste is voor Mastodon.
+
+VERMELD IN: TIME, Forbes, Wired, The Guardian, CNN, The Verge, TechCrunch, Financial Times, Gizmodo, PCMAG.com en meer.

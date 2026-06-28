@@ -1,0 +1,61 @@
+Mastodon merupakan cara terbaik untuk tetap mengikuti apa yang terjadi. Ikuti siapapun dalam fediverse dan lihat semuanya secara kronologis. Tidak ada algoritma, iklan, atau clickbait.
+
+Ini adalah aplikasi Android resmi untuk Mastodon. Cepat dan mengesankan, didesain tidak hanya sekadar kuat tetapi juga mudah digunakan. Di dalam aplikasi ini, anda dapat:
+
+MENJELAJAHI
+
+Temukan penulis, jurnalis, kreator, fotografer, ilmuwan, dan lainnya
+Melihat apa yang sedang terjadi
+
+MEMBACA
+
+Tetap berhubungan dengan orang terdekat anda tanpa gangguan
+Mengikuti tagar untuk tetap terupdate dengan topik-topik baru
+
+MEMBUAT
+
+Tautkan konten kepada pengikut anda dengan poll, gambar dan video berkualitas tinggi
+Berpartisipasi dalam percakapan yang menarik dengan orang lain
+
+MENYUSUN
+
+Buat daftar orang agar tidak ketinggalan
+Saring kata atau frasa untuk mengontrol apa yang anda ingin lihat atau tidak
+
+DAN BANYAK LAGI!
+
+Tema indah yang menyesuaikan skema warna perangkat anda, terang atau gelap
+Bagikan dan pindai QR code untuk bertukar profil Mastodon dengan cepat
+Login dengan lebih dari satu akun
+Tetap ternotifikasi dengan postingan orang tertentu menggunakan tombol dering
+Tidak ada spoilers! Anda bisa mencantumkan postingan anda dibelakang tanda peringatan
+
+PLATFORM PUBLIKASI YANG KUAT
+
+Anda tidak lagi perlu mengikuti algoritma yang menentukan jika teman anda akan melihat apa yang anda tautkan. Jika mereka mengikuti anda, mereka akan melihat tautan tersebut.
+
+Jika anda mempublikasikan di internet, tautan tersebut dapat diakses di internet. Anda bisa dengan aman membagikan situs di Mastodon dengan catatan bahwa siapa saja dapat melihatnya tanpa login.
+
+Selain threads, polls, gambar berkualitas tinggi, video, audio, dan peringatan konten, Mastodon menawarkan beragam cara untuk mengekspresikan diri anda dengan cara yang anda inginkan.
+
+SEBUAH PLATFORM MEMBACA YANG KUAT
+
+Kami tidak perlu menayangkan iklan, sehingga kami tidak perlu menahan anda di dalam aplikasi kami. Mastodon memiliki pilihan aplikasi pihak ketiga terbanyak sehingga anda mendapatkan pengalaman yang anda inginkan. 
+
+Berkat laman feed yang kronologis, anda dapat dengan mudah mengikuti update dan melakukan hal lain.
+
+Tidak perlu khawatir jika anda salah mengklik dan mengubah rekomendasi. Kami tidak mengatur apa yang anda ingit lihat, kami serahkan kepada anda yang mengontrolnya.
+
+PROTOKOL, BUKAN PLATFORM
+
+Mastodon tidak seperti platform media sosial pada umumnya, tetapi dibangun pada protokol yang terdesentralisasi. Anda dapat mendaftar pada server resmi kami, atau memilih pihak ketiga untuk melayani data anda.
+
+Berkat protokol, apapun yang anda pilih, anda tetap dapat berkomunikasi dengan pengguna di server Mastodon yang berbeda. Dengan satu akun, anda dapat berkomunikasi dengan pengguna dari platform fediverse yang lain.
+
+Tidak puas dengan pilihan anda? Anda dapat selalu berpindah ke server Mastodon yang berbeda selagi membawa pengikut anda. Untuk pengguna yang serius, anda bahkan bisa menyimpan data pada infrastruktur sendiri, karena Mastodon ini open-source.
+
+NON-PROFIT
+
+Mastodon terdaftar sebagai lembaga non-profit di US dan Jerman. Kami tidak terdorong untuk memperoleh keuntungan, tetapi apa yang terbaik.
+
+SEPERTI YANG DILIHAT DI: TIME, Forbes, Wired, The Guardian, CNN, The Verge, TechCrunch, Financial Times, Gizmodo, PCMAG.com, dan lainnya.

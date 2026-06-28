@@ -1,0 +1,61 @@
+Mastodon olan biteni takip etmenin en iyi yoludur. Fediverse ağındaki herhangi birini takip edin ve her şeyi kronolojik sırayla görün. Hem de herhangi bir algoritma, reklam veya tık tuzağı olmadan.
+
+Bu, aşağıdakiler için resmi uygulamasıdır. Sadece güçlü değil aynı zamanda kullanımı kolay olacak şekilde tasarlanmış, son derece hızlı ve şaşırtıcı derecede güzel. Uygulamamızda yapabileceğiniz şeyler:
+
+KEŞFEDİN
+
+■ Yeni yazarlar, gazeteciler, sanatçılar, fotoğrafçılar, bilim insanları ve daha fazlasını keşfedin
+■ Dünyada neler olup bittiğini görün
+
+OKUYUN
+
+■ Önem verdiğiniz kişileri kesintisiz bir kronolojik akışta takip edin
+■ Belirli konuları gerçek zamanlı olarak takip etmek için etiketleri takip edin
+
+OLUŞTURUN
+
+■ Anketler, yüksek kaliteli görüntüler ve videolarla takipçilerinize veya tüm dünyaya gönderiler yayınlayın
+■ Diğer insanlarla ilginç sohbetlere katılın
+
+KİŞİSELLEŞTİRİN
+
+■ Hiçbir paylaşımı kaçırmamak için kişi listeleri oluşturun
+■ Görmek isteyip istemediğiniz içerikleri kontrol etmek için kelimeleri veya ifadeleri filtreleyin
+
+VE DAHA FAZLASINI YAPIN!
+
+Kişiselleştirilmiş renk düzeninize, aydınlık veya karanlık temaya uyum sağlayan zarif bir görünüm
+■ Mastodon profillerini başkalarıyla hızlıca paylaşmak için QR kodlarını paylaşın ve tarayın
+■ Giriş yapın ve birden fazla hesap arasında geçiş yapın
+■ Zil butonu ile belirli bir kişi paylaşım yaptığında bildirim alın
+■ Sürprizbozanlar yok! Gönderilerinizin önüne içerik uyarıları koyabilirsiniz
+
+GÜÇLÜ BIR YAYINCILIK PLATFORMU
+
+Artık paylaştıklarınızı arkadaşlarınızın görüp görmeyeceğine karar veren ve şeffaf olmayan bir algoritmayı memnun etmeye çalışmak zorunda değilsiniz. Sizi takip ediyorlarsa, paylaşımlarınızı görürler.
+
+Eğer gönderilerinizi açık web'de paylaşırsanız, açık web'den erişilebilir olur. Herkesin giriş yapmadan okuyabileceğinden emin olarak Mastodon bağlantılarını güvenle paylaşabilirsiniz.
+
+Başlıklar, anketler, yüksek kaliteli görüntüler, videolar, sesler ve içerik uyarıları arasında, kendinizi size uygun bir şekilde ifade etmenin birçok yolunu sunar.
+
+GÜÇLÜ BİR OKUMA PLATFORMU
+
+Size reklam göstermemize gerek yok, bu yüzden sizi uygulamamızda tutmamıza da gerek yok. Sosyal ağımız, size en uygun deneyimi seçebileceğiniz en zengin 3. parti uygulama ve entegrasyon seçeneklerine sahiptir. 
+
+Kronolojik ana sayfa akışı sayesinde, tüm güncellemeleri ne zaman yakaladığınızı ve başka bir şeye geçebileceğinizi anlamak kolaydır.
+
+Yanlış bir tıklamanın önerilerinizi sonsuza dek mahvedeceğinden endişelenmenize gerek yok. Ne görmek istediğinizi tahmin etmiyoruz, sizin kontrol etmenize izin veriyoruz.
+
+PLATFORMLAR DEĞİL, PROTOKOLLER
+
+Sosyal ağımız geleneksel bir sosyal medya platformu gibi değil, merkezi olmayan bir protokol üzerine inşa edilmiştir. Resmi sunucumuza kayıt olabilir veya verilerinizi barındırmak ve deneyiminizi denetlemek için 3. bir taraf seçebilirsiniz.
+
+Ortak protokol sayesinde, neyi seçerseniz seçin, diğer sunucularındaki kişilerle sorunsuz bir şekilde iletişim kurabilirsiniz. Ama dahası da var: Sadece tek bir hesapla, diğer federe platformlarındaki kişilerle iletişim kurabilirsiniz.
+
+Seçimden memnun değil misiniz? Takipçilerini yanınızda götürürken her zaman farklı bir sunucusuna geçebilirsiniz. İleri düzey kullanıcılar için, Açık kaynaklı olduğundan verilerinizi kendi altyapınızda bile barındırabilir.
+
+KÂR AMACI GÜTMEYEN NİTELİKTE 
+
+Mastodon, ABD ve Almanya'da kayıtlı bir kâr amacı kuruluştur. Motivasyonumuz platformdan maddi kazanç elde etmek değil, platform için en iyisini yapmaktır.
+
+TIME, Forbes, Wired, The Guardian, CNN, The Verge, TechCrunch, Financial Times, Gizmodo, PCMAG.com, ve çok daha fazla yayında bize yer verildi.

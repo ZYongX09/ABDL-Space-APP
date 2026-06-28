@@ -1,0 +1,61 @@
+Mastodon este cel mai bun mod de a ține pasul cu ceea ce se întâmplă. Urmăriți pe oricine din fediverse și vizualizați totul în ordine cronologică. Fără algoritmi, reclame sau clickbait la vedere.
+
+Aceasta este aplicația oficială Android pentru Mastodon. Este incredibil de rapid și uimitor de frumos, conceput să fie nu doar puternic, ci și ușor de utilizat. În aplicația noastră, puteți:
+
+EXPLORA
+
+■ Descoperiți noi scriitori, jurnaliști, artiști, fotografi, oameni de știință și multe altele
+■ Vedeți ce se întâmplă în lume
+
+CITII
+
+■ Țineți pasul cu oamenii la care țineți într-un flux cronologic fără întreruperi
+■ Urmăriți hashtag-uri pentru a fi la curent cu anumite subiecte în timp real
+
+CREA
+
+■ Postați pentru urmăritorii dvs. sau pentru întreaga lume, cu sondaje, imagini și videoclipuri de înaltă calitate
+■ Participați la conversații interesante cu alte persoane
+
+GESTIONA
+
+Creați liste de persoane pentru a nu pierde niciodată o postare
+■ Filtrați cuvinte sau expresii pentru a controla ceea ce faceți și ceea ce nu doriți să vedeți
+
+ȘI MAI MULTE!
+
+■ O temă frumoasă care se adaptează schemei dvs. de culori personalizate, luminoasă sau întunecată
+■ Partajați și scanați coduri QR pentru a schimba rapid profilurile Mastodon cu alții
+■ Conectați-vă și comutați între mai multe conturi
+■ Primiți notificări când o anumită persoană postează cu butonul clopoțel
+■ Fără spoilere! Puteți pune postările în spatele avertismentelor de conținut
+
+O PLATFORMĂ PUTERNICĂ DE PUBLICARE
+
+Nu mai trebuie să încerci să mulțumești un algoritm opac care decide dacă prietenii tăi vor vedea ceea ce ai postat. Dacă vă urmăresc, îl vor vedea.
+
+If you publish it to the open web, it’s accessible on the open web. You can safely share links to Mastodon in the knowledge that anyone will be able to read them without logging in.
+
+Between threads, polls, high quality images, videos, audio, and content warnings, Mastodon offers plenty of ways to express yourself in a way that suits you.
+
+A POWERFUL READING PLATFORM
+
+We don’t need to show you ads, so we don’t need to keep you in our app. Mastodon has the richest selection of 3rd party apps and integrations so you can choose the experience that fits you best. 
+
+Thanks to the chronological home feed, it’s easy to tell when you’ve caught up on all updates and can move on to something else.
+
+No need to worry that a misclick will ruin your recommendations forever. We don’t guess what you want to see, we let you control it.
+
+PROTOCOLS, NOT PLATFORMS
+
+Mastodon is not like a traditional social media platform, but is built on a decentralized protocol. You can sign up on our official server, or choose a 3rd party to host your data and moderate your experience.
+
+Thanks to the common protocol, no matter what you choose, you can communicate seamlessly with people on other Mastodon servers. But there’s more: With just one account, you can communicate with people from other fediverse platforms.
+
+Not happy with your choice? You can always switch to a different Mastodon server while taking your followers with you. For advanced users, you can even host your data on your own infrastructure, since Mastodon is open-source.
+
+NON-PROFIT IN NATURE
+
+Mastodon is a registered non-profit in the US and Germany. We are not motivated by extracting monetary value from the platform, but by what’s best for the platform.
+
+AS FEATURED IN: TIME, Forbes, Wired, The Guardian, CNN, The Verge, TechCrunch, Financial Times, Gizmodo, PCMAG.com, and more.

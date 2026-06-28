@@ -79,6 +79,7 @@ public class SettingsMainFragment extends BaseSettingsFragment<Object>{
 			items.add(new ListItem<>(R.string.settings_manage_donations, 0, R.drawable.ic_settings_heart_24px, this::onManageDonationClick));
 		}
 		items.add(new ListItem<>(getString(R.string.about_app, getString(R.string.app_name)), null, R.drawable.ic_info_24px, this::onAboutClick, null));
+		items.add(new ListItem<>(getString(R.string.check_for_updates), null, R.drawable.ic_apk_install_24px, this::onCheckUpdatesClick, null));
 		if(BuildConfig.DEBUG || BuildConfig.BUILD_TYPE.equals("appcenterPrivateBeta")){
 			items.add(new ListItem<>("Debug settings", null, R.drawable.ic_bug_report_24px, i->Nav.go(getActivity(), SettingsDebugFragment.class, makeFragmentArgs()), null));
 		}
@@ -159,6 +160,11 @@ public class SettingsMainFragment extends BaseSettingsFragment<Object>{
 
 	private void onAboutClick(ListItem<?> item_){
 		Nav.go(getActivity(), SettingsAboutAppFragment.class, makeFragmentArgs());
+	}
+
+	private void onCheckUpdatesClick(ListItem<?> item_){
+		GithubSelfUpdater.forceUpdate=true;
+		GithubSelfUpdater.getInstance().maybeCheckForUpdates();
 	}
 
 	private boolean useStagingEnvironmentForDonations(){

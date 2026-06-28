@@ -1,0 +1,61 @@
+A Mastodon a legjobb módja annak, hogy a történésekkel kapcsolatban naprakész maradj. Kövess bárkit a födiverzumban, és láss mindent időrendi sorrendben. Nincsenek algoritmusok, reklámok vagy kattintásvadászat.
+
+Ez a Mastodon hivatalos androidos alkalmazása. Villámgyors és meghökkentően szép, úgy lett tervezve, hogy ne csak sokoldalú, de könnyen használható is legyen. Az alkamazásban ezeket teheted:
+
+FEDEZZ FEL
+
+■ Fedezz fel új írókat, újságírókat, művészeket, fotósokat, tudósokat és másokat
+■ Nézd meg, hogy mi történik a világban
+
+OLVASS
+
+■ Kövesd figyelemmel, hogy mi érdekli az embereket, mindezt egy időrendi hírfolyamban, megszakítások nélkül
+■ Kövess hashtageket, hogy valós időben kövess különböző témákat
+
+ALKOSS
+
+■ Tegyél közzé bejegyzéseket a követőid vagy az egész világ számára, szavazásokkal, magas minőségű képekkel és videókkal
+■ Vegyél részt érdekes beszélgetésekben másokkal
+
+VÁLOGASS
+
+■ Hozz létre listákat, hogy ne maradj le egyetlen bejegyzésről sem
+■ Szűrj ki szavakat vagy kifejezéseket, hogy megmondd, hogy mit szeretnél látni, és mit nem
+
+ÉS EZ CSAK A KEZDET!
+
+■ Szép téma, amely követi a személyre szabott színsémádat, legyen világos vagy sötét
+■ QR-kódok megosztása vagy beolvasása, hogy gyorsan Mastodon-profilt válthass másokkal
+■ Bejelentkezés és váltás több fiók között
+■ Kapj értesítést, ha egy adott személy közzétesz valamit (a csengő ikonnal)
+■ Csak semmi spoiler! A bejegyzéseket tartalmi figyelmeztetés mögé teheted
+
+HATÁSOS KÖZZÉTÉTELI PLATFORM
+
+Többé nem kell egy átláthatatlan algoritmus kedvére tennéd, amely eldönti, hogy a barátaid mit látnak a bejegyzéseidből. Ha követnek, látni fogják.
+
+Ha közzéteszed a nyílt webnek, akkor elérhető lesz a nyílt weben. Biztonsággal oszthatsz meg hivatkozásokat a Mastodonon, annak tudatában, hogy bárki el tudja olvasni bejelentkezés nélkül is.
+
+A beszélgetések, szavazások, magas minőségű képek, videók, hangok, a tartalmi figyelmeztetések mellett a Mastodon számos módot biztosít az önkifejezésre.
+
+HATÁSOS OLVASÁSI PLATFORM
+
+Nem kell reklámokat megjelenítenünk, így nem célunk, hogy az alkalmazásban tartsunk. A Mastodon rendelkezik a külső alkalmazások és integrációk leggazdagabb választékával, így olyan élményt választhatsz, amely a számodra leginkább megfelelő. 
+
+Köszönhetően az időrendi kezdőlapi hírfolyamnak, könnyen meg tudod mondani, hogy mikor vagy naprakész, és utána foglalkozhatsz mással.
+
+Nem kell aggódnod, hogy egy félrekattintás végleg tönkreteszi a javaslataidat. Nem próbáljuk meg kitalálni, hogy mit szeretnél látni, rádbízzuk az irányítást.
+
+PROTOKOLLOK, NEM PLATFORMOK
+
+A Mastodon nem olyan, mint egy hagyományos közösségimédia-platform, egy decentralizált protokollra épül. Regisztrálhatsz a hivatalos kiszolgálónkon, vagy választhatsz egy külső felet, aki kiszolgálja az adataidat és kezeli az élményedet.
+
+A közös protokollnak köszönhetően, nem számít hogy mit választol, zökkenőmentesen kommunikálhatsz az egyéb Mastodon-kiszolgálókon lévő emberekkel. De ez még nem minden: egyetlen fiókkal más födiverzum-platformokon lévő emberekkel is kommunikálhatsz.
+
+Nem vagy elégedett a választásoddal? Bármikor másik Mastodon-kiszolgálóra válthatsz úgy, hogy magaddal viszed a követőidet is. Haladó felhasználók akár a saját infrastruktúrájukat is használhatják, mivel a Mastodon nyílt forráskódú.
+
+NONPROFIT TERMÉSZETŰ
+
+A Mastodon egy az Egyesült Államokban és Németországban bejegyzett nonprofit szervezet. Nem a platformból kinyerhető pénzügyi haszon motivál minket, hanem hogy a legtöbbet hozzuk ki belőle.
+
+BEMUTATVA A SAJTÓBAN: TIME, Forbes, Wired, The Guardian, CNN, The Verge, TechCrunch, Financial Times, Gizmodo, PCMAG.com és továbbiak.

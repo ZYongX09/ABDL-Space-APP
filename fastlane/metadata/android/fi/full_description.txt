@@ -1,0 +1,61 @@
+Mastodon on paras tapa pysyä ajan tasalla siitä, mitä ympärillä tapahtuu. Seuraa muita ympäri fediverseä ja näe kaikki aikajärjestyksessä. Ei algoritmeja, mainoksia tai klikkienkalastelua näkyvissä.
+
+Tämä on virallinen Android-sovellus Mastodonille. Se on häikäisevän nopea ja ilo silmälle, suunniteltu tehokkaaksi mutta myös helppokäyttöiseksi. Sovelluksellamme voit:
+
+SELATA
+
+■ Löytää uusia kirjailijoita, toimittajia, taiteilijoita, valokuvaajia, tieteentekijöitä ja paljon muuta
+■ Nähdä mitä maailmalla tapahtuu
+
+LUKEA
+
+■ Olla yhteydessä niiden ihmisten kanssa, joista välität, syötteen avulla ilman häiriötekijöitä
+■ Seurata aihetunnisteita pysyäksesi ajan tasalla eri aihepiirien tapahtumista
+
+LUODA
+
+■ Julkaista seuraajillesi tai koko maailmalle, kyselyjen, korkealaatuisten kuvien ja videoiden kera
+■ Osallistua mielenkiintoisiin keskusteluihin muiden ihmisten kanssa
+
+VALIKOIDA
+
+■ Luoda listoja ihmisistä, jotta et jää paitsi julkaisuista
+■ Suodattaa sanoja ja lauseita määrittääksesi, mitä näet ja mitä et halua nähdä
+
+JA PALJON MUUTA!
+
+■ Nätti teema, joka mukautuu valitsemaasi väripalettiin, vaaleaan tai tummaan
+■ Jaa ja skannaa QR-koodeja jakaaksesi Mastodon-profiileja muiden kanssa
+■ Kirjaudu sisään useilla eri tileillä ja vaihda niiden välillä
+■ Vastaanota ilmoitus, kun tietty henkilö julkaisee soittokellopainikkeella
+■ Ei juonipaljastuksia! Voit asettaa julkaisusi sisältövaroitusten taakse
+
+TEHOKAS JULKAISUALUSTA
+
+Sinun ei enää tarvitse yrittää miellyttää läpinäkymätöntä algoritmia, joka päättää, näkevätkö ystäväsi julkaisusi. Jos he seuraavat sinua, he näkevät julkaisusi.
+
+Jos julkaiset avoimeen verkkoon, se on saatavilla avoimessa verkossa. Voit jakaa linkkejä Mastodonissa tietäen, että kuka tahansa voi lukea niitä kirjautumatta sisään.
+
+Keskusteluketjujen, äänestysten, korkealaatuisten kuvien, videoiden, äänen ja sisältövaroitusten ansiosta Mastodon tarjoaa runsaasti tapoja ilmaista itseäsi haluamallasi tavalla.
+
+TEHOKAS LUKEMISALUSTA
+
+Meidän ei tarvitse näyttää sinulle mainoksia, joten meidän ei tarvitse lukita sinua sovellukseemme. Mastodonilla on laajin valikoima kolmannen osapuolen sovelluksia ja integraatioita, joten voit valita juuri sinulle parhaiten sopivan käyttökokemuksen. 
+
+Aikajärjestyksessä esitettävän syötteen ansiosta on helppo huomata, milloin olet lukenut kaikki päivitykset, ja voit siirtyä tekemään muita asioita.
+
+Ei pelkoa, että väärä napsautus pilaisi sinulle annettavat suositukset pysyvästi. Emme arvaile mitä haluat nähdä, annamme sinun päättää siitä.
+
+YHTEYSKÄYTÄNTÖJÄ, EI ALUSTOJA
+
+Mastodon ei ole kuin perinteinen sosiaalisen median alusta, vaan se on rakennettu hajautetun yhteyskäytännön varaan. Voit rekisteröityä viralliselle palvelimellemme tai valita kolmannen osapuolen ylläpitämään tietojasi ja säätelemään kokemustasi.
+
+Riippumatta mitä valitset, yhteisen yhteyskäytännön ansiosta voit kommunikoida saumattomasti muilla Mastodon-palvelimilla olevien ihmisten kanssa. Eikä siinä kaikki: Yhdellä käyttäjätilillä voit kommunikoida muilla fediversealustoilla olevien ihmisten kanssa.
+
+Etkö ole tyytyväinen valintaasi? Voit aina vaihtaa toiseen Mastodon-palvelimeen, ja samalla ottaa seuraajasi mukanasi. Kokeneet käyttäjät voivat isännöidä tietonsa omalla infrastruktuurillaan, sillä Mastodon on avointa lähdekoodia.
+
+VOITTOA TAVOITTELEMATON LUONTEELTAAN
+
+Mastodon on rekisteröity voittoa tavoittelematon yhdistys Yhdysvalloissa ja Saksassa. Meitä ei motivoi alustan rahallinen hyödyntäminen, vaan se, mikä on parasta itse alustalle.
+
+ESITTELYSSÄ ERI MEDIOISSA: TIME, Forbes, Wired, The Guardian, CNN, The Verge, TechCrunch, Financial Times, Gizmodo, PCMAG.com ja monissa muissa.

@@ -1,0 +1,61 @@
+Is Mastodon an dòigh as fheàrr airson sùil a chumail air na tha a’ dol. Lean duine sam bith air a’ cho-shaoghal agus faic a h-uile càil a-rèir an ama. Chan eil sgeul air algairimean, sanasachd no clickbait.
+
+Seo an aplacaid Android oifigeil airson Mastodon. The e àlainn ’s cho luath ris a’ ghaoth, air a dhealbhadh ach am biodh e cumhachdach ach furasta cleachdadh. Seo na nì thu san aplacaid againn:
+
+RÙRAICH
+
+■ Lorg sgrìobhadairean, luchd-naidheachd, luchd-ealain, luchd togail dhealbhan, luchd-saidheans is eile
+■ Faic na tha a’ dol air an t-saoghal
+
+LEUGH
+
+■ Gabh naidheachdan na feadhainn a tha cudromach dhut a-rèir an ama ’s gun bhuairidhean
+■ Lean tagaichean hais airson ceum a chumail ri cuspairean àraid ann am fìor-àm
+
+CRUTHAICH
+
+■ Postaich chun luchd-leantainn agad no chun t-saoghail air fad, le cunntasan-bheachd agus dealbhan ’s videothan le càileachd àrd
+■ Gabh pàirt ann an còmhraidhean inntinneach le daoine eile
+
+CURAIDICH
+
+■ Cruthaich liostaichean de dhaoine ach nach caill thu post uapa-san
+■ Criathraich faclan no abairtean a stiùireadh na chì ’s nach fhaic thu
+
+AGUS MÒRAN A BHARRACHD!
+
+■ Ùrlar àlainn a fhreagras dhan sgeama dhathan phearsanaichte agad, soilleir no dorcha
+■ Co-roinn is sganaich còdaichean QR airson pròifilean Mhastodon iomlaid le càch sa bhad
+■ Clàraich a-steach ’s geàrr leum eadar iomadh cunntas
+■ Faigh brath nuair a phostaich cuideigin sònraichte rud le putan a’ chluig
+■ Seachainn spoilers! ’S urrainn dhut na postaichean agad a chur air cùlaibh rabhaidhean susbainte
+
+ÙRLAR FOILLSEACHAIDH CUMHACHDACH
+
+You no longer have to try and appease an opaque algorithm that decides if your friends are going to see what you posted. If they follow you, they’ll see it.
+
+If you publish it to the open web, it’s accessible on the open web. You can safely share links to Mastodon in the knowledge that anyone will be able to read them without logging in.
+
+Between threads, polls, high quality images, videos, audio, and content warnings, Mastodon offers plenty of ways to express yourself in a way that suits you.
+
+ÙRLAR LEUGHAIDH CUMHACHDACH
+
+We don’t need to show you ads, so we don’t need to keep you in our app. Mastodon has the richest selection of 3rd party apps and integrations so you can choose the experience that fits you best. 
+
+Thanks to the chronological home feed, it’s easy to tell when you’ve caught up on all updates and can move on to something else.
+
+No need to worry that a misclick will ruin your recommendations forever. We don’t guess what you want to see, we let you control it.
+
+PRÒTACALAN SEACH ÙRLARAN
+
+Mastodon is not like a traditional social media platform, but is built on a decentralized protocol. You can sign up on our official server, or choose a 3rd party to host your data and moderate your experience.
+
+Thanks to the common protocol, no matter what you choose, you can communicate seamlessly with people on other Mastodon servers. But there’s more: With just one account, you can communicate with people from other fediverse platforms.
+
+Not happy with your choice? You can always switch to a different Mastodon server while taking your followers with you. For advanced users, you can even host your data on your own infrastructure, since Mastodon is open-source.
+
+GUN AMAS AIR PRÒTHAID
+
+Mastodon is a registered non-profit in the US and Germany. We are not motivated by extracting monetary value from the platform, but by what’s best for the platform.
+
+AS FEATURED IN: TIME, Forbes, Wired, The Guardian, CNN, The Verge, TechCrunch, Financial Times, Gizmodo, PCMAG.com, and more.

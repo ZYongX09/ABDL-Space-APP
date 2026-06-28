@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+	android:id="@+id/floating_toolbar"
+	android:layout_width="match_parent"
+	android:layout_height="wrap_content"
+	android:layout_gravity="top"
+	android:orientation="horizontal"
+	android:gravity="center_vertical"
+	android:paddingStart="8dp"
+	android:paddingEnd="8dp"
+	android:paddingTop="8dp">
+
+	<!-- 左侧药丸：时间线切换 -->
+	<LinearLayout
+		android:id="@+id/floating_switcher"
+		android:layout_width="0dp"
+		android:layout_height="42dp"
+		android:layout_weight="1"
+		android:background="@drawable/bg_pill_toolbar"
+		android:gravity="center_vertical"
+		android:orientation="horizontal"
+		android:paddingStart="12dp"
+		android:paddingEnd="10dp">
+
+		<ImageView
+			android:id="@+id/floating_timeline_icon"
+			android:layout_width="22dp"
+			android:layout_height="22dp"
+			android:layout_gravity="center_vertical"
+			android:src="@drawable/ic_fluent_home_24_regular" />
+
+		<TextView
+			android:id="@+id/floating_timeline_title"
+			style="@style/action_bar_title"
+			android:layout_width="wrap_content"
+			android:layout_height="wrap_content"
+			android:layout_gravity="center_vertical"
+			android:layout_marginStart="8dp"
+			android:drawableEnd="@drawable/ic_fluent_chevron_down_16_filled"
+			android:drawablePadding="4dp"
+			android:textSize="15sp" />
+	</LinearLayout>
+
+	<!-- 右侧药丸：按钮组 -->
+	<LinearLayout
+		android:id="@+id/floating_right_group"
+		android:layout_width="wrap_content"
+		android:layout_height="42dp"
+		android:layout_marginStart="8dp"
+		android:background="@drawable/bg_pill_toolbar"
+		android:gravity="center_vertical"
+		android:orientation="horizontal"
+		android:paddingStart="4dp"
+		android:paddingEnd="4dp">
+
+		<ImageView
+			android:id="@+id/floating_notifications"
+			android:layout_width="38dp"
+			android:layout_height="38dp"
+			android:padding="8dp"
+			android:scaleType="centerInside"
+			android:src="@drawable/ic_announcements_24_badged"
+			android:visibility="gone" />
+
+		<ImageView
+			android:id="@+id/floating_settings"
+			android:layout_width="38dp"
+			android:layout_height="38dp"
+			android:padding="8dp"
+			android:scaleType="centerInside"
+			android:src="@drawable/ic_settings_24_badged"
+			android:visibility="gone" />
+
+		<ImageView
+			android:id="@+id/floating_overflow"
+			android:layout_width="38dp"
+			android:layout_height="38dp"
+			android:padding="8dp"
+			android:scaleType="centerInside"
+			android:src="@drawable/ic_fluent_more_vertical_24_regular" />
+	</LinearLayout>
+</LinearLayout>

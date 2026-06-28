@@ -1,0 +1,61 @@
+O Mastodon é a melhor maneira de acompanhares o que está a acontecer. Segue qualquer um durante o fediverso e vê tudo em ordem cronológica. Sem algoritmos, anúncios ou caça-cliques.
+
+Esta é a aplicação oficial para Android do Mastodon. É extremamente rápida e de uma beleza estonteante, concebida para ser não só poderosa mas também fácil de utilizar. Na nossa aplicação, podes:
+
+EXPLORAR
+
+■ Descobrir novos escritores, jornalistas, artistas, fotógrafos, cientistas e muito mais
+■ Ver o que está a acontecer no mundo
+
+LER
+
+■ Acompanha as pessoas de quem gostas num mural cronológico sem interrupções
+■ Segue #etiquetas para te manteres a par de tópicos específicos em tempo real
+
+CRIAR
+
+■ Publica para os teus seguidores ou para o mundo inteiro, com sondagens, imagens e vídeos de alta qualidade
+■ Participa em conversas interessantes com outras pessoas
+
+CURAR
+
+■ Cria listas de pessoas para nunca perderes uma publicação
+■ Filtra palavras ou frases para controlar o que queres e o que não queres ver
+
+E MAIS!
+
+■ Um tema bonito que se adapta ao teu esquema de cores personalizado, claro ou escuro
+■ Partilha e lê códigos QR para trocares rapidamente perfis Mastodon com outros
+■ Inicia sessão e alterna entre várias contas
+■ Sê notificado quando uma pessoa específica faz uma publicação com o botão de campainha
+■ Sem revelação do enredo! Podes colocar as tuas publicações atrás de avisos de conteúdo
+
+UMA PLATAFORMA DE PUBLICAÇÃO PODEROSA
+
+Já não tens de tentar apaziguar um algoritmo opaco que decide se os teus amigos vão ver o que publicaste. Se te seguirem, vão ver-te.
+
+Se publicares na Internet, fica acessível na Internet. Podes partilhar hiperligações para o Mastodon com segurança, sabendo que qualquer pessoa os poderá ler sem ter de iniciar sessão ou criar uma conta.
+
+Entre tópicos, sondagens, imagens de alta qualidade, vídeos, áudio e avisos de conteúdo, o Mastodon oferece muitas formas de te expressares da maneira que mais te convém.
+
+UMA PLATAFORMA DE LEITURA PODEROSA
+
+Não precisamos de te mostrar anúncios, por isso não precisamos de te manter na nossa aplicação. O Mastodon tem a seleção mais rica de aplicações e integrações de terceiros para que possas escolher a experiência que melhor se adapta a ti. 
+
+Graças ao mural cronológico da página inicial, é fácil perceberes quando já estás a par de todas as atualizações e podes passar para outra coisa.
+
+Não precisas de te preocupar com a possibilidade de um clique errado arruinar as tuas recomendações para sempre. Não adivinhamos o que queres ver, deixamos-te controlar isso.
+
+PROTOCOLOS, NÃO PLATAFORMAS
+
+O Mastodon não é como uma plataforma tradicional de mídia social, mas é construída sobre um protocolo descentralizado. Podes inscrever-te no nosso servidor oficial ou escolher um terceiro para alojar os teus dados e moderar a tua experiência.
+
+Graças ao protocolo comum, independentemente do que escolheres, podes comunicar sem problemas com pessoas noutros servidores Mastodon. Mas há mais: com apenas uma conta, podes comunicar com pessoas de outras plataformas do fediverso.
+
+Não está satisfeito com a tua escolha? Podes sempre mudar para um servidor Mastodon diferente, levando os teus seguidores contigo. Para os utilizadores avançados, podes até alojar os teus dados na tua própria infraestrutura, uma vez que o Mastodon é de código aberto.
+
+SEM FINS LUCRATIVOS
+
+O Mastodon é uma organização sem fins lucrativos registada nos EUA e na Alemanha. Não somos motivados pela extração de valor monetário da plataforma, mas sim pelo que é melhor para a plataforma.
+
+COM DESTAQUE EM: TIME, Forbes, Wired, The Guardian, CNN, The Verge, TechCrunch, Financial Times, Gizmodo, PCMAG.com e muito mais.
