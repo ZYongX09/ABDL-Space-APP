@@ -11,3 +11,4 @@ local.properties
 *.jks
 /fastlane/report.xml
 .mimocode
+AGENTS.md
