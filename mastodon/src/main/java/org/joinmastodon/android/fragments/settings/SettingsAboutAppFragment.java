@@ -88,7 +88,7 @@ public class SettingsAboutAppFragment extends BaseSettingsFragment<Void>{
 				new ListItem<>(R.string.settings_cookie_policy, 0, (Consumer<ListItem<Void>>) i->UiUtils.launchWebBrowser(getActivity(), "https://abdl-space.top/cookies"), 0, true),
 				// === 链接 ===
 				new ListItem<>(R.string.settings_about_website, 0, (Consumer<ListItem<Void>>) i->UiUtils.launchWebBrowser(getActivity(), "https://abdl-space.top")),
-				new ListItem<>(R.string.settings_github, 0, (Consumer<ListItem<Void>>) i->UiUtils.launchWebBrowser(getActivity(), "https://github.com/ZYongX09/ABDL-Space-V2")),
+				new ListItem<>(R.string.settings_github, 0, (Consumer<ListItem<Void>>) i->UiUtils.launchWebBrowser(getActivity(), "https://github.com/ZYongX09/ABDL-Space-APP")),
 				new ListItem<>(R.string.settings_about_blog, 0, (Consumer<ListItem<Void>>) i->UiUtils.launchWebBrowser(getActivity(), "https://zhx-blog.top"), 0, true),
 				// === 数据管理 ===
 				exportItem=new ListItem<>(R.string.export_settings_title, R.string.export_settings_summary, R.drawable.ic_fluent_arrow_export_24_filled, this::onExportClick, 0, false),
@@ -116,7 +116,7 @@ public class SettingsAboutAppFragment extends BaseSettingsFragment<Void>{
 		// Toast countdown
 		int remaining=7-eggTapCount;
 		if(remaining>0){
-			eggToast=Toast.makeText(getActivity(), "千万不要再点"+remaining+"次", Toast.LENGTH_SHORT);
+			eggToast=Toast.makeText(getActivity(), "再点"+remaining+"次会发生什么呢？", Toast.LENGTH_SHORT);
 			eggToast.show();
 		}
 		// On 7th tap, launch intro animation (bypass splash_shown check)
