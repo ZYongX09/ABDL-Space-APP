@@ -717,7 +717,7 @@ public class ComposeMediaViewController{
 		public int fileSize;
 		public boolean nsfwDetected;
 		public float nsfwScore;
-		public boolean descriptionSaved=true;
+		public boolean descriptionSaved=false;
 
 		public transient View view;
 		public transient ProgressBar progressBar;
