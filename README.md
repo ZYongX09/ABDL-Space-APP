@@ -1,7 +1,12 @@
 <div align="center">
   <img src="https://img.abdl-space.top/file/system/1781439303787_play_store_512.png" width="100" />
   <h1>ABDL Space</h1>
-  <p>你的 ABDL 手机社区</p>
+  <p>Android 客户端 · 基于 Moshidon（Mastodon fork）二次开发</p>
+  <p>
+    <img src="https://img.shields.io/badge/Version-1.0.5-blue?style=flat-square" />
+    <img src="https://img.shields.io/badge/Android-8.0%2B-green?style=flat-square&logo=android&logoColor=white" />
+    <img src="https://img.shields.io/badge/License-GPL--3.0-red?style=flat-square" />
+  </p>
   <p>
     <a href="https://abdl-space.top/app"><img src="https://img.shields.io/badge/下载最新版-89CFF0?style=for-the-badge&logo=android&logoColor=white" /></a>
   </p>
@@ -11,50 +16,69 @@
 
 ## 这是什么
 
-ABDL Space 是一个专为 ABDL 爱好者搭建的社区 App。你可以在这里发帖、聊天、分享纸尿裤使用体验、给产品打分，认识志同道合的朋友。
+ABDL Space 是一个基于 Mastodon 协议的 Android 社区客户端，面向 ABDL 爱好者群体。
 
-网页版：[abdl-space.top](https://abdl-space.top)
+网页端 [abdl-space.top](https://abdl-space.top) 和 App 共用同一套账户体系，数据互通。App 端额外提供了原生推送通知、NSFW 图片本地识别、纸尿裤评分系统等功能。
 
-## 功能一览
+## 功能
 
-**社区互动**
-- 发帖、回复、转发、点赞
-- 上传图片，支持 NSFW 标记
-- 链接自动预览（B站、YouTube 等）
-- 标签、搜索、公开时间线
+**社区**
+发帖、回复、转发、点赞、图片上传、NSFW 标记。发链接自动生成预览卡片（B站、YouTube、微博等）。标签搜索、用户搜索、帖子搜索。
 
-**纸尿裤评分**
-- 给用过的纸尿裤打分写评价
-- 查看排行榜，发现热门产品
-- 纸尿裤百科，品牌/尺码/类型一览
+**纸尿裤系统**
+评分、排行榜、百科、品牌库。按类型/尺码/品牌筛选，社区共同维护数据。
 
 **私信 & 通知**
-- 一对一私信聊天
-- 点赞、回复、关注实时推送
+一对一实时私信。点赞、回复、关注、私信均触发推送通知（JPush）。
 
-**账户 & 安全**
-- 支持账号密码 / 第三方登录
-- NSFW 内容自动识别（本地 AI 模型，不上传图片）
-- 举报功能，管理员审核
+**安全**
+NSFW 图片通过 TensorFlow Lite 本地识别，图片不上传服务器。支持内容举报和管理员审核。
 
 **自动更新**
-- App 启动时自动检测新版本，提示更新
+App 启动时检查后端版本接口，有新版提示下载安装。
+
+## 技术栈
+
+| | |
+|---|---|
+| 语言 | Java（无 Kotlin / Compose） |
+| UI | Android View + XML 布局，Fragment 导航 |
+| 构建 | Gradle 8.5，AGP 8.x，compileSdk 35，minSdk 24 |
+| 网络 | OkHttp + Gson |
+| 推送 | JPush（极光推送） |
+| AI | TensorFlow Lite（NSFW 本地识别） |
+| 后端 | Hono + Cloudflare Workers + D1（独立仓库） |
+
+## 构建
+
+需要 JDK 17 和 Android SDK（API 35）。
+
+```bash
+git clone https://github.com/ZYongX09/ABDL-Space-APP.git
+cd ABDL-Space-APP
+JAVA_HOME=/usr/lib/jvm/java-17-openjdk ./gradlew :mastodon:assembleDebug --no-daemon
+```
+
+APK 产物在 `mastodon/build/outputs/apk/debug/`。
+
+Release 构建需要签名文件 `mastodon/release.keystore`。
 
 ## 安装
 
-1. 前往 [下载页面](https://abdl-space.top/app) 获取 APK
-2. 安装时允许「安装未知来源应用」
-3. 打开 App，注册或登录
+直接从 [官网下载页](https://abdl-space.top/app) 下载 APK 安装即可。安装时需要允许「安装未知来源应用」。
 
-系统要求：Android 8.0+
+## 参与
+
+欢迎提 Issue 和 PR。Fork 后从 `develop` 分支建功能分支，改动聚焦，PR 里说清楚改了什么、为什么改。
 
 ## 平台规则
 
 - 仅限 18 岁以上用户
-- 禁止发布违法内容
-- 举报通道随时可用
-- 管理员保留内容审核和账号处置权
+- 违规内容零容忍
+- 管理员保留审核和处置账号的权利
 
 ## 许可证
 
-[GPL-3.0](LICENSE)，基于 [Moshidon](https://github.com/Moshidon/Moshidon) 开发。
+[GPL-3.0](LICENSE)
+
+基于 [Moshidon](https://github.com/Moshidon/Moshidon) 二次开发，原项目版权归 Moshidon 团队。
