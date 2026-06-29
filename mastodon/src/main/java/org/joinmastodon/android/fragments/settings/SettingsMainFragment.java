@@ -164,7 +164,10 @@ public class SettingsMainFragment extends BaseSettingsFragment<Object>{
 
 	private void onCheckUpdatesClick(ListItem<?> item_){
 		GithubSelfUpdater updater=GithubSelfUpdater.getInstance();
-		if(updater==null) return;
+		if(updater==null){
+			android.widget.Toast.makeText(getActivity(), R.string.no_updates_available, android.widget.Toast.LENGTH_SHORT).show();
+			return;
+		}
 		GithubSelfUpdater.forceUpdate=true;
 		updater.maybeCheckForUpdates();
 	}
