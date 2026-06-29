@@ -668,31 +668,9 @@ public class ComposeMediaViewController{
 	}
 
 	public void saveAltTextsBeforePublishing(Runnable onSuccess, Consumer<ErrorResponse> onError){
-		ArrayList<UpdateAttachment> updateAltTextRequests=new ArrayList<>();
-		for(DraftMediaAttachment att:attachments){
-			if(!att.descriptionSaved && (fragment.editingStatus==null || !fragment.editingStatus.mediaAttachments.contains(att.serverAttachment))){
-				UpdateAttachment req=new UpdateAttachment(att.serverAttachment.id, att.description);
-				req.setCallback(new Callback<>(){
-							@Override
-							public void onSuccess(Attachment result){
-								att.descriptionSaved=true;
-								att.serverAttachment=result;
-								updateAltTextRequests.remove(req);
-								if(updateAltTextRequests.isEmpty())
-									onSuccess.run();
-							}
-
-							@Override
-							public void onError(ErrorResponse error){
-								onError.accept(error);
-							}
-				})
-				.exec(fragment.getAccountID());
-				updateAltTextRequests.add(req);
-			}
-		}
-		if(updateAltTextRequests.isEmpty())
-			onSuccess.run();
+		// Descriptions are now always sent via mediaAttributes in CreateStatus,
+		// so no need to call PUT /media/:id before publishing.
+		onSuccess.run();
 	}
 
 	public void onSaveInstanceState(Bundle outState){

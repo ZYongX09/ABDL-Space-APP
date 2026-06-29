@@ -7,6 +7,7 @@ import android.net.Uri;
 import android.text.TextUtils;
 
 import org.joinmastodon.android.R;
+import org.joinmastodon.android.api.requests.announcements.DismissAnnouncement;
 import org.joinmastodon.android.api.requests.announcements.GetAnnouncements;
 import org.joinmastodon.android.api.requests.statuses.GetScheduledStatuses;
 import org.joinmastodon.android.api.session.AccountSession;
@@ -84,7 +85,13 @@ public class AnnouncementsFragment extends BaseStatusListFragment<Announcement> 
 						// get unread items first
 						List<Announcement> data = result.stream().filter(a -> !a.read).collect(toList());
 						if (data.isEmpty()) setResult(true, null);
-						else unreadIDs = data.stream().map(a -> a.id).collect(toList());
+						else {
+							unreadIDs = data.stream().map(a -> a.id).collect(toList());
+							// Mark all unread as read on server
+							for (Announcement a : data) {
+								new DismissAnnouncement(a.id).exec(accountID);
+							}
+						}
 
 						// append read items at the end
 						data.addAll(result.stream().filter(a -> a.read).collect(toList()));

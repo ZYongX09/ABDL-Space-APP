@@ -163,8 +163,10 @@ public class SettingsMainFragment extends BaseSettingsFragment<Object>{
 	}
 
 	private void onCheckUpdatesClick(ListItem<?> item_){
+		GithubSelfUpdater updater=GithubSelfUpdater.getInstance();
+		if(updater==null) return;
 		GithubSelfUpdater.forceUpdate=true;
-		GithubSelfUpdater.getInstance().maybeCheckForUpdates();
+		updater.maybeCheckForUpdates();
 	}
 
 	private boolean useStagingEnvironmentForDonations(){
