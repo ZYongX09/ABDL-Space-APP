@@ -183,6 +183,9 @@ public class SettingsMainFragment extends BaseSettingsFragment<Object>{
 	@Subscribe
 	public void onSelfUpdateStateChanged(SelfUpdateStateChangedEvent ev){
 		updateUpdateBanner();
+		if(ev.state==GithubSelfUpdater.UpdateState.NO_UPDATE){
+			android.widget.Toast.makeText(getActivity(), R.string.no_updates_available, android.widget.Toast.LENGTH_SHORT).show();
+		}
 	}
 
 	@Subscribe
