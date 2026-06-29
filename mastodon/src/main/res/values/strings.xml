@@ -303,7 +303,7 @@
 	<string name="file_size_gb">%.2f GB</string>
 	<string name="upload_processing">Processing…</string>
 	<!-- %s is file size -->
-	<string name="download_update">下载</string>
+	<string name="download_update">下载 (%s)</string>
 	<string name="install_update">Install</string>
 	<string name="privacy_policy_title">Your privacy</string>
 	<string name="privacy_policy_subtitle">Although the ABDL Space app does not collect any data, the server you sign up through may have a different policy.\n\nIf you disagree with the policy for %s, you can go back and pick a different server.</string>

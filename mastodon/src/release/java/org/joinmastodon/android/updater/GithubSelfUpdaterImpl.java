@@ -99,12 +99,13 @@ public class GithubSelfUpdaterImpl extends GithubSelfUpdater{
 			int remoteCode=obj.has("versionCode") ? obj.get("versionCode").getAsInt() : 0;
 			String remoteName=obj.has("versionName") ? obj.get("versionName").getAsString() : "";
 			String downloadUrl=obj.has("downloadUrl") ? obj.get("downloadUrl").getAsString() : "";
+			long remoteSize=obj.has("apkSize") ? obj.get("apkSize").getAsLong() : 0;
 
 			if(remoteCode>BuildConfig.VERSION_CODE && downloadUrl.length()>0){
 				Log.d(TAG, "New version: v"+remoteName+" (code "+remoteCode+")");
 				UpdateInfo updateInfo=new UpdateInfo();
 				updateInfo.version=remoteName;
-				updateInfo.size=0;
+				updateInfo.size=remoteSize;
 				this.info=updateInfo;
 				getPrefs().edit()
 						.putString("version", remoteName)
