@@ -461,7 +461,7 @@ public class FooterStatusDisplayItem extends StatusDisplayItem{
 					R.string.sk_favorite_as,
 					R.string.sk_favorited_as,
 					R.string.sk_already_favorited,
-					GlobalUserPreferences.likeIcon ? R.drawable.ic_fluent_heart_28_regular : R.drawable.ic_fluent_heart_28_regular
+					R.drawable.ic_fluent_heart_20_regular
 			);
 			return true;
 		}
