@@ -45,6 +45,7 @@ public class SettingsMainFragment extends BaseSettingsFragment<Object>{
 	private Runnable updateDownloadProgressUpdater=new Runnable(){
 		@Override
 		public void run(){
+			if(!isAdded()) return;
 			GithubSelfUpdater.UpdateState state=GithubSelfUpdater.getInstance().getState();
 			if(state==GithubSelfUpdater.UpdateState.DOWNLOADING){
 				updateButton1.setText(getString(R.string.downloading_update, Math.round(GithubSelfUpdater.getInstance().getDownloadProgress()*100f)));
