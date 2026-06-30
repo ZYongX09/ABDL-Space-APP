@@ -60,7 +60,8 @@ public class FooterStatusDisplayItem extends StatusDisplayItem{
 	public static class Holder extends StatusDisplayItem.Holder<FooterStatusDisplayItem>{
 		private final TextView reply, boost, favorite;
 		private final ImageView share;
-		private final ColorStateList buttonColors;
+		private ColorStateList defaultColors;
+		private ColorStateList favoriteColors;
 		private final View replyBtn, boostBtn, favoriteBtn, shareBtn /* MOSHIDON */, bookmarkBtn;
 		private final PopupMenu boostLongTapMenu, favoriteLongTapMenu;
 		private final View spacer1, spacer2 /* MOSHIDON */ ,spacer3;
@@ -92,7 +93,8 @@ public class FooterStatusDisplayItem extends StatusDisplayItem{
 			hsb[1]+=0.1f;
 			hsb[2]+=0.16f;
 
-			buttonColors=new ColorStateList(new int[][]{
+			// 默认按钮颜色
+			ColorStateList defaultColors=new ColorStateList(new int[][]{
 					{android.R.attr.state_selected},
 					{android.R.attr.state_enabled},
 					{}
@@ -102,10 +104,22 @@ public class FooterStatusDisplayItem extends StatusDisplayItem{
 					UiUtils.getThemeColor(activity, R.attr.colorM3Outline) & 0x80FFFFFF
 			});
 
-			boost.setTextColor(buttonColors);
-			boost.setCompoundDrawableTintList(buttonColors);
-			favorite.setTextColor(buttonColors);
-			favorite.setCompoundDrawableTintList(buttonColors);
+			// 点赞按钮：点亮后变宝宝粉
+			int babyPink=0xFFFF69B4;
+			ColorStateList favoriteColors=new ColorStateList(new int[][]{
+					{android.R.attr.state_selected},
+					{android.R.attr.state_enabled},
+					{}
+			}, new int[]{
+					babyPink,
+					UiUtils.getThemeColor(activity, R.attr.colorM3Outline),
+					UiUtils.getThemeColor(activity, R.attr.colorM3Outline) & 0x80FFFFFF
+			});
+
+			boost.setTextColor(defaultColors);
+			boost.setCompoundDrawableTintList(defaultColors);
+			favorite.setTextColor(favoriteColors);
+			favorite.setCompoundDrawableTintList(favoriteColors);
 
 			if(Build.VERSION.SDK_INT<Build.VERSION_CODES.N){
 				UiUtils.fixCompoundDrawableTintOnAndroid6(reply);
@@ -447,7 +461,7 @@ public class FooterStatusDisplayItem extends StatusDisplayItem{
 					R.string.sk_favorite_as,
 					R.string.sk_favorited_as,
 					R.string.sk_already_favorited,
-					GlobalUserPreferences.likeIcon ? R.drawable.ic_fluent_heart_28_regular : R.drawable.ic_fluent_star_28_regular
+					GlobalUserPreferences.likeIcon ? R.drawable.ic_fluent_heart_28_regular : R.drawable.ic_fluent_heart_28_regular
 			);
 			return true;
 		}
