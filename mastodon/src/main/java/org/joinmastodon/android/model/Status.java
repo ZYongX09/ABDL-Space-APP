@@ -57,6 +57,8 @@ public class Status extends BaseModel implements DisplayItemsParent, Searchable 
 	public long favouritesCount;
 	public long repliesCount;
 	public long quotesCount;
+	public long bookmarksCount;
+	public long sharesCount;
 	public Instant editedAt;
 
 	public String url;

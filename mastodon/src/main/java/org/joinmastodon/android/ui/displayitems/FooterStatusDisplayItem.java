@@ -63,6 +63,7 @@ public class FooterStatusDisplayItem extends StatusDisplayItem{
 		private ColorStateList defaultColors;
 		private ColorStateList favoriteColors;
 		private final View replyBtn, boostBtn, favoriteBtn, shareBtn /* MOSHIDON */, bookmarkBtn;
+		private final TextView bookmarkText;
 		private final PopupMenu boostLongTapMenu, favoriteLongTapMenu;
 		private final View spacer1, spacer2 /* MOSHIDON */ ,spacer3;
 
@@ -86,6 +87,7 @@ public class FooterStatusDisplayItem extends StatusDisplayItem{
 
 			// MOSHIDON:
 			bookmarkBtn=findViewById(R.id.bookmark_btn);
+			bookmarkText=bookmarkBtn.findViewById(R.id.bookmark);
 			spacer3=findViewById(R.id.spacer3);
 
 			float[] hsb={0, 0, 0};
@@ -169,6 +171,7 @@ public class FooterStatusDisplayItem extends StatusDisplayItem{
 			bindButton(reply, item.status.repliesCount);
 			bindButton(boost, item.status.reblogsCount);
 			bindButton(favorite, item.status.favouritesCount);
+			bindButton(bookmarkText, item.status.bookmarksCount);
 			boostBtn.setSelected(item.status.reblogged);
 			favoriteBtn.setSelected(item.status.favourited);
 			boolean isOwn=item.status.account.id.equals(AccountSessionManager.getInstance().getAccount(item.accountID).self.id);
@@ -188,7 +191,7 @@ public class FooterStatusDisplayItem extends StatusDisplayItem{
 		}
 
 		private void bindButton(TextView btn, long count){
-			if(count>0 && !item.hideCounts){
+			if(!item.hideCounts){
 				btn.setText(UiUtils.abbreviateNumber(count));
 				btn.setCompoundDrawablePadding(V.dp(6));
 			}else{
