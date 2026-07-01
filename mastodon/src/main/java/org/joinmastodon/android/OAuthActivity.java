@@ -65,8 +65,10 @@ public class OAuthActivity extends Activity{
 				restartMainActivity();
 				finish();
 			}else{
-				// need_bind — 显示错误弹窗，关闭后回到主页
-				showUnboundSheet();
+				// need_bind — 回到主页并提示
+				Toast.makeText(this, "该宝宝新天地账号尚未绑定，请先在网页端完成绑定", Toast.LENGTH_LONG).show();
+				restartMainActivity();
+				finish();
 			}
 			return;
 		}
