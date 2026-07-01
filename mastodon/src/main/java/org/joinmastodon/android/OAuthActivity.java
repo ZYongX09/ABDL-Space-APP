@@ -23,6 +23,7 @@ import org.joinmastodon.android.model.Application;
 import org.joinmastodon.android.model.Instance;
 import org.joinmastodon.android.model.InstanceV2;
 import org.joinmastodon.android.model.Token;
+import org.joinmastodon.android.ui.M3AlertDialogBuilder;
 import org.joinmastodon.android.ui.utils.UiUtils;
 
 import androidx.annotation.Nullable;
@@ -190,22 +191,12 @@ public class OAuthActivity extends Activity{
 	}
 
 	private void showUnboundSheet(){
-		View sheetView = LayoutInflater.from(this).inflate(R.layout.sheet_error_bottom, null);
-		me.grishka.appkit.views.BottomSheet sheet = new me.grishka.appkit.views.BottomSheet(this) {{
-			setContentView(sheetView);
-			setNavigationBarBackground(new ColorDrawable(
-				UiUtils.alphaBlendColors(
-					UiUtils.getThemeColor(OAuthActivity.this, R.attr.colorM3Surface),
-					UiUtils.getThemeColor(OAuthActivity.this, R.attr.colorM3Primary), 0.05f)),
-				!UiUtils.isDarkTheme());
-
-			sheetView.findViewById(R.id.btn_confirm).setOnClickListener(v -> dismiss());
-			sheetView.findViewById(R.id.btn_web).setOnClickListener(v -> {
-				dismiss();
-				UiUtils.launchWebBrowser(OAuthActivity.this, "https://abdl-space.top");
-			});
-		}};
-		sheet.show();
+		new M3AlertDialogBuilder(this)
+			.setTitle("错误")
+			.setMessage("该宝宝新天地账号尚未绑定 ABDL Space 账号，请先完成绑定")
+			.setPositiveButton("访问网页端", (d, w) -> UiUtils.launchWebBrowser(OAuthActivity.this, "https://abdl-space.top"))
+			.setNegativeButton("知道了", null)
+			.show();
 	}
 
 	private void restartMainActivity(){

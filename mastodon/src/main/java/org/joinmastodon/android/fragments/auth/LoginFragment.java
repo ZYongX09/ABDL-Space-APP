@@ -257,7 +257,7 @@ public class LoginFragment extends ToolbarFragment {
 			title.setText("确认同意协议");
 			sessionInfo.setText(android.text.Html.fromHtml(
 				"登录前请仔细阅读<a href=\"https://abdl-space.top/agreement\">《用户协议》</a>" +
-				"和<a href=\"https://abdl-space.top/privacy\">《隐私政策》</a>，若您同意请点击确认按钮。"));
+				"和<a href=\"https://abdl-space.top/privacy\">《隐私政策》</a>，若您同意以上协议请点击确认按钮。"));
 			sessionInfo.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());
 
 			// 改"授权"按钮为"确认"
