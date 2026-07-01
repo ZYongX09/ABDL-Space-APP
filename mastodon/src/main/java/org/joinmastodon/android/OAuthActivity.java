@@ -62,12 +62,12 @@ public class OAuthActivity extends Activity{
 				if(session!=null)
 					intent.putExtra("account", session.getID());
 				startActivity(intent);
+				restartMainActivity();
+				finish();
 			}else{
-				// need_bind — 显示错误弹窗
+				// need_bind — 显示错误弹窗，关闭后回到主页
 				showUnboundSheet();
 			}
-			restartMainActivity();
-			finish();
 			return;
 		}
 
@@ -200,10 +200,16 @@ public class OAuthActivity extends Activity{
 					UiUtils.getThemeColor(OAuthActivity.this, R.attr.colorM3Primary), 0.05f)),
 				!UiUtils.isDarkTheme());
 
-			sheetView.findViewById(R.id.btn_confirm).setOnClickListener(v -> dismiss());
+			sheetView.findViewById(R.id.btn_confirm).setOnClickListener(v -> {
+				dismiss();
+				restartMainActivity();
+				finish();
+			});
 			sheetView.findViewById(R.id.btn_web).setOnClickListener(v -> {
 				dismiss();
 				UiUtils.launchWebBrowser(OAuthActivity.this, "https://abdl-space.top");
+				restartMainActivity();
+				finish();
 			});
 		}};
 		sheet.show();
