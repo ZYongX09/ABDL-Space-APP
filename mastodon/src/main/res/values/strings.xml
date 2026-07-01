@@ -555,7 +555,7 @@
 	<string name="nbw_unbind_title">解绑宝宝新天地</string>
 	<string name="nbw_unbind_message">确定解绑 %s？</string>
 	<string name="nbw_unbind">解绑</string>
-	<string name="nbw_unbound">已解绑</string>
+	<string name="nbw_unbound">未绑定</string>
 	<string name="nbw_bound">已绑定</string>
 	<string name="downloading_update">Downloading (%d%%)</string>
 	<!-- Shown like a content warning, %s is the name of the filter -->

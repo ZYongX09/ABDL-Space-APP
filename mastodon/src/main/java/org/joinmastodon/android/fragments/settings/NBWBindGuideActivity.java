@@ -40,7 +40,7 @@ public class NBWBindGuideActivity extends Activity {
 		Button authButton = findViewById(R.id.btn_auth);
 		authButton.setOnClickListener(v -> {
 			String state = Base64.encodeToString(
-					("{\"ts\":" + System.currentTimeMillis() + "}").getBytes(StandardCharsets.UTF_8),
+					("{\"ts\":" + System.currentTimeMillis() + ",\"action\":\"bind\"}").getBytes(StandardCharsets.UTF_8),
 					Base64.NO_WRAP);
 			String url = "https://api.abdl-space.top/api/auth/nbw/mobile-start?state=" + state;
 			UiUtils.launchWebBrowser(this, url);

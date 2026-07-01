@@ -40,6 +40,10 @@ public class NBWBindResultActivity extends Activity {
 			stateLoading.setVisibility(View.GONE);
 			stateSuccess.setVisibility(View.VISIBLE);
 			doneButton.setVisibility(View.VISIBLE);
+		}else if("need_bind".equals(nbwBindResult)){
+			stateLoading.setVisibility(View.GONE);
+			Toast.makeText(this, "请先在 ABDL Space 网页端绑定宝宝新天地账户", Toast.LENGTH_LONG).show();
+			finish();
 		}else{
 			stateLoading.setVisibility(View.GONE);
 			Toast.makeText(this, "绑定失败，请重试", Toast.LENGTH_SHORT).show();
