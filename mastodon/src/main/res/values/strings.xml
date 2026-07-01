@@ -545,7 +545,7 @@
 	<string name="check_for_updates">检查更新</string>
 	<string name="no_updates_available">当前已是最新版本</string>
 	<string name="nbw_bind_guide_title">宝宝新天地账户</string>
-	<string name="nbw_bind_guide_desc">绑定宝宝新天地账户后，您可以在两个平台之间同步内容。\n\n绑定需要跳转浏览器进行授权登录，授权完成后将自动返回本应用完成绑定。</string>
+	<string name="nbw_bind_guide_desc">绑定宝宝新天地账户后，您可以在两个平台之间同步内容，并使用宝宝新天地账户一键登录 ABDL Space。\n\n绑定需要跳转浏览器进行授权登录，授权完成后将自动返回本应用完成绑定。</string>
 	<string name="nbw_bind_guide_button">前往浏览器授权登录</string>
 	<string name="nbw_bind_loading">正在绑定</string>
 	<string name="nbw_bind_success">绑定成功</string>

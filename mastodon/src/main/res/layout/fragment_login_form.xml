@@ -87,24 +87,35 @@
 				android:background="@drawable/bg_m3_outlined_text_field"
 				android:textSize="15sp"/>
 
-			<Button
-				android:id="@+id/btn_login"
-				android:layout_width="match_parent"
-				android:layout_height="48dp"
-				style="@style/Widget.Mastodon.M3.Button.Filled"
-				android:text="@string/log_in"
-				android:textSize="15sp"
-				android:enabled="false"/>
+		<Button
+			android:id="@+id/btn_login"
+			android:layout_width="match_parent"
+			android:layout_height="48dp"
+			style="@style/Widget.Mastodon.M3.Button.Filled"
+			android:text="@string/log_in"
+			android:textSize="15sp"
+			android:enabled="false"/>
 
-			<TextView
-				android:layout_width="match_parent"
-				android:layout_height="wrap_content"
-				android:layout_marginTop="24dp"
-				android:layout_marginBottom="16dp"
-				android:text="或使用第三方授权登录"
-				android:textColor="?colorM3OnSurfaceVariant"
-				android:textSize="12sp"
-				android:gravity="center"/>
+		<TextView
+			android:id="@+id/cb_agree"
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:layout_marginTop="12dp"
+			android:drawableStart="@drawable/ic_baseline_check_box_outline_blank_24"
+			android:drawablePadding="8dp"
+			android:text="我已阅读并同意《用户协议》和《隐私政策》"
+			android:textSize="12sp"
+			android:textColor="?colorM3OnSurfaceVariant"/>
+
+		<TextView
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:layout_marginTop="24dp"
+			android:layout_marginBottom="16dp"
+			android:text="或使用第三方授权登录"
+			android:textColor="?colorM3OnSurfaceVariant"
+			android:textSize="12sp"
+			android:gravity="center"/>
 
 			<Button
 				android:id="@+id/btn_oauth"

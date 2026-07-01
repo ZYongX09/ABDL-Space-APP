@@ -12,12 +12,14 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.google.gson.Gson;
 
 import org.joinmastodon.android.MainActivity;
 import org.joinmastodon.android.R;
+import org.joinmastodon.android.api.MastodonAPIController;
 import org.joinmastodon.android.api.requests.accounts.GetOwnAccount;
 import org.joinmastodon.android.api.requests.oauth.CreateOAuthApp;
 import org.joinmastodon.android.api.session.AccountSessionManager;
@@ -25,6 +27,7 @@ import org.joinmastodon.android.model.Account;
 import org.joinmastodon.android.model.Application;
 import org.joinmastodon.android.model.InstanceV2;
 import org.joinmastodon.android.model.Token;
+import org.joinmastodon.android.ui.utils.UiUtils;
 
 import java.io.IOException;
 
@@ -63,6 +66,19 @@ public class LoginFragment extends ToolbarFragment {
 		loginButton = view.findViewById(R.id.btn_login);
 		oauthButton = view.findViewById(R.id.btn_oauth);
 		nbwButton = view.findViewById(R.id.btn_nbw);
+		TextView agreeText = view.findViewById(R.id.cb_agree);
+		final boolean[] agreed = {false};
+
+		agreeText.setOnClickListener(v -> {
+			agreed[0] = !agreed[0];
+			agreeText.setCompoundDrawablesRelativeWithIntrinsicBounds(
+				agreed[0] ? R.drawable.ic_baseline_check_box_24 : R.drawable.ic_baseline_check_box_outline_blank_24,
+				0, 0, 0);
+			updateButtonState();
+		});
+		agreeText.setText(android.text.Html.fromHtml(
+			"我已阅读并同意<a href=\"https://abdl-space.top/agreement\">《用户协议》</a>和<a href=\"https://abdl-space.top/privacy\">《隐私政策》</a>"));
+		agreeText.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());
 
 		TextWatcher textWatcher = new TextWatcher() {
 			@Override
@@ -80,14 +96,26 @@ public class LoginFragment extends ToolbarFragment {
 		loginButton.setOnClickListener(v -> attemptLogin());
 
 		if (oauthButton != null) {
-			oauthButton.setOnClickListener(v -> startOAuthLogin());
+			oauthButton.setOnClickListener(v -> {
+				if (!agreed[0]) {
+					Toast.makeText(getActivity(), "请先同意用户协议和隐私政策", Toast.LENGTH_SHORT).show();
+					return;
+				}
+				showConsentSheet(() -> startOAuthLogin());
+			});
 		}
 
 		if (nbwButton != null) {
 			nbwButton.setOnClickListener(v -> {
-				Intent intent = new Intent(Intent.ACTION_VIEW,
-					Uri.parse("https://api.abdl-space.top/api/auth/nbw/mobile-start"));
-				startActivity(intent);
+				if (!agreed[0]) {
+					Toast.makeText(getActivity(), "请先同意用户协议和隐私政策", Toast.LENGTH_SHORT).show();
+					return;
+				}
+				showConsentSheet(() -> {
+					Intent intent = new Intent(Intent.ACTION_VIEW,
+						Uri.parse("https://api.abdl-space.top/api/auth/nbw/mobile-start"));
+					startActivity(intent);
+				});
 			});
 		}
 
@@ -95,6 +123,7 @@ public class LoginFragment extends ToolbarFragment {
 	}
 
 	private void updateButtonState() {
+		// 复选框状态通过 agreed 数组跟踪
 		loginButton.setEnabled(loginEdit.length() > 0 && passwordEdit.length() > 0);
 	}
 
@@ -209,6 +238,36 @@ public class LoginFragment extends ToolbarFragment {
 		public String username;
 		public String avatar;
 		public String role;
+	}
+
+	private void showConsentSheet(Runnable onConfirm) {
+		android.app.Activity activity = getActivity();
+		if (activity == null) return;
+		View sheetView = LayoutInflater.from(activity).inflate(R.layout.sheet_qr_login, null);
+		me.grishka.appkit.views.BottomSheet sheet = new me.grishka.appkit.views.BottomSheet(activity) {{
+			setContentView(sheetView);
+			setNavigationBarBackground(new android.graphics.drawable.ColorDrawable(
+				UiUtils.alphaBlendColors(
+					UiUtils.getThemeColor(activity, R.attr.colorM3Surface),
+					UiUtils.getThemeColor(activity, R.attr.colorM3Primary), 0.05f)),
+				!UiUtils.isDarkTheme());
+
+			TextView title = sheetView.findViewById(R.id.sheet_title);
+			TextView sessionInfo = sheetView.findViewById(R.id.qr_session_info);
+			title.setText("授权登录确认");
+			sessionInfo.setText(android.text.Html.fromHtml(
+				"点击「授权」后，将跳转浏览器进行授权登录。\n\n" +
+				"授权即表示您同意<a href=\"https://abdl-space.top/agreement\">《用户协议》</a>" +
+				"和<a href=\"https://abdl-space.top/privacy\">《隐私政策》</a>。"));
+			sessionInfo.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());
+
+			sheetView.findViewById(R.id.btn_cancel).setOnClickListener(v -> dismiss());
+			sheetView.findViewById(R.id.btn_authorize).setOnClickListener(v -> {
+				dismiss();
+				onConfirm.run();
+			});
+		}};
+		sheet.show();
 	}
 
 	private void startOAuthLogin() {
