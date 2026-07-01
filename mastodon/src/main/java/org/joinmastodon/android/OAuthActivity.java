@@ -44,17 +44,22 @@ public class OAuthActivity extends Activity{
 			return;
 		}
 
-		// NBW 绑定回调: ?nbw_bind=success&nbw_user=xxx
+		// NBW 绑定回调: ?nbw_bind=success/need_bind&nbw_user=xxx
 		String nbwBind=uri.getQueryParameter("nbw_bind");
 		if(nbwBind!=null){
-			String nbwUser=uri.getQueryParameter("nbw_user");
-			Intent intent=new Intent(this, NBWBindResultActivity.class);
-			intent.putExtra("nbw_bind_result", nbwBind);
-			intent.putExtra("nbw_user", nbwUser);
-			AccountSession session=AccountSessionManager.getInstance().getLastActiveAccount();
-			if(session!=null)
-				intent.putExtra("account", session.getID());
-			startActivity(intent);
+			if("success".equals(nbwBind)){
+				String nbwUser=uri.getQueryParameter("nbw_user");
+				Intent intent=new Intent(this, NBWBindResultActivity.class);
+				intent.putExtra("nbw_bind_result", nbwBind);
+				intent.putExtra("nbw_user", nbwUser);
+				AccountSession session=AccountSessionManager.getInstance().getLastActiveAccount();
+				if(session!=null)
+					intent.putExtra("account", session.getID());
+				startActivity(intent);
+			}else{
+				Toast.makeText(this, "该宝宝新天地账号尚未绑定 ABDL Space 账号，请先在网页端完成绑定", Toast.LENGTH_LONG).show();
+			}
+			restartMainActivity();
 			finish();
 			return;
 		}
