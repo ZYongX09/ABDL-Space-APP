@@ -18,6 +18,7 @@ import org.joinmastodon.android.api.requests.oauth.GetOauthToken;
 import org.joinmastodon.android.api.session.AccountSession;
 import org.joinmastodon.android.api.session.AccountSessionManager;
 import org.joinmastodon.android.fragments.settings.NBWBindResultActivity;
+import org.joinmastodon.android.fragments.settings.NBWNotBoundActivity;
 import org.joinmastodon.android.model.Account;
 import org.joinmastodon.android.model.Application;
 import org.joinmastodon.android.model.Instance;
@@ -50,20 +51,35 @@ public class OAuthActivity extends Activity{
 			return;
 		}
 
-		// NBW 绑定回调: ?nbw_bind=success/need_bind&nbw_user=xxx&nbw_token=xxx
+		// NBW 绑定回调: ?nbw_bind=success/need_bind&nbw_user=xxx&nbw_token=xxx&nbw_flow=bind/login
 		String nbwBind=uri.getQueryParameter("nbw_bind");
 		if(nbwBind!=null){
 			String nbwUser=uri.getQueryParameter("nbw_user");
 			String nbwToken=uri.getQueryParameter("nbw_token");
-			Intent intent=new Intent(this, NBWBindResultActivity.class);
-			intent.putExtra("nbw_bind_result", nbwBind);
+			String nbwFlow=uri.getQueryParameter("nbw_flow");
+			Intent intent;
+			if("need_bind".equals(nbwBind)){
+				if("bind".equals(nbwFlow)){
+					// 绑定流程 → 绑定结果页（执行绑定）
+					intent=new Intent(this, NBWBindResultActivity.class);
+					intent.putExtra("nbw_bind_result", nbwBind);
+					intent.putExtra("nbw_token", nbwToken);
+				}else{
+					// 登录流程 → 未绑定提示页
+					intent=new Intent(this, NBWNotBoundActivity.class);
+				}
+			}else{
+				// success → 绑定结果页
+				intent=new Intent(this, NBWBindResultActivity.class);
+				intent.putExtra("nbw_bind_result", nbwBind);
+				intent.putExtra("nbw_token", nbwToken);
+			}
 			intent.putExtra("nbw_user", nbwUser);
-			intent.putExtra("nbw_token", nbwToken);
 			AccountSession session=AccountSessionManager.getInstance().getLastActiveAccount();
 			if(session!=null)
 				intent.putExtra("account", session.getID());
+			intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
 			startActivity(intent);
-			restartMainActivity();
 			finish();
 			return;
 		}

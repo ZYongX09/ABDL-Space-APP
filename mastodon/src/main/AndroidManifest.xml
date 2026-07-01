@@ -87,6 +87,7 @@
 		</activity>
 		<activity android:name=".fragments.settings.NBWBindGuideActivity" android:configChanges="orientation|screenSize" android:theme="@style/Theme.Mastodon.AutoLightDark"/>
 		<activity android:name=".fragments.settings.NBWBindResultActivity" android:configChanges="orientation|screenSize" android:theme="@style/Theme.Mastodon.AutoLightDark"/>
+		<activity android:name=".fragments.settings.NBWNotBoundActivity" android:configChanges="orientation|screenSize" android:theme="@style/Theme.Mastodon.AutoLightDark"/>
 		<activity android:name=".ExternalShareActivity" android:exported="true" android:configChanges="orientation|screenSize" android:windowSoftInputMode="adjustResize">
 			<intent-filter>
 				<action android:name="android.intent.action.SEND"/>
