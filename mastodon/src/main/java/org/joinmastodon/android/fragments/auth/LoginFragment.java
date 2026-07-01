@@ -81,6 +81,13 @@ public class LoginFragment extends ToolbarFragment {
 
 		loginEdit.addTextChangedListener(textWatcher);
 		passwordEdit.addTextChangedListener(textWatcher);
+
+		// 设置协议文本超链接
+		TextView tvAgreement = view.findViewById(R.id.tv_agreement);
+		tvAgreement.setText(android.text.Html.fromHtml(
+			"在登录前您需要仔细阅读<a href=\"https://abdl-space.top/agreement\">《用户协议》</a>和<a href=\"https://abdl-space.top/privacy\">《隐私政策》</a>"));
+		tvAgreement.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());
+
 		loginButton.setOnClickListener(v -> showConsentSheet(this::attemptLogin));
 
 		if (oauthButton != null) {
@@ -247,11 +254,17 @@ public class LoginFragment extends ToolbarFragment {
 
 			TextView title = sheetView.findViewById(R.id.sheet_title);
 			TextView sessionInfo = sheetView.findViewById(R.id.qr_session_info);
-			title.setText("授权登录确认");
+			title.setText("确认同意协议");
 			sessionInfo.setText(android.text.Html.fromHtml(
-				"请仔细阅读<a href=\"https://abdl-space.top/agreement\">《用户协议》</a>" +
-				"和<a href=\"https://abdl-space.top/privacy\">《隐私政策》</a>，是否同意？"));
+				"登录前请仔细阅读<a href=\"https://abdl-space.top/agreement\">《用户协议》</a>" +
+				"和<a href=\"https://abdl-space.top/privacy\">《隐私政策》</a>，若您同意请点击确认按钮。"));
 			sessionInfo.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());
+
+			// 改"授权"按钮为"确认"
+			TextView authorizeBtn = sheetView.findViewById(R.id.btn_authorize);
+			if (authorizeBtn != null) {
+				authorizeBtn.setText("确认");
+			}
 
 			sheetView.findViewById(R.id.btn_cancel).setOnClickListener(v -> dismiss());
 			sheetView.findViewById(R.id.btn_authorize).setOnClickListener(v -> {

@@ -97,10 +97,10 @@
 			android:enabled="false"/>
 
 		<TextView
+			android:id="@+id/tv_agreement"
 			android:layout_width="match_parent"
 			android:layout_height="wrap_content"
 			android:layout_marginTop="8dp"
-			android:text="在登录前您需要仔细阅读《用户协议》和《隐私政策》"
 			android:textSize="12sp"
 			android:textColor="?colorM3OnSurfaceVariant"
 			android:gravity="center"/>

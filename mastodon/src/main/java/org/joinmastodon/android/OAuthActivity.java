@@ -3,9 +3,14 @@ package org.joinmastodon.android;
 import android.app.Activity;
 import android.app.ProgressDialog;
 import android.content.Intent;
+import android.graphics.drawable.ColorDrawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import org.joinmastodon.android.api.requests.accounts.GetOwnAccount;
@@ -57,7 +62,8 @@ public class OAuthActivity extends Activity{
 					intent.putExtra("account", session.getID());
 				startActivity(intent);
 			}else{
-				Toast.makeText(this, "该宝宝新天地账号尚未绑定 ABDL Space 账号，请先在网页端完成绑定", Toast.LENGTH_LONG).show();
+				// need_bind — 显示错误弹窗
+				showUnboundSheet();
 			}
 			restartMainActivity();
 			finish();
@@ -181,6 +187,25 @@ public class OAuthActivity extends Activity{
 		error.showToast(OAuthActivity.this);
 		finish();
 		restartMainActivity();
+	}
+
+	private void showUnboundSheet(){
+		View sheetView = LayoutInflater.from(this).inflate(R.layout.sheet_error_bottom, null);
+		me.grishka.appkit.views.BottomSheet sheet = new me.grishka.appkit.views.BottomSheet(this) {{
+			setContentView(sheetView);
+			setNavigationBarBackground(new ColorDrawable(
+				UiUtils.alphaBlendColors(
+					UiUtils.getThemeColor(OAuthActivity.this, R.attr.colorM3Surface),
+					UiUtils.getThemeColor(OAuthActivity.this, R.attr.colorM3Primary), 0.05f)),
+				!UiUtils.isDarkTheme());
+
+			sheetView.findViewById(R.id.btn_confirm).setOnClickListener(v -> dismiss());
+			sheetView.findViewById(R.id.btn_web).setOnClickListener(v -> {
+				dismiss();
+				UiUtils.launchWebBrowser(OAuthActivity.this, "https://abdl-space.top");
+			});
+		}};
+		sheet.show();
 	}
 
 	private void restartMainActivity(){

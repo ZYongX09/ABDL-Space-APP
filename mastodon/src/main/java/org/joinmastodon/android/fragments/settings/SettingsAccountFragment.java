@@ -48,23 +48,22 @@ public class SettingsAccountFragment extends BaseSettingsFragment<Void>{
 
 		ArrayList<ListItem<Void>> items=new ArrayList<>();
 		items.add(new SectionHeaderListItem(R.string.account_settings));
-
 		items.add(new ListItem<>(R.string.settings_privacy, 0, R.drawable.ic_privacy_tip_24px, this::onPrivacyClick));
 		items.add(new ListItem<>(R.string.settings_filters, 0, R.drawable.ic_filter_alt_24px, this::onFiltersClick));
 		items.add(new ListItem<>(R.string.settings_notifications, 0, R.drawable.ic_notifications_24px, this::onNotificationsClick));
 		items.add(new ListItem<>(R.string.settings_posting_defaults, 0, R.drawable.ic_edit_square_24px, this::onPostingDefaultsClick));
+
+		// 第三方账户
+		AccountSession acctSession = AccountSessionManager.get(accountID);
+		String nbwStatus = acctSession.self.nbwUsername != null ? acctSession.self.nbwUsername : getString(R.string.nbw_unbound);
+		items.add(new SectionHeaderListItem(R.string.nbw_third_party_account));
+		items.add(new ListItem<>(getString(R.string.nbw_third_party_nbw), nbwStatus, R.drawable.ic_nbw, this::onNBWBindClick));
 
 		items.add(new SectionHeaderListItem(account.domain));
 		items.add(new ListItem<>(getString(R.string.settings_about_this_server), getString(R.string.settings_server_explanation), R.drawable.ic_dns_24px, this::onServerClick));
 		if(account.isEligibleForDonations()){
 			items.add(new ListItem<>(R.string.settings_donate, 0, R.drawable.ic_volunteer_activism_24px, this::onDonateClick));
 		}
-
-		// 第三方账户
-		AccountSession session = AccountSessionManager.get(accountID);
-		String nbwStatus = session.self.nbwUsername != null ? session.self.nbwUsername : getString(R.string.nbw_unbound);
-		items.add(new SectionHeaderListItem(R.string.nbw_third_party_account));
-		items.add(new ListItem<>(getString(R.string.nbw_third_party_nbw), nbwStatus, R.drawable.ic_nbw, this::onNBWBindClick));
 
 		items.add(new SectionHeaderListItem(R.string.manage_account));
 		items.add(new ListItem<>(R.string.switch_to_this_account, 0, R.drawable.ic_switch_account_24px, AccountSessionManager.getInstance().getLastActiveAccountID().equals(accountID) ? null : this::onSwitchAccountClick));
