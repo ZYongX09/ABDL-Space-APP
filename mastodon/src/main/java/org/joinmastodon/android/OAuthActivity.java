@@ -10,7 +10,9 @@ import android.widget.Toast;
 
 import org.joinmastodon.android.api.requests.accounts.GetOwnAccount;
 import org.joinmastodon.android.api.requests.oauth.GetOauthToken;
+import org.joinmastodon.android.api.session.AccountSession;
 import org.joinmastodon.android.api.session.AccountSessionManager;
+import org.joinmastodon.android.fragments.settings.NBWBindResultActivity;
 import org.joinmastodon.android.model.Account;
 import org.joinmastodon.android.model.Application;
 import org.joinmastodon.android.model.Instance;
@@ -38,6 +40,21 @@ public class OAuthActivity extends Activity{
 				error=uri.getQueryParameter("error");
 			Toast.makeText(this, error, Toast.LENGTH_LONG).show();
 			restartMainActivity();
+			finish();
+			return;
+		}
+
+		// NBW 绑定回调: ?nbw_bind=success&nbw_user=xxx
+		String nbwBind=uri.getQueryParameter("nbw_bind");
+		if(nbwBind!=null){
+			String nbwUser=uri.getQueryParameter("nbw_user");
+			Intent intent=new Intent(this, NBWBindResultActivity.class);
+			intent.putExtra("nbw_bind_result", nbwBind);
+			intent.putExtra("nbw_user", nbwUser);
+			AccountSession session=AccountSessionManager.getInstance().getLastActiveAccount();
+			if(session!=null)
+				intent.putExtra("account", session.getID());
+			startActivity(intent);
 			finish();
 			return;
 		}

@@ -76,6 +76,10 @@ public class Account extends BaseModel implements Searchable{
 	 */
 	public boolean locked;
 	/**
+	 * NBW (宝宝新天地) bound username
+	 */
+	public String nbwUsername;
+	/**
 	 * Custom emoji entities to be used when rendering the profile. If none, an empty array will be returned.
 	 */
 	public List<Emoji> emojis;

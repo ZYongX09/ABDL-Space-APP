@@ -11,6 +11,7 @@ import android.widget.Toast;
 import org.joinmastodon.android.BuildConfig;
 import org.joinmastodon.android.MainActivity;
 import org.joinmastodon.android.R;
+import org.joinmastodon.android.api.MastodonAPIController;
 import org.joinmastodon.android.api.requests.catalog.GetDonationCampaigns;
 import org.joinmastodon.android.api.session.AccountSession;
 import org.joinmastodon.android.api.session.AccountSessionManager;
@@ -58,6 +59,12 @@ public class SettingsAccountFragment extends BaseSettingsFragment<Void>{
 		if(account.isEligibleForDonations()){
 			items.add(new ListItem<>(R.string.settings_donate, 0, R.drawable.ic_volunteer_activism_24px, this::onDonateClick));
 		}
+
+		// 第三方账户
+		AccountSession session = AccountSessionManager.get(accountID);
+		String nbwStatus = session.self.nbwUsername != null ? session.self.nbwUsername : getString(R.string.nbw_unbound);
+		items.add(new SectionHeaderListItem(R.string.nbw_third_party_account));
+		items.add(new ListItem<>(getString(R.string.nbw_third_party_nbw), nbwStatus, R.drawable.ic_nbw, this::onNBWBindClick));
 
 		items.add(new SectionHeaderListItem(R.string.manage_account));
 		items.add(new ListItem<>(R.string.switch_to_this_account, 0, R.drawable.ic_switch_account_24px, AccountSessionManager.getInstance().getLastActiveAccountID().equals(accountID) ? null : this::onSwitchAccountClick));
@@ -197,5 +204,43 @@ public class SettingsAccountFragment extends BaseSettingsFragment<Void>{
 				}))
 				.setNegativeButton(R.string.cancel, null)
 				.show();
+	}
+
+	private void onNBWBindClick(ListItem<?> item){
+		AccountSession session=AccountSessionManager.get(accountID);
+		if(session.self.nbwUsername!=null){
+			// 已绑定 → 解绑对话框
+			new M3AlertDialogBuilder(getActivity())
+					.setTitle(R.string.nbw_unbind_title)
+					.setMessage(getString(R.string.nbw_unbind_message, session.self.nbwUsername))
+					.setPositiveButton(R.string.nbw_unbind, (d, w)->unbindNBW())
+					.setNegativeButton(R.string.cancel, null)
+					.show();
+		}else{
+			// 未绑定 → 打开引导页
+			Intent intent=new Intent(getActivity(), NBWBindGuideActivity.class);
+			startActivity(intent);
+		}
+	}
+
+	private void unbindNBW(){
+		new org.joinmastodon.android.api.requests.accounts.UnbindNBW()
+				.setCallback(new me.grishka.appkit.api.Callback<>(){
+					@Override
+					public void onSuccess(Object result){
+						if(getActivity()==null) return;
+						getActivity().runOnUiThread(()->{
+							android.widget.Toast.makeText(getActivity(), R.string.nbw_unbound, android.widget.Toast.LENGTH_SHORT).show();
+							AccountSessionManager.get(accountID).updateAccountInfo();
+							getActivity().finish();
+						});
+					}
+					@Override
+					public void onError(me.grishka.appkit.api.ErrorResponse error){
+						if(getActivity()==null) return;
+						getActivity().runOnUiThread(()->error.showToast(getActivity()));
+					}
+				})
+				.exec(accountID);
 	}
 }

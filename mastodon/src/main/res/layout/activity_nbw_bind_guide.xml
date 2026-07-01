@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="?android:attr/colorBackground">
+
+    <!-- 返回按钮 -->
+    <ImageView
+        android:id="@+id/btn_back"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_marginStart="8dp"
+        android:layout_marginTop="8dp"
+        android:padding="12dp"
+        android:src="@drawable/ic_arrow_back_24"
+        android:background="?android:attr/selectableItemBackgroundBorderless"
+        android:contentDescription="返回"
+        android:tint="?android:attr/textColorPrimary" />
+
+    <!-- 内容区域 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:gravity="center_horizontal">
+
+        <!-- 标题 -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="宝宝新天地账户"
+            android:textSize="28sp"
+            android:textStyle="bold"
+            android:textColor="?android:attr/textColorPrimary" />
+
+        <!-- 图标区域：ABDL Space ← 互联 → NBW -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="48dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <ImageView
+                android:layout_width="64dp"
+                android:layout_height="64dp"
+                android:src="@drawable/ic_abdl_icon"
+                android:scaleType="fitCenter"
+                tools:ignore="ContentDescription" />
+
+            <ImageView
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginHorizontal="24dp"
+                android:src="@drawable/ic_link_exchange"
+                android:scaleType="fitCenter"
+                tools:ignore="ContentDescription" />
+
+            <ImageView
+                android:layout_width="64dp"
+                android:layout_height="64dp"
+                android:src="@drawable/ic_nbw_large"
+                android:scaleType="fitCenter"
+                tools:ignore="ContentDescription" />
+        </LinearLayout>
+
+        <!-- 说明文字 -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="48dp"
+            android:layout_marginHorizontal="32dp"
+            android:gravity="center"
+            android:text="绑定宝宝新天地账户后，您可以在两个平台之间同步内容。\n\n绑定需要跳转浏览器进行授权登录，授权完成后将自动返回本应用完成绑定。"
+            android:textSize="14sp"
+            android:textColor="?android:attr/textColorSecondary"
+            android:lineSpacingExtra="4dp" />
+
+    </LinearLayout>
+
+    <!-- 底部按钮 -->
+    <Button
+        android:id="@+id/btn_auth"
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:layout_marginHorizontal="24dp"
+        android:layout_marginBottom="32dp"
+        android:text="前往浏览器授权登录"
+        android:textSize="16sp"
+        android:textColor="@android:color/white"
+        android:backgroundTint="#2ECA70" />
+
+</LinearLayout>
