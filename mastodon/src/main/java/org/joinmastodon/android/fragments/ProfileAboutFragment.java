@@ -24,6 +24,7 @@ import org.joinmastodon.android.ui.utils.SimpleTextWatcher;
 import org.joinmastodon.android.ui.utils.UiUtils;
 import org.joinmastodon.android.ui.views.LinkedTextView;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -80,6 +81,14 @@ public class ProfileAboutFragment extends Fragment implements WindowInsetsAwareF
 
 	public void enterEditMode(List<AccountField> editableFields){
 		isInEditMode=true;
+		// Ensure parsedName/parsedValue are set for display
+		for(AccountField field : editableFields){
+			if(field.parsedName==null) field.parsedName=field.name;
+			if(field.parsedValue==null) field.parsedValue=field.value;
+			if(field.nameEmojis==null) field.nameEmojis=new CustomEmojiSpan[0];
+			if(field.valueEmojis==null) field.valueEmojis=new CustomEmojiSpan[0];
+			if(field.emojiRequests==null) field.emojiRequests=new ArrayList<>();
+		}
 		fields=editableFields;
 		adapter.notifyDataSetChanged();
 		dragHelper.attachToRecyclerView(list);
