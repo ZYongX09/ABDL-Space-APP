@@ -3,8 +3,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:background="?android:attr/colorBackground">
+    android:orientation="vertical">
 
     <!-- 返回按钮 -->
     <ImageView
@@ -12,7 +11,6 @@
         android:layout_width="48dp"
         android:layout_height="48dp"
         android:layout_marginStart="8dp"
-        android:layout_marginTop="8dp"
         android:padding="12dp"
         android:src="@drawable/ic_arrow_back_24"
         android:background="?android:attr/selectableItemBackgroundBorderless"
@@ -92,6 +90,6 @@
         android:text="前往浏览器授权登录"
         android:textSize="16sp"
         android:textColor="@android:color/white"
-        android:backgroundTint="#2ECA70" />
+        android:backgroundTint="#1A6FB5" />
 
 </LinearLayout>
