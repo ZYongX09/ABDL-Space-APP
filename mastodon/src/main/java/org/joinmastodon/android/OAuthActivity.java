@@ -51,25 +51,23 @@ public class OAuthActivity extends Activity{
 			return;
 		}
 
-		// NBW 绑定回调: ?nbw_bind=success/need_bind&nbw_user=xxx&nbw_token=xxx&nbw_flow=bind/login
+		// NBW 绑定回调: ?nbw_bind=success/need_bind&nbw_user=xxx&nbw_token=xxx
 		String nbwBind=uri.getQueryParameter("nbw_bind");
 		if(nbwBind!=null){
 			String nbwUser=uri.getQueryParameter("nbw_user");
 			String nbwToken=uri.getQueryParameter("nbw_token");
-			String nbwFlow=uri.getQueryParameter("nbw_flow");
+			// 从 SharedPreferences 读取流程类型（不依赖 state，因为 NBW 会修改 state）
+			String flow = getSharedPreferences("nbw_bind", MODE_PRIVATE).getString("flow", "login");
 			Intent intent;
 			if("need_bind".equals(nbwBind)){
-				if("bind".equals(nbwFlow)){
-					// 绑定流程 → 绑定结果页（执行绑定）
+				if("bind".equals(flow)){
 					intent=new Intent(this, NBWBindResultActivity.class);
 					intent.putExtra("nbw_bind_result", nbwBind);
 					intent.putExtra("nbw_token", nbwToken);
 				}else{
-					// 登录流程 → 未绑定提示页
 					intent=new Intent(this, NBWNotBoundActivity.class);
 				}
 			}else{
-				// success → 绑定结果页
 				intent=new Intent(this, NBWBindResultActivity.class);
 				intent.putExtra("nbw_bind_result", nbwBind);
 				intent.putExtra("nbw_token", nbwToken);

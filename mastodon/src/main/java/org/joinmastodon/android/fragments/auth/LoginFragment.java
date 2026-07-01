@@ -96,6 +96,8 @@ public class LoginFragment extends ToolbarFragment {
 
 		if (nbwButton != null) {
 			nbwButton.setOnClickListener(v -> showConsentSheet(() -> {
+				// 记录当前是登录流程
+				getActivity().getSharedPreferences("nbw_bind", android.content.Context.MODE_PRIVATE).edit().putString("flow", "login").apply();
 				Intent intent = new Intent(Intent.ACTION_VIEW,
 					Uri.parse("https://api.abdl-space.top/api/auth/nbw/mobile-start"));
 				startActivity(intent);
