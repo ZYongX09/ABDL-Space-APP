@@ -50,26 +50,21 @@ public class OAuthActivity extends Activity{
 			return;
 		}
 
-		// NBW 绑定回调: ?nbw_bind=success/need_bind&nbw_user=xxx
+		// NBW 绑定回调: ?nbw_bind=success/need_bind&nbw_user=xxx&nbw_token=xxx
 		String nbwBind=uri.getQueryParameter("nbw_bind");
 		if(nbwBind!=null){
-			if("success".equals(nbwBind)){
-				String nbwUser=uri.getQueryParameter("nbw_user");
-				Intent intent=new Intent(this, NBWBindResultActivity.class);
-				intent.putExtra("nbw_bind_result", nbwBind);
-				intent.putExtra("nbw_user", nbwUser);
-				AccountSession session=AccountSessionManager.getInstance().getLastActiveAccount();
-				if(session!=null)
-					intent.putExtra("account", session.getID());
-				startActivity(intent);
-				restartMainActivity();
-				finish();
-			}else{
-				// need_bind — 回到主页并提示
-				Toast.makeText(this, "该宝宝新天地账号尚未绑定，请先在网页端完成绑定", Toast.LENGTH_LONG).show();
-				restartMainActivity();
-				finish();
-			}
+			String nbwUser=uri.getQueryParameter("nbw_user");
+			String nbwToken=uri.getQueryParameter("nbw_token");
+			Intent intent=new Intent(this, NBWBindResultActivity.class);
+			intent.putExtra("nbw_bind_result", nbwBind);
+			intent.putExtra("nbw_user", nbwUser);
+			intent.putExtra("nbw_token", nbwToken);
+			AccountSession session=AccountSessionManager.getInstance().getLastActiveAccount();
+			if(session!=null)
+				intent.putExtra("account", session.getID());
+			startActivity(intent);
+			restartMainActivity();
+			finish();
 			return;
 		}
 
