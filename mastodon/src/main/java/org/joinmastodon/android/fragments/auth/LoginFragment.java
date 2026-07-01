@@ -12,6 +12,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -66,19 +67,6 @@ public class LoginFragment extends ToolbarFragment {
 		loginButton = view.findViewById(R.id.btn_login);
 		oauthButton = view.findViewById(R.id.btn_oauth);
 		nbwButton = view.findViewById(R.id.btn_nbw);
-		TextView agreeText = view.findViewById(R.id.cb_agree);
-		final boolean[] agreed = {false};
-
-		agreeText.setOnClickListener(v -> {
-			agreed[0] = !agreed[0];
-			agreeText.setCompoundDrawablesRelativeWithIntrinsicBounds(
-				agreed[0] ? R.drawable.ic_baseline_check_box_24 : R.drawable.ic_baseline_check_box_outline_blank_24,
-				0, 0, 0);
-			updateButtonState();
-		});
-		agreeText.setText(android.text.Html.fromHtml(
-			"我已阅读并同意<a href=\"https://abdl-space.top/agreement\">《用户协议》</a>和<a href=\"https://abdl-space.top/privacy\">《隐私政策》</a>"));
-		agreeText.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());
 
 		TextWatcher textWatcher = new TextWatcher() {
 			@Override
@@ -93,30 +81,18 @@ public class LoginFragment extends ToolbarFragment {
 
 		loginEdit.addTextChangedListener(textWatcher);
 		passwordEdit.addTextChangedListener(textWatcher);
-		loginButton.setOnClickListener(v -> attemptLogin());
+		loginButton.setOnClickListener(v -> showConsentSheet(this::attemptLogin));
 
 		if (oauthButton != null) {
-			oauthButton.setOnClickListener(v -> {
-				if (!agreed[0]) {
-					Toast.makeText(getActivity(), "请先同意用户协议和隐私政策", Toast.LENGTH_SHORT).show();
-					return;
-				}
-				showConsentSheet(() -> startOAuthLogin());
-			});
+			oauthButton.setOnClickListener(v -> showConsentSheet(() -> startOAuthLogin()));
 		}
 
 		if (nbwButton != null) {
-			nbwButton.setOnClickListener(v -> {
-				if (!agreed[0]) {
-					Toast.makeText(getActivity(), "请先同意用户协议和隐私政策", Toast.LENGTH_SHORT).show();
-					return;
-				}
-				showConsentSheet(() -> {
-					Intent intent = new Intent(Intent.ACTION_VIEW,
-						Uri.parse("https://api.abdl-space.top/api/auth/nbw/mobile-start"));
-					startActivity(intent);
-				});
-			});
+			nbwButton.setOnClickListener(v -> showConsentSheet(() -> {
+				Intent intent = new Intent(Intent.ACTION_VIEW,
+					Uri.parse("https://api.abdl-space.top/api/auth/nbw/mobile-start"));
+				startActivity(intent);
+			}));
 		}
 
 		return view;
@@ -244,6 +220,23 @@ public class LoginFragment extends ToolbarFragment {
 		android.app.Activity activity = getActivity();
 		if (activity == null) return;
 		View sheetView = LayoutInflater.from(activity).inflate(R.layout.sheet_qr_login, null);
+		ImageView iconView = sheetView.findViewById(R.id.icon);
+		if (iconView == null) {
+			// sheet_qr_login 的 icon 没有 id，通过父容器的第一个 ImageView 找到
+			View header = sheetView.findViewById(R.id.sheet_title);
+			if (header != null && header.getParent() instanceof ViewGroup) {
+				ViewGroup parent = (ViewGroup) header.getParent();
+				for (int i = 0; i < parent.getChildCount(); i++) {
+					if (parent.getChildAt(i) instanceof ImageView) {
+						iconView = (ImageView) parent.getChildAt(i);
+						break;
+					}
+				}
+			}
+		}
+		if (iconView != null) {
+			iconView.setImageResource(R.drawable.ic_description_24);
+		}
 		me.grishka.appkit.views.BottomSheet sheet = new me.grishka.appkit.views.BottomSheet(activity) {{
 			setContentView(sheetView);
 			setNavigationBarBackground(new android.graphics.drawable.ColorDrawable(
@@ -256,9 +249,8 @@ public class LoginFragment extends ToolbarFragment {
 			TextView sessionInfo = sheetView.findViewById(R.id.qr_session_info);
 			title.setText("授权登录确认");
 			sessionInfo.setText(android.text.Html.fromHtml(
-				"点击「授权」后，将跳转浏览器进行授权登录。\n\n" +
-				"授权即表示您同意<a href=\"https://abdl-space.top/agreement\">《用户协议》</a>" +
-				"和<a href=\"https://abdl-space.top/privacy\">《隐私政策》</a>。"));
+				"请仔细阅读<a href=\"https://abdl-space.top/agreement\">《用户协议》</a>" +
+				"和<a href=\"https://abdl-space.top/privacy\">《隐私政策》</a>，是否同意？"));
 			sessionInfo.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());
 
 			sheetView.findViewById(R.id.btn_cancel).setOnClickListener(v -> dismiss());

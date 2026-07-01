@@ -97,15 +97,13 @@
 			android:enabled="false"/>
 
 		<TextView
-			android:id="@+id/cb_agree"
 			android:layout_width="match_parent"
 			android:layout_height="wrap_content"
-			android:layout_marginTop="12dp"
-			android:drawableStart="@drawable/ic_baseline_check_box_outline_blank_24"
-			android:drawablePadding="8dp"
-			android:text="我已阅读并同意《用户协议》和《隐私政策》"
+			android:layout_marginTop="8dp"
+			android:text="在登录前您需要仔细阅读《用户协议》和《隐私政策》"
 			android:textSize="12sp"
-			android:textColor="?colorM3OnSurfaceVariant"/>
+			android:textColor="?colorM3OnSurfaceVariant"
+			android:gravity="center"/>
 
 		<TextView
 			android:layout_width="match_parent"
