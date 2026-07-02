@@ -110,7 +110,7 @@ public class NBWBindResultActivity extends Activity {
 	}
 
 	private static class BindBody {
-		String code;
-		BindBody(String code){ this.code = code; }
+		String access_token;
+		BindBody(String token){ this.access_token = token; }
 	}
 }
