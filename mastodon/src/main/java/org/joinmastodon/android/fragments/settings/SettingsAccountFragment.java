@@ -39,6 +39,7 @@ public class SettingsAccountFragment extends BaseSettingsFragment<Void>{
 	private static final int DONATION_RESULT=433;
 	private DonationSheet donationSheet;
 	private boolean loggedOut;
+	private ListItem<Void> nbwItem;
 
 	@Override
 	public void onCreate(Bundle savedInstanceState){
@@ -57,7 +58,8 @@ public class SettingsAccountFragment extends BaseSettingsFragment<Void>{
 		AccountSession acctSession = AccountSessionManager.get(accountID);
 		String nbwStatus = acctSession.self.nbwUsername != null ? acctSession.self.nbwUsername : getString(R.string.nbw_unbound);
 		items.add(new SectionHeaderListItem(R.string.nbw_third_party_account));
-		items.add(new ListItem<>(getString(R.string.nbw_third_party_nbw), nbwStatus, R.drawable.ic_nbw, this::onNBWBindClick));
+		nbwItem = new ListItem<>(getString(R.string.nbw_third_party_nbw), nbwStatus, R.drawable.ic_nbw, this::onNBWBindClick);
+		items.add(nbwItem);
 
 		items.add(new SectionHeaderListItem(account.domain));
 		items.add(new ListItem<>(getString(R.string.settings_about_this_server), getString(R.string.settings_server_explanation), R.drawable.ic_dns_24px, this::onServerClick));
@@ -75,6 +77,19 @@ public class SettingsAccountFragment extends BaseSettingsFragment<Void>{
 
 	@Override
 	protected void doLoadData(int offset, int count){}
+
+	@Override
+	public void onResume(){
+		super.onResume();
+		if(nbwItem != null){
+			AccountSession session = AccountSessionManager.get(accountID);
+			if(session != null && session.self != null){
+				String nbwStatus = session.self.nbwUsername != null ? session.self.nbwUsername : getString(R.string.nbw_unbound);
+				nbwItem.subtitle = nbwStatus;
+				rebindItem(nbwItem);
+			}
+		}
+	}
 
 	@Override
 	public void onActivityResult(int requestCode, int resultCode, Intent data){

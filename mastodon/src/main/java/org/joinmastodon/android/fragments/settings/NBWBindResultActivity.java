@@ -1,13 +1,17 @@
 package org.joinmastodon.android.fragments.settings;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 
 import org.joinmastodon.android.R;
 import org.joinmastodon.android.api.session.AccountSession;
@@ -27,7 +31,9 @@ public class NBWBindResultActivity extends Activity {
 	private LinearLayout stateLoading;
 	private LinearLayout stateSuccess;
 	private Button doneButton;
+	private TextView nbwUsernameText;
 	private String accountID;
+	private String nbwUser;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState){
@@ -37,26 +43,25 @@ public class NBWBindResultActivity extends Activity {
 		stateLoading = findViewById(R.id.state_loading);
 		stateSuccess = findViewById(R.id.state_success);
 		doneButton = findViewById(R.id.btn_done);
+		nbwUsernameText = findViewById(R.id.tv_nbw_username);
 
 		accountID = getIntent().getStringExtra("account");
+		nbwUser = getIntent().getStringExtra("nbw_user");
 
-		doneButton.setOnClickListener(v -> {
-			if(accountID != null){
-				AccountSessionManager.get(accountID).updateAccountInfo();
-			}
-			finish();
-		});
+		ImageView btnBack = findViewById(R.id.btn_back);
+		btnBack.setOnClickListener(v -> finish());
+
+		doneButton.setOnClickListener(v -> finish());
 
 		String nbwBindResult = getIntent().getStringExtra("nbw_bind_result");
 		String nbwToken = getIntent().getStringExtra("nbw_token");
 
 		if("success".equals(nbwBindResult)){
-			// 已经绑定成功
 			stateLoading.setVisibility(View.GONE);
 			stateSuccess.setVisibility(View.VISIBLE);
 			doneButton.setVisibility(View.VISIBLE);
+			if(nbwUser != null) nbwUsernameText.setText("@" + nbwUser);
 		}else if("need_bind".equals(nbwBindResult) && nbwToken != null && !nbwToken.isEmpty()){
-			// 需要绑定 — 调用 bind API
 			executeBind(nbwToken);
 		}else{
 			stateLoading.setVisibility(View.GONE);
@@ -99,6 +104,16 @@ public class NBWBindResultActivity extends Activity {
 							stateLoading.setVisibility(View.GONE);
 							stateSuccess.setVisibility(View.VISIBLE);
 							doneButton.setVisibility(View.VISIBLE);
+
+							try{
+								JsonObject jsonResp = new Gson().fromJson(responseBody, JsonObject.class);
+								String respUsername = jsonResp.has("nbw_username") ? jsonResp.get("nbw_username").getAsString() : null;
+								if(respUsername != null) nbwUser = respUsername;
+							}catch(Exception ignored){}
+
+							if(nbwUser != null) nbwUsernameText.setText("@" + nbwUser);
+
+							updateLocalAccount();
 						}else{
 							stateLoading.setVisibility(View.GONE);
 							Toast.makeText(NBWBindResultActivity.this, "绑定失败: " + responseBody, Toast.LENGTH_SHORT).show();
@@ -107,6 +122,15 @@ public class NBWBindResultActivity extends Activity {
 					});
 				}
 			});
+	}
+
+	private void updateLocalAccount(){
+		if(accountID == null) return;
+		AccountSession session = AccountSessionManager.getInstance().getAccount(accountID);
+		if(session == null || session.self == null) return;
+
+		session.self.nbwUsername = nbwUser;
+		AccountSessionManager.getInstance().updateAccountInfo(accountID, session.self);
 	}
 
 	private static class BindBody {

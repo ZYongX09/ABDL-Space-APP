@@ -5,11 +5,24 @@
     android:layout_height="match_parent"
     android:orientation="vertical">
 
+    <!-- 返回按钮 -->
+    <ImageView
+        android:id="@+id/btn_back"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_marginStart="8dp"
+        android:padding="12dp"
+        android:src="@drawable/ic_arrow_back_24"
+        android:background="?android:attr/selectableItemBackgroundBorderless"
+        android:contentDescription="返回"
+        android:tint="?android:attr/textColorPrimary" />
+
     <!-- 绑定中状态 -->
     <LinearLayout
         android:id="@+id/state_loading"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
         android:orientation="vertical"
         android:gravity="center">
 
@@ -31,7 +44,8 @@
     <LinearLayout
         android:id="@+id/state_success"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
         android:orientation="vertical"
         android:gravity="center"
         android:visibility="gone">
@@ -39,7 +53,7 @@
         <ImageView
             android:layout_width="96dp"
             android:layout_height="96dp"
-            android:src="@drawable/ic_nbw_success"
+            android:src="@drawable/ic_nbw_large"
             android:scaleType="fitCenter"
             tools:ignore="ContentDescription" />
 
@@ -52,9 +66,17 @@
             android:textStyle="bold"
             android:textColor="?android:attr/textColorPrimary" />
 
+        <TextView
+            android:id="@+id/tv_nbw_username"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:textSize="14sp"
+            android:textColor="?android:attr/textColorSecondary" />
+
     </LinearLayout>
 
-    <!-- 完成按钮 -->
+    <!-- 底部按钮 -->
     <Button
         android:id="@+id/btn_done"
         android:layout_width="match_parent"
