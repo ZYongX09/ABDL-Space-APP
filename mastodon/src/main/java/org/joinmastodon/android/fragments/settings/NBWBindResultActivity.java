@@ -13,6 +13,7 @@ import android.widget.Toast;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 
+import org.joinmastodon.android.MainActivity;
 import org.joinmastodon.android.R;
 import org.joinmastodon.android.api.session.AccountSession;
 import org.joinmastodon.android.api.session.AccountSessionManager;
@@ -51,7 +52,13 @@ public class NBWBindResultActivity extends Activity {
 		ImageView btnBack = findViewById(R.id.btn_back);
 		btnBack.setOnClickListener(v -> finish());
 
-		doneButton.setOnClickListener(v -> finish());
+		doneButton.setOnClickListener(v -> {
+			updateLocalAccount();
+			Intent intent = new Intent(this, MainActivity.class);
+			intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+			startActivity(intent);
+			finish();
+		});
 
 		String nbwBindResult = getIntent().getStringExtra("nbw_bind_result");
 		String nbwToken = getIntent().getStringExtra("nbw_token");
