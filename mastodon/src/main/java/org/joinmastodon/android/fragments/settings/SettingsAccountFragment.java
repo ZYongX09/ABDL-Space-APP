@@ -12,9 +12,11 @@ import org.joinmastodon.android.BuildConfig;
 import org.joinmastodon.android.MainActivity;
 import org.joinmastodon.android.R;
 import org.joinmastodon.android.api.MastodonAPIController;
+import org.joinmastodon.android.api.requests.accounts.GetOwnAccount;
 import org.joinmastodon.android.api.requests.catalog.GetDonationCampaigns;
 import org.joinmastodon.android.api.session.AccountSession;
 import org.joinmastodon.android.api.session.AccountSessionManager;
+import org.joinmastodon.android.model.Account;
 import org.joinmastodon.android.model.donations.DonationCampaign;
 import org.joinmastodon.android.model.viewmodel.ListItem;
 import org.joinmastodon.android.model.viewmodel.SectionHeaderListItem;
@@ -81,14 +83,28 @@ public class SettingsAccountFragment extends BaseSettingsFragment<Void>{
 	@Override
 	public void onResume(){
 		super.onResume();
-		if(nbwItem != null){
-			AccountSession session = AccountSessionManager.get(accountID);
-			if(session != null && session.self != null){
-				String nbwStatus = session.self.nbwUsername != null ? session.self.nbwUsername : getString(R.string.nbw_unbound);
-				nbwItem.subtitle = nbwStatus;
-				rebindItem(nbwItem);
-			}
-		}
+		refreshNBWStatus();
+	}
+
+	private void refreshNBWStatus(){
+		if(nbwItem == null) return;
+		new GetOwnAccount()
+			.setCallback(new me.grishka.appkit.api.Callback<Account>(){
+				@Override
+				public void onSuccess(Account account){
+					if(getActivity() == null) return;
+					getActivity().runOnUiThread(()->{
+						AccountSessionManager.getInstance().updateAccountInfo(accountID, account);
+						String nbwStatus = account.nbwUsername != null ? account.nbwUsername : getString(R.string.nbw_unbound);
+						nbwItem.subtitle = nbwStatus;
+						rebindItem(nbwItem);
+					});
+				}
+
+				@Override
+				public void onError(ErrorResponse error){}
+			})
+			.exec(accountID);
 	}
 
 	@Override
@@ -245,8 +261,7 @@ public class SettingsAccountFragment extends BaseSettingsFragment<Void>{
 						if(getActivity()==null) return;
 						getActivity().runOnUiThread(()->{
 							android.widget.Toast.makeText(getActivity(), R.string.nbw_unbound, android.widget.Toast.LENGTH_SHORT).show();
-							AccountSessionManager.get(accountID).updateAccountInfo();
-							getActivity().finish();
+							refreshNBWStatus();
 						});
 					}
 					@Override

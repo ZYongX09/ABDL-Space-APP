@@ -7,4 +7,9 @@ public class UnbindNBW extends MastodonAPIRequest<Object>{
 		super(HttpMethod.POST, "/auth/nbw/unbind", Object.class);
 		setRequestBody(new Object());
 	}
+
+	@Override
+	protected String getPathPrefix(){
+		return "/api";
+	}
 }

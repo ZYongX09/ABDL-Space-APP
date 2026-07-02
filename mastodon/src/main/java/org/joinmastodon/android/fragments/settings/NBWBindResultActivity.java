@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
+import android.view.WindowInsets;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -40,6 +41,14 @@ public class NBWBindResultActivity extends Activity {
 	protected void onCreate(Bundle savedInstanceState){
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_nbw_bind_result);
+
+		// 状态栏 padding
+		View rootView = findViewById(R.id.root);
+		rootView.setOnApplyWindowInsetsListener((v, insets) -> {
+			int statusBar = insets.getInsets(WindowInsets.Type.statusBars()).top;
+			rootView.setPadding(0, statusBar, 0, 0);
+			return WindowInsets.CONSUMED;
+		});
 
 		stateLoading = findViewById(R.id.state_loading);
 		stateSuccess = findViewById(R.id.state_success);
