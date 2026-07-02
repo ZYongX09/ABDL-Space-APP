@@ -50,12 +50,17 @@ public class NBWBindResultActivity extends Activity {
 		nbwUser = getIntent().getStringExtra("nbw_user");
 
 		ImageView btnBack = findViewById(R.id.btn_back);
-		btnBack.setOnClickListener(v -> finish());
+		btnBack.setOnClickListener(v -> {
+			Intent intent = new Intent(this, MainActivity.class);
+			intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
+			startActivity(intent);
+			finish();
+		});
 
 		doneButton.setOnClickListener(v -> {
 			updateLocalAccount();
 			Intent intent = new Intent(this, MainActivity.class);
-			intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+			intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
 			startActivity(intent);
 			finish();
 		});
