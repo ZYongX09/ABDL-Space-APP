@@ -260,7 +260,7 @@ public class SettingsAccountFragment extends BaseSettingsFragment<Void>{
 					public void onSuccess(Object result){
 						if(getActivity()==null) return;
 						getActivity().runOnUiThread(()->{
-							android.widget.Toast.makeText(getActivity(), R.string.nbw_unbound, android.widget.Toast.LENGTH_SHORT).show();
+							android.widget.Toast.makeText(getActivity(), R.string.nbw_unbind_success, android.widget.Toast.LENGTH_SHORT).show();
 							refreshNBWStatus();
 						});
 					}
