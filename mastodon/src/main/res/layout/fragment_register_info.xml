@@ -7,7 +7,6 @@
     android:paddingStart="24dp"
     android:paddingEnd="24dp">
 
-    <!-- 返回按钮 -->
     <ImageView
         android:id="@+id/btn_back"
         android:layout_width="40dp"
@@ -16,58 +15,67 @@
         android:layout_marginStart="-8dp"
         android:padding="8dp"
         android:src="@drawable/ic_arrow_back_24"
+        android:tint="#333333"
         android:background="?android:attr/selectableItemBackgroundBorderless"
         android:contentDescription="返回" />
+
+    <View
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
 
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="24dp"
-        android:layout_marginBottom="8dp"
         android:text="完善注册信息"
         android:textSize="24sp"
         android:textStyle="bold"
-        android:textColor="?colorM3OnSurface" />
+        android:textColor="#333333"
+        android:gravity="center"
+        android:layout_marginBottom="8dp" />
 
     <TextView
         android:id="@+id/tv_email"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="28dp"
+        android:layout_marginBottom="24dp"
         android:text="user@example.com"
         android:textSize="15sp"
-        android:textColor="#999999" />
+        android:textColor="#AAAAAA"
+        android:gravity="center" />
 
     <EditText
         android:id="@+id/username_edit"
         android:layout_width="match_parent"
         android:layout_height="56dp"
-        android:layout_marginBottom="16dp"
+        android:layout_marginBottom="12dp"
         android:background="@drawable/bg_pin_input"
         android:hint="请输入用户名（3-30个字符）"
         android:inputType="textPersonName"
         android:singleLine="true"
         android:textSize="16sp"
-        android:textColorHint="#999999"
+        android:textColor="#333333"
+        android:textColorHint="#AAAAAA"
         android:drawableStart="@drawable/ic_person_24"
         android:drawablePadding="12dp"
-        android:drawableTint="#999999" />
+        android:drawableTint="#AAAAAA" />
 
     <EditText
         android:id="@+id/password_edit"
         android:layout_width="match_parent"
         android:layout_height="56dp"
-        android:layout_marginBottom="16dp"
+        android:layout_marginBottom="12dp"
         android:background="@drawable/bg_pin_input"
         android:hint="请输入密码（至少8位）"
         android:inputType="textPassword"
         android:autofillHints="newPassword"
         android:singleLine="true"
         android:textSize="16sp"
-        android:textColorHint="#999999"
+        android:textColor="#333333"
+        android:textColorHint="#AAAAAA"
         android:drawableStart="@drawable/ic_lock_24"
         android:drawablePadding="12dp"
-        android:drawableTint="#999999"
+        android:drawableTint="#AAAAAA"
         android:drawableEnd="@drawable/ic_eye_toggle"
         android:backgroundTint="@null" />
 
@@ -82,10 +90,11 @@
         android:autofillHints="newPassword"
         android:singleLine="true"
         android:textSize="16sp"
-        android:textColorHint="#999999"
+        android:textColor="#333333"
+        android:textColorHint="#AAAAAA"
         android:drawableStart="@drawable/ic_lock_24"
         android:drawablePadding="12dp"
-        android:drawableTint="#999999"
+        android:drawableTint="#AAAAAA"
         android:drawableEnd="@drawable/ic_eye_toggle"
         android:backgroundTint="@null" />
 
@@ -93,13 +102,15 @@
         android:id="@+id/btn_register"
         android:layout_width="match_parent"
         android:layout_height="52dp"
-        style="@style/Widget.Mastodon.M3.Button.Filled"
+        android:layout_marginStart="24dp"
+        android:layout_marginEnd="24dp"
+        android:layout_marginBottom="16dp"
+        android:background="@drawable/bg_btn_baby_blue"
         android:text="注册"
         android:textSize="16sp"
         android:textAllCaps="false"
         android:enabled="false"
-        android:backgroundTint="#FFD54F"
-        android:textColor="#333333" />
+        android:textColor="#FFFFFF" />
 
     <View
         android:layout_width="0dp"

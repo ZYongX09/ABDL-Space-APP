@@ -7,7 +7,6 @@
     android:paddingStart="24dp"
     android:paddingEnd="24dp">
 
-    <!-- 返回按钮 -->
     <ImageView
         android:id="@+id/btn_back"
         android:layout_width="40dp"
@@ -16,56 +15,66 @@
         android:layout_marginStart="-8dp"
         android:padding="8dp"
         android:src="@drawable/ic_arrow_back_24"
+        android:tint="#333333"
         android:background="?android:attr/selectableItemBackgroundBorderless"
         android:contentDescription="返回" />
+
+    <View
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
 
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="24dp"
-        android:layout_marginBottom="8dp"
         android:text="输入验证码"
         android:textSize="24sp"
         android:textStyle="bold"
-        android:textColor="?colorM3OnSurface" />
+        android:textColor="#333333"
+        android:gravity="center"
+        android:layout_marginBottom="8dp" />
 
     <TextView
         android:id="@+id/tv_email_hint"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="36dp"
+        android:layout_marginBottom="32dp"
         android:text="验证码已发送至\nuser@example.com"
         android:textSize="14sp"
-        android:textColor="#999999"
-        android:lineSpacingExtra="4dp" />
+        android:textColor="#AAAAAA"
+        android:lineSpacingExtra="4dp"
+        android:gravity="center" />
 
-    <!-- 6位验证码输入框 -->
     <org.joinmastodon.android.ui.views.PinView
         android:id="@+id/pin_view"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="center_horizontal"
-        android:layout_marginBottom="32dp" />
+        android:layout_marginBottom="32dp"
+        android:focusable="true"
+        android:focusableInTouchMode="true" />
 
     <Button
         android:id="@+id/btn_open_email"
         android:layout_width="match_parent"
         android:layout_height="52dp"
-        style="@style/Widget.Mastodon.M3.Button.Filled"
+        android:layout_marginStart="24dp"
+        android:layout_marginEnd="24dp"
+        android:layout_marginBottom="16dp"
+        android:background="@drawable/bg_btn_baby_blue"
         android:text="打开邮件"
         android:textSize="16sp"
         android:textAllCaps="false"
-        android:backgroundTint="#FFD54F"
-        android:textColor="#333333" />
+        android:textColor="#FFFFFF" />
 
     <TextView
         android:id="@+id/tv_resend"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
+        android:layout_marginBottom="16dp"
         android:text="重新发送（60s）"
         android:textSize="14sp"
-        android:textColor="?colorM3OnSurfaceVariant"
+        android:textColor="#4FC3F7"
         android:gravity="center"
         android:padding="8dp" />
 
@@ -74,7 +83,6 @@
         android:layout_height="0dp"
         android:layout_weight="1" />
 
-    <!-- 错误提示 -->
     <TextView
         android:id="@+id/tv_error"
         android:layout_width="match_parent"

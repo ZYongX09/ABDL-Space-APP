@@ -2,7 +2,6 @@ package org.joinmastodon.android.ui.views;
 
 import android.content.Context;
 import android.graphics.Canvas;
-import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.RectF;
 import android.text.Editable;
@@ -10,19 +9,22 @@ import android.text.InputFilter;
 import android.text.InputType;
 import android.text.TextWatcher;
 import android.util.AttributeSet;
+import android.view.KeyEvent;
+import android.view.MotionEvent;
 import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 
 /**
  * 6位验证码输入框组件（美团风格）
- * 6个独立格子，输入满后自动回调
  */
 public class PinView extends EditText {
 
     private static final int PIN_LENGTH = 6;
     private static final int CHAR_SIZE_DP = 44;
-    private static final int CHAR_GAP_DP = 12;
+    private static final int CHAR_GAP_DP = 10;
     private static final int CHAR_RADIUS_DP = 12;
+    private static final int PADDING_DP = 16;
 
     private final Paint boxPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -34,7 +36,7 @@ public class PinView extends EditText {
     private int boxColor = 0xFFF5F5F5;
     private int boxActiveColor = 0xFFE8E8E8;
     private int textColor = 0xFF1A1A1A;
-    private int cursorColor = 0xFFFFD700;
+    private int cursorColor = 0xFF4FC3F7;
 
     private OnPinCompleteListener onPinCompleteListener;
 
@@ -42,14 +44,8 @@ public class PinView extends EditText {
         void onPinComplete(String pin);
     }
 
-    public PinView(Context context) {
-        this(context, null);
-    }
-
-    public PinView(Context context, AttributeSet attrs) {
-        this(context, attrs, 0);
-    }
-
+    public PinView(Context context) { this(context, null); }
+    public PinView(Context context, AttributeSet attrs) { this(context, attrs, 0); }
     public PinView(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
         init();
@@ -64,7 +60,7 @@ public class PinView extends EditText {
         setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_VARIATION_NORMAL);
         setImeOptions(EditorInfo.IME_ACTION_DONE);
         setCursorVisible(false);
-        setTextSize(0); // hide default text
+        setTextSize(0);
 
         boxPaint.setStyle(Paint.Style.FILL);
         boxPaint.setColor(boxColor);
@@ -101,35 +97,42 @@ public class PinView extends EditText {
             float x = startX + i * (charSize + charGap);
             RectF rect = new RectF(x, centerY - charSize / 2f, x + charSize, centerY + charSize / 2f);
 
-            // Box background
             boxPaint.setColor(i == length ? boxActiveColor : boxColor);
             canvas.drawRoundRect(rect, charRadius, charRadius, boxPaint);
 
             // Cursor
-            if (i == length) {
-                float cursorWidth = dpToPx(2);
+            if (i == length && hasFocus()) {
+                float cw = dpToPx(2);
                 canvas.drawRoundRect(
-                    new RectF(x + charSize / 2f - cursorWidth / 2, centerY - charSize / 3f,
-                              x + charSize / 2f + cursorWidth / 2, centerY + charSize / 3f),
-                    cursorWidth / 2, cursorWidth / 2, cursorPaint
-                );
+                    new RectF(x + charSize / 2f - cw / 2, centerY - charSize / 3f,
+                              x + charSize / 2f + cw / 2, centerY + charSize / 3f),
+                    cw / 2, cw / 2, cursorPaint);
             }
 
             // Text
             if (i < length) {
-                String charStr = String.valueOf(getText().charAt(i));
+                String ch = String.valueOf(getText().charAt(i));
                 Paint.FontMetrics fm = textPaint.getFontMetrics();
                 float textY = centerY - (fm.ascent + fm.descent) / 2;
-                canvas.drawText(charStr, x + charSize / 2f, textY, textPaint);
+                canvas.drawText(ch, x + charSize / 2f, textY, textPaint);
             }
         }
     }
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        int totalWidth = PIN_LENGTH * charSize + (PIN_LENGTH - 1) * charGap + getPaddingLeft() + getPaddingRight();
-        int height = charSize + getPaddingTop() + getPaddingBottom();
+        int totalWidth = PIN_LENGTH * charSize + (PIN_LENGTH - 1) * charGap + dpToPx(PADDING_DP) * 2;
+        int height = charSize + dpToPx(PADDING_DP) * 2;
         setMeasuredDimension(totalWidth, height);
+    }
+
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+        if (event.getAction() == MotionEvent.ACTION_DOWN) {
+            requestFocus();
+            showKeyboard();
+        }
+        return super.onTouchEvent(event);
     }
 
     @Override
@@ -137,8 +140,16 @@ public class PinView extends EditText {
         super.onFocusChanged(focused, direction, previouslyFocusedRect);
         if (focused) {
             setSelection(getText().length());
+            showKeyboard();
         }
         invalidate();
+    }
+
+    private void showKeyboard() {
+        InputMethodManager imm = (InputMethodManager) getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+        if (imm != null) {
+            postDelayed(() -> imm.showSoftInput(this, InputMethodManager.SHOW_IMPLICIT), 100);
+        }
     }
 
     public void setOnPinCompleteListener(OnPinCompleteListener listener) {

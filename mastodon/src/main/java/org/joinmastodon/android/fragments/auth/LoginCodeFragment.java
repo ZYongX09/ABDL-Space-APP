@@ -82,6 +82,7 @@ public class LoginCodeFragment extends AppKitFragment {
         // 打开邮件 App
         btnOpenEmail.setOnClickListener(v -> {
             Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse("mailto:"));
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_MULTIPLE_TASK);
             try { startActivity(intent); } catch (Exception e) {
                 Toast.makeText(getActivity(), "未找到邮件应用", Toast.LENGTH_SHORT).show();
             }
