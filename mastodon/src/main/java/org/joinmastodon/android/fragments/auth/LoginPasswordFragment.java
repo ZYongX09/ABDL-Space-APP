@@ -104,7 +104,7 @@ public class LoginPasswordFragment extends AppKitFragment {
 
         // 验证码登录 → 返回 LoginEmailFragment
         btnCodeLogin.setOnClickListener(v -> {
-            getActivity().getFragmentManager().popBackStack();
+            getActivity().onBackPressed();
         });
 
         // 宝宝新天地登录
@@ -112,7 +112,7 @@ public class LoginPasswordFragment extends AppKitFragment {
             getActivity().getSharedPreferences("nbw_bind", android.content.Context.MODE_PRIVATE)
                 .edit().putString("flow", "login").apply();
             Intent intent = new Intent(Intent.ACTION_VIEW,
-                Uri.parse("https://api.abdl-space.top/api/auth/nbw/mobile-start"));
+                Uri.parse("https://abdl-space.top/api/auth/nbw/mobile-start"));
             startActivity(intent);
         });
 
@@ -153,7 +153,7 @@ public class LoginPasswordFragment extends AppKitFragment {
         RequestBody body = RequestBody.create(MediaType.parse("application/json"), json);
 
         httpClient.newCall(new Request.Builder()
-                .url("https://api.abdl-space.top/api/auth/login")
+                .url("https://abdl-space.top/api/auth/login")
                 .post(body).build())
             .enqueue(new okhttp3.Callback() {
                 @Override
@@ -186,7 +186,7 @@ public class LoginPasswordFragment extends AppKitFragment {
                                             if (getActivity() == null) return;
 
                                             InstanceV2 instance = new InstanceV2();
-                                            instance.domain = "api.abdl-space.top";
+                                            instance.domain = "abdl-space.top";
                                             instance.title = "ABDL Space";
                                             instance.description = "ABDL Space";
                                             instance.version = "4.0.0";
@@ -216,7 +216,7 @@ public class LoginPasswordFragment extends AppKitFragment {
                                             error.showToast(getActivity());
                                         }
                                     })
-                                    .exec("api.abdl-space.top", token);
+                                    .exec("abdl-space.top", token);
                             } else {
                                 progress.dismiss();
                                 if (btnLogin != null) btnLogin.setEnabled(true);

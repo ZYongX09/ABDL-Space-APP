@@ -84,7 +84,7 @@ public class LoginEmailFragment extends AppKitFragment {
             getActivity().getSharedPreferences("nbw_bind", android.content.Context.MODE_PRIVATE)
                 .edit().putString("flow", "login").apply();
             Intent intent = new Intent(Intent.ACTION_VIEW,
-                Uri.parse("https://api.abdl-space.top/api/auth/nbw/mobile-start"));
+                Uri.parse("https://abdl-space.top/api/auth/nbw/mobile-start"));
             startActivity(intent);
         });
 
@@ -104,7 +104,7 @@ public class LoginEmailFragment extends AppKitFragment {
         RequestBody body = RequestBody.create(MediaType.parse("application/json"), json);
 
         httpClient.newCall(new Request.Builder()
-                .url("https://api.abdl-space.top/api/auth/send-code")
+                .url("https://abdl-space.top/api/auth/send-code")
                 .post(body).build())
             .enqueue(new okhttp3.Callback() {
                 @Override

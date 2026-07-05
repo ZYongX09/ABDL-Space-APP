@@ -79,7 +79,7 @@ public class RegisterInfoFragment extends AppKitFragment {
 
         tvEmail.setText(email);
 
-        btnBack.setOnClickListener(v -> getActivity().getFragmentManager().popBackStack());
+        btnBack.setOnClickListener(v -> getActivity().onBackPressed());
 
         // 密码可见切换
         setupPasswordToggle(passwordEdit, () -> passwordVisible = !passwordVisible, () -> passwordVisible);
@@ -160,7 +160,7 @@ public class RegisterInfoFragment extends AppKitFragment {
         RequestBody body = RequestBody.create(MediaType.parse("application/json"), json);
 
         httpClient.newCall(new Request.Builder()
-                .url("https://api.abdl-space.top/api/auth/register")
+                .url("https://abdl-space.top/api/auth/register")
                 .post(body).build())
             .enqueue(new okhttp3.Callback() {
                 @Override
@@ -194,7 +194,7 @@ public class RegisterInfoFragment extends AppKitFragment {
                                             if (getActivity() == null) return;
 
                                             InstanceV2 instance = new InstanceV2();
-                                            instance.domain = "api.abdl-space.top";
+                                            instance.domain = "abdl-space.top";
                                             instance.title = "ABDL Space";
                                             instance.description = "ABDL Space";
                                             instance.version = "4.0.0";
@@ -226,7 +226,7 @@ public class RegisterInfoFragment extends AppKitFragment {
                                             error.showToast(getActivity());
                                         }
                                     })
-                                    .exec("api.abdl-space.top", token);
+                                    .exec("abdl-space.top", token);
                             } else {
                                 if (btnRegister != null) btnRegister.setEnabled(true);
                                 Toast.makeText(getActivity(), "注册失败: " + responseBody, Toast.LENGTH_SHORT).show();

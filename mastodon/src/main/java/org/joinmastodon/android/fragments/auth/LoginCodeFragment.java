@@ -77,7 +77,7 @@ public class LoginCodeFragment extends AppKitFragment {
 
         tvEmailHint.setText("验证码已发送至\n" + email);
 
-        btnBack.setOnClickListener(v -> getActivity().getFragmentManager().popBackStack());
+        btnBack.setOnClickListener(v -> getActivity().onBackPressed());
 
         // 打开邮件 App
         btnOpenEmail.setOnClickListener(v -> {
@@ -120,7 +120,7 @@ public class LoginCodeFragment extends AppKitFragment {
         RequestBody body = RequestBody.create(MediaType.parse("application/json"), json);
 
         httpClient.newCall(new Request.Builder()
-                .url("https://api.abdl-space.top/api/auth/login-by-code")
+                .url("https://abdl-space.top/api/auth/login-by-code")
                 .post(body).build())
             .enqueue(new okhttp3.Callback() {
                 @Override
@@ -156,7 +156,7 @@ public class LoginCodeFragment extends AppKitFragment {
                                             if (getActivity() == null) return;
 
                                             InstanceV2 instance = new InstanceV2();
-                                            instance.domain = "api.abdl-space.top";
+                                            instance.domain = "abdl-space.top";
                                             instance.title = "ABDL Space";
                                             instance.description = "ABDL Space";
                                             instance.version = "4.0.0";
@@ -185,7 +185,7 @@ public class LoginCodeFragment extends AppKitFragment {
                                             error.showToast(getActivity());
                                         }
                                     })
-                                    .exec("api.abdl-space.top", token);
+                                    .exec("abdl-space.top", token);
                             } else if ("register".equals(verifyResp.action)) {
                                 // 未注册 → 进入注册流程
                                 Bundle args = new Bundle();
@@ -222,7 +222,7 @@ public class LoginCodeFragment extends AppKitFragment {
         RequestBody body = RequestBody.create(MediaType.parse("application/json"), json);
 
         httpClient.newCall(new Request.Builder()
-                .url("https://api.abdl-space.top/api/auth/send-code")
+                .url("https://abdl-space.top/api/auth/send-code")
                 .post(body).build())
             .enqueue(new okhttp3.Callback() {
                 @Override

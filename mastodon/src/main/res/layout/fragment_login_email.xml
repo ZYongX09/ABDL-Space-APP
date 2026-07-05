@@ -121,50 +121,76 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
+        android:orientation="vertical"
         android:gravity="center"
         android:layout_marginBottom="32dp">
 
-        <TextView
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="16dp">
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1"
+                android:background="#E0E0E0" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="  其他登录方式  "
+                android:textSize="12sp"
+                android:textColor="#AAAAAA" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1"
+                android:background="#E0E0E0" />
+        </LinearLayout>
+
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="其他方式登录"
-            android:textSize="12sp"
-            android:textColor="#AAAAAA"
-            android:layout_marginEnd="12dp" />
+            android:orientation="horizontal"
+            android:gravity="center">
 
-        <FrameLayout
-            android:id="@+id/btn_nbw"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:background="@drawable/bg_circle_gray"
-            android:layout_marginEnd="16dp"
-            android:clickable="true"
-            android:focusable="true"
-            android:contentDescription="宝宝新天地">
-            <ImageView
-                android:layout_width="28dp"
-                android:layout_height="28dp"
-                android:layout_gravity="center"
-                android:src="@drawable/ic_nbw"
-                android:scaleType="fitCenter" />
-        </FrameLayout>
+            <FrameLayout
+                android:id="@+id/btn_nbw"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="@drawable/bg_circle_gray"
+                android:layout_marginEnd="16dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:contentDescription="宝宝新天地">
+                <ImageView
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_nbw"
+                    android:scaleType="fitCenter" />
+            </FrameLayout>
 
-        <FrameLayout
-            android:id="@+id/btn_oauth"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:background="@drawable/bg_circle_gray"
-            android:clickable="true"
-            android:focusable="true"
-            android:contentDescription="ABDL Space">
-            <ImageView
-                android:layout_width="28dp"
-                android:layout_height="28dp"
-                android:layout_gravity="center"
-                android:src="@drawable/ic_abdl_icon"
-                android:scaleType="fitCenter" />
-        </FrameLayout>
+            <FrameLayout
+                android:id="@+id/btn_oauth"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="@drawable/bg_circle_gray"
+                android:clickable="true"
+                android:focusable="true"
+                android:contentDescription="ABDL Space">
+                <ImageView
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_abdl_icon"
+                    android:scaleType="fitCenter" />
+            </FrameLayout>
+        </LinearLayout>
     </LinearLayout>
 
 </LinearLayout>
