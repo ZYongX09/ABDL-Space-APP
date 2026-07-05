@@ -245,12 +245,9 @@ public class MainActivity extends FragmentStackActivity{
 
 	public void restartHomeFragment(){
 		if(AccountSessionManager.getInstance().getLoggedInAccounts().isEmpty()){
-			// Skip server input, go directly to login with hardcoded server
-			Bundle args = new Bundle();
-			args.putString("domain", "abdl-space.top");
-			org.joinmastodon.android.fragments.auth.LoginFragment loginFragment = new org.joinmastodon.android.fragments.auth.LoginFragment();
-			loginFragment.setArguments(args);
-			showFragmentClearingBackStack(loginFragment);
+			// 无账户时直接进入新的验证码登录页
+			org.joinmastodon.android.fragments.auth.LoginEmailFragment loginEmailFragment = new org.joinmastodon.android.fragments.auth.LoginEmailFragment();
+			showFragmentClearingBackStack(loginEmailFragment);
 		}else{
 			AccountSessionManager.getInstance().maybeUpdateLocalInfo();
 			AccountSession session;
