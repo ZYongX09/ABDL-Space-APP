@@ -35,19 +35,20 @@
 
         <!-- 标题 -->
         <TextView
+            android:id="@+id/title"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="4dp">
-            <span android:textColor="#FFFFFF" android:textSize="26sp" android:textStyle="bold">欢迎登录 </span>
-            <span android:textColor="#88AAFF" android:textSize="26sp" android:textStyle="bold">ABDL Space</span>
-        </TextView>
+            android:layout_marginBottom="4dp"
+            android:textSize="26sp"
+            android:textStyle="bold"
+            android:textColor="#FFFFFF" />
 
         <!-- 副标题 -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginBottom="36dp"
-            android:text="⭐ 温馨的空间，专属于你 ⭐"
+            android:text="⭐ 探索全新世界 ⭐"
             android:textSize="13sp"
             android:textColor="#88AACC" />
 

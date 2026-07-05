@@ -66,7 +66,9 @@ public class LoginEmailFragment extends AppKitFragment {
         View btnOAuth = view.findViewById(R.id.btn_oauth);
         logo = view.findViewById(R.id.logo);
 
-        // 深色模式检测
+        // 标题彩色文字
+        TextView titleView = view.findViewById(R.id.title);
+        titleView.setText(android.text.Html.fromHtml("<font color='#FFFFFF'>欢迎登录 </font><font color='#88AAFF'>ABDL Space</font>"));
         SpaceBackgroundView spaceBg = view.findViewById(R.id.space_bg);
         boolean isDark = (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
         spaceBg.setDarkMode(isDark);

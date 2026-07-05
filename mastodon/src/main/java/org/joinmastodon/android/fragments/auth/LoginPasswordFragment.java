@@ -72,6 +72,8 @@ public class LoginPasswordFragment extends AppKitFragment {
         TextView btnCodeLogin = view.findViewById(R.id.btn_code_login);
         View btnNBW = view.findViewById(R.id.btn_nbw);
         View btnOAuth = view.findViewById(R.id.btn_oauth);
+        TextView titleView = view.findViewById(R.id.title);
+        titleView.setText(android.text.Html.fromHtml("<font color='#FFFFFF'>欢迎登录 </font><font color='#88AAFF'>ABDL Space</font>"));
 
         // 协议文本
         tvAgreement.setText(android.text.Html.fromHtml(
