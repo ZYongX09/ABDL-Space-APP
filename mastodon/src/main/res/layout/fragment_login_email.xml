@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="?colorM3Background"
+    android:paddingStart="24dp"
+    android:paddingEnd="24dp">
+
+    <TextView
+        android:id="@+id/title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="48dp"
+        android:layout_marginBottom="40dp"
+        android:text="欢迎登录 ABDL Space"
+        android:textSize="26sp"
+        android:textStyle="bold"
+        android:textColor="?colorM3OnSurface" />
+
+    <EditText
+        android:id="@+id/email_edit"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:background="@drawable/bg_pin_input"
+        android:hint="请输入邮箱"
+        android:inputType="textEmailAddress"
+        android:autofillHints="emailAddress"
+        android:singleLine="true"
+        android:textSize="16sp"
+        android:textColorHint="#999999"
+        android:drawableStart="@drawable/ic_email_24"
+        android:drawablePadding="12dp"
+        android:drawableTint="#999999"
+        android:imeOptions="actionNext" />
+
+    <TextView
+        android:id="@+id/hint_text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:layout_marginBottom="32dp"
+        android:text="未注册的邮箱验证后自动创建ABDL Space账号"
+        android:textSize="13sp"
+        android:textColor="#999999"
+        android:gravity="center" />
+
+    <LinearLayout
+        android:id="@+id/agreement_row"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="28dp">
+
+        <CheckBox
+            android:id="@+id/cb_agreement"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:buttonTint="?colorM3Primary" />
+
+        <TextView
+            android:id="@+id/tv_agreement"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textSize="13sp"
+            android:textColor="#666666" />
+    </LinearLayout>
+
+    <Button
+        android:id="@+id/btn_send_code"
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        style="@style/Widget.Mastodon.M3.Button.Filled"
+        android:text="获取验证码"
+        android:textSize="16sp"
+        android:textAllCaps="false"
+        android:enabled="false"
+        android:backgroundTint="#FFD54F"
+        android:textColor="#333333" />
+
+    <TextView
+        android:id="@+id/btn_password_login"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:text="账号密码登录"
+        android:textSize="15sp"
+        android:textColor="?colorM3OnSurfaceVariant"
+        android:gravity="center"
+        android:padding="8dp" />
+
+    <View
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:layout_marginBottom="24dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="其他方式登录"
+            android:textSize="12sp"
+            android:textColor="#999999"
+            android:layout_marginEnd="12dp" />
+
+        <Button
+            android:id="@+id/btn_nbw"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="@drawable/bg_circle_gray"
+            android:padding="0dp"
+            android:layout_marginEnd="16dp"
+            android:contentDescription="宝宝新天地">
+            <ImageView
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_nbw"
+                android:scaleType="fitCenter" />
+        </Button>
+
+        <Button
+            android:id="@+id/btn_oauth"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="@drawable/bg_circle_gray"
+            android:padding="0dp"
+            android:contentDescription="ABDL Space">
+            <ImageView
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_abdl_icon"
+                android:scaleType="fitCenter" />
+        </Button>
+    </LinearLayout>
+
+</LinearLayout>

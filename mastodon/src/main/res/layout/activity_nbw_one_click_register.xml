@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="?colorM3Background">
+
+    <!-- 顶部标题栏 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="4dp"
+        android:paddingEnd="16dp"
+        android:background="?colorM3Surface"
+        android:elevation="2dp">
+
+        <ImageView
+            android:id="@+id/btn_back"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:padding="10dp"
+            android:src="@drawable/ic_arrow_back_24"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:contentDescription="返回" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="一键注册"
+            android:textSize="17sp"
+            android:textStyle="bold"
+            android:textColor="?colorM3OnSurface"
+            android:layout_marginStart="4dp" />
+    </LinearLayout>
+
+    <!-- 阶段1：加载中 -->
+    <LinearLayout
+        android:id="@+id/phase_loading"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:visibility="visible">
+
+        <ProgressBar
+            android:id="@+id/progress_bar"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginBottom="16dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="正在向宝宝新天地获取注册链接..."
+            android:textSize="14sp"
+            android:textColor="#999999" />
+
+        <TextView
+            android:id="@+id/tv_error"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:textColor="#D32F2F"
+            android:textSize="13sp"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <!-- 阶段2：第一步已完成 -->
+    <LinearLayout
+        android:id="@+id/phase_info"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:paddingStart="32dp"
+        android:paddingEnd="32dp"
+        android:visibility="gone">
+
+        <ImageView
+            android:layout_width="80dp"
+            android:layout_height="80dp"
+            android:layout_marginBottom="20dp"
+            android:src="@drawable/ic_nbw_large"
+            android:scaleType="fitCenter"
+            android:background="@drawable/bg_circle_gray"
+            android:padding="16dp"
+            android:contentDescription="宝宝新天地" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="第一步已完成"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:textColor="?colorM3OnSurface"
+            android:layout_marginBottom="8dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="但您需要前往宝宝新天地补充个人信息"
+            android:textSize="14sp"
+            android:textColor="#999999"
+            android:layout_marginBottom="32dp" />
+
+        <Button
+            android:id="@+id/btn_go_web"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            style="@style/Widget.Mastodon.M3.Button.Filled"
+            android:text="去宝宝新天地补充信息"
+            android:textSize="15sp"
+            android:textAllCaps="false" />
+
+        <Button
+            android:id="@+id/btn_back_to_info"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            style="@style/Widget.Mastodon.M3.Button.Text"
+            android:text="← 返回"
+            android:textSize="13sp"
+            android:textAllCaps="false"
+            android:textColor="#999999"
+            android:layout_marginTop="8dp" />
+    </LinearLayout>
+
+    <!-- 阶段3：WebView + 底部横幅 -->
+    <LinearLayout
+        android:id="@+id/phase_webview"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <ProgressBar
+            android:id="@+id/progress_bar_webview"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="3dp"
+            android:indeterminate="true"
+            android:visibility="gone" />
+
+        <WebView
+            android:id="@+id/web_view"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+
+        <!-- 底部横幅 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="?colorM3Surface"
+            android:padding="12dp"
+            android:elevation="4dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="请完成宝宝新天地注册，完成后请点击右边按钮"
+                android:textSize="12sp"
+                android:textColor="#666666"
+                android:layout_marginEnd="12dp" />
+
+            <Button
+                android:id="@+id/btn_complete"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                style="@style/Widget.Mastodon.M3.Button.Filled"
+                android:text="已完成注册"
+                android:textSize="13sp"
+                android:textAllCaps="false"
+                android:backgroundTint="#4FC3F7"
+                android:textColor="#FFFFFF" />
+        </LinearLayout>
+    </LinearLayout>
+
+</LinearLayout>

@@ -20,6 +20,7 @@ import org.joinmastodon.android.api.MastodonErrorResponse;
 import org.joinmastodon.android.api.requests.accounts.CheckInviteLink;
 import org.joinmastodon.android.api.requests.catalog.GetCatalogDefaultInstances;
 import org.joinmastodon.android.api.session.AccountSessionManager;
+import org.joinmastodon.android.fragments.auth.LoginEmailFragment;
 import org.joinmastodon.android.fragments.onboarding.InstanceCatalogSignupFragment;
 import org.joinmastodon.android.fragments.onboarding.InstanceChooserLoginFragment;
 import org.joinmastodon.android.fragments.onboarding.InstanceRulesFragment;
@@ -124,7 +125,8 @@ public class SplashFragment extends AppKitFragment{
 		boolean isSignup=v.getId()==R.id.btn_get_started;
 		extras.putBoolean("signup", isSignup);
 		extras.putString("defaultServer", chosenDefaultServer);
-		Nav.go(getActivity(), isSignup ? InstanceCatalogSignupFragment.class : InstanceChooserLoginFragment.class, extras);
+		// 直接进入 LoginEmailFragment（新登录流程）
+		Nav.go(getActivity(), LoginEmailFragment.class, extras);
 	}
 
 	private void onJoinDefaultServerClick(View v){
