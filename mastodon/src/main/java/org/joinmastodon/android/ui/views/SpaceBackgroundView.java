@@ -24,7 +24,6 @@ import java.util.Random;
 public class SpaceBackgroundView extends View {
 
     private final Paint gradientPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint starPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint glowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint planetPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint dustPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -42,8 +41,6 @@ public class SpaceBackgroundView extends View {
     private int lightMid = Color.parseColor("#EAF1FF");
     private int lightBot = Color.parseColor("#FFFFFF");
 
-    private final List<Star> stars = new ArrayList<>();
-    private final List<float[]> dusts = new ArrayList<>();
     private boolean initialized = false;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -56,15 +53,12 @@ public class SpaceBackgroundView extends View {
         }
     };
 
-    private static class Star {
-        float x, y, radius, phase, speed;
-    }
+    private final List<float[]> dusts = new ArrayList<>();
 
     public SpaceBackgroundView(Context context) { this(context, null); }
     public SpaceBackgroundView(Context context, AttributeSet attrs) { this(context, attrs, 0); }
     public SpaceBackgroundView(Context context, AttributeSet attrs, int defStyle) {
         super(context, attrs, defStyle);
-        starPaint.setStyle(Paint.Style.FILL);
         glowPaint.setStyle(Paint.Style.FILL);
         planetPaint.setStyle(Paint.Style.FILL);
         dustPaint.setStyle(Paint.Style.FILL);

@@ -101,6 +101,11 @@ public class LoginPasswordFragment extends AppKitFragment {
             "我已阅读并同意<a href=\"https://abdl-space.top/agreement\">《用户协议》</a>和<a href=\"https://abdl-space.top/privacy\">《隐私政策》</a>"));
         tvAgreement.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());
 
+        // 点击整行切换复选框
+        View agreementRow = view.findViewById(R.id.agreement_row);
+        agreementRow.setOnClickListener(v -> cbAgreement.setChecked(!cbAgreement.isChecked()));
+        tvAgreement.setOnClickListener(v -> cbAgreement.setChecked(!cbAgreement.isChecked()));
+
         // 密码可见切换
         passwordEdit.setOnTouchListener((v, event) -> {
             if (event.getAction() == android.view.MotionEvent.ACTION_UP) {

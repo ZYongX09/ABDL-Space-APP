@@ -114,8 +114,7 @@
                 android:textSize="17sp"
                 android:textAllCaps="false"
                 android:enabled="false"
-                android:textColor="#FFFFFF"
-                android:elevation="8dp" />
+                android:textColor="#FFFFFF" />
 
             <!-- 分隔线 -->
             <LinearLayout
