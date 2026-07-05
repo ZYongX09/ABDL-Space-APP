@@ -2,14 +2,17 @@ package org.joinmastodon.android.fragments.auth;
 
 import android.app.ProgressDialog;
 import android.content.Intent;
+import android.content.res.Configuration;
 import android.net.Uri;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.animation.AccelerateDecelerateInterpolator;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -17,10 +20,14 @@ import com.google.gson.Gson;
 
 import org.joinmastodon.android.R;
 import org.joinmastodon.android.ui.utils.UiUtils;
+import org.joinmastodon.android.ui.views.SpaceBackgroundView;
 
 import java.io.IOException;
 
 import androidx.annotation.Nullable;
+import androidx.dynamicanimation.animation.DynamicAnimation;
+import androidx.dynamicanimation.animation.SpringAnimation;
+import androidx.dynamicanimation.animation.SpringForce;
 import me.grishka.appkit.Nav;
 import me.grishka.appkit.fragments.AppKitFragment;
 import okhttp3.Call;
@@ -37,6 +44,7 @@ public class LoginEmailFragment extends AppKitFragment {
     private CheckBox cbAgreement;
     private Button btnSendCode;
     private TextView tvAgreement;
+    private ImageView logo;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -56,7 +64,22 @@ public class LoginEmailFragment extends AppKitFragment {
         TextView btnPasswordLogin = view.findViewById(R.id.btn_password_login);
         View btnNBW = view.findViewById(R.id.btn_nbw);
         View btnOAuth = view.findViewById(R.id.btn_oauth);
+        logo = view.findViewById(R.id.logo);
 
+        // 深色模式检测
+        SpaceBackgroundView spaceBg = view.findViewById(R.id.space_bg);
+        boolean isDark = (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
+        spaceBg.setDarkMode(isDark);
+
+        // 浅色模式下调整文字颜色
+        if (!isDark) {
+            tvAgreement.setTextColor(0xFF7788AA);
+        }
+
+        // 浮动动画
+        startFloatingAnimation();
+
+        // 协议
         tvAgreement.setText(android.text.Html.fromHtml(
             "我已阅读并同意<a href=\"https://abdl-space.top/agreement\">《用户协议》</a>和<a href=\"https://abdl-space.top/privacy\">《隐私政策》</a>"));
         tvAgreement.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());
@@ -68,7 +91,6 @@ public class LoginEmailFragment extends AppKitFragment {
             @Override public void afterTextChanged(android.text.Editable s) { updateButtonState(); }
         });
 
-        // 获取验证码
         btnSendCode.setOnClickListener(v -> {
             String email = emailEdit.getText().toString().trim();
             if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
@@ -91,6 +113,28 @@ public class LoginEmailFragment extends AppKitFragment {
         btnOAuth.setOnClickListener(v -> UiUtils.launchWebBrowser(getActivity(), "https://abdl-space.top/login"));
 
         return view;
+    }
+
+    private void startFloatingAnimation() {
+        if (logo == null) return;
+        // Y轴浮动动画
+        logo.animate()
+            .translationY(-dp(10))
+            .setDuration(2000)
+            .setInterpolator(new AccelerateDecelerateInterpolator())
+            .withEndAction(() -> {
+                if (logo != null) {
+                    logo.animate()
+                        .translationY(0)
+                        .setDuration(2000)
+                        .setInterpolator(new AccelerateDecelerateInterpolator())
+                        .withEndAction(() -> {
+                            if (logo != null && isAdded()) startFloatingAnimation();
+                        })
+                        .start();
+                }
+            })
+            .start();
     }
 
     private void sendCode(String email) {
@@ -141,6 +185,10 @@ public class LoginEmailFragment extends AppKitFragment {
         if (btnSendCode != null) {
             btnSendCode.setEnabled(cbAgreement.isChecked() && emailEdit.getText().length() > 0);
         }
+    }
+
+    private int dp(int dp) {
+        return (int) (dp * getResources().getDisplayMetrics().density + 0.5f);
     }
 
     private static class SendCodeBody {
