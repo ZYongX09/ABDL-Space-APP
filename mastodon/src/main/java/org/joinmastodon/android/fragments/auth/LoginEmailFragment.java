@@ -74,9 +74,9 @@ public class LoginEmailFragment extends AppKitFragment {
         // 标题彩色文字
         TextView titleView = view.findViewById(R.id.title);
         if (isDark) {
-            titleView.setText(android.text.Html.fromHtml("<font color='#FFFFFF'>欢迎登录 </font><font color='#88AAFF'>ABDL Space</font>"));
+            titleView.setText(android.text.Html.fromHtml("<font color='#FFFFFF'>欢迎登录 </font><font color='#A1D9F7'>ABDL Space</font>"));
         } else {
-            titleView.setText(android.text.Html.fromHtml("<font color='#333333'>欢迎登录 </font><font color='#4A90D9'>ABDL Space</font>"));
+            titleView.setText(android.text.Html.fromHtml("<font color='#333333'>欢迎登录 </font><font color='#A1D9F7'>ABDL Space</font>"));
         }
 
         // 浅色/深色模式适配
@@ -90,9 +90,6 @@ public class LoginEmailFragment extends AppKitFragment {
             btnNBW.setBackgroundResource(R.drawable.bg_social_dark);
             btnOAuth.setBackgroundResource(R.drawable.bg_social_dark);
         }
-
-        // 浮动动画
-        startFloatingAnimation();
 
         // 协议
         tvAgreement.setText(android.text.Html.fromHtml(

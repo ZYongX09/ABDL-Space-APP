@@ -83,13 +83,13 @@ public class LoginPasswordFragment extends AppKitFragment {
         spaceBg.setDarkMode(isDark);
 
         if (isDark) {
-            titleView.setText(android.text.Html.fromHtml("<font color='#FFFFFF'>欢迎登录 </font><font color='#88AAFF'>ABDL Space</font>"));
+            titleView.setText(android.text.Html.fromHtml("<font color='#FFFFFF'>欢迎登录 </font><font color='#A1D9F7'>ABDL Space</font>"));
             emailEdit.setBackgroundResource(R.drawable.bg_input_dark);
             passwordEdit.setBackgroundResource(R.drawable.bg_input_dark);
             btnNBW.setBackgroundResource(R.drawable.bg_social_dark);
             btnOAuth.setBackgroundResource(R.drawable.bg_social_dark);
         } else {
-            titleView.setText(android.text.Html.fromHtml("<font color='#333333'>欢迎登录 </font><font color='#4A90D9'>ABDL Space</font>"));
+            titleView.setText(android.text.Html.fromHtml("<font color='#333333'>欢迎登录 </font><font color='#A1D9F7'>ABDL Space</font>"));
             emailEdit.setBackgroundResource(R.drawable.bg_input_light);
             passwordEdit.setBackgroundResource(R.drawable.bg_input_light);
             btnNBW.setBackgroundResource(R.drawable.bg_social_light);
