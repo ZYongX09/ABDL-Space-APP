@@ -95,18 +95,8 @@ public class SpaceBackgroundView extends View {
     }
 
     private void initStars(int w, int h) {
-        stars.clear();
         dusts.clear();
         Random r = new Random(42);
-        for (int i = 0; i < 45; i++) {
-            Star s = new Star();
-            s.x = r.nextFloat() * w;
-            s.y = r.nextFloat() * h;
-            s.radius = dp(r.nextInt(3) + 1);
-            s.phase = r.nextFloat() * 10;
-            s.speed = 0.3f + r.nextFloat() * 0.7f;
-            stars.add(s);
-        }
         for (int i = 0; i < 80; i++) {
             dusts.add(new float[]{r.nextFloat() * w, r.nextFloat() * h, 3 + r.nextInt(6)});
         }
@@ -160,17 +150,7 @@ public class SpaceBackgroundView extends View {
             canvas.drawCircle(w - dp(70), h - dp(220), dp(45), planetPaint);
         }
 
-        // 4. 星星闪烁
-        int starBaseAlpha = isDarkMode ? 180 : 120;
-        int starRange = isDarkMode ? 75 : 60;
-        for (Star s : stars) {
-            float alpha = starBaseAlpha + starRange * (float) Math.sin(time * s.speed + s.phase);
-            starPaint.setColor(isDarkMode ? Color.parseColor("#CFE0FF") : Color.parseColor("#AABBDD"));
-            starPaint.setAlpha(Math.max(0, Math.min(255, (int) alpha)));
-            canvas.drawCircle(s.x, s.y, s.radius, starPaint);
-        }
-
-        // 5. 宇宙尘埃
+        // 4. 宇宙尘埃
         int dustAlpha = isDarkMode ? 15 : 8;
         dustPaint.setColor(isDarkMode ? Color.WHITE : Color.parseColor("#99AACC"));
         for (float[] d : dusts) {

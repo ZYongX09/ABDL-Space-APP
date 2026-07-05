@@ -2,6 +2,7 @@ package org.joinmastodon.android.fragments.auth;
 
 import android.app.ProgressDialog;
 import android.content.Intent;
+import android.content.res.Configuration;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.InputType;
@@ -16,6 +17,8 @@ import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import org.joinmastodon.android.ui.views.SpaceBackgroundView;
 
 import com.google.gson.Gson;
 
@@ -73,7 +76,25 @@ public class LoginPasswordFragment extends AppKitFragment {
         View btnNBW = view.findViewById(R.id.btn_nbw);
         View btnOAuth = view.findViewById(R.id.btn_oauth);
         TextView titleView = view.findViewById(R.id.title);
-        titleView.setText(android.text.Html.fromHtml("<font color='#FFFFFF'>欢迎登录 </font><font color='#88AAFF'>ABDL Space</font>"));
+
+        // 深色模式检测
+        SpaceBackgroundView spaceBg = view.findViewById(R.id.space_bg);
+        boolean isDark = (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
+        spaceBg.setDarkMode(isDark);
+
+        if (isDark) {
+            titleView.setText(android.text.Html.fromHtml("<font color='#FFFFFF'>欢迎登录 </font><font color='#88AAFF'>ABDL Space</font>"));
+            emailEdit.setBackgroundResource(R.drawable.bg_input_dark);
+            passwordEdit.setBackgroundResource(R.drawable.bg_input_dark);
+            btnNBW.setBackgroundResource(R.drawable.bg_social_dark);
+            btnOAuth.setBackgroundResource(R.drawable.bg_social_dark);
+        } else {
+            titleView.setText(android.text.Html.fromHtml("<font color='#333333'>欢迎登录 </font><font color='#4A90D9'>ABDL Space</font>"));
+            emailEdit.setBackgroundResource(R.drawable.bg_input_light);
+            passwordEdit.setBackgroundResource(R.drawable.bg_input_light);
+            btnNBW.setBackgroundResource(R.drawable.bg_social_light);
+            btnOAuth.setBackgroundResource(R.drawable.bg_social_light);
+        }
 
         // 协议文本
         tvAgreement.setText(android.text.Html.fromHtml(

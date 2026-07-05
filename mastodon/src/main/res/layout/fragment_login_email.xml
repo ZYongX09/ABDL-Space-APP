@@ -27,7 +27,7 @@
             android:layout_width="120dp"
             android:layout_height="120dp"
             android:layout_marginBottom="8dp"
-            android:src="@mipmap/ic_launcher"
+            android:src="@drawable/ic_abdl_icon"
             android:scaleType="fitCenter"
             android:outlineProvider="background"
             android:clipToOutline="true"
@@ -48,7 +48,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginBottom="36dp"
-            android:text="⭐ 探索全新世界 ⭐"
+            android:text="探索全新世界"
             android:textSize="13sp"
             android:textColor="#88AACC" />
 
@@ -130,7 +130,7 @@
                     android:layout_width="0dp"
                     android:layout_height="1dp"
                     android:layout_weight="1"
-                    android:background="#15000000" />
+                    android:background="#30AABBCC" />
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -143,7 +143,7 @@
                     android:layout_width="0dp"
                     android:layout_height="1dp"
                     android:layout_weight="1"
-                    android:background="#15000000" />
+                    android:background="#30AABBCC" />
             </LinearLayout>
 
             <!-- 社交登录按钮 -->
@@ -202,9 +202,6 @@
             android:text="账号密码登录"
             android:textSize="15sp"
             android:textColor="#88AAFF"
-            android:drawableEnd="@android:drawable/ic_media_play"
-            android:drawableTint="#88AAFF"
-            android:drawablePadding="4dp"
             android:padding="8dp" />
 
     </LinearLayout>
