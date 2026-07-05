@@ -79,6 +79,16 @@
                 android:paddingEnd="16dp"
                 android:imeOptions="actionNext" />
 
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="16dp"
+                android:text="未注册的邮箱验证后自动创建ABDL Space账号"
+                android:textSize="12sp"
+                android:textColor="#7788AA"
+                android:gravity="center" />
+
             <!-- 协议 -->
             <LinearLayout
                 android:id="@+id/agreement_row"

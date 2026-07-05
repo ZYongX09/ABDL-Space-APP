@@ -3,6 +3,7 @@ package org.joinmastodon.android.fragments.auth;
 import android.app.ProgressDialog;
 import android.content.Intent;
 import android.net.Uri;
+import android.content.res.Configuration;
 import android.os.Bundle;
 import android.os.CountDownTimer;
 import android.view.LayoutInflater;
@@ -67,6 +68,11 @@ public class LoginCodeFragment extends AppKitFragment {
     @Override
     public View onCreateView(LayoutInflater inflater, @Nullable ViewGroup container, Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_login_code, container, false);
+
+        // 深色模式
+        org.joinmastodon.android.ui.views.SpaceBackgroundView spaceBg = view.findViewById(R.id.space_bg);
+        boolean isDark = (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
+        spaceBg.setDarkMode(isDark);
 
         ImageView btnBack = view.findViewById(R.id.btn_back);
         tvEmailHint = view.findViewById(R.id.tv_email_hint);

@@ -70,6 +70,12 @@ public class RegisterInfoFragment extends AppKitFragment {
     public View onCreateView(LayoutInflater inflater, @Nullable ViewGroup container, Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_register_info, container, false);
 
+        // 深色模式
+        org.joinmastodon.android.ui.views.SpaceBackgroundView spaceBg = view.findViewById(R.id.space_bg);
+        boolean isDark = (android.os.Build.VERSION.SDK_INT >= 21) &&
+            ((getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES);
+        spaceBg.setDarkMode(isDark);
+
         ImageView btnBack = view.findViewById(R.id.btn_back);
         TextView tvEmail = view.findViewById(R.id.tv_email);
         usernameEdit = view.findViewById(R.id.username_edit);
