@@ -51,8 +51,8 @@ public class LoginEmailFragment extends AppKitFragment {
         btnSendCode = view.findViewById(R.id.btn_send_code);
         tvAgreement = view.findViewById(R.id.tv_agreement);
         TextView btnPasswordLogin = view.findViewById(R.id.btn_password_login);
-        Button btnNBW = view.findViewById(R.id.btn_nbw);
-        Button btnOAuth = view.findViewById(R.id.btn_oauth);
+        View btnNBW = view.findViewById(R.id.btn_nbw);
+        View btnOAuth = view.findViewById(R.id.btn_oauth);
 
         // 协议文本
         tvAgreement.setText(android.text.Html.fromHtml(

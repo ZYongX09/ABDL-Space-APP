@@ -70,8 +70,8 @@ public class LoginPasswordFragment extends AppKitFragment {
         btnLogin = view.findViewById(R.id.btn_login);
         TextView tvAgreement = view.findViewById(R.id.tv_agreement);
         TextView btnCodeLogin = view.findViewById(R.id.btn_code_login);
-        Button btnNBW = view.findViewById(R.id.btn_nbw);
-        Button btnOAuth = view.findViewById(R.id.btn_oauth);
+        View btnNBW = view.findViewById(R.id.btn_nbw);
+        View btnOAuth = view.findViewById(R.id.btn_oauth);
 
         // 协议文本
         tvAgreement.setText(android.text.Html.fromHtml(
