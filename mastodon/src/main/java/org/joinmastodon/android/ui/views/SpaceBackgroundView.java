@@ -32,9 +32,9 @@ public class SpaceBackgroundView extends View {
     private float time = 0f;
 
     // 深色模式颜色
-    private int darkTop = Color.parseColor("#0B0F1A");
-    private int darkMid = Color.parseColor("#101B34");
-    private int darkBot = Color.parseColor("#1A1628");
+    private int darkTop = Color.parseColor("#06080F");
+    private int darkMid = Color.parseColor("#0A1020");
+    private int darkBot = Color.parseColor("#0D0F18");
 
     // 浅色模式颜色
     private int lightTop = Color.parseColor("#F4F7FF");
@@ -122,7 +122,7 @@ public class SpaceBackgroundView extends View {
         drawGlow(canvas, dp(60), dp(100), dp(150), isDarkMode ? 0x185577EE : 0x1288AADD, glowAlpha2);
         drawGlow(canvas, w - dp(80), h - dp(200), dp(170), isDarkMode ? 0x18446688 : 0x1099BBCC, glowAlpha3);
 
-        // 3. 星球装饰
+        // 3. 星球装饰（仅深色模式）
         if (isDarkMode) {
             planetPaint.setColor(Color.parseColor("#1A2540"));
             planetPaint.setAlpha(40);
@@ -136,12 +136,6 @@ public class SpaceBackgroundView extends View {
             ringPaint.setColor(Color.parseColor("#33557788"));
             ringPaint.setAlpha(30);
             canvas.drawOval(w - dp(140), h - dp(280), w - dp(40), h - dp(220), ringPaint);
-        } else {
-            planetPaint.setColor(Color.parseColor("#D8E8F8"));
-            planetPaint.setAlpha(15);
-            canvas.drawCircle(dp(100), dp(140), dp(35), planetPaint);
-            planetPaint.setAlpha(10);
-            canvas.drawCircle(w - dp(70), h - dp(220), dp(45), planetPaint);
         }
 
         // 4. 宇宙尘埃（仅深色模式）

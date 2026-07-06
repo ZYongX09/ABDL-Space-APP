@@ -18,37 +18,30 @@
             android:layout_width="match_parent"
             android:layout_height="0dp" />
 
-        <!-- 标题栏 -->
-        <LinearLayout
+        <!-- 返回按钮 -->
+        <ImageView
+            android:id="@+id/btn_back"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginStart="8dp"
+            android:padding="10dp"
+            android:src="@drawable/ic_arrow_back_24"
+            android:tint="#FFFFFF"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:contentDescription="返回" />
+
+        <!-- 标题 -->
+        <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:paddingStart="4dp"
-            android:paddingEnd="24dp"
-            android:paddingTop="8dp"
-            android:paddingBottom="8dp">
-
-            <ImageView
-                android:id="@+id/btn_back"
-                android:layout_width="44dp"
-                android:layout_height="44dp"
-                android:padding="10dp"
-                android:src="@drawable/ic_arrow_back_24"
-                android:tint="#FFFFFF"
-                android:background="?android:attr/selectableItemBackgroundBorderless"
-                android:contentDescription="返回" />
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="完善注册信息"
-                android:textSize="20sp"
-                android:textStyle="bold"
-                android:textColor="#FFFFFF"
-                android:layout_marginStart="4dp" />
-        </LinearLayout>
+            android:text="完善注册信息"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:textColor="#FFFFFF"
+            android:paddingStart="20dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="8dp" />
 
         <!-- 内容区 -->
         <ScrollView
@@ -110,6 +103,8 @@
                     android:drawablePadding="12dp"
                     android:drawableTint="#888899"
                     android:drawableEnd="@drawable/ic_eye_toggle"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp"
                     android:backgroundTint="@null" />
 
                 <EditText
@@ -129,6 +124,8 @@
                     android:drawablePadding="12dp"
                     android:drawableTint="#888899"
                     android:drawableEnd="@drawable/ic_eye_toggle"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp"
                     android:backgroundTint="@null" />
 
                 <Button

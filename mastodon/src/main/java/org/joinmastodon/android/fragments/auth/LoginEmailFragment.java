@@ -3,6 +3,7 @@ package org.joinmastodon.android.fragments.auth;
 import android.app.ProgressDialog;
 import android.content.Intent;
 import android.content.res.Configuration;
+import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
 import android.view.LayoutInflater;
@@ -83,10 +84,12 @@ public class LoginEmailFragment extends AppKitFragment {
         if (!isDark) {
             tvAgreement.setTextColor(0xFF7788AA);
             emailEdit.setBackgroundResource(R.drawable.bg_input_light);
+            emailEdit.setTextColor(Color.BLACK);
             btnNBW.setBackgroundResource(R.drawable.bg_social_light);
             btnOAuth.setBackgroundResource(R.drawable.bg_social_light);
         } else {
             emailEdit.setBackgroundResource(R.drawable.bg_input_dark);
+            emailEdit.setTextColor(Color.WHITE);
             btnNBW.setBackgroundResource(R.drawable.bg_social_dark);
             btnOAuth.setBackgroundResource(R.drawable.bg_social_dark);
         }
