@@ -70,6 +70,17 @@ public class RegisterInfoFragment extends AppKitFragment {
     public View onCreateView(LayoutInflater inflater, @Nullable ViewGroup container, Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_register_info, container, false);
 
+        // 状态栏 padding
+        View statusBar = view.findViewById(R.id.status_bar);
+        if (statusBar != null) {
+            statusBar.post(() -> {
+                int statusBarHeight = getResources().getDimensionPixelSize(
+                    getResources().getIdentifier("status_bar_height", "dimen", "android"));
+                statusBar.getLayoutParams().height = statusBarHeight;
+                statusBar.requestLayout();
+            });
+        }
+
         // 深色模式
         org.joinmastodon.android.ui.views.SpaceBackgroundView spaceBg = view.findViewById(R.id.space_bg);
         boolean isDark = (android.os.Build.VERSION.SDK_INT >= 21) &&

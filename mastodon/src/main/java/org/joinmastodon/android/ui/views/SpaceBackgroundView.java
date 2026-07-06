@@ -144,12 +144,14 @@ public class SpaceBackgroundView extends View {
             canvas.drawCircle(w - dp(70), h - dp(220), dp(45), planetPaint);
         }
 
-        // 4. 宇宙尘埃
-        int dustAlpha = isDarkMode ? 15 : 8;
-        dustPaint.setColor(isDarkMode ? Color.WHITE : Color.parseColor("#99AACC"));
-        for (float[] d : dusts) {
-            dustPaint.setAlpha(dustAlpha);
-            canvas.drawCircle(d[0], d[1], d[2], dustPaint);
+        // 4. 宇宙尘埃（仅深色模式）
+        if (isDarkMode) {
+            int dustAlpha = 15;
+            dustPaint.setColor(Color.WHITE);
+            for (float[] d : dusts) {
+                dustPaint.setAlpha(dustAlpha);
+                canvas.drawCircle(d[0], d[1], d[2], dustPaint);
+            }
         }
     }
 
