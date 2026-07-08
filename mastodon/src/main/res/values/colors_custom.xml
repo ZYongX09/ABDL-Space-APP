@@ -445,5 +445,5 @@
 	<color name="white_gray_700">#303030</color>
 	<color name="white_gray_800">#262626</color>
 	<color name="white_gray_900">#1A1A1A</color>
-	<color name="splash_bg">#F4F7FF</color>
+	<color name="splash_bg">#FFFFFF</color>
 </resources>

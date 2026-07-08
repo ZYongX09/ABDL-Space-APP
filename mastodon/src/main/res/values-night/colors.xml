@@ -2,5 +2,5 @@
 <resources>
 	<color name="shortcut_icon_background">#000</color>
 	<color name="shortcut_icon_foreground">@color/m3_sys_dark_primary</color>
-	<color name="splash_bg">#06080F</color>
+	<color name="splash_bg">#000000</color>
 </resources>

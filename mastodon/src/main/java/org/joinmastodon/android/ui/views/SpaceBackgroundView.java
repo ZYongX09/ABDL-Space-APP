@@ -62,6 +62,13 @@ public class SpaceBackgroundView extends View {
         glowPaint.setStyle(Paint.Style.FILL);
         planetPaint.setStyle(Paint.Style.FILL);
         dustPaint.setStyle(Paint.Style.FILL);
+
+        // 自动添加状态栏 padding
+        setOnApplyWindowInsetsListener((v, insets) -> {
+            int statusBarHeight = insets.getInsets(android.view.WindowInsets.Type.statusBars()).top;
+            setPadding(0, statusBarHeight, 0, 0);
+            return insets;
+        });
     }
 
     public void setDarkMode(boolean dark) {
