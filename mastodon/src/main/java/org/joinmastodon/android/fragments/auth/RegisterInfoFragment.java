@@ -85,6 +85,23 @@ public class RegisterInfoFragment extends AppKitFragment {
 
         tvEmail.setText(email);
 
+        // 深浅色输入框适配（与 LoginEmail/LoginPassword 一致）
+        if (isDark) {
+            usernameEdit.setBackgroundResource(R.drawable.bg_input_dark);
+            usernameEdit.setTextColor(android.graphics.Color.WHITE);
+            passwordEdit.setBackgroundResource(R.drawable.bg_input_dark);
+            passwordEdit.setTextColor(android.graphics.Color.WHITE);
+            confirmEdit.setBackgroundResource(R.drawable.bg_input_dark);
+            confirmEdit.setTextColor(android.graphics.Color.WHITE);
+        } else {
+            usernameEdit.setBackgroundResource(R.drawable.bg_input_light);
+            usernameEdit.setTextColor(android.graphics.Color.BLACK);
+            passwordEdit.setBackgroundResource(R.drawable.bg_input_light);
+            passwordEdit.setTextColor(android.graphics.Color.BLACK);
+            confirmEdit.setBackgroundResource(R.drawable.bg_input_light);
+            confirmEdit.setTextColor(android.graphics.Color.BLACK);
+        }
+
         btnBack.setOnClickListener(v -> getActivity().onBackPressed());
 
         // 密码可见切换
