@@ -138,15 +138,7 @@ public class SpaceBackgroundView extends View {
             canvas.drawOval(w - dp(140), h - dp(280), w - dp(40), h - dp(220), ringPaint);
         }
 
-        // 4. 宇宙尘埃（仅深色模式）
-        if (isDarkMode) {
-            int dustAlpha = 15;
-            dustPaint.setColor(Color.WHITE);
-            for (float[] d : dusts) {
-                dustPaint.setAlpha(dustAlpha);
-                canvas.drawCircle(d[0], d[1], d[2], dustPaint);
-            }
-        }
+        // 4. 无尘埃粒子
     }
 
     private void drawGlow(Canvas canvas, float x, float y, float radius, int color, int alpha) {
