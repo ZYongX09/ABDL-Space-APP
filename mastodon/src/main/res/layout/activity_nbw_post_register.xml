@@ -23,7 +23,7 @@
             android:layout_marginTop="8dp"
             android:padding="10dp"
             android:src="@drawable/ic_arrow_back_24"
-            android:tint="#FFFFFF"
+            android:tint="?colorM3OnSurface"
             android:background="?android:attr/selectableItemBackgroundBorderless"
             android:contentDescription="返回" />
 
@@ -36,7 +36,7 @@
             android:text="宝宝新天地账号绑定"
             android:textSize="28sp"
             android:textStyle="bold"
-            android:textColor="#FFFFFF" />
+            android:textColor="?colorM3OnSurface" />
 
         <ScrollView
             android:layout_width="match_parent"
@@ -63,30 +63,31 @@
                     android:padding="12dp"
                     android:contentDescription="宝宝新天地" />
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="宝宝新天地"
-                    android:textSize="18sp"
-                    android:textStyle="bold"
-                    android:textColor="#FFFFFF" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="宝宝新天地"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:textColor="?colorM3OnSurface" />
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:layout_marginBottom="16dp"
-                    android:text="ABDL Space 深度合作平台"
-                    android:textSize="13sp"
-                    android:textColor="#CCCCDD" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="16dp"
+                android:text="ABDL Space 深度合作平台"
+                android:textSize="13sp"
+                android:textColor="?colorM3OnSurfaceVariant" />
 
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="16dp"
-                    android:text="绑定宝宝新天地账户后，您可以在 ABDL Space 发帖并同步到宝宝新天地社区，享受更多互动体验。"
-                    android:textSize="14sp"
-                    android:textColor="#CCCCDD"
+            <!-- 说明文字 -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:text="绑定宝宝新天地账户后，您可以在 ABDL Space 发帖并同步到宝宝新天地社区，享受更多互动体验。"
+                android:textSize="14sp"
+                android:textColor="?colorM3OnSurfaceVariant"
                     android:lineSpacingExtra="4dp" />
 
                 <LinearLayout
@@ -133,7 +134,7 @@
                     android:text="绑定已有宝宝新天地账号"
                     android:textSize="15sp"
                     android:textAllCaps="false"
-                    android:textColor="#A1D9F7"
+                    android:textColor="?colorM3OnSurface"
                     android:layout_marginBottom="12dp" />
 
                 <Button

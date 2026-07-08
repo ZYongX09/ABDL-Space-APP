@@ -23,7 +23,7 @@
             android:layout_marginTop="8dp"
             android:padding="10dp"
             android:src="@drawable/ic_arrow_back_24"
-            android:tint="#FFFFFF"
+            android:tint="?colorM3OnSurface"
             android:background="?android:attr/selectableItemBackgroundBorderless"
             android:contentDescription="返回" />
 
@@ -36,7 +36,7 @@
             android:text="一键注册"
             android:textSize="28sp"
             android:textStyle="bold"
-            android:textColor="#FFFFFF" />
+            android:textColor="?colorM3OnSurface" />
 
         <!-- 阶段1：加载中 -->
         <LinearLayout
@@ -59,7 +59,7 @@
                 android:layout_height="wrap_content"
                 android:text="正在向宝宝新天地获取注册链接..."
                 android:textSize="14sp"
-                android:textColor="#CCCCDD" />
+                android:textColor="?colorM3OnSurfaceVariant" />
 
             <TextView
                 android:id="@+id/tv_error"
@@ -111,7 +111,7 @@
                 android:text="第一步已完成"
                 android:textSize="20sp"
                 android:textStyle="bold"
-                android:textColor="#FFFFFF"
+                android:textColor="?colorM3OnSurface"
                 android:layout_marginBottom="8dp" />
 
             <TextView
@@ -119,7 +119,7 @@
                 android:layout_height="wrap_content"
                 android:text="但您需要前往宝宝新天地补充个人信息"
                 android:textSize="14sp"
-                android:textColor="#CCCCDD"
+                android:textColor="?colorM3OnSurfaceVariant"
                 android:layout_marginBottom="32dp" />
 
             <Button
@@ -170,9 +170,9 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="请完成宝宝新天地注册，完成后请点击右边按钮"
-                    android:textSize="12sp"
-                    android:textColor="#CCCCDD"
+                android:text="请完成宝宝新天地注册，完成后请点击右边按钮"
+                android:textSize="12sp"
+                android:textColor="?colorM3OnSurfaceVariant"
                     android:layout_marginEnd="12dp" />
 
                 <Button
@@ -183,7 +183,7 @@
                     android:text="已完成注册"
                     android:textSize="13sp"
                     android:textAllCaps="false"
-                    android:textColor="#FFFFFF" />
+                    android:textColor="?colorM3OnSurface" />
             </LinearLayout>
         </LinearLayout>
     </LinearLayout>

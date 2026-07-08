@@ -13,50 +13,30 @@
         android:layout_height="match_parent"
         android:orientation="vertical">
 
-        <View
-            android:id="@+id/status_bar"
+        <!-- 返回按钮 -->
+        <ImageView
+            android:id="@+id/btn_back"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginStart="8dp"
+            android:padding="10dp"
+            android:src="@drawable/ic_arrow_back_24"
+            android:tint="?colorM3OnSurface"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:contentDescription="返回" />
+
+        <!-- 标题 -->
+        <TextView
             android:layout_width="match_parent"
-            android:layout_height="0dp" />
-
-        <!-- 返回按钮 + 状态栏 padding -->
-        <FrameLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content">
-
-            <View
-                android:id="@+id/status_bar"
-                android:layout_width="match_parent"
-                android:layout_height="0dp" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical">
-
-                <ImageView
-                    android:id="@+id/btn_back"
-                    android:layout_width="44dp"
-                    android:layout_height="44dp"
-                    android:layout_marginTop="8dp"
-                    android:layout_marginStart="8dp"
-                    android:padding="10dp"
-                    android:src="@drawable/ic_arrow_back_24"
-                    android:tint="#FFFFFF"
-                    android:background="?android:attr/selectableItemBackgroundBorderless"
-                    android:contentDescription="返回" />
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="完善注册信息"
-                    android:textSize="28sp"
-                    android:textStyle="bold"
-                    android:textColor="#FFFFFF"
-                    android:paddingStart="20dp"
-                    android:paddingTop="8dp"
-                    android:paddingBottom="12dp" />
-            </LinearLayout>
-        </FrameLayout>
+            android:layout_height="wrap_content"
+            android:text="完善注册信息"
+            android:textSize="28sp"
+            android:textStyle="bold"
+            android:textColor="?colorM3OnSurface"
+            android:paddingStart="20dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="8dp" />
 
         <!-- 内容区 -->
         <ScrollView
@@ -80,7 +60,7 @@
                     android:layout_marginBottom="20dp"
                     android:text="user@example.com"
                     android:textSize="15sp"
-                    android:textColor="#CCCCDD"
+                    android:textColor="?colorM3OnSurfaceVariant"
                     android:gravity="center" />
 
                 <EditText
@@ -88,16 +68,16 @@
                     android:layout_width="match_parent"
                     android:layout_height="56dp"
                     android:layout_marginBottom="14dp"
-                    android:background="@drawable/bg_input_dark"
+                    android:background="@drawable/bg_input_light"
                     android:hint="请输入用户名（3-30个字符）"
                     android:inputType="textPersonName"
                     android:singleLine="true"
                     android:textSize="16sp"
-                    android:textColor="#FFFFFF"
-                    android:textColorHint="#888899"
+                    android:textColor="?colorM3OnSurface"
+                    android:textColorHint="?colorM3OnSurfaceVariant"
                     android:drawableStart="@drawable/ic_person_24"
                     android:drawablePadding="12dp"
-                    android:drawableTint="#888899"
+                    android:drawableTint="?colorM3OnSurfaceVariant"
                     android:paddingStart="16dp"
                     android:paddingEnd="16dp" />
 
@@ -106,17 +86,17 @@
                     android:layout_width="match_parent"
                     android:layout_height="56dp"
                     android:layout_marginBottom="14dp"
-                    android:background="@drawable/bg_input_dark"
+                    android:background="@drawable/bg_input_light"
                     android:hint="请输入密码（至少8位）"
                     android:inputType="textPassword"
                     android:autofillHints="newPassword"
                     android:singleLine="true"
                     android:textSize="16sp"
-                    android:textColor="#FFFFFF"
-                    android:textColorHint="#888899"
+                    android:textColor="?colorM3OnSurface"
+                    android:textColorHint="?colorM3OnSurfaceVariant"
                     android:drawableStart="@drawable/ic_lock_24"
                     android:drawablePadding="12dp"
-                    android:drawableTint="#888899"
+                    android:drawableTint="?colorM3OnSurfaceVariant"
                     android:drawableEnd="@drawable/ic_eye_toggle"
                     android:paddingStart="16dp"
                     android:paddingEnd="16dp"
@@ -127,17 +107,17 @@
                     android:layout_width="match_parent"
                     android:layout_height="56dp"
                     android:layout_marginBottom="24dp"
-                    android:background="@drawable/bg_input_dark"
+                    android:background="@drawable/bg_input_light"
                     android:hint="确认密码"
                     android:inputType="textPassword"
                     android:autofillHints="newPassword"
                     android:singleLine="true"
                     android:textSize="16sp"
-                    android:textColor="#FFFFFF"
-                    android:textColorHint="#888899"
+                    android:textColor="?colorM3OnSurface"
+                    android:textColorHint="?colorM3OnSurfaceVariant"
                     android:drawableStart="@drawable/ic_lock_24"
                     android:drawablePadding="12dp"
-                    android:drawableTint="#888899"
+                    android:drawableTint="?colorM3OnSurfaceVariant"
                     android:drawableEnd="@drawable/ic_eye_toggle"
                     android:paddingStart="16dp"
                     android:paddingEnd="16dp"
