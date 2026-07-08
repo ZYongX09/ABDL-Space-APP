@@ -2,6 +2,8 @@ package org.joinmastodon.android.fragments.settings;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.content.res.Configuration;
+import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
 import android.util.Base64;
@@ -9,6 +11,7 @@ import android.view.View;
 import android.view.WindowInsets;
 import android.widget.Button;
 import android.widget.ImageView;
+import android.widget.TextView;
 
 import org.joinmastodon.android.MainActivity;
 import org.joinmastodon.android.R;
@@ -29,6 +32,15 @@ public class NBWPostRegisterActivity extends Activity {
         UiUtils.setUserPreferredTheme(this);
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_nbw_post_register);
+
+        // 深色模式检测
+        org.joinmastodon.android.ui.views.SpaceBackgroundView spaceBg = findViewById(R.id.space_bg);
+        boolean isDark = (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
+        spaceBg.setDarkMode(isDark);
+
+        // 标题颜色
+        TextView titleView = findViewById(R.id.title);
+        if (titleView != null) titleView.setTextColor(Color.WHITE);
 
         // 状态栏 padding
         View rootView = findViewById(android.R.id.content);

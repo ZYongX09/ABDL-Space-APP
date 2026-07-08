@@ -51,15 +51,20 @@ public class OAuthActivity extends Activity{
 			return;
 		}
 
-		// NBW 绑定回调: ?nbw_bind=success/need_bind&nbw_user=xxx&nbw_token=xxx
+		// NBW 绑定回调: ?nbw_bind=success/need_bind/already_bound&nbw_user=xxx&nbw_token=xxx
 		String nbwBind=uri.getQueryParameter("nbw_bind");
 		if(nbwBind!=null){
 			String nbwUser=uri.getQueryParameter("nbw_user");
 			String nbwToken=uri.getQueryParameter("nbw_token");
-			// 从 SharedPreferences 读取流程类型（不依赖 state，因为 NBW 会修改 state）
 			String flow = getSharedPreferences("nbw_bind", MODE_PRIVATE).getString("flow", "login");
 			Intent intent;
-			if("need_bind".equals(nbwBind)){
+			if("already_bound".equals(nbwBind)){
+				// NBW 账号已被其他用户绑定 → 显示错误提示
+				Toast.makeText(this, "该宝宝新天地账号已被其他用户绑定", Toast.LENGTH_LONG).show();
+				restartMainActivity();
+				finish();
+				return;
+			} else if("need_bind".equals(nbwBind)){
 				if("bind".equals(flow)){
 					intent=new Intent(this, NBWBindResultActivity.class);
 					intent.putExtra("nbw_bind_result", nbwBind);

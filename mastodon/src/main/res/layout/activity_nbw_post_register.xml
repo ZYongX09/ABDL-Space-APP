@@ -1,147 +1,152 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/root"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:background="?colorM3Background">
+    android:layout_height="match_parent">
 
-    <!-- 返回按钮 -->
-    <ImageView
-        android:id="@+id/btn_back"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
-        android:layout_marginStart="8dp"
-        android:layout_marginTop="8dp"
-        android:padding="8dp"
-        android:src="@drawable/ic_arrow_back_24"
-        android:background="?android:attr/selectableItemBackgroundBorderless"
-        android:contentDescription="返回" />
-
-    <!-- 标题 -->
-    <TextView
+    <org.joinmastodon.android.ui.views.SpaceBackgroundView
+        android:id="@+id/space_bg"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="16dp"
-        android:layout_marginBottom="24dp"
-        android:text="宝宝新天地账号绑定"
-        android:textSize="22sp"
-        android:textStyle="bold"
-        android:textColor="?colorM3OnSurface" />
+        android:layout_height="match_parent" />
 
-    <ScrollView
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:fillViewport="true">
+        android:layout_height="match_parent"
+        android:orientation="vertical">
 
-        <LinearLayout
+        <!-- 返回按钮 -->
+        <ImageView
+            android:id="@+id/btn_back"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginStart="8dp"
+            android:layout_marginTop="8dp"
+            android:padding="10dp"
+            android:src="@drawable/ic_arrow_back_24"
+            android:tint="#FFFFFF"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:contentDescription="返回" />
+
+        <!-- 标题 -->
+        <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:gravity="center_horizontal"
-            android:paddingStart="24dp"
-            android:paddingEnd="24dp">
+            android:layout_marginStart="20dp"
+            android:layout_marginBottom="16dp"
+            android:text="宝宝新天地账号绑定"
+            android:textSize="28sp"
+            android:textStyle="bold"
+            android:textColor="#FFFFFF" />
 
-            <!-- Logo + 名称 -->
-            <ImageView
-                android:layout_width="64dp"
-                android:layout_height="64dp"
-                android:layout_marginTop="16dp"
-                android:layout_marginBottom="16dp"
-                android:src="@drawable/ic_nbw_large"
-                android:scaleType="fitCenter"
-                android:background="@drawable/bg_circle_gray"
-                android:padding="12dp"
-                android:contentDescription="宝宝新天地" />
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:fillViewport="true">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="宝宝新天地"
-                android:textSize="18sp"
-                android:textStyle="bold"
-                android:textColor="?colorM3OnSurface" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:layout_marginBottom="16dp"
-                android:text="ABDL Space 深度合作平台"
-                android:textSize="13sp"
-                android:textColor="#999999" />
-
-            <!-- 说明文字 -->
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp"
-                android:text="绑定宝宝新天地账户后，您可以在 ABDL Space 发帖并同步到宝宝新天地社区，享受更多互动体验。"
-                android:textSize="14sp"
-                android:textColor="#666666"
-                android:lineSpacingExtra="4dp" />
-
-            <!-- 警告条 -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="24dp"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:background="#1AFF0000"
-                android:padding="12dp">
+                android:orientation="vertical"
+                android:gravity="center_horizontal"
+                android:paddingStart="32dp"
+                android:paddingEnd="32dp">
 
                 <ImageView
-                    android:layout_width="20dp"
-                    android:layout_height="20dp"
-                    android:layout_marginEnd="8dp"
-                    android:src="@drawable/ic_warning_24px"
-                    android:contentDescription="警告" />
+                    android:layout_width="64dp"
+                    android:layout_height="64dp"
+                    android:layout_marginTop="16dp"
+                    android:layout_marginBottom="16dp"
+                    android:src="@drawable/ic_nbw_large"
+                    android:scaleType="fitCenter"
+                    android:background="@drawable/bg_circle_gray"
+                    android:padding="12dp"
+                    android:contentDescription="宝宝新天地" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="未绑定宝宝新天地账户将无法发帖"
-                    android:textSize="13sp"
+                    android:text="宝宝新天地"
+                    android:textSize="18sp"
                     android:textStyle="bold"
-                    android:textColor="#D32F2F" />
+                    android:textColor="#FFFFFF" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:layout_marginBottom="16dp"
+                    android:text="ABDL Space 深度合作平台"
+                    android:textSize="13sp"
+                    android:textColor="#CCCCDD" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="16dp"
+                    android:text="绑定宝宝新天地账户后，您可以在 ABDL Space 发帖并同步到宝宝新天地社区，享受更多互动体验。"
+                    android:textSize="14sp"
+                    android:textColor="#CCCCDD"
+                    android:lineSpacingExtra="4dp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="24dp"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:background="#22FF0000"
+                    android:padding="12dp">
+
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:layout_marginEnd="8dp"
+                        android:src="@drawable/ic_warning_24px"
+                        android:contentDescription="警告" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="未绑定宝宝新天地账户将无法发帖"
+                        android:textSize="13sp"
+                        android:textStyle="bold"
+                        android:textColor="#FF6B6B" />
+                </LinearLayout>
+
+                <Button
+                    android:id="@+id/btn_bind_existing"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:background="@drawable/bg_btn_gradient_purple"
+                    android:text="绑定已有宝宝新天地账号"
+                    android:textSize="15sp"
+                    android:textAllCaps="false"
+                    android:textColor="#FFFFFF"
+                    android:layout_marginBottom="12dp" />
+
+                <Button
+                    android:id="@+id/btn_one_click"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:background="@drawable/bg_input_light"
+                    android:text="一键注册宝宝新天地新账号"
+                    android:textSize="15sp"
+                    android:textAllCaps="false"
+                    android:textColor="#FFFFFF"
+                    android:layout_marginBottom="12dp" />
+
+                <Button
+                    android:id="@+id/btn_skip"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:background="@android:color/transparent"
+                    android:text="暂时跳过"
+                    android:textSize="14sp"
+                    android:textAllCaps="false"
+                    android:textColor="#A1D9F7" />
+
             </LinearLayout>
-
-            <!-- 按钮1：绑定已有 -->
-            <Button
-                android:id="@+id/btn_bind_existing"
-                android:layout_width="match_parent"
-                android:layout_height="52dp"
-                style="@style/Widget.Mastodon.M3.Button.Filled"
-                android:text="绑定已有宝宝新天地账号"
-                android:textSize="15sp"
-                android:textAllCaps="false"
-                android:layout_marginBottom="12dp" />
-
-            <!-- 按钮2：一键注册 -->
-            <Button
-                android:id="@+id/btn_one_click"
-                android:layout_width="match_parent"
-                android:layout_height="52dp"
-                style="@style/Widget.Mastodon.M3.Button.Outlined"
-                android:text="一键注册宝宝新天地新账号"
-                android:textSize="15sp"
-                android:textAllCaps="false"
-                android:layout_marginBottom="12dp" />
-
-            <!-- 按钮3：跳过 -->
-            <Button
-                android:id="@+id/btn_skip"
-                android:layout_width="match_parent"
-                android:layout_height="48dp"
-                style="@style/Widget.Mastodon.M3.Button.Text"
-                android:text="暂时跳过"
-                android:textSize="14sp"
-                android:textAllCaps="false"
-                android:textColor="#999999" />
-
-        </LinearLayout>
-    </ScrollView>
-
-</LinearLayout>
+        </ScrollView>
+    </LinearLayout>
+</FrameLayout>

@@ -2,7 +2,9 @@ package org.joinmastodon.android.fragments.settings;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.content.res.Configuration;
 import android.graphics.Bitmap;
+import android.graphics.Color;
 import android.net.http.SslError;
 import android.os.Bundle;
 import android.os.Handler;
@@ -55,6 +57,7 @@ public class NBWOneClickRegisterActivity extends Activity {
     private TextView tvError;
     private WebView webView;
     private Button btnComplete;
+    private Button btnRetry;
 
     private String email;
     private String registerUrl;
@@ -66,6 +69,11 @@ public class NBWOneClickRegisterActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_nbw_one_click_register);
+
+        // 深色模式
+        org.joinmastodon.android.ui.views.SpaceBackgroundView spaceBg = findViewById(R.id.space_bg);
+        boolean isDark = (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
+        spaceBg.setDarkMode(isDark);
 
         // 状态栏 padding
         View rootView = findViewById(android.R.id.content);
@@ -86,6 +94,7 @@ public class NBWOneClickRegisterActivity extends Activity {
         tvError = findViewById(R.id.tv_error);
         webView = findViewById(R.id.web_view);
         btnComplete = findViewById(R.id.btn_complete);
+        btnRetry = findViewById(R.id.btn_retry);
 
         ImageView btnBack = findViewById(R.id.btn_back);
         btnBack.setOnClickListener(v -> finish());
@@ -93,10 +102,13 @@ public class NBWOneClickRegisterActivity extends Activity {
         Button btnGoWeb = findViewById(R.id.btn_go_web);
         btnGoWeb.setOnClickListener(v -> showPhase3());
 
-        Button btnBackToInfo = findViewById(R.id.btn_back_to_info);
-        btnBackToInfo.setOnClickListener(v -> showPhase2());
-
         btnComplete.setOnClickListener(v -> checkRegisterStatus());
+        btnRetry.setOnClickListener(v -> {
+            tvError.setVisibility(View.GONE);
+            btnRetry.setVisibility(View.GONE);
+            progressBar.setVisibility(View.VISIBLE);
+            fetchRegisterUrl();
+        });
 
         // 配置 WebView
         WebSettings ws = webView.getSettings();
@@ -169,6 +181,7 @@ public class NBWOneClickRegisterActivity extends Activity {
                         progressBar.setVisibility(View.GONE);
                         tvError.setText("网络错误: " + e.getMessage());
                         tvError.setVisibility(View.VISIBLE);
+                        btnRetry.setVisibility(View.VISIBLE);
                     });
                 }
 
@@ -186,6 +199,7 @@ public class NBWOneClickRegisterActivity extends Activity {
                                 String msg = resp != null ? resp.msg : "获取失败";
                                 tvError.setText(msg);
                                 tvError.setVisibility(View.VISIBLE);
+                                btnRetry.setVisibility(View.VISIBLE);
                             }
                         } catch (Exception e) {
                             tvError.setText("解析失败");
