@@ -1,6 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 背景圆圈（浅色模式可见） -->
+    <item>
+        <shape android:shape="oval">
+            <solid android:color="#E8F0FE" />
+            <size android:width="100dp" android:height="100dp" />
+        </shape>
+    </item>
+    <!-- ABDL 图标居中 -->
     <item
         android:drawable="@drawable/ic_splash_abdl"
-        android:gravity="center" />
+        android:gravity="center"
+        android:width="60dp"
+        android:height="60dp" />
 </layer-list>

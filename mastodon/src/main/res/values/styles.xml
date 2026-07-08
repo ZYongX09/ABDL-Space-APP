@@ -410,7 +410,7 @@
 
 	<style name="Theme.Mastodon.SplashScreen" parent="Theme.Mastodon.Dark">
 		<item name="android:windowBackground">@color/splash_bg</item>
-		<item name="android:windowSplashScreenBackground">@color/splash_bg</item>
+		<item name="android:windowSplashScreenBackground">?android:windowBackground</item>
 		<item name="android:windowSplashScreenAnimatedIcon">@drawable/system_splash</item>
 		<item name="android:windowSplashScreenIconBackgroundColor">@null</item>
 		<item name="android:windowSplashScreenBehavior">icon_preferred</item>
