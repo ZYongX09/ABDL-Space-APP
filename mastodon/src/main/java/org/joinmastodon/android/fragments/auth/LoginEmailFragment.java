@@ -82,7 +82,7 @@ public class LoginEmailFragment extends AppKitFragment {
 
         // 浅色/深色模式适配
         if (!isDark) {
-            tvAgreement.setTextColor(0xFF7788AA);
+            tvAgreement.setTextColor(androidx.core.content.ContextCompat.getColor(getActivity(), R.color.m3_sys_light_on_surface_variant));
             emailEdit.setBackgroundResource(R.drawable.bg_input_light);
             emailEdit.setTextColor(Color.BLACK);
             btnNBW.setBackgroundResource(R.drawable.bg_social_light);
@@ -90,6 +90,7 @@ public class LoginEmailFragment extends AppKitFragment {
         } else {
             emailEdit.setBackgroundResource(R.drawable.bg_input_dark);
             emailEdit.setTextColor(Color.WHITE);
+            tvAgreement.setTextColor(androidx.core.content.ContextCompat.getColor(getActivity(), R.color.m3_sys_dark_on_surface_variant));
             btnNBW.setBackgroundResource(R.drawable.bg_social_dark);
             btnOAuth.setBackgroundResource(R.drawable.bg_social_dark);
         }

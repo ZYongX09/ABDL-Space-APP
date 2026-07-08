@@ -50,7 +50,7 @@
             android:layout_marginBottom="36dp"
             android:text="探索全新世界"
             android:textSize="13sp"
-            android:textColor="#88AACC" />
+            android:textColor="?colorM3OnSurfaceVariant" />
 
         <!-- 输入框卡片 -->
         <LinearLayout
@@ -71,10 +71,10 @@
                 android:singleLine="true"
                 android:textSize="16sp"
                 android:textColor="#333333"
-                android:textColorHint="#AABBCC"
+                android:textColorHint="?colorM3OnSurfaceVariant"
                 android:drawableStart="@drawable/ic_email_24"
                 android:drawablePadding="12dp"
-                android:drawableTint="#8899BB"
+                android:drawableTint="?colorM3OnSurfaceVariant"
                 android:paddingStart="16dp"
                 android:paddingEnd="16dp"
                 android:imeOptions="actionNext" />
@@ -86,7 +86,7 @@
                 android:layout_marginBottom="16dp"
                 android:text="未注册的邮箱验证后自动创建ABDL Space账号"
                 android:textSize="12sp"
-                android:textColor="#7788AA"
+                android:textColor="?colorM3OnSurfaceVariant"
                 android:gravity="center" />
 
             <!-- 协议 -->
@@ -103,7 +103,7 @@
                     android:id="@+id/cb_agreement"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:buttonTint="#88AAFF" />
+                    android:buttonTint="#A1D9F7" />
 
                 <TextView
                     android:id="@+id/tv_agreement"
@@ -111,7 +111,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:textSize="12sp"
-                    android:textColor="#7788AA" />
+                    android:textColor="?colorM3OnSurfaceVariant" />
             </LinearLayout>
 
             <!-- 获取验证码按钮 -->
@@ -139,20 +139,20 @@
                     android:layout_width="0dp"
                     android:layout_height="1dp"
                     android:layout_weight="1"
-                    android:background="#30AABBCC" />
+                    android:background="?colorM3Outline" />
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="  或使用其他方式登录  "
-                    android:textSize="12sp"
-                    android:textColor="#99AABB" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="  或使用其他方式登录  "
+                android:textSize="12sp"
+                android:textColor="?colorM3OnSurfaceVariant" />
 
                 <View
                     android:layout_width="0dp"
                     android:layout_height="1dp"
                     android:layout_weight="1"
-                    android:background="#30AABBCC" />
+                    android:background="?colorM3Outline" />
             </LinearLayout>
 
             <!-- 社交登录按钮 -->

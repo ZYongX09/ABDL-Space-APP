@@ -115,25 +115,25 @@
                 </LinearLayout>
 
                 <Button
-                    android:id="@+id/btn_bind_existing"
+                    android:id="@+id/btn_one_click"
                     android:layout_width="match_parent"
                     android:layout_height="52dp"
                     android:background="@drawable/bg_btn_gradient_purple"
-                    android:text="绑定已有宝宝新天地账号"
+                    android:text="一键注册宝宝新天地新账号"
                     android:textSize="15sp"
                     android:textAllCaps="false"
                     android:textColor="#FFFFFF"
                     android:layout_marginBottom="12dp" />
 
                 <Button
-                    android:id="@+id/btn_one_click"
+                    android:id="@+id/btn_bind_existing"
                     android:layout_width="match_parent"
                     android:layout_height="52dp"
-                    android:background="@drawable/bg_input_light"
-                    android:text="一键注册宝宝新天地新账号"
+                    android:background="@drawable/bg_btn_outline_blue"
+                    android:text="绑定已有宝宝新天地账号"
                     android:textSize="15sp"
                     android:textAllCaps="false"
-                    android:textColor="#FFFFFF"
+                    android:textColor="#A1D9F7"
                     android:layout_marginBottom="12dp" />
 
                 <Button
