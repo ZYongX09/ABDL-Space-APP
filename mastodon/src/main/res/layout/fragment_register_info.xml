@@ -35,8 +35,8 @@
             android:textStyle="bold"
             android:textColor="?colorM3OnSurface"
             android:paddingStart="20dp"
-            android:paddingTop="8dp"
-            android:paddingBottom="8dp" />
+            android:paddingTop="24dp"
+            android:paddingBottom="16dp" />
 
         <!-- 内容区 -->
         <ScrollView
@@ -101,6 +101,14 @@
                     android:paddingStart="16dp"
                     android:paddingEnd="16dp"
                     android:backgroundTint="@null" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="14dp"
+                    android:text="密码需8位以上，包含大小写字母和数字"
+                    android:textSize="11sp"
+                    android:textColor="?colorM3OnSurfaceVariant" />
 
                 <EditText
                     android:id="@+id/confirm_edit"

@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- 蓝色背景圆圈 -->
+    <!-- 背景圆圈（跟随主题白/黑） -->
     <item>
         <shape android:shape="oval">
-            <solid android:color="#b0e0ff" />
+            <solid android:color="?colorM3Surface" />
             <size android:width="100dp" android:height="100dp" />
         </shape>
     </item>

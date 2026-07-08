@@ -34,8 +34,8 @@
                 android:textStyle="bold"
                 android:textColor="?colorM3OnSurface"
                 android:paddingStart="20dp"
-                android:paddingTop="8dp"
-                android:paddingBottom="12dp" />
+                android:paddingTop="24dp"
+                android:paddingBottom="16dp" />
 
             <TextView
                 android:id="@+id/tv_email_hint"

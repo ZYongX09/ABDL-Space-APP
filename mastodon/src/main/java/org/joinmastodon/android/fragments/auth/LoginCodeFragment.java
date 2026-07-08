@@ -201,16 +201,14 @@ public class LoginCodeFragment extends AppKitFragment {
                             } else {
                                 verifying = false;
                                 pinView.clearPin();
-                                tvError.setText("验证失败: " + responseBody);
-                                tvError.setVisibility(View.VISIBLE);
+                                Toast.makeText(getActivity(), "验证失败: " + responseBody, Toast.LENGTH_SHORT).show();
                             }
                         } else {
                             verifying = false;
                             pinView.clearPin();
                             String errorMsg = verifyResp != null && verifyResp.error != null
                                 ? verifyResp.error : "验证码错误";
-                            tvError.setText(errorMsg);
-                            tvError.setVisibility(View.VISIBLE);
+                            Toast.makeText(getActivity(), errorMsg, Toast.LENGTH_SHORT).show();
                         }
                     });
                 }

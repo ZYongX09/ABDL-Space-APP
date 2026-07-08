@@ -42,24 +42,6 @@ public class NBWPostRegisterActivity extends Activity {
         TextView titleView = findViewById(R.id.title);
         if (titleView != null) titleView.setTextColor(Color.WHITE);
 
-        // 状态栏 padding
-        View rootView = findViewById(android.R.id.content);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            rootView.setOnApplyWindowInsetsListener((v, insets) -> {
-                int statusBar = insets.getInsets(WindowInsets.Type.statusBars()).top;
-                rootView.setPadding(0, statusBar, 0, 0);
-                return insets;
-            });
-        } else {
-            rootView.setPadding(0, getStatusBarHeight(), 0, 0);
-        }
-
-        // 返回按钮
-        ImageView btnBack = findViewById(R.id.btn_back);
-        btnBack.setOnClickListener(v -> {
-            navigateToMain();
-        });
-
         // 绑定已有账号
         Button btnBindExisting = findViewById(R.id.btn_bind_existing);
         btnBindExisting.setOnClickListener(v -> {
