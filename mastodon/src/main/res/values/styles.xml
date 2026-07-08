@@ -411,6 +411,11 @@
 	<style name="Theme.Mastodon.SplashScreen" parent="Theme.Mastodon.Dark">
 		<item name="android:windowBackground">@color/splash_bg</item>
 		<item name="android:windowSplashScreenBackground">@color/splash_bg</item>
+		<item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_abdl_icon</item>
+		<item name="android:windowSplashScreenIconBackgroundColor">@null</item>
+		<item name="android:windowSplashScreenBehavior">icon_preferred</item>
+		<item name="android:statusBarColor">@color/splash_bg</item>
+		<item name="android:navigationBarColor">@color/splash_bg</item>
 	</style>
 
 	<!-- Android 12+ preview window theme for SplashActivity -->
