@@ -69,6 +69,17 @@ public class LoginCodeFragment extends AppKitFragment {
     public View onCreateView(LayoutInflater inflater, @Nullable ViewGroup container, Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_login_code, container, false);
 
+        // 状态栏 padding
+        View statusBar = view.findViewById(R.id.status_bar);
+        if (statusBar != null) {
+            statusBar.post(() -> {
+                int statusBarHeight = getResources().getDimensionPixelSize(
+                    getResources().getIdentifier("status_bar_height", "dimen", "android"));
+                statusBar.getLayoutParams().height = statusBarHeight;
+                statusBar.requestLayout();
+            });
+        }
+
         // 深色模式
         org.joinmastodon.android.ui.views.SpaceBackgroundView spaceBg = view.findViewById(R.id.space_bg);
         boolean isDark = (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
@@ -193,10 +204,9 @@ public class LoginCodeFragment extends AppKitFragment {
                                     })
                                     .exec("abdl-space.top", token);
                             } else if ("register".equals(verifyResp.action)) {
-                                // 未注册 → 进入注册流程
+                                // 未注册 → 进入注册流程（不传code，login-by-code已验证过）
                                 Bundle args = new Bundle();
                                 args.putString("email", email);
-                                args.putString("code", code);
                                 Nav.go(getActivity(), RegisterInfoFragment.class, args);
                                 verifying = false;
                             } else {

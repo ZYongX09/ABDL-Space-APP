@@ -122,21 +122,7 @@ public class SpaceBackgroundView extends View {
         drawGlow(canvas, dp(60), dp(100), dp(150), isDarkMode ? 0x185577EE : 0x1288AADD, glowAlpha2);
         drawGlow(canvas, w - dp(80), h - dp(200), dp(170), isDarkMode ? 0x18446688 : 0x1099BBCC, glowAlpha3);
 
-        // 3. 星球装饰（仅深色模式）
-        if (isDarkMode) {
-            planetPaint.setColor(Color.parseColor("#1A2540"));
-            planetPaint.setAlpha(40);
-            canvas.drawCircle(dp(120), dp(160), dp(40), planetPaint);
-            planetPaint.setAlpha(25);
-            canvas.drawCircle(w - dp(90), h - dp(250), dp(55), planetPaint);
-            // 星球环
-            Paint ringPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-            ringPaint.setStyle(Paint.Style.STROKE);
-            ringPaint.setStrokeWidth(dp(2));
-            ringPaint.setColor(Color.parseColor("#33557788"));
-            ringPaint.setAlpha(30);
-            canvas.drawOval(w - dp(140), h - dp(280), w - dp(40), h - dp(220), ringPaint);
-        }
+        // 3. 无星球装饰
 
         // 4. 无尘埃粒子
     }
