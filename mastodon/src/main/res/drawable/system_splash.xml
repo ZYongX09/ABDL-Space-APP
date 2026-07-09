@@ -3,14 +3,14 @@
     <!-- 背景圆圈（跟随主题白/黑） -->
     <item>
         <shape android:shape="oval">
-            <solid android:color="?colorM3Surface" />
-            <size android:width="100dp" android:height="100dp" />
+            <solid android:color="@color/splash_bg" />
+            <size android:width="140dp" android:height="140dp" />
         </shape>
     </item>
     <!-- ABDL 图标居中 -->
     <item
         android:drawable="@drawable/ic_splash_abdl"
         android:gravity="center"
-        android:width="60dp"
-        android:height="60dp" />
+        android:width="96dp"
+        android:height="96dp" />
 </layer-list>

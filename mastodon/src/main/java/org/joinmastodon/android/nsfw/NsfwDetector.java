@@ -12,18 +12,18 @@ import android.util.Log;
  * NSFW 图片检测封装类。
  * 使用 open_nsfw (Yahoo VGG16 TFLite 模型) 在本地离线检测图片敏感度。
  *
- * 阈值（宁可错杀不可放过）：
- * - nsfwScore > 0.3 → 禁止上传
- * - nsfwScore > 0.15 → 标记 is_nsfw
- * - nsfwScore <= 0.15 → 安全
+ * 阈值（避免误判普通内容）：
+ * - nsfwScore > 0.8 → 禁止上传
+ * - nsfwScore > 0.5 → 标记 is_nsfw
+ * - nsfwScore <= 0.5 → 安全
  *
  * 模型加载失败时，checkImage 回调 blocked=true，禁止上传带图片的帖子。
  */
 public class NsfwDetector {
     private static final String TAG = "NsfwDetector";
 
-    public static final float THRESHOLD_BLOCK = 0.3f;
-    public static final float THRESHOLD_MARK = 0.15f;
+    public static final float THRESHOLD_BLOCK = 0.8f;
+    public static final float THRESHOLD_MARK = 0.5f;
 
     private static NsfwClassifier classifier;
     private static boolean initialized = false;

@@ -414,6 +414,7 @@
 		<item name="android:windowSplashScreenAnimatedIcon">@drawable/system_splash</item>
 		<item name="android:windowSplashScreenIconBackgroundColor">@null</item>
 		<item name="android:windowSplashScreenBehavior">icon_preferred</item>
+		<item name="android:windowSplashScreenBrandingImage">@drawable/ic_abdl_word</item>
 		<item name="android:statusBarColor">@color/splash_bg</item>
 		<item name="android:navigationBarColor">@color/splash_bg</item>
 	</style>

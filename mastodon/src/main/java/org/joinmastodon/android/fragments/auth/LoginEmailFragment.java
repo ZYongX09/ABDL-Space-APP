@@ -58,6 +58,31 @@ public class LoginEmailFragment extends AppKitFragment {
     public View onCreateView(LayoutInflater inflater, @Nullable ViewGroup container, Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_login_email, container, false);
 
+        // 状态栏 padding
+        View contentContainer = view.findViewById(R.id.content_container);
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+            contentContainer.setOnApplyWindowInsetsListener((v, insets) -> {
+                int statusBar = insets.getInsets(android.view.WindowInsets.Type.statusBars()).top;
+                v.setPadding(0, statusBar, 0, 0);
+                return insets;
+            });
+        } else {
+            android.content.Context ctx = getActivity();
+            if (ctx != null) {
+                int resId = ctx.getResources().getIdentifier("status_bar_height", "dimen", "android");
+                int sb = resId > 0 ? ctx.getResources().getDimensionPixelSize(resId) : 0;
+                contentContainer.setPadding(0, sb, 0, 0);
+            }
+        }
+
+        // 返回按钮（仅从其他页面跳入时显示）
+        ImageView btnBack = view.findViewById(R.id.btn_back);
+        boolean showBack = getArguments() != null && getArguments().getBoolean("show_back", false);
+        if (showBack) {
+            btnBack.setVisibility(View.VISIBLE);
+            btnBack.setOnClickListener(v -> getActivity().onBackPressed());
+        }
+
         emailEdit = view.findViewById(R.id.email_edit);
         cbAgreement = view.findViewById(R.id.cb_agreement);
         btnSendCode = view.findViewById(R.id.btn_send_code);

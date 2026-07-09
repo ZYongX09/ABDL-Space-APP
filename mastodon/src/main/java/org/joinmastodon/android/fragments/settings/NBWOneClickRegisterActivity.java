@@ -60,6 +60,8 @@ public class NBWOneClickRegisterActivity extends Activity {
     private Button btnRetry;
 
     private String email;
+    private String nbwUsername;
+    private String nbwPassword;
     private String registerUrl;
     private long phase3StartTime;
     private boolean checking = false;
@@ -68,6 +70,19 @@ public class NBWOneClickRegisterActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        // 全屏透明状态栏
+        android.view.Window window = getWindow();
+        window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+        window.setStatusBarColor(android.graphics.Color.TRANSPARENT);
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+            window.setDecorFitsSystemWindows(false);
+        } else {
+            window.getDecorView().setSystemUiVisibility(
+                View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
+        }
+
         setContentView(R.layout.activity_nbw_one_click_register);
 
         // 深色模式
@@ -75,16 +90,18 @@ public class NBWOneClickRegisterActivity extends Activity {
         boolean isDark = (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
         spaceBg.setDarkMode(isDark);
 
-        // 状态栏 padding
-        View rootView = findViewById(android.R.id.content);
-        rootView.setOnApplyWindowInsetsListener((v, insets) -> {
+        // 状态栏 padding — 应用到内容容器而非 android.R.id.content
+        View contentContainer = findViewById(R.id.content_container);
+        contentContainer.setOnApplyWindowInsetsListener((v, insets) -> {
             int statusBar = insets.getInsets(WindowInsets.Type.statusBars()).top;
-            rootView.setPadding(0, statusBar, 0, 0);
+            v.setPadding(0, statusBar, 0, 0);
             return insets;
         });
 
         // 获取当前用户邮箱（从 SharedPreferences 读取）
         email = getSharedPreferences("login_prefs", MODE_PRIVATE).getString("email", "");
+        nbwUsername = getIntent().getStringExtra("nbw_username");
+        nbwPassword = getIntent().getStringExtra("nbw_password");
 
         // 初始化视图
         phaseLoading = findViewById(R.id.phase_loading);
@@ -98,6 +115,11 @@ public class NBWOneClickRegisterActivity extends Activity {
 
         ImageView btnBack = findViewById(R.id.btn_back);
         btnBack.setOnClickListener(v -> finish());
+
+        ImageView btnRefresh = findViewById(R.id.btn_refresh);
+        btnRefresh.setOnClickListener(v -> {
+            if (webView != null) webView.reload();
+        });
 
         Button btnGoWeb = findViewById(R.id.btn_go_web);
         btnGoWeb.setOnClickListener(v -> showPhase3());
@@ -125,6 +147,22 @@ public class NBWOneClickRegisterActivity extends Activity {
             @Override
             public void onPageFinished(WebView view, String url) {
                 progressBar.setVisibility(View.GONE);
+                if (nbwUsername != null && nbwPassword != null) {
+                    String safeU = nbwUsername.replace("\\", "\\\\").replace("'", "\\'");
+                    String safeP = nbwPassword.replace("\\", "\\\\").replace("'", "\\'");
+                    String js = "javascript:(function(){" +
+                        "var u=document.getElementById('yonghuname');" +
+                        "var p=document.getElementById('psmima');" +
+                        "var r=document.getElementById('remima');" +
+                        "if(u){u.value='" + safeU + "';u.dispatchEvent(new Event('input',{bubbles:true}));}" +
+                        "if(p){p.value='" + safeP + "';p.dispatchEvent(new Event('input',{bubbles:true}));}" +
+                        "if(r){r.value='" + safeP + "';r.dispatchEvent(new Event('input',{bubbles:true}));}" +
+                        "})()";
+                    view.evaluateJavascript(js, null);
+                    Toast.makeText(NBWOneClickRegisterActivity.this,
+                        "已成功帮您自动填写您在 ABDL Space 留下的信息，您可以在页面内修改这些信息",
+                        Toast.LENGTH_LONG).show();
+                }
             }
 
             @Override
@@ -196,14 +234,22 @@ public class NBWOneClickRegisterActivity extends Activity {
                                 registerUrl = resp.data.register_url;
                                 showPhase2();
                             } else {
-                                String msg = resp != null ? resp.msg : "获取失败";
+                                String msg = resp != null && resp.msg != null ? resp.msg : "获取注册链接失败";
+                                if (response.code() == 401) {
+                                    msg = "登录已过期，请重新登录";
+                                } else if (response.code() == 400) {
+                                    msg = "请求参数错误";
+                                } else if (!response.isSuccessful()) {
+                                    msg = "服务器错误 (" + response.code() + ")";
+                                }
                                 tvError.setText(msg);
                                 tvError.setVisibility(View.VISIBLE);
                                 btnRetry.setVisibility(View.VISIBLE);
                             }
                         } catch (Exception e) {
-                            tvError.setText("解析失败");
+                            tvError.setText("服务器响应异常");
                             tvError.setVisibility(View.VISIBLE);
+                            btnRetry.setVisibility(View.VISIBLE);
                         }
                     });
                 }
@@ -266,7 +312,7 @@ public class NBWOneClickRegisterActivity extends Activity {
                                 bindByEmail();
                             }
                         } catch (Exception e) {
-                            // 忽略解析错误，继续轮询
+                            // 继续轮询
                         }
                     });
                 }
@@ -291,7 +337,7 @@ public class NBWOneClickRegisterActivity extends Activity {
                 @Override
                 public void onFailure(Call call, IOException e) {
                     runOnUiThread(() -> {
-                        Toast.makeText(NBWOneClickRegisterActivity.this, "绑定失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                        Toast.makeText(NBWOneClickRegisterActivity.this, "网络错误: " + e.getMessage(), Toast.LENGTH_SHORT).show();
                         btnComplete.setEnabled(true);
                     });
                 }
@@ -304,7 +350,21 @@ public class NBWOneClickRegisterActivity extends Activity {
                             Toast.makeText(NBWOneClickRegisterActivity.this, "绑定成功！", Toast.LENGTH_SHORT).show();
                             navigateToMain();
                         } else {
-                            Toast.makeText(NBWOneClickRegisterActivity.this, "绑定失败: " + respBody, Toast.LENGTH_SHORT).show();
+                            String errorMsg = "绑定失败";
+                            try {
+                                BindErrorResponse errResp = new Gson().fromJson(respBody, BindErrorResponse.class);
+                                if (errResp != null && errResp.error != null) {
+                                    errorMsg = errResp.error;
+                                }
+                            } catch (Exception ignored) {}
+                            if (response.code() == 404) {
+                                errorMsg = "未找到对应的宝宝新天地账户，请确认注册已完成";
+                            } else if (response.code() == 409) {
+                                errorMsg = "该宝宝新天地账户已被其他用户绑定";
+                            } else if (response.code() == 401) {
+                                errorMsg = "登录已过期，请重新登录";
+                            }
+                            Toast.makeText(NBWOneClickRegisterActivity.this, errorMsg, Toast.LENGTH_LONG).show();
                             btnComplete.setEnabled(true);
                         }
                     });
@@ -354,5 +414,9 @@ public class NBWOneClickRegisterActivity extends Activity {
 
     private static class CheckResponse {
         boolean registered;
+    }
+
+    private static class BindErrorResponse {
+        String error;
     }
 }

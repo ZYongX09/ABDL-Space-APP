@@ -27,6 +27,7 @@ public class PinView extends EditText {
     private static final int PADDING_DP = 16;
 
     private final Paint boxPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint boxStrokePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint cursorPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
@@ -35,6 +36,7 @@ public class PinView extends EditText {
     private float charRadius;
     private int boxColor = 0xFFF5F5F5;
     private int boxActiveColor = 0xFFE8E8E8;
+    private int boxStrokeColor = 0xFFA1D9F7;
     private int textColor = 0xFF1A1A1A;
     private int cursorColor = 0xFF4FC3F7;
 
@@ -70,6 +72,10 @@ public class PinView extends EditText {
         textPaint.setTextSize(dpToPx(22));
         textPaint.setTextAlign(Paint.Align.CENTER);
 
+        boxStrokePaint.setStyle(Paint.Style.STROKE);
+        boxStrokePaint.setStrokeWidth(dpToPx(1.5f));
+        boxStrokePaint.setColor(boxStrokeColor);
+
         cursorPaint.setStyle(Paint.Style.FILL);
         cursorPaint.setColor(cursorColor);
 
@@ -99,6 +105,8 @@ public class PinView extends EditText {
 
             boxPaint.setColor(i == length ? boxActiveColor : boxColor);
             canvas.drawRoundRect(rect, charRadius, charRadius, boxPaint);
+            // 蓝色描边
+            canvas.drawRoundRect(rect, charRadius, charRadius, boxStrokePaint);
 
             // Cursor
             if (i == length && hasFocus()) {

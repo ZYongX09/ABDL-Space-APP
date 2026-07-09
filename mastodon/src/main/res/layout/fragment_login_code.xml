@@ -9,6 +9,7 @@
         android:layout_height="match_parent" />
 
     <LinearLayout
+        android:id="@+id/content_container"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical">
@@ -27,70 +28,118 @@
             android:contentDescription="返回" />
 
         <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="输入验证码"
+            android:textSize="28sp"
+            android:textStyle="bold"
+            android:textColor="?colorM3OnSurface"
+            android:paddingStart="20dp"
+            android:paddingTop="24dp"
+            android:paddingBottom="16dp" />
+
+        <TextView
+            android:id="@+id/tv_email_hint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="32dp"
+            android:text="验证码已发送至\nuser@example.com"
+            android:textSize="14sp"
+            android:textColor="?colorM3OnSurfaceVariant"
+            android:lineSpacingExtra="4dp"
+            android:gravity="center" />
+
+        <org.joinmastodon.android.ui.views.PinView
+            android:id="@+id/pin_view"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="24dp"
+            android:focusable="true"
+            android:focusableInTouchMode="true" />
+
+        <!-- 打开邮箱APP 按钮（镂空圆角） -->
+        <Button
+            android:id="@+id/btn_open_email"
+            android:layout_width="320dp"
+            android:layout_height="48dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="12dp"
+            android:background="@drawable/bg_btn_outline_blue_rounded"
+            android:text="打开邮箱APP"
+            android:textSize="15sp"
+            android:textAllCaps="false"
+            android:textColor="#A1D9F7" />
+
+        <!-- 重新发送倒计时 -->
+        <TextView
+            android:id="@+id/tv_resend"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="24dp"
+            android:textSize="14sp"
+            android:gravity="center"
+            android:padding="8dp" />
+
+        <View
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+
+        <!-- 提示卡片 -->
+        <LinearLayout
+            android:id="@+id/card_help"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="20dp"
+            android:layout_marginEnd="20dp"
+            android:layout_marginBottom="32dp"
+            android:orientation="vertical"
+            android:padding="16dp"
+            android:background="@drawable/bg_hint_card_light">
+
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="输入验证码"
-                android:textSize="28sp"
-                android:textStyle="bold"
-                android:textColor="?colorM3OnSurface"
-                android:paddingStart="20dp"
-                android:paddingTop="24dp"
-                android:paddingBottom="16dp" />
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="10dp">
+
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:layout_marginEnd="8dp"
+                    android:src="@drawable/ic_info_24px"
+                    android:tint="#A1D9F7"
+                    android:contentDescription="提示" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="没有收到邮件？"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:textColor="?colorM3OnSurface" />
+            </LinearLayout>
 
             <TextView
-                android:id="@+id/tv_email_hint"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="32dp"
-                android:text="验证码已发送至\nuser@example.com"
-                android:textSize="14sp"
-                android:textColor="?colorM3OnSurfaceVariant"
-                android:lineSpacingExtra="4dp"
-                android:gravity="center" />
-
-            <org.joinmastodon.android.ui.views.PinView
-                android:id="@+id/pin_view"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center_horizontal"
-                android:layout_marginBottom="32dp"
-                android:focusable="true"
-                android:focusableInTouchMode="true" />
-
-            <Button
-                android:id="@+id/btn_open_email"
-                android:layout_width="match_parent"
-                android:layout_height="52dp"
-                android:background="@drawable/bg_btn_gradient_purple"
-                android:text="打开邮件"
-                android:textSize="16sp"
-                android:textAllCaps="false"
-                android:textColor="#FFFFFF" />
-
-            <TextView
-                android:id="@+id/tv_resend"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:text="重新发送（60s）"
-                android:textSize="14sp"
-                android:textColor="#A1D9F7"
-                android:gravity="center"
-                android:padding="8dp" />
-
-            <View
-                android:layout_width="0dp"
-                android:layout_height="0dp"
-                android:layout_weight="1" />
-
-            <TextView
-                android:id="@+id/tv_error"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp"
-                android:textColor="#FF6B6B"
+                android:text="•  请检查垃圾邮件箱\n•  邮件可能需要 1～2 分钟送达\n•  确认邮箱地址填写正确"
                 android:textSize="13sp"
-                android:gravity="center"
-                android:visibility="gone" />
+                android:textColor="?colorM3OnSurfaceVariant"
+                android:lineSpacingExtra="4dp" />
         </LinearLayout>
+
+        <TextView
+            android:id="@+id/tv_error"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:textColor="#FF6B6B"
+            android:textSize="13sp"
+            android:gravity="center"
+            android:visibility="gone" />
+    </LinearLayout>
 </FrameLayout>

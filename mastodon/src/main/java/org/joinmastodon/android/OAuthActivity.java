@@ -19,6 +19,7 @@ import org.joinmastodon.android.api.session.AccountSession;
 import org.joinmastodon.android.api.session.AccountSessionManager;
 import org.joinmastodon.android.fragments.settings.NBWBindResultActivity;
 import org.joinmastodon.android.fragments.settings.NBWNotBoundActivity;
+import org.joinmastodon.android.fragments.settings.NBWPostRegisterActivity;
 import org.joinmastodon.android.model.Account;
 import org.joinmastodon.android.model.Application;
 import org.joinmastodon.android.model.Instance;
@@ -59,9 +60,11 @@ public class OAuthActivity extends Activity{
 			String flow = getSharedPreferences("nbw_bind", MODE_PRIVATE).getString("flow", "login");
 			Intent intent;
 			if("already_bound".equals(nbwBind)){
-				// NBW 账号已被其他用户绑定 → 显示错误提示
+				// NBW 账号已被其他用户绑定 → 显示错误提示，回到绑定引导页
 				Toast.makeText(this, "该宝宝新天地账号已被其他用户绑定", Toast.LENGTH_LONG).show();
-				restartMainActivity();
+				Intent backIntent = new Intent(this, NBWPostRegisterActivity.class);
+				backIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+				startActivity(backIntent);
 				finish();
 				return;
 			} else if("need_bind".equals(nbwBind)){

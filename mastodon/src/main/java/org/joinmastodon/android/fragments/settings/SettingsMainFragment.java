@@ -18,7 +18,7 @@ import org.joinmastodon.android.api.session.AccountSessionManager;
 import org.joinmastodon.android.events.AccountLoggedOutEvent;
 import org.joinmastodon.android.events.SelfUpdateStateChangedEvent;
 import org.joinmastodon.android.fragments.SplashFragment;
-import org.joinmastodon.android.fragments.auth.LoginFragment;
+import org.joinmastodon.android.fragments.auth.LoginEmailFragment;
 import org.joinmastodon.android.model.viewmodel.ListItem;
 import org.joinmastodon.android.model.viewmodel.SectionHeaderListItem;
 import org.joinmastodon.android.model.viewmodel.SettingsAccountListItem;
@@ -148,7 +148,8 @@ public class SettingsMainFragment extends BaseSettingsFragment<Object>{
 	private void onAddAccountClick(ListItem<?> item_){
 		Bundle args = new Bundle();
 		args.putString("domain", AccountSessionManager.getInstance().getLastActiveAccount().domain);
-		Nav.go(getActivity(), LoginFragment.class, args);
+		args.putBoolean("show_back", true);
+		Nav.go(getActivity(), LoginEmailFragment.class, args);
 	}
 
 	private void onBehaviorClick(ListItem<?> item_){

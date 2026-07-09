@@ -248,7 +248,8 @@ public class SettingsAccountFragment extends BaseSettingsFragment<Void>{
 					.show();
 		}else{
 			// 未绑定 → 打开引导页
-			Intent intent=new Intent(getActivity(), NBWBindGuideActivity.class);
+			Intent intent=new Intent(getActivity(), NBWPostRegisterActivity.class);
+			intent.putExtra("show_back", true);
 			startActivity(intent);
 		}
 	}

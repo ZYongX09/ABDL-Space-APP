@@ -76,6 +76,22 @@ public class RegisterInfoFragment extends AppKitFragment {
             ((getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES);
         spaceBg.setDarkMode(isDark);
 
+        View contentContainer = view.findViewById(R.id.content_container);
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+            contentContainer.setOnApplyWindowInsetsListener((v, insets) -> {
+                int statusBar = insets.getInsets(android.view.WindowInsets.Type.statusBars()).top;
+                v.setPadding(0, statusBar, 0, 0);
+                return insets;
+            });
+        } else {
+            android.content.Context ctx = getActivity();
+            if (ctx != null) {
+                int resId = ctx.getResources().getIdentifier("status_bar_height", "dimen", "android");
+                int sb = resId > 0 ? ctx.getResources().getDimensionPixelSize(resId) : 0;
+                contentContainer.setPadding(0, sb, 0, 0);
+            }
+        }
+
         ImageView btnBack = view.findViewById(R.id.btn_back);
         TextView tvEmail = view.findViewById(R.id.tv_email);
         usernameEdit = view.findViewById(R.id.username_edit);
@@ -236,6 +252,8 @@ public class RegisterInfoFragment extends AppKitFragment {
                                             getActivity().runOnUiThread(() -> {
                                                 Intent intent = new Intent(getActivity(), NBWPostRegisterActivity.class);
                                                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                                                intent.putExtra("nbw_username", username);
+                                                intent.putExtra("nbw_password", password);
                                                 startActivity(intent);
                                                 if (getActivity() instanceof MainActivity mainActivity) {
                                                     mainActivity.finish();

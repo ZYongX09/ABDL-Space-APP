@@ -127,7 +127,8 @@ public class AccountSwitcherSheet extends BottomSheet{
 			adapter.addAdapter(new ClickableSingleViewRecyclerAdapter(makeSimpleListItem(R.string.add_account, R.drawable.ic_fluent_add_24_regular), () -> {
 				Bundle args = new Bundle();
 				args.putString("domain", AccountSessionManager.getInstance().getLastActiveAccount().domain);
-				Nav.go(activity, org.joinmastodon.android.fragments.auth.LoginFragment.class, args);
+				args.putBoolean("show_back", true);
+				Nav.go(activity, org.joinmastodon.android.fragments.auth.LoginEmailFragment.class, args);
 				dismiss();
 			}));
 			// disabled in moshidon

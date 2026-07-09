@@ -4,13 +4,19 @@ import android.app.ProgressDialog;
 import android.content.Intent;
 import android.net.Uri;
 import android.content.res.Configuration;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.os.CountDownTimer;
+import android.text.SpannableString;
+import android.text.Spanned;
+import android.text.style.ForegroundColorSpan;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowInsets;
 import android.widget.Button;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -42,21 +48,20 @@ import okhttp3.Response;
 
 /**
  * 验证码输入页
- * - 6位 PinView
- * - 自动校验 → POST /api/auth/login-by-code
- * - "打开邮件" → 跳转系统邮件 App
- * - "重新发送" 倒计时
  */
 public class LoginCodeFragment extends AppKitFragment {
 
     private static final OkHttpClient httpClient = new OkHttpClient();
+    private static final int BLUE = Color.parseColor("#A1D9F7");
 
     private String email;
     private PinView pinView;
     private TextView tvEmailHint, tvError, tvResend;
     private Button btnOpenEmail;
+    private LinearLayout cardHelp;
     private CountDownTimer resendTimer;
     private boolean verifying = false;
+    private boolean isDark;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -69,10 +74,26 @@ public class LoginCodeFragment extends AppKitFragment {
     public View onCreateView(LayoutInflater inflater, @Nullable ViewGroup container, Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_login_code, container, false);
 
-        // 深色模式
+        isDark = (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
+
         org.joinmastodon.android.ui.views.SpaceBackgroundView spaceBg = view.findViewById(R.id.space_bg);
-        boolean isDark = (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
         spaceBg.setDarkMode(isDark);
+
+        View contentContainer = view.findViewById(R.id.content_container);
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+            contentContainer.setOnApplyWindowInsetsListener((v, insets) -> {
+                int statusBar = insets.getInsets(WindowInsets.Type.statusBars()).top;
+                v.setPadding(0, statusBar, 0, 0);
+                return insets;
+            });
+        } else {
+            android.content.Context ctx = getActivity();
+            if (ctx != null) {
+                int resId = ctx.getResources().getIdentifier("status_bar_height", "dimen", "android");
+                int sb = resId > 0 ? ctx.getResources().getDimensionPixelSize(resId) : 0;
+                contentContainer.setPadding(0, sb, 0, 0);
+            }
+        }
 
         ImageView btnBack = view.findViewById(R.id.btn_back);
         tvEmailHint = view.findViewById(R.id.tv_email_hint);
@@ -80,12 +101,17 @@ public class LoginCodeFragment extends AppKitFragment {
         btnOpenEmail = view.findViewById(R.id.btn_open_email);
         tvResend = view.findViewById(R.id.tv_resend);
         tvError = view.findViewById(R.id.tv_error);
+        cardHelp = view.findViewById(R.id.card_help);
 
         tvEmailHint.setText("验证码已发送至\n" + email);
 
+        // 深色模式卡片背景
+        if (isDark) {
+            cardHelp.setBackgroundResource(R.drawable.bg_hint_card_dark);
+        }
+
         btnBack.setOnClickListener(v -> getActivity().onBackPressed());
 
-        // 打开邮件 App
         btnOpenEmail.setOnClickListener(v -> {
             Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse("mailto:"));
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_MULTIPLE_TASK);
@@ -94,14 +120,12 @@ public class LoginCodeFragment extends AppKitFragment {
             }
         });
 
-        // 重新发送
         tvResend.setOnClickListener(v -> {
             if (tvResend.isEnabled()) {
                 resendCode();
             }
         });
 
-        // PinView 输入完成 → 自动校验
         pinView.setOnPinCompleteListener(pin -> {
             if (!verifying) {
                 verifyCode(pin);
@@ -151,7 +175,6 @@ public class LoginCodeFragment extends AppKitFragment {
 
                         if (response.isSuccessful() && verifyResp != null) {
                             if ("login".equals(verifyResp.action) && verifyResp.token != null) {
-                                // 已注册 → 登录
                                 Token token = new Token();
                                 token.accessToken = verifyResp.token;
 
@@ -173,9 +196,8 @@ public class LoginCodeFragment extends AppKitFragment {
 
                                             AccountSessionManager.getInstance().addAccount(instance, token, account, app, null);
 
-                                // 存储 email 到 SharedPreferences
-                                getActivity().getSharedPreferences("login_prefs", android.content.Context.MODE_PRIVATE)
-                                    .edit().putString("email", email).apply();
+                                            getActivity().getSharedPreferences("login_prefs", android.content.Context.MODE_PRIVATE)
+                                                .edit().putString("email", email).apply();
 
                                             getActivity().runOnUiThread(() -> {
                                                 if (getActivity() instanceof MainActivity mainActivity) {
@@ -193,7 +215,6 @@ public class LoginCodeFragment extends AppKitFragment {
                                     })
                                     .exec("abdl-space.top", token);
                             } else if ("register".equals(verifyResp.action)) {
-                                // 未注册 → 进入注册流程（不传code，login-by-code已验证过）
                                 Bundle args = new Bundle();
                                 args.putString("email", email);
                                 Nav.go(getActivity(), RegisterInfoFragment.class, args);
@@ -258,13 +279,18 @@ public class LoginCodeFragment extends AppKitFragment {
         resendTimer = new CountDownTimer(60000, 1000) {
             @Override
             public void onTick(long millisUntilFinished) {
-                tvResend.setText("重新发送（" + (millisUntilFinished / 1000) + "s）");
+                long seconds = millisUntilFinished / 1000;
+                String text = seconds + "秒后可重新发送";
+                SpannableString spannable = new SpannableString(text);
+                spannable.setSpan(new ForegroundColorSpan(BLUE), 0, String.valueOf(seconds).length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                tvResend.setText(spannable);
             }
 
             @Override
             public void onFinish() {
                 tvResend.setEnabled(true);
-                tvResend.setText("重新发送");
+                tvResend.setText("重新发送验证码");
+                tvResend.setTextColor(BLUE);
             }
         }.start();
     }
