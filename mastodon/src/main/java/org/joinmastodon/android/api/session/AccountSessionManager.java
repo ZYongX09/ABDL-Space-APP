@@ -31,6 +31,7 @@ import com.google.gson.reflect.TypeToken;
 
 import org.joinmastodon.android.BuildConfig;
 import org.joinmastodon.android.E;
+import org.joinmastodon.android.JPushReceiver;
 import org.joinmastodon.android.MainActivity;
 import org.joinmastodon.android.MastodonApp;
 import org.joinmastodon.android.R;
@@ -149,6 +150,8 @@ public class AccountSessionManager{
 		if(PushSubscriptionManager.arePushNotificationsAvailable()){
 			session.getPushSubscriptionManager().registerAccountForPush(null);
 		}
+		// 登录成功后上报 JPush regId
+		JPushReceiver.uploadSavedRegId(MastodonApp.context);
 		maybeUpdateShortcuts();
 	}
 

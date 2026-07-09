@@ -33,22 +33,24 @@ public class JPushReceiver extends JPushMessageReceiver {
 		Log.d(TAG, "onRegister: " + regId);
 		if (regId == null || regId.isEmpty()) return;
 
-		// 保存 regId
 		context.getSharedPreferences("jpush", Context.MODE_PRIVATE)
 			.edit()
 			.putString("regId", regId)
 			.apply();
 
-		// 注册到后端
-		registerWithBackend(regId);
+		uploadSavedRegId(context);
 	}
 
-	private void registerWithBackend(String regId) {
+	/**
+	 * 登录成功后调用，上传已保存的 regId 到后端
+	 */
+	public static void uploadSavedRegId(Context context) {
+		String regId = context.getSharedPreferences("jpush", Context.MODE_PRIVATE)
+			.getString("regId", null);
+		if (regId == null || regId.isEmpty()) return;
+
 		AccountSession session = AccountSessionManager.getInstance().getLastActiveAccount();
-		if (session == null || !session.activated) {
-			Log.w(TAG, "No active session, skipping registration");
-			return;
-		}
+		if (session == null || !session.activated) return;
 
 		String json = new Gson().toJson(new RegisterRequest(regId));
 		httpClient.newCall(new Request.Builder()
@@ -89,12 +91,7 @@ public class JPushReceiver extends JPushMessageReceiver {
 	public void onConnected(Context context, boolean connected) {
 		Log.d(TAG, "onConnected: " + connected);
 		if (connected) {
-			// 连接成功后尝试获取 regId
-			String regId = context.getSharedPreferences("jpush", Context.MODE_PRIVATE)
-				.getString("regId", null);
-			if (regId != null) {
-				registerWithBackend(regId);
-			}
+			uploadSavedRegId(context);
 		}
 	}
 
