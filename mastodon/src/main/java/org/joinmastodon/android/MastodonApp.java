@@ -10,6 +10,7 @@ import android.webkit.WebView;
 import org.joinmastodon.android.api.PushSubscriptionManager;
 import org.joinmastodon.android.ui.utils.UiUtils;
 
+import cn.jiguang.api.utils.JCollectionAuth;
 import cn.jpush.android.api.JPushInterface;
 import me.grishka.appkit.imageloader.ImageCache;
 import me.grishka.appkit.utils.NetworkUtils;
@@ -35,6 +36,7 @@ public class MastodonApp extends Application{
 
 		// 初始化极光推送
 		JPushInterface.setDebugMode(BuildConfig.DEBUG);
+		JCollectionAuth.setAuth(this, true);
 		JPushInterface.init(this);
 		Log.i(TAG, "JPush initialized");
 

@@ -3,6 +3,7 @@
 	package="org.joinmastodon.android">
 
 	<uses-permission android:name="android.permission.INTERNET"/>
+	<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
 	<uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
 	<uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
 	<uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE"/>
@@ -121,6 +122,17 @@
 			</intent-filter>
 		</receiver>
 
+		<!-- JPush Service (required) -->
+		<service
+			android:name=".JPushService"
+			android:enabled="true"
+			android:exported="false"
+			android:process=":pushcore">
+			<intent-filter>
+				<action android:name="cn.jiguang.user.service.action" />
+			</intent-filter>
+		</service>
+
 		<!-- JPush 接收器 -->
 		<receiver
 			android:name=".JPushReceiver"
@@ -128,7 +140,7 @@
 			android:exported="false">
 			<intent-filter>
 				<action android:name="cn.jpush.android.intent.RECEIVE_MESSAGE" />
-				<category android:name="top.abdl_space.app" />
+				<category android:name="${applicationId}" />
 			</intent-filter>
 		</receiver>
 

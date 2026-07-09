@@ -37,6 +37,6 @@ android {
 
 dependencies {
     api fileTree(dir: 'libs', include: ['*.jar'])
-    implementation fileTree(dir: 'libs', include: ["*.aar"])
+    api fileTree(dir: 'libs', include: ["*.aar"])
 }
 
