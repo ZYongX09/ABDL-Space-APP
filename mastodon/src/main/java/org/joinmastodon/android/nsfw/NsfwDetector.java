@@ -67,10 +67,10 @@ public class NsfwDetector {
 
         if (!initialized) init(context);
 
-        // 模型不可用：禁止上传
+        // 模型不可用：允许上传（不误杀）
         if (!initialized || classifier == null) {
-            Log.e(TAG, "NSFW detector not available, blocking image upload");
-            mainHandler.post(() -> callback.onResult(1f, true));
+            Log.e(TAG, "NSFW detector not available, allowing image upload");
+            mainHandler.post(() -> callback.onResult(0f, false));
             return;
         }
 
@@ -81,6 +81,22 @@ public class NsfwDetector {
                     decoder.setAllocator(ImageDecoder.ALLOCATOR_SOFTWARE);
                 });
 
+                // 跳过太小的图片
+                if (bitmap.getWidth() < 50 || bitmap.getHeight() < 50) {
+                    bitmap.recycle();
+                    Log.i(TAG, "Image too small, skipping NSFW detection");
+                    mainHandler.post(() -> callback.onResult(0f, false));
+                    return;
+                }
+
+                // 检查图片复杂度：纯色/简单图片跳过检测（避免误判文本截图等）
+                if (isLowComplexity(bitmap)) {
+                    bitmap.recycle();
+                    Log.i(TAG, "Image low complexity, skipping NSFW detection");
+                    mainHandler.post(() -> callback.onResult(0f, false));
+                    return;
+                }
+
                 float[] scores = classifier.classify(bitmap);
                 float nsfwScore = scores.length > 1 ? scores[1] : 0f;
                 boolean blocked = nsfwScore > THRESHOLD_BLOCK;
@@ -90,10 +106,49 @@ public class NsfwDetector {
                 mainHandler.post(() -> callback.onResult(nsfwScore, blocked));
             } catch (Exception e) {
                 Log.e(TAG, "NSFW detection failed", e);
-                // 检测异常也禁止上传
-                mainHandler.post(() -> callback.onResult(1f, true));
+                // 检测异常允许上传（不误杀）
+                mainHandler.post(() -> callback.onResult(0f, false));
             }
         }).start();
+    }
+
+    /**
+     * 检查图片是否为低复杂度（纯色、渐变、简单图形）。
+     * 采样中心区域像素，计算颜色方差。
+     */
+    private static boolean isLowComplexity(Bitmap bitmap) {
+        int w = bitmap.getWidth();
+        int h = bitmap.getHeight();
+        int sampleSize = 20;
+        int[] pixels = new int[sampleSize * sampleSize];
+        int startX = (w - sampleSize) / 2;
+        int startY = (h - sampleSize) / 2;
+        bitmap.getPixels(pixels, 0, sampleSize, startX, startY, sampleSize, sampleSize);
+
+        long sumR = 0, sumG = 0, sumB = 0;
+        for (int p : pixels) {
+            sumR += (p >> 16) & 0xFF;
+            sumG += (p >> 8) & 0xFF;
+            sumB += p & 0xFF;
+        }
+        int n = pixels.length;
+        double avgR = sumR / (double) n;
+        double avgG = sumG / (double) n;
+        double avgB = sumB / (double) n;
+
+        double varR = 0, varG = 0, varB = 0;
+        for (int p : pixels) {
+            double dR = ((p >> 16) & 0xFF) - avgR;
+            double dG = ((p >> 8) & 0xFF) - avgG;
+            double dB = (p & 0xFF) - avgB;
+            varR += dR * dR;
+            varG += dG * dG;
+            varB += dB * dB;
+        }
+        double variance = (varR + varG + varB) / (n * 3.0);
+
+        // 方差极低 → 纯色/渐变/简单图片，跳过 NSFW 检测
+        return variance < 50.0;
     }
 
     public static boolean isNsfw(float nsfwScore) {
