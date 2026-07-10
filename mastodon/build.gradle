@@ -181,7 +181,6 @@ dependencies {
 	implementation 'com.google.zxing:core:3.5.3'
 	implementation 'com.journeyapps:zxing-android-embedded:4.3.0'
 	implementation 'org.tensorflow:tensorflow-lite:2.16.1'
-	implementation 'com.caverock:androidsvg:1.4'
 	implementation 'org.microg:safe-parcel:1.5.0'
 	implementation 'org.parceler:parceler-api:1.1.12'
 	annotationProcessor 'org.parceler:parceler:1.1.12'

@@ -6,15 +6,4 @@
 	<style name="Theme.Mastodon.AutoLightDark.Masterial" parent="Theme.Mastodon.Dark.Masterial"/>
 	<style name="Theme.Mastodon.AutoLightDark.MediumContrast.Masterial" parent="Theme.Mastodon.Dark.MediumContrast.Masterial"/>
 	<style name="Theme.Mastodon.AutoLightDark.HighContrast.Masterial" parent="Theme.Mastodon.Dark.HighContrast.Masterial"/>
-
-	<!-- 深色模式启动页：使用品牌 icon，自定义图标由 SplashActivity 处理 -->
-	<style name="Theme.Mastodon.SplashScreen" parent="Theme.Mastodon.Dark">
-		<item name="android:windowBackground">@color/splash_bg</item>
-		<item name="android:windowSplashScreenBackground">?android:windowBackground</item>
-		<item name="android:windowSplashScreenAnimatedIcon">@drawable/system_splash</item>
-		<item name="android:windowSplashScreenIconBackgroundColor">@null</item>
-		<item name="android:windowSplashScreenBehavior">icon_preferred</item>
-		<item name="android:statusBarColor">@color/splash_bg</item>
-		<item name="android:navigationBarColor">@color/splash_bg</item>
-	</style>
 </resources>
