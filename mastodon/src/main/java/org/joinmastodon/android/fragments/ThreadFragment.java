@@ -522,13 +522,13 @@ public class ThreadFragment extends StatusListFragment implements AssistContentP
 				if(!Objects.equals(currentID, itemID)){
 					currentID=itemID;
 					Status current=getStatusByID(currentID);
-					Status parentStatus=findParentStatus(currentID);
+					Status previous=findPreviousStatus(currentID);
 					Status next=findNextStatus(currentID);
 					if(current==null)
 						continue;
 
-					connectUp=parentStatus!=null && !parentStatus.id.equals(mainStatus.id);
-					connectToRoot=mainStatus.id.equals(current.inReplyToId);
+					connectUp=previous!=null && previous.id.equals(current.inReplyToId) && !current.inReplyToId.equals(mainStatus.id);
+					connectToRoot=false;
 					connectReply=next!=null && itemID.equals(next.inReplyToId);
 				}
 
