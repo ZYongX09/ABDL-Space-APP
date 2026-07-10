@@ -82,7 +82,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
                 android:layout_marginBottom="16dp"
-                android:text="ABDL Space 深度合作平台"
+                android:text="ABDL Space 联邦·深度合作成员"
                 android:textSize="13sp"
                 android:textColor="?colorM3OnSurfaceVariant" />
 

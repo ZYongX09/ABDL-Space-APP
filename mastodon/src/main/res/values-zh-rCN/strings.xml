@@ -643,11 +643,11 @@
 	<string name="handle_username_explanation_own">你在此实例上的唯一标识符。在不同的实例上可能会找到相同用户名的用户。</string>
 	<string name="server">实例</string>
 	<string name="handle_server_explanation">他们的数字家园，他们的所有帖子都存放在那里。</string>
-	<string name="handle_explanation">代号可以告诉你一个人是谁和在哪里，所以你可以在社交网络上与&lt;a&gt;由ActivityPub驱动的不同平台&lt;/a&gt;的人们互动。</string>
+	<string name="handle_explanation">代号可以告诉你一个人是谁和在哪里，所以你可以在社交网络上与&lt;a&gt;由ABDL Space联邦协议驱动的不同平台&lt;/a&gt;的人们互动。</string>
 	<string name="handle_server_explanation_own">你的数字家园，你的所有帖子都存放在这里。不喜欢这个服务器吗？随时带上你的关注者一起迁移到其它服务器。</string>
-	<string name="handle_explanation_own">你的代号可以告诉别人你是谁和你在哪里，这样社交网络上来自&lt;a&gt;由ActivityPub驱动的不同平台&lt;/a&gt;的人们就可以与你互动。</string>
-	<string name="what_is_activitypub_title">什么是ActivityPub？</string>
-	<string name="what_is_activitypub">ActivityPub就好比ABDL Space与其他社交网络交流时使用的语言。\n\n它让你不仅可以与在ABDL Space上的人连接和互动，还能跨越不同的社交应用与人们互动。</string>
+	<string name="handle_explanation_own">你的代号可以告诉别人你是谁和你在哪里，这样社交网络上来自&lt;a&gt;由ABDL Space联邦协议驱动的不同平台&lt;/a&gt;的人们就可以与你互动。</string>
+	<string name="what_is_activitypub_title">什么是ABDL Space联邦协议？</string>
+	<string name="what_is_activitypub">ABDL Space联邦协议就好比ABDL Space与其他社交网络交流时使用的语言。\n\n它让你不仅可以与在ABDL Space上的人连接和互动，还能跨越不同的社交应用与人们互动。</string>
 	<string name="handle_copied">代号已复制到剪贴板。</string>
 	<string name="qr_code">二维码</string>
 	<string name="scan_qr_code">扫描二维码</string>
