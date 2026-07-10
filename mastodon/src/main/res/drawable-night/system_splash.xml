@@ -3,8 +3,8 @@
     <!-- 深色模式：使用霓虹 PNG 图标，开启抗锯齿和双线性过滤 -->
     <item
         android:gravity="center"
-        android:width="160dp"
-        android:height="160dp">
+        android:width="128dp"
+        android:height="128dp">
         <bitmap
             android:src="@drawable/ic_splash_dark"
             android:gravity="center"
