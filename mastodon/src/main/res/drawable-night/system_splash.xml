@@ -1,9 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- 深色模式：直接使用霓虹 PNG 图标 -->
+    <!-- 深色模式：使用霓虹 PNG 图标，开启抗锯齿和双线性过滤 -->
     <item
-        android:drawable="@drawable/ic_splash_dark"
         android:gravity="center"
         android:width="128dp"
-        android:height="128dp" />
+        android:height="128dp">
+        <bitmap
+            android:src="@drawable/ic_splash_dark"
+            android:gravity="center"
+            android:antialias="true"
+            android:filter="false"
+            android:mipMap="false" />
+    </item>
 </layer-list>
