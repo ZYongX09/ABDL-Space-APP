@@ -24,13 +24,13 @@ public class NsfwClassifier {
 
     private Interpreter interpreter;
 
-    public void init(String modelPath) throws Exception {
+    public synchronized void init(String modelPath) throws Exception {
         interpreter = new Interpreter(new FileInputStream(modelPath).getChannel().map(
             FileChannel.MapMode.READ_ONLY, 0, new java.io.File(modelPath).length()
         ));
     }
 
-    public void initFromAssets(android.content.Context context) throws Exception {
+    public synchronized void initFromAssets(android.content.Context context) throws Exception {
         android.content.res.AssetFileDescriptor fd = context.getAssets().openFd("nsfw.tflite");
         interpreter = new Interpreter(
             new FileInputStream(fd.getFileDescriptor()).getChannel().map(
@@ -39,7 +39,7 @@ public class NsfwClassifier {
         );
     }
 
-    public void close() {
+    public synchronized void close() {
         if (interpreter != null) {
             interpreter.close();
             interpreter = null;
@@ -50,7 +50,7 @@ public class NsfwClassifier {
      * 对 Bitmap 进行 NSFW 分类。
      * @return float[2] = {sfwScore, nsfwScore}，各 0~1
      */
-    public float[] classify(Bitmap bitmap) {
+    public synchronized float[] classify(Bitmap bitmap) {
         if (interpreter == null) throw new IllegalStateException("Classifier not initialized");
 
         float[][] output = new float[1][2];
