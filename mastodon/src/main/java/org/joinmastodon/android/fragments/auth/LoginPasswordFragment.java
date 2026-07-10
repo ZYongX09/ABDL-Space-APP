@@ -16,6 +16,7 @@ import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -150,9 +151,9 @@ public class LoginPasswordFragment extends AppKitFragment {
         });
 
         // OAuth 登录
-        btnOAuth.setOnClickListener(v -> {
+        btnOAuth.setOnClickListener(v -> showConsentSheet(() -> {
             UiUtils.launchWebBrowser(getActivity(), "https://abdl-space.top/login");
-        });
+        }));
 
         return view;
     }
@@ -263,6 +264,56 @@ public class LoginPasswordFragment extends AppKitFragment {
                     });
                 }
             });
+    }
+
+    private void showConsentSheet(Runnable onConfirm) {
+        android.app.Activity activity = getActivity();
+        if (activity == null) return;
+        View sheetView = LayoutInflater.from(activity).inflate(R.layout.sheet_qr_login, null);
+        ImageView iconView = sheetView.findViewById(R.id.icon);
+        if (iconView == null) {
+            View header = sheetView.findViewById(R.id.sheet_title);
+            if (header != null && header.getParent() instanceof ViewGroup) {
+                ViewGroup parent = (ViewGroup) header.getParent();
+                for (int i = 0; i < parent.getChildCount(); i++) {
+                    if (parent.getChildAt(i) instanceof ImageView) {
+                        iconView = (ImageView) parent.getChildAt(i);
+                        break;
+                    }
+                }
+            }
+        }
+        if (iconView != null) {
+            iconView.setImageResource(R.drawable.ic_description_24);
+        }
+        me.grishka.appkit.views.BottomSheet sheet = new me.grishka.appkit.views.BottomSheet(activity) {{
+            setContentView(sheetView);
+            setNavigationBarBackground(new android.graphics.drawable.ColorDrawable(
+                UiUtils.alphaBlendColors(
+                    UiUtils.getThemeColor(activity, R.attr.colorM3Surface),
+                    UiUtils.getThemeColor(activity, R.attr.colorM3Primary), 0.05f)),
+                !UiUtils.isDarkTheme());
+
+            TextView title = sheetView.findViewById(R.id.sheet_title);
+            TextView sessionInfo = sheetView.findViewById(R.id.qr_session_info);
+            title.setText("确认同意协议");
+            sessionInfo.setText(android.text.Html.fromHtml(
+                "登录前请仔细阅读<a href=\"https://abdl-space.top/agreement\">《用户协议》</a>" +
+                "和<a href=\"https://abdl-space.top/privacy\">《隐私政策》</a>，若您同意以上协议请点击确认按钮。"));
+            sessionInfo.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());
+
+            TextView authorizeBtn = sheetView.findViewById(R.id.btn_authorize);
+            if (authorizeBtn != null) {
+                authorizeBtn.setText("确认");
+            }
+
+            sheetView.findViewById(R.id.btn_cancel).setOnClickListener(v -> dismiss());
+            sheetView.findViewById(R.id.btn_authorize).setOnClickListener(v -> {
+                dismiss();
+                onConfirm.run();
+            });
+        }};
+        sheet.show();
     }
 
     private static class LoginBody {
