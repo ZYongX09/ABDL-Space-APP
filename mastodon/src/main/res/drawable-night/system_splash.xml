@@ -4,13 +4,16 @@
     <item>
         <shape android:shape="oval">
             <solid android:color="#000000" />
-            <size android:width="140dp" android:height="140dp" />
+            <size android:width="160dp" android:height="160dp" />
         </shape>
     </item>
-    <!-- PNG 图标缩小放在圆内 -->
+    <!-- PNG 图标 -->
     <item
-        android:drawable="@drawable/ic_splash_dark"
-        android:gravity="center"
-        android:width="100dp"
-        android:height="100dp" />
+        android:gravity="center">
+        <bitmap
+            android:src="@drawable/ic_splash_dark"
+            android:gravity="center"
+            android:dither="true"
+            android:mipMap="false" />
+    </item>
 </layer-list>
