@@ -433,6 +433,22 @@ public class ThreadFragment extends StatusListFragment implements AssistContentP
 		return null;
 	}
 
+	private Status findParentStatus(String id){
+		for(int i=0;i<data.size();i++){
+			if(data.get(i).id.equals(id)){
+				Status s=data.get(i);
+				if(s.inReplyToId!=null){
+					for(int j=0;j<data.size();j++){
+						if(data.get(j).id.equals(s.inReplyToId))
+							return data.get(j);
+					}
+				}
+				return null;
+			}
+		}
+		return null;
+	}
+
 	@Override
 	public void onProvideAssistContent(AssistContent content){
 		content.setWebUri(Uri.parse(mainStatus.url));
@@ -506,12 +522,12 @@ public class ThreadFragment extends StatusListFragment implements AssistContentP
 				if(!Objects.equals(currentID, itemID)){
 					currentID=itemID;
 					Status current=getStatusByID(currentID);
-					Status previous=findPreviousStatus(currentID);
+					Status parentStatus=findParentStatus(currentID);
 					Status next=findNextStatus(currentID);
 					if(current==null)
 						continue;
 
-					connectUp=previous!=null && previous.id.equals(current.inReplyToId);
+					connectUp=parentStatus!=null && !parentStatus.id.equals(mainStatus.id);
 					connectToRoot=mainStatus.id.equals(current.inReplyToId);
 					connectReply=next!=null && itemID.equals(next.inReplyToId);
 				}
