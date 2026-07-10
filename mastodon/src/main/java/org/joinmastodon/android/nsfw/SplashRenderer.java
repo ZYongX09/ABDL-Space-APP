@@ -40,17 +40,20 @@ public class SplashRenderer {
      */
     public static void renderInBackground(Context context, Callback callback) {
         new Thread(() -> {
+            File cacheFile = getCachedFile(context);
             try {
                 long start = System.currentTimeMillis();
 
                 // 读取 SVG
                 InputStream is = context.getAssets().open(SVG_FILE);
+                Log.i(TAG, "SVG file size: " + is.available() + " bytes");
                 SVG svg = SVG.getFromInputStream(is);
                 is.close();
 
                 // 按屏幕密度计算渲染尺寸：288dp
                 float density = context.getResources().getDisplayMetrics().density;
                 int size = (int) (288 * density);
+                Log.i(TAG, "Rendering SVG to " + size + "x" + size + " bitmap");
 
                 // 渲染到 Bitmap
                 Bitmap bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
@@ -58,7 +61,6 @@ public class SplashRenderer {
                 svg.renderToCanvas(canvas);
 
                 // 压缩为 WebP 写入缓存
-                File cacheFile = getCachedFile(context);
                 FileOutputStream fos = new FileOutputStream(cacheFile);
                 bitmap.compress(Bitmap.CompressFormat.WEBP_LOSSY, 90, fos);
                 fos.flush();
@@ -71,7 +73,8 @@ public class SplashRenderer {
                 new Handler(Looper.getMainLooper()).post(() -> callback.onReady(cacheFile));
             } catch (Exception e) {
                 Log.e(TAG, "Failed to render SVG", e);
-                // 渲染失败不回调，使用品牌 icon 兜底
+                // 渲染失败也回调，让 SplashActivity 正常跳转
+                new Handler(Looper.getMainLooper()).post(() -> callback.onReady(cacheFile));
             }
         }).start();
     }

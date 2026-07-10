@@ -17,12 +17,13 @@ import org.joinmastodon.android.nsfw.SplashRenderer;
 import java.io.File;
 
 /**
- * 技术过渡页 — 检查缓存图标，有则显示，无则后台渲染。
+ * 启动页 — 显示 SVG 缓存图标，无缓存则等待渲染完成。
  */
 public class SplashActivity extends android.app.Activity {
 
     private ImageView splashIcon;
     private final Handler handler = new Handler(Looper.getMainLooper());
+    private boolean navigated = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -41,13 +42,14 @@ public class SplashActivity extends android.app.Activity {
         // 检查缓存
         File cached = SplashRenderer.getCachedFile(this);
         if (cached.exists() && cached.length() > 0) {
-            // 有缓存：显示自定义图标
             showCachedIcon(cached);
         } else {
-            // 无缓存：后台渲染 SVG
-            SplashRenderer.renderInBackground(this, file -> showCachedIcon(file));
-            // 延迟跳转（给渲染一些时间）
-            handler.postDelayed(this::navigate, 500);
+            // 无缓存：后台渲染 SVG，完成后显示并跳转
+            SplashRenderer.renderInBackground(this, file -> {
+                if (!navigated) showCachedIcon(file);
+            });
+            // 超时保护：5秒后如果还没渲染完，直接跳转
+            handler.postDelayed(this::navigate, 5000);
         }
     }
 
@@ -68,7 +70,8 @@ public class SplashActivity extends android.app.Activity {
     }
 
     private void navigate() {
-        if (isFinishing()) return;
+        if (navigated || isFinishing()) return;
+        navigated = true;
         startActivity(new Intent(this, MainActivity.class)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK));
         overridePendingTransition(0, 0);
