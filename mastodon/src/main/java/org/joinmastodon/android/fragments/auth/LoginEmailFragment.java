@@ -148,13 +148,13 @@ public class LoginEmailFragment extends AppKitFragment {
 
         btnPasswordLogin.setOnClickListener(v -> Nav.go(getActivity(), LoginPasswordFragment.class, new Bundle()));
 
-        btnNBW.setOnClickListener(v -> {
+        btnNBW.setOnClickListener(v -> showConsentSheet(() -> {
             getActivity().getSharedPreferences("nbw_bind", android.content.Context.MODE_PRIVATE)
                 .edit().putString("flow", "login").apply();
             Intent intent = new Intent(Intent.ACTION_VIEW,
                 Uri.parse("https://abdl-space.top/api/auth/nbw/mobile-start"));
             startActivity(intent);
-        });
+        }));
 
         btnOAuth.setOnClickListener(v -> showConsentSheet(() -> UiUtils.launchWebBrowser(getActivity(), "https://abdl-space.top/login")));
 

@@ -142,13 +142,13 @@ public class LoginPasswordFragment extends AppKitFragment {
         });
 
         // 宝宝新天地登录
-        btnNBW.setOnClickListener(v -> {
+        btnNBW.setOnClickListener(v -> showConsentSheet(() -> {
             getActivity().getSharedPreferences("nbw_bind", android.content.Context.MODE_PRIVATE)
                 .edit().putString("flow", "login").apply();
             Intent intent = new Intent(Intent.ACTION_VIEW,
                 Uri.parse("https://abdl-space.top/api/auth/nbw/mobile-start"));
             startActivity(intent);
-        });
+        }));
 
         // OAuth 登录
         btnOAuth.setOnClickListener(v -> showConsentSheet(() -> {
