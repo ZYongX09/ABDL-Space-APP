@@ -39,6 +39,10 @@ public class NsfwDetector {
             classifier.initFromAssets(context.getApplicationContext());
             initialized = true;
             Log.i(TAG, "NSFW detector initialized");
+        } catch (UnsatisfiedLinkError e) {
+            Log.e(TAG, "TFLite native library incompatible with this device", e);
+            classifier = null;
+            initialized = false;
         } catch (Exception e) {
             Log.e(TAG, "Failed to init NSFW detector", e);
             classifier = null;
