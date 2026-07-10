@@ -4,6 +4,6 @@
     <item
         android:drawable="@drawable/ic_splash_dark"
         android:gravity="center"
-        android:width="96dp"
-        android:height="96dp" />
+        android:width="128dp"
+        android:height="128dp" />
 </layer-list>

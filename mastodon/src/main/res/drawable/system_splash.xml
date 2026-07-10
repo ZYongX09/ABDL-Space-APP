@@ -4,13 +4,13 @@
     <item>
         <shape android:shape="oval">
             <solid android:color="@color/splash_bg" />
-            <size android:width="140dp" android:height="140dp" />
+            <size android:width="180dp" android:height="180dp" />
         </shape>
     </item>
     <!-- ABDL 图标居中 -->
     <item
         android:drawable="@drawable/ic_splash_abdl"
         android:gravity="center"
-        android:width="96dp"
-        android:height="96dp" />
+        android:width="128dp"
+        android:height="128dp" />
 </layer-list>
