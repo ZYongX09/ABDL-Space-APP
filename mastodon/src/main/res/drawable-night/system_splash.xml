@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 黑色圆形背景 -->
+    <item>
+        <shape android:shape="oval">
+            <solid android:color="#000000" />
+            <size android:width="140dp" android:height="140dp" />
+        </shape>
+    </item>
+    <!-- PNG 图标缩小放在圆内 -->
+    <item
+        android:drawable="@drawable/ic_splash_dark"
+        android:gravity="center"
+        android:width="100dp"
+        android:height="100dp" />
+</layer-list>
