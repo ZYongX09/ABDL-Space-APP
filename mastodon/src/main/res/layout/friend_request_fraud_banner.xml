@@ -11,7 +11,7 @@
         android:layout_width="20dp"
         android:layout_height="20dp"
         android:layout_marginEnd="8dp"
-        android:src="@drawable/ic_warning_24px"
+        android:src="@drawable/ic_warning_red"
         android:contentDescription="警告" />
 
     <TextView

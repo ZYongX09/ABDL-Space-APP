@@ -9,27 +9,6 @@
         android:orientation="vertical"
         android:padding="16dp">
 
-        <!-- 标题 -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="标题"
-            android:textSize="14sp"
-            android:textStyle="bold"
-            android:textColor="?android:textColorPrimary"
-            android:layout_marginBottom="8dp" />
-
-        <EditText
-            android:id="@+id/create_title"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="@string/friend_request_title_hint"
-            android:inputType="text"
-            android:maxLength="100"
-            android:background="@drawable/search_bg"
-            android:padding="12dp"
-            android:textSize="15sp" />
-
         <!-- 交友类型 -->
         <TextView
             android:layout_width="wrap_content"

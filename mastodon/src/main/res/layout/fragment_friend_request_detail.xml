@@ -2,7 +2,8 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical">
+    android:orientation="vertical"
+    android:background="#F0F8FF">
 
     <ScrollView
         android:layout_width="match_parent"
@@ -81,9 +82,9 @@
                 android:id="@+id/detail_description"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:textSize="15sp"
+                android:textSize="16sp"
                 android:textColor="?android:textColorPrimary"
-                android:lineSpacingExtra="4dp"
+                android:lineSpacingExtra="6dp"
                 android:layout_marginTop="16dp" />
 
             <!-- 评论区标题 -->
@@ -99,49 +100,5 @@
 
         </LinearLayout>
     </ScrollView>
-
-    <!-- 评论列表 -->
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/comments_list"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:padding="16dp"
-        android:clipToPadding="false" />
-
-    <!-- 评论输入框 -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:padding="8dp"
-        android:background="?android:attr/colorBackground"
-        android:gravity="center_vertical">
-
-        <EditText
-            android:id="@+id/comment_input"
-            android:layout_width="0dp"
-            android:layout_height="40dp"
-            android:layout_weight="1"
-            android:background="@drawable/search_bg"
-            android:hint="@string/friend_request_comment_hint"
-            android:inputType="textMultiLine"
-            android:maxLines="3"
-            android:paddingStart="12dp"
-            android:paddingEnd="12dp"
-            android:textSize="14sp"
-            android:textColor="?android:textColorPrimary"
-            android:textColorHint="?android:textColorTertiary" />
-
-        <ImageButton
-            android:id="@+id/send_btn"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:layout_marginStart="8dp"
-            android:background="?android:selectableItemBackgroundBorderless"
-            android:src="@drawable/ic_fluent_send_24_regular"
-            android:contentDescription="发送" />
-
-    </LinearLayout>
 
 </LinearLayout>

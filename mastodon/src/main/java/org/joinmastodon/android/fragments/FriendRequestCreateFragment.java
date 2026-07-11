@@ -76,7 +76,6 @@ public class FriendRequestCreateFragment extends ToolbarFragment {
 	public View onCreateContentView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
 		View view = inflater.inflate(R.layout.fragment_friend_request_create, container, false);
 
-		titleInput = view.findViewById(R.id.create_title);
 		descriptionInput = view.findViewById(R.id.create_description);
 		fieldsContainer = view.findViewById(R.id.create_fields);
 		lookingForLabel = view.findViewById(R.id.create_looking_for_label);
@@ -179,11 +178,10 @@ public class FriendRequestCreateFragment extends ToolbarFragment {
 	}
 
 	private void save() {
-		String title = titleInput.getText().toString().trim();
 		String description = descriptionInput.getText().toString().trim();
 
-		if (title.isEmpty()) {
-			Toast.makeText(getContext(), "标题不能为空", Toast.LENGTH_SHORT).show();
+		if (selectedLookingFor.isEmpty()) {
+			Toast.makeText(getContext(), "请选择交友类型", Toast.LENGTH_SHORT).show();
 			return;
 		}
 		if (selectedLookingFor.isEmpty()) {
@@ -210,7 +208,7 @@ public class FriendRequestCreateFragment extends ToolbarFragment {
 
 		if (editRequestId != null) {
 			// 编辑模式
-			new UpdateFriendRequest(editRequestId, title, selectedLookingFor, description, fields)
+			new UpdateFriendRequest(editRequestId, null, selectedLookingFor, description, fields)
 				.setCallback(new Callback<Map<String, Object>>() {
 					@Override
 					public void onSuccess(Map<String, Object> result) {
@@ -226,7 +224,7 @@ public class FriendRequestCreateFragment extends ToolbarFragment {
 				.exec(accountID);
 		} else {
 			// 创建模式
-			new CreateFriendRequest(title, selectedLookingFor, description, fields)
+			new CreateFriendRequest(null, selectedLookingFor, description, fields)
 				.setCallback(new Callback<Map<String, Object>>() {
 					@Override
 					public void onSuccess(Map<String, Object> result) {

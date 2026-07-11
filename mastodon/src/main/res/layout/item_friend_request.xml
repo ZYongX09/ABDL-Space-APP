@@ -47,7 +47,7 @@
                 android:layout_marginTop="4dp"
                 android:textSize="12sp"
                 android:textColor="#1976D2"
-                android:background="@drawable/bg_tag"
+                android:background="@drawable/bg_tag_blue"
                 android:paddingHorizontal="12dp"
                 android:paddingVertical="4dp"
                 android:includeFontPadding="false" />

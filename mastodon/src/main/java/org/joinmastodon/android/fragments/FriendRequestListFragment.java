@@ -324,6 +324,7 @@ public class FriendRequestListFragment extends LoaderFragment {
 	private String formatTime(String createdAt) {
 		try {
 			java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault());
+			sdf.setTimeZone(java.util.TimeZone.getTimeZone("Asia/Shanghai"));
 			java.util.Date date = sdf.parse(createdAt);
 			long diff = System.currentTimeMillis() - date.getTime();
 			long seconds = diff / 1000;
@@ -433,8 +434,8 @@ public class FriendRequestListFragment extends LoaderFragment {
 						int iconRes = getMetadataIconRes(f.field_key);
 						if (iconRes != 0) {
 							ImageView icon = new ImageView(getContext());
-							icon.setLayoutParams(new LinearLayout.LayoutParams(V.dp(20), V.dp(20)));
-							icon.setPadding(0, 0, V.dp(8), 0);
+							icon.setLayoutParams(new LinearLayout.LayoutParams(V.dp(24), V.dp(24)));
+							icon.setPadding(0, 0, V.dp(10), 0);
 							icon.setImageResource(iconRes);
 							icon.setColorFilter(getResources().getColor(android.R.color.darker_gray));
 							icon.setContentDescription(f.field_key);
