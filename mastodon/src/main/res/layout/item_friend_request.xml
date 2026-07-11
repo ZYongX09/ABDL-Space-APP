@@ -16,6 +16,7 @@
         android:layout_width="48dp"
         android:layout_height="48dp"
         android:scaleType="centerCrop"
+        android:clipToOutline="true"
         android:contentDescription="头像" />
 
     <LinearLayout
@@ -67,7 +68,7 @@
         android:id="@+id/menu_btn"
         android:layout_width="32dp"
         android:layout_height="32dp"
-        android:background="?attr/selectableItemBackgroundBorderless"
+        android:background="?android:selectableItemBackgroundBorderless"
         android:src="@drawable/ic_fluent_more_vertical_24_regular"
         android:contentDescription="菜单"
         android:scaleType="centerInside" />

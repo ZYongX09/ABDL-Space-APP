@@ -41,6 +41,7 @@ import me.grishka.appkit.fragments.LoaderFragment;
 import me.grishka.appkit.imageloader.ViewImageLoader;
 import me.grishka.appkit.imageloader.requests.UrlImageLoaderRequest;
 import me.grishka.appkit.utils.V;
+import org.joinmastodon.android.ui.OutlineProviders;
 
 public class FriendRequestDetailFragment extends LoaderFragment {
 	private String requestId;
@@ -164,6 +165,7 @@ public class FriendRequestDetailFragment extends LoaderFragment {
 		description.setText(friendRequest.description != null ? friendRequest.description : "");
 
 		if (friendRequest.user != null && friendRequest.user.avatar != null) {
+			avatar.setOutlineProvider(OutlineProviders.roundedRect(10));
 			ViewImageLoader.loadWithoutAnimation(avatar, null, new UrlImageLoaderRequest(friendRequest.user.avatar, V.dp(56), V.dp(56)));
 		}
 

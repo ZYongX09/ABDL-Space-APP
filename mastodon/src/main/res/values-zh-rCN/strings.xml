@@ -887,7 +887,7 @@
 	<string name="friend_request_field_key_hint">字段名，如"年龄"</string>
 	<string name="friend_request_field_value_hint">字段值</string>
 	<string name="friend_request_show_on_list">在列表展示</string>
-	<string name="friend_request_fraud_warning">⚠️ 交友需谨慎，如发现违法违规行为将封号处理</string>
+	<string name="friend_request_fraud_warning">交友需谨慎，如发现违法违规行为将封号处理</string>
 	<string name="friend_request_comment_hint">发表评论…</string>
 	<string name="friend_request_no_data">暂无交友请求</string>
 	<string name="friend_request_deleted">已删除</string>

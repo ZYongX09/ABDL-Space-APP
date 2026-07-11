@@ -5,9 +5,10 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.LinearLayout;
-import android.widget.Switch;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -38,10 +39,20 @@ public class FriendRequestCreateFragment extends ToolbarFragment {
 	private String selectedLookingFor = "";
 	private TextView lookingForLabel;
 
+	// 交友类型（优先放前面）
 	private static final String[] LOOKING_FOR_OPTIONS = {
-		"弟弟", "妹妹", "哥哥", "姐姐", "爸爸", "妈妈",
-		"朋友", "游戏搭子", "同城朋友", "对象", "基友", "闺蜜", "金主"
+		"找家长", "找朋友", "找弟弟", "找姐姐", "找哥哥", "找同城朋友", "找对象", "找妈妈",
+		"找妹妹", "找游戏搭子", "找基友", "找闺蜜", "找金主"
 	};
+
+	// 字段名选项
+	private static final String[] FIELD_NAME_OPTIONS = {
+		"性别", "年龄", "城市", "QQ", "微信", "手机号", "推特", "Telegram",
+		"博客", "宝宝新天地", "爱好", "出生地", "工作地", "现居地", "性取向", "会玩游戏"
+	};
+
+	// 默认字段
+	private static final String[] DEFAULT_FIELDS = {"年龄", "性别", "城市"};
 
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
@@ -68,7 +79,7 @@ public class FriendRequestCreateFragment extends ToolbarFragment {
 		fieldsContainer = view.findViewById(R.id.create_fields);
 		lookingForLabel = view.findViewById(R.id.create_looking_for_label);
 
-		// 设置"找的类型"标签
+		// 设置"交友类型"标签
 		LinearLayout lookingForContainer = view.findViewById(R.id.create_looking_for_container);
 		for (String option : LOOKING_FOR_OPTIONS) {
 			TextView tag = new TextView(getContext());
@@ -88,7 +99,7 @@ public class FriendRequestCreateFragment extends ToolbarFragment {
 
 			tag.setOnClickListener(v -> {
 				selectedLookingFor = option;
-				lookingForLabel.setText("找：" + option);
+				lookingForLabel.setText(option);
 				// 更新所有标签样式
 				for (int i = 0; i < lookingForContainer.getChildCount(); i++) {
 					View child = lookingForContainer.getChildAt(i);
@@ -109,7 +120,7 @@ public class FriendRequestCreateFragment extends ToolbarFragment {
 		}
 
 		// 添加字段按钮
-		view.findViewById(R.id.add_field_btn).setOnClickListener(v -> addFieldRow(null, null, false));
+		view.findViewById(R.id.add_field_btn).setOnClickListener(v -> addFieldRow(null, null));
 
 		// 保存按钮
 		view.findViewById(R.id.save_btn).setOnClickListener(v -> save());
@@ -120,23 +131,44 @@ public class FriendRequestCreateFragment extends ToolbarFragment {
 			if (editDescription != null) descriptionInput.setText(editDescription);
 			if (editLookingFor != null) {
 				selectedLookingFor = editLookingFor;
-				lookingForLabel.setText("找：" + editLookingFor);
+				lookingForLabel.setText(editLookingFor);
+			}
+			if (editFields != null) {
+				for (Map<String, Object> f : editFields) {
+					addFieldRow((String) f.get("field_key"), (String) f.get("field_value"));
+				}
+			}
+		} else {
+			// 创建模式：添加默认字段
+			for (String fieldName : DEFAULT_FIELDS) {
+				addFieldRow(fieldName, null);
 			}
 		}
 
 		return view;
 	}
 
-	private void addFieldRow(String key, String value, boolean isPrimary) {
+	private void addFieldRow(String key, String value) {
 		View row = LayoutInflater.from(getContext()).inflate(R.layout.item_friend_request_field, fieldsContainer, false);
-		EditText keyInput = row.findViewById(R.id.field_key_input);
+		Spinner keySpinner = row.findViewById(R.id.field_key_spinner);
 		EditText valueInput = row.findViewById(R.id.field_value_input);
-		Switch primarySwitch = row.findViewById(R.id.field_primary_switch);
 		View removeBtn = row.findViewById(R.id.field_remove_btn);
 
-		if (key != null) keyInput.setText(key);
+		// 设置Spinner
+		ArrayAdapter<String> spinnerAdapter = new ArrayAdapter<>(getContext(), android.R.layout.simple_spinner_item, FIELD_NAME_OPTIONS);
+		spinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+		keySpinner.setAdapter(spinnerAdapter);
+
+		// 设置默认值
+		if (key != null) {
+			for (int i = 0; i < FIELD_NAME_OPTIONS.length; i++) {
+				if (FIELD_NAME_OPTIONS[i].equals(key)) {
+					keySpinner.setSelection(i);
+					break;
+				}
+			}
+		}
 		if (value != null) valueInput.setText(value);
-		primarySwitch.setChecked(isPrimary);
 
 		removeBtn.setOnClickListener(v -> fieldsContainer.removeView(row));
 
@@ -160,17 +192,15 @@ public class FriendRequestCreateFragment extends ToolbarFragment {
 		List<Map<String, Object>> fields = new ArrayList<>();
 		for (int i = 0; i < fieldsContainer.getChildCount(); i++) {
 			View row = fieldsContainer.getChildAt(i);
-			EditText keyInput = row.findViewById(R.id.field_key_input);
+			Spinner keySpinner = row.findViewById(R.id.field_key_spinner);
 			EditText valueInput = row.findViewById(R.id.field_value_input);
-			Switch primarySwitch = row.findViewById(R.id.field_primary_switch);
 
-			String key = keyInput.getText().toString().trim();
+			String key = (String) keySpinner.getSelectedItem();
 			String value = valueInput.getText().toString().trim();
-			if (!key.isEmpty() && !value.isEmpty()) {
+			if (key != null && !value.isEmpty()) {
 				Map<String, Object> field = new HashMap<>();
 				field.put("field_key", key);
 				field.put("field_value", value);
-				field.put("is_primary", primarySwitch.isChecked() ? 1 : 0);
 				fields.add(field);
 			}
 		}

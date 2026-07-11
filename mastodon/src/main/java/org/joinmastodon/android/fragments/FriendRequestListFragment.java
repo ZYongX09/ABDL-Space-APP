@@ -44,6 +44,7 @@ import me.grishka.appkit.imageloader.ViewImageLoader;
 import me.grishka.appkit.imageloader.requests.UrlImageLoaderRequest;
 import me.grishka.appkit.utils.V;
 import me.grishka.appkit.views.FragmentRootLinearLayout;
+import org.joinmastodon.android.ui.OutlineProviders;
 
 public class FriendRequestListFragment extends LoaderFragment {
 	private RecyclerView recyclerView;
@@ -333,23 +334,35 @@ public class FriendRequestListFragment extends LoaderFragment {
 
 				// 加载头像
 				if (item.user != null && item.user.avatar != null) {
+					avatar.setOutlineProvider(OutlineProviders.roundedRect(10));
 					ViewImageLoader.loadWithoutAnimation(avatar, null, new UrlImageLoaderRequest(item.user.avatar, V.dp(48), V.dp(48)));
 				}
 
-				// 主要信息
+				// 主要信息（固定字段：年龄、性别、城市）
 				List<String> primaryInfo = new ArrayList<>();
+				String age = "未知", gender = "未知", city = "未知";
+				if (item.fields != null) {
+					for (FriendRequestField f : item.fields) {
+						if ("年龄".equals(f.field_key)) age = f.field_value;
+						else if ("性别".equals(f.field_key)) gender = f.field_value;
+						else if ("城市".equals(f.field_key)) city = f.field_value;
+					}
+				}
+				primaryInfo.add(age + "岁");
+				primaryInfo.add(gender);
+				primaryInfo.add(city);
+				primaryFields.setText(String.join(" · ", primaryInfo));
+
+				// 次要信息（显示字段名作为图标占位）
 				List<String> secondaryInfo = new ArrayList<>();
 				if (item.fields != null) {
 					for (FriendRequestField f : item.fields) {
-						if (f.is_primary == 1) {
-							primaryInfo.add(f.field_key + "：" + f.field_value);
-						} else {
+						if (!"年龄".equals(f.field_key) && !"性别".equals(f.field_key) && !"城市".equals(f.field_key)) {
 							secondaryInfo.add(f.field_key);
 						}
 					}
 				}
-				primaryFields.setText(String.join("  ·  ", primaryInfo));
-				secondaryIcons.setText(String.join("  ", secondaryInfo));
+				secondaryIcons.setText(secondaryInfo.isEmpty() ? "" : String.join("  ", secondaryInfo));
 
 				// 菜单
 				menuBtn.setOnClickListener(v -> {
