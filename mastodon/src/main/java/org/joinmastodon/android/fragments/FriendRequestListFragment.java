@@ -1,21 +1,26 @@
 package org.joinmastodon.android.fragments;
 
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
+import android.animation.ValueAnimator;
 import android.app.Activity;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.EditText;
+import android.view.animation.DecelerateInterpolator;
+import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.PopupMenu;
 import android.widget.TextView;
 import android.widget.Toast;
-import android.widget.FrameLayout;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -51,13 +56,29 @@ public class FriendRequestListFragment extends LoaderFragment {
 	private SwipeRefreshLayout swipeRefreshLayout;
 	private FriendRequestAdapter adapter;
 	private List<FriendRequest> data = new ArrayList<>();
-	private EditText searchInput;
 	private String currentSearch = "";
+	private String currentFilter = "";
 	private int currentPage = 1;
 	private boolean loadingMore = false;
 	private boolean hasMore = true;
 	private String accountID;
-	private TextView emptyView;
+	private View emptyState;
+	private ImageButton fab;
+	private float totalDy = 0;
+	private boolean fabHidden = false;
+
+	// Metadata icon 映射
+	private static final String[][] METADATA_ICONS = {
+		{"生理性别", "ic_field_gender"}, {"心理性别", "ic_field_gender_identity"},
+		{"年龄", "ic_field_age"}, {"生日", "ic_field_birthday"},
+		{"城市", "ic_field_city"}, {"QQ", "ic_field_qq"},
+		{"微信", "ic_field_wechat"}, {"手机号", "ic_field_phone"},
+		{"X(原推特)", "ic_field_twitter"}, {"Telegram", "ic_field_telegram"},
+		{"博客", "ic_field_blog"}, {"宝宝新天地", "ic_field_nbw"},
+		{"爱好", "ic_field_hobby"}, {"出生地", "ic_field_birthplace"},
+		{"工作地", "ic_field_workplace"}, {"现居地", "ic_field_city"},
+		{"性取向", "ic_field_orientation"}, {"会玩游戏", "ic_field_game"}
+	};
 
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
@@ -82,7 +103,6 @@ public class FriendRequestListFragment extends LoaderFragment {
 	@Override
 	public boolean onOptionsItemSelected(MenuItem item) {
 		if (item.getItemId() == 1) {
-			// 搜索功能暂未实现
 			Toast.makeText(getContext(), "搜索功能即将上线", Toast.LENGTH_SHORT).show();
 			return true;
 		}
@@ -98,13 +118,57 @@ public class FriendRequestListFragment extends LoaderFragment {
 		root.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 		root.setOrientation(LinearLayout.VERTICAL);
 
-		// 防诈骗提示横幅
-		View banner = inflater.inflate(R.layout.friend_request_fraud_banner, root, false);
-		root.addView(banner);
+		// 防诈骗 Banner
+		SharedPreferences prefs = getContext().getSharedPreferences("friend_request", 0);
+		if (!prefs.getBoolean("banner_dismissed", false)) {
+			View banner = inflater.inflate(R.layout.friend_request_fraud_banner, root, false);
+			banner.setOnClickListener(v -> {
+				prefs.edit().putBoolean("banner_dismissed", true).apply();
+				((ViewGroup) banner.getParent()).removeView(banner);
+			});
+			root.addView(banner);
+		}
+
+		// 分类 Chip
+		LinearLayout chipContainer = new LinearLayout(getContext());
+		chipContainer.setOrientation(LinearLayout.HORIZONTAL);
+		chipContainer.setPadding(V.dp(16), V.dp(8), V.dp(16), 0);
+
+		String[] filters = {"推荐", "最新", "同城", "找家长", "找弟弟", "找姐姐", "找哥哥", "找朋友"};
+		for (int i = 0; i < filters.length; i++) {
+			TextView chip = new TextView(getContext());
+			chip.setText(filters[i]);
+			chip.setTextSize(12);
+			chip.setPadding(V.dp(12), V.dp(8), V.dp(12), V.dp(8));
+			chip.setBackgroundResource(i == 0 ? R.drawable.bg_tag_selected : R.drawable.bg_tag);
+			chip.setTextColor(i == 0 ? 0xFFFFFFFF : 0xFF333333);
+			LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+				LinearLayout.LayoutParams.WRAP_CONTENT,
+				LinearLayout.LayoutParams.WRAP_CONTENT
+			);
+			params.setMarginEnd(V.dp(8));
+			chip.setLayoutParams(params);
+			chip.setOnClickListener(v -> {
+				for (int j = 0; j < chipContainer.getChildCount(); j++) {
+					TextView c = (TextView) chipContainer.getChildAt(j);
+					c.setBackgroundResource(R.drawable.bg_tag);
+					c.setTextColor(0xFF333333);
+				}
+				chip.setBackgroundResource(R.drawable.bg_tag_selected);
+				chip.setTextColor(0xFFFFFFFF);
+				currentFilter = chip.getText().toString();
+				currentPage = 1;
+				data.clear();
+				adapter.notifyDataSetChanged();
+				loadData();
+			});
+			chipContainer.addView(chip);
+		}
+		root.addView(chipContainer);
 
 		// 下拉刷新
 		swipeRefreshLayout = new SwipeRefreshLayout(getContext());
-		swipeRefreshLayout.setColorSchemeResources(android.R.color.holo_orange_dark);
+		swipeRefreshLayout.setColorSchemeResources(android.R.color.holo_blue_dark);
 		swipeRefreshLayout.setOnRefreshListener(() -> {
 			currentPage = 1;
 			data.clear();
@@ -112,41 +176,57 @@ public class FriendRequestListFragment extends LoaderFragment {
 			loadData();
 		});
 
-		// 空状态提示
-		emptyView = new TextView(getContext());
-		emptyView.setText(R.string.friend_request_no_data);
-		emptyView.setTextSize(15);
-		emptyView.setGravity(android.view.Gravity.CENTER);
-		emptyView.setPadding(0, V.dp(64), 0, 0);
-		emptyView.setVisibility(View.GONE);
+		// 空状态
+		emptyState = inflater.inflate(R.layout.friend_request_empty_state, swipeRefreshLayout, false);
+		emptyState.setVisibility(View.GONE);
 
 		// RecyclerView
 		recyclerView = new RecyclerView(getContext());
 		recyclerView.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 		recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
+		recyclerView.setClipToPadding(false);
+		recyclerView.setPadding(0, V.dp(8), 0, V.dp(80));
 		adapter = new FriendRequestAdapter();
 		recyclerView.setAdapter(adapter);
 
-		// 滚动加载更多
+		// 滚动监听
 		recyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
 			@Override
 			public void onScrolled(@NonNull RecyclerView rv, int dx, int dy) {
+				totalDy += dy;
+				// 加载更多
 				LinearLayoutManager lm = (LinearLayoutManager) rv.getLayoutManager();
 				if (lm != null && !loadingMore && hasMore && lm.findLastVisibleItemPosition() >= data.size() - 3) {
 					loadingMore = true;
 					currentPage++;
 					loadMore();
 				}
+				// FAB 隐藏/显示
+				if (dy > V.dp(24) && !fabHidden) {
+					fabHidden = true;
+					fab.animate().scaleX(0f).scaleY(0f).setDuration(200).setInterpolator(new DecelerateInterpolator()).start();
+				} else if (dy < -V.dp(24) && fabHidden) {
+					fabHidden = false;
+					fab.animate().scaleX(1f).scaleY(1f).setDuration(200).setInterpolator(new DecelerateInterpolator()).start();
+				}
+			}
+
+			@Override
+			public void onScrollStateChanged(@NonNull RecyclerView rv, int newState) {
+				if (newState == RecyclerView.SCROLL_STATE_IDLE && !fabHidden) {
+					fab.animate().scaleX(1f).scaleY(1f).setDuration(200).setInterpolator(new DecelerateInterpolator()).start();
+				}
 			}
 		});
 
 		swipeRefreshLayout.addView(recyclerView);
+		swipeRefreshLayout.addView(emptyState);
 		root.addView(swipeRefreshLayout);
 
 		wrapper.addView(root);
 
-		// FAB - 发布交友请求
-		ImageButton fab = new ImageButton(getContext());
+		// FAB
+		fab = new ImageButton(getContext());
 		fab.setImageResource(R.drawable.ic_fluent_add_24_regular);
 		FrameLayout.LayoutParams fabParams = new FrameLayout.LayoutParams(V.dp(56), V.dp(56));
 		fabParams.gravity = android.view.Gravity.BOTTOM | android.view.Gravity.END;
@@ -272,8 +352,8 @@ public class FriendRequestListFragment extends LoaderFragment {
 	}
 
 	private void updateEmptyState() {
-		if (emptyView != null) {
-			emptyView.setVisibility(data.isEmpty() ? View.VISIBLE : View.GONE);
+		if (emptyState != null) {
+			emptyState.setVisibility(data.isEmpty() ? View.VISIBLE : View.GONE);
 			recyclerView.setVisibility(data.isEmpty() ? View.GONE : View.VISIBLE);
 		}
 	}
@@ -287,19 +367,25 @@ public class FriendRequestListFragment extends LoaderFragment {
 			long minutes = seconds / 60;
 			long hours = minutes / 60;
 			long days = hours / 24;
-			long weeks = days / 7;
-			long months = days / 30;
 
 			if (seconds < 60) return "刚刚";
 			if (minutes < 60) return minutes + "分钟前";
 			if (hours < 24) return hours + "小时前";
-			if (days < 7) return days + "天前";
-			if (weeks < 4) return weeks + "周前";
-			if (months < 12) return months + "个月前";
+			if (days < 30) return days + "天前";
+			if (days < 365) return (days / 30) + "个月前";
 			return (days / 365) + "年前";
 		} catch (Exception e) {
 			return "";
 		}
+	}
+
+	private int getMetadataIconRes(String fieldKey) {
+		for (String[] mapping : METADATA_ICONS) {
+			if (mapping[0].equals(fieldKey)) {
+				return getResources().getIdentifier(mapping[1], "drawable", getContext().getPackageName());
+			}
+		}
+		return 0;
 	}
 
 	private class FriendRequestAdapter extends RecyclerView.Adapter<FriendRequestAdapter.VH> {
@@ -321,14 +407,13 @@ public class FriendRequestListFragment extends LoaderFragment {
 		@Override
 		public void onBindViewHolder(@NonNull VH holder, int position) {
 			if (getItemViewType(position) == TYPE_FOOTER) return;
-
 			FriendRequest item = data.get(position);
 			holder.bind(item);
 		}
 
 		@Override
 		public int getItemCount() {
-			return data.size() + 1; // +1 for footer
+			return data.size() + 1;
 		}
 
 		@Override
@@ -338,41 +423,33 @@ public class FriendRequestListFragment extends LoaderFragment {
 
 		class VH extends RecyclerView.ViewHolder {
 			ImageView avatar;
-			TextView username, lookingFor, primaryFields, secondaryIcons, publishTime;
+			TextView username, lookingForChip, basicInfo, publishTime;
+			LinearLayout metadataContainer;
 			ImageButton menuBtn;
 
 			VH(View itemView) {
 				super(itemView);
-				if (itemView.findViewById(R.id.avatar) == null) return; // footer
+				if (itemView.findViewById(R.id.avatar) == null) return;
 				avatar = itemView.findViewById(R.id.avatar);
 				username = itemView.findViewById(R.id.username);
-				lookingFor = itemView.findViewById(R.id.looking_for);
-				primaryFields = itemView.findViewById(R.id.primary_fields);
-				secondaryIcons = itemView.findViewById(R.id.secondary_icons);
+				lookingForChip = itemView.findViewById(R.id.looking_for_chip);
+				basicInfo = itemView.findViewById(R.id.basic_info);
+				metadataContainer = itemView.findViewById(R.id.metadata_container);
 				publishTime = itemView.findViewById(R.id.publish_time);
 				menuBtn = itemView.findViewById(R.id.menu_btn);
 			}
 
 			void bind(FriendRequest item) {
 				username.setText(item.user != null ? item.user.display_name : "");
-				lookingFor.setText(item.looking_for != null ? item.looking_for : "");
+				lookingForChip.setText(item.looking_for != null ? item.looking_for : "");
 
-				// 发布时间
-				if (item.created_at != null) {
-					publishTime.setText(formatTime(item.created_at));
-					publishTime.setVisibility(View.VISIBLE);
-				} else {
-					publishTime.setVisibility(View.GONE);
-				}
-
-				// 加载头像
+				// 头像
 				if (item.user != null && item.user.avatar != null) {
-					avatar.setOutlineProvider(OutlineProviders.roundedRect(10));
-					ViewImageLoader.loadWithoutAnimation(avatar, null, new UrlImageLoaderRequest(item.user.avatar, V.dp(48), V.dp(48)));
+					avatar.setOutlineProvider(OutlineProviders.roundedRect(16));
+					ViewImageLoader.loadWithoutAnimation(avatar, null, new UrlImageLoaderRequest(item.user.avatar, V.dp(64), V.dp(64)));
 				}
 
-				// 主要信息（固定字段：年龄、性别、城市）
-				List<String> primaryInfo = new ArrayList<>();
+				// 基础信息：年龄·性别·城市
 				String age = "未知", gender = "未知", city = "未知";
 				if (item.fields != null) {
 					for (FriendRequestField f : item.fields) {
@@ -381,26 +458,57 @@ public class FriendRequestListFragment extends LoaderFragment {
 						else if ("城市".equals(f.field_key)) city = f.field_value;
 					}
 				}
-				primaryInfo.add(age + "岁");
-				primaryInfo.add(gender);
-				primaryInfo.add(city);
-				primaryFields.setText(String.join(" · ", primaryInfo));
+				basicInfo.setText(age + "岁 · " + gender + " · " + city);
 
-				// 次要信息（显示字段名作为图标占位）
-				List<String> secondaryInfo = new ArrayList<>();
+				// Metadata icons
+				metadataContainer.removeAllViews();
+				int count = 0;
 				if (item.fields != null) {
 					for (FriendRequestField f : item.fields) {
-						if (!"年龄".equals(f.field_key) && !"生理性别".equals(f.field_key) && !"城市".equals(f.field_key)) {
-							secondaryInfo.add(f.field_key);
+						if (count >= 6) break;
+						if ("年龄".equals(f.field_key) || "生理性别".equals(f.field_key) || "城市".equals(f.field_key)) continue;
+						int iconRes = getMetadataIconRes(f.field_key);
+						if (iconRes != 0) {
+							ImageView icon = new ImageView(getContext());
+							icon.setLayoutParams(new LinearLayout.LayoutParams(V.dp(20), V.dp(20)));
+							icon.setPadding(0, 0, V.dp(8), 0);
+							icon.setImageResource(iconRes);
+							icon.setColorFilter(getResources().getColor(android.R.color.darker_gray));
+							icon.setContentDescription(f.field_key);
+							metadataContainer.addView(icon);
+							count++;
 						}
 					}
 				}
-				secondaryIcons.setText(secondaryInfo.isEmpty() ? "" : String.join("  ", secondaryInfo));
+
+				// 时间
+				if (item.created_at != null) {
+					publishTime.setText(formatTime(item.created_at));
+					publishTime.setVisibility(View.VISIBLE);
+				} else {
+					publishTime.setVisibility(View.GONE);
+				}
+
+				// Card 按压动画
+			 itemView.setOnTouchListener((v, event) -> {
+					switch (event.getAction()) {
+						case MotionEvent.ACTION_DOWN:
+							v.animate().scaleX(0.985f).scaleY(0.985f).setDuration(180).setInterpolator(new DecelerateInterpolator()).start();
+							v.setTranslationZ(V.dp(4));
+							break;
+						case MotionEvent.ACTION_UP:
+						case MotionEvent.ACTION_CANCEL:
+							v.animate().scaleX(1f).scaleY(1f).setDuration(180).setInterpolator(new DecelerateInterpolator()).start();
+							v.setTranslationZ(0);
+							break;
+					}
+					return false;
+				});
 
 				// 菜单
 				menuBtn.setOnClickListener(v -> {
 					PopupMenu popup = new PopupMenu(getContext(), v);
-							String myUserId = String.valueOf(AccountSessionManager.getInstance().getAccount(accountID).self.id);
+					String myUserId = String.valueOf(AccountSessionManager.getInstance().getAccount(accountID).self.id);
 					boolean isOwner = item.user_id != null && item.user_id.equals(myUserId);
 
 					if (isOwner) {
@@ -411,14 +519,12 @@ public class FriendRequestListFragment extends LoaderFragment {
 
 					popup.setOnMenuItemClickListener(menuItem -> {
 						if (menuItem.getItemId() == 1) {
-							// 编辑
 							Bundle args = new Bundle();
 							args.putString("account", accountID);
 							args.putString("editRequestId", item.id);
 							args.putString("editTitle", item.title);
 							args.putString("editLookingFor", item.looking_for);
 							args.putString("editDescription", item.description);
-							// Pass fields as string array
 							if (item.fields != null) {
 								String[] fieldKeys = new String[item.fields.size()];
 								String[] fieldValues = new String[item.fields.size()];
@@ -437,6 +543,7 @@ public class FriendRequestListFragment extends LoaderFragment {
 									public void onSuccess(Map<String, Object> result) {
 										data.remove(item);
 										adapter.notifyDataSetChanged();
+										updateEmptyState();
 										Toast.makeText(getContext(), "已删除", Toast.LENGTH_SHORT).show();
 									}
 
@@ -447,7 +554,6 @@ public class FriendRequestListFragment extends LoaderFragment {
 								})
 								.exec(accountID);
 						} else if (menuItem.getItemId() == 3) {
-							// 举报
 							Bundle args = new Bundle();
 							args.putString("account", accountID);
 							args.putString("requestId", item.id);
@@ -467,12 +573,6 @@ public class FriendRequestListFragment extends LoaderFragment {
 					Nav.go(getActivity(), FriendRequestDetailFragment.class, args);
 				});
 			}
-		}
-	}
-
-	private static class V {
-		static int dp(int dp) {
-			return (int) (dp * android.content.res.Resources.getSystem().getDisplayMetrics().density);
 		}
 	}
 }

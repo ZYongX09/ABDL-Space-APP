@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:padding="48dp">
+
+    <ImageView
+        android:layout_width="64dp"
+        android:layout_height="64dp"
+        android:src="@drawable/ic_dream_lit"
+        android:alpha="0.5"
+        android:contentDescription="暂无数据" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="暂无交友请求"
+        android:textSize="16sp"
+        android:textColor="?android:textColorSecondary"
+        android:includeFontPadding="false" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="快来发布第一条交友请求吧"
+        android:textSize="14sp"
+        android:textColor="?android:textColorTertiary"
+        android:includeFontPadding="false" />
+
+</LinearLayout>
