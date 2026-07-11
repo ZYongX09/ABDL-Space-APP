@@ -96,6 +96,7 @@ public class FriendRequestDetailFragment extends LoaderFragment {
 					Gson gson = new Gson();
 					friendRequest = gson.fromJson(gson.toJson(result), FriendRequest.class);
 					updateUI();
+					dataLoaded();
 				}
 
 				@Override
@@ -118,7 +119,7 @@ public class FriendRequestDetailFragment extends LoaderFragment {
 		LinearLayout fieldsCard = getView().findViewById(R.id.detail_fields_card);
 		ImageButton menuBtn = getView().findViewById(R.id.detail_menu);
 
-		username.setText(friendRequest.user != null ? friendRequest.user.display_name : "");
+		username.setText(friendRequest.user != null ? friendRequest.user.username : "");
 		lookingFor.setText(friendRequest.looking_for != null ? friendRequest.looking_for : "");
 		description.setText(friendRequest.description != null ? friendRequest.description : "");
 

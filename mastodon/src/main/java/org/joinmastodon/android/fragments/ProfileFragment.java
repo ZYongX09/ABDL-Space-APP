@@ -195,14 +195,13 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 			account=Parcels.unwrap(getArguments().getParcelable("profileAccount"));
 			profileAccountID=account.id;
 			isOwnProfile=AccountSessionManager.getInstance().isSelf(accountID, account);
-			loaded=true;
-			if(!isOwnProfile)
-				loadRelationship();
+			// Always fetch fresh data instead of using cached account
+			profileAccountID=getArguments().getString("profileAccountID", account.id);
 		}else{
 			profileAccountID=getArguments().getString("profileAccountID");
-			if(!getArguments().getBoolean("noAutoLoad", false))
-				loadData();
 		}
+		if(!getArguments().getBoolean("noAutoLoad", false))
+			loadData();
 	}
 
 	@Override

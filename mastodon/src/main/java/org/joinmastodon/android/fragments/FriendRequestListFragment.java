@@ -404,7 +404,7 @@ public class FriendRequestListFragment extends LoaderFragment {
 			}
 
 			void bind(FriendRequest item) {
-				username.setText(item.user != null ? item.user.display_name : "");
+				username.setText(item.user != null ? item.user.username : "");
 				lookingForChip.setText(item.looking_for != null ? item.looking_for : "");
 
 				// 头像
