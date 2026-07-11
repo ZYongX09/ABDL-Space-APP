@@ -38,7 +38,7 @@ public class FriendRequestReportFragment extends ToolbarFragment {
 	}
 
 	@Override
-	protected View onCreateContentView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+	public View onCreateContentView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
 		View view = inflater.inflate(R.layout.fragment_friend_request_report, container, false);
 
 		reasonInput = view.findViewById(R.id.report_reason);

@@ -60,7 +60,7 @@ public class FriendRequestCreateFragment extends ToolbarFragment {
 	}
 
 	@Override
-	protected View onCreateContentView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+	public View onCreateContentView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
 		View view = inflater.inflate(R.layout.fragment_friend_request_create, container, false);
 
 		titleInput = view.findViewById(R.id.create_title);

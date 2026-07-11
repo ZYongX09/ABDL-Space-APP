@@ -36,6 +36,9 @@ import me.grishka.appkit.Nav;
 import me.grishka.appkit.api.Callback;
 import me.grishka.appkit.api.ErrorResponse;
 import me.grishka.appkit.fragments.LoaderFragment;
+import me.grishka.appkit.imageloader.ViewImageLoader;
+import me.grishka.appkit.imageloader.requests.UrlImageLoaderRequest;
+import me.grishka.appkit.utils.V;
 import me.grishka.appkit.views.FragmentRootLinearLayout;
 
 public class FriendRequestListFragment extends LoaderFragment {
@@ -64,7 +67,7 @@ public class FriendRequestListFragment extends LoaderFragment {
 	}
 
 	@Override
-	protected View onCreateContentView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+	public View onCreateContentView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
 		FragmentRootLinearLayout root = new FragmentRootLinearLayout(getContext());
 		root.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 		root.setOrientation(LinearLayout.VERTICAL);
@@ -88,7 +91,7 @@ public class FriendRequestListFragment extends LoaderFragment {
 
 		// 下拉刷新
 		swipeRefreshLayout = new SwipeRefreshLayout(getContext());
-		swipeRefreshLayout.setColorSchemeResources(R.color.brand_accent);
+		swipeRefreshLayout.setColorSchemeResources(android.R.color.holo_orange_dark);
 		swipeRefreshLayout.setOnRefreshListener(() -> {
 			currentPage = 1;
 			data.clear();
@@ -130,7 +133,20 @@ public class FriendRequestListFragment extends LoaderFragment {
 		}
 	}
 
-	private void loadData() {
+	@Override
+	protected void doLoadData() {
+		loadData();
+	}
+
+	@Override
+	public void onRefresh() {
+		currentPage = 1;
+		data.clear();
+		hasMore = true;
+		loadData();
+	}
+
+	public void loadData() {
 		dataLoading = true;
 		showProgress();
 
@@ -270,7 +286,7 @@ public class FriendRequestListFragment extends LoaderFragment {
 
 				// 加载头像
 				if (item.user != null && item.user.avatar != null) {
-					me.grishka.appkit.imageloader.ImageLoader.getInstance().loadAsync(avatar, item.user.avatar, null);
+					ViewImageLoader.loadWithoutAnimation(avatar, null, new UrlImageLoaderRequest(item.user.avatar, V.dp(48), V.dp(48)));
 				}
 
 				// 主要信息
@@ -291,7 +307,7 @@ public class FriendRequestListFragment extends LoaderFragment {
 				// 菜单
 				menuBtn.setOnClickListener(v -> {
 					PopupMenu popup = new PopupMenu(getContext(), v);
-					String myUserId = AccountSessionManager.getInstance().getAccount(accountID).getUserId();
+							String myUserId = AccountSessionManager.getInstance().getAccount(accountID).getID();
 					boolean isOwner = item.user_id != null && item.user_id.equals(myUserId);
 
 					if (isOwner) {

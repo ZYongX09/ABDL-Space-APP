@@ -33,10 +33,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import androidx.annotation.NonNull;
 import me.grishka.appkit.Nav;
 import me.grishka.appkit.api.Callback;
 import me.grishka.appkit.api.ErrorResponse;
 import me.grishka.appkit.fragments.LoaderFragment;
+import me.grishka.appkit.imageloader.ViewImageLoader;
+import me.grishka.appkit.imageloader.requests.UrlImageLoaderRequest;
+import me.grishka.appkit.utils.V;
 
 public class FriendRequestDetailFragment extends LoaderFragment {
 	private String requestId;
@@ -61,7 +65,7 @@ public class FriendRequestDetailFragment extends LoaderFragment {
 	}
 
 	@Override
-	protected View onCreateContentView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+	public View onCreateContentView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
 		View view = inflater.inflate(R.layout.fragment_friend_request_detail, container, false);
 
 		commentInput = view.findViewById(R.id.comment_input);
@@ -79,7 +83,17 @@ public class FriendRequestDetailFragment extends LoaderFragment {
 		}
 	}
 
-	private void loadData() {
+	@Override
+	protected void doLoadData() {
+		loadData();
+	}
+
+	@Override
+	public void onRefresh() {
+		loadData();
+	}
+
+	public void loadData() {
 		dataLoading = true;
 		showProgress();
 
@@ -112,14 +126,16 @@ public class FriendRequestDetailFragment extends LoaderFragment {
 				@SuppressWarnings("unchecked")
 				public void onSuccess(Map<String, Object> result) {
 					if (getActivity() == null) return;
-					List<Map<String, Object>> commentList = (List<Map<String, Object>>) result.get("comments");
+					List<Map<String, Object>> commentListData = (List<Map<String, Object>>) result.get("comments");
 					Gson gson = new Gson();
-					comments = gson.fromJson(gson.toJson(commentList), new TypeToken<List<FriendRequestComment>>(){}.getType());
-					commentAdapter = new CommentAdapter();
-					RecyclerView commentList = getView().findViewById(R.id.comments_list);
-					if (commentList != null) {
-						commentList.setLayoutManager(new LinearLayoutManager(getContext()));
-						commentList.setAdapter(commentAdapter);
+					comments = gson.fromJson(gson.toJson(commentListData), new TypeToken<List<FriendRequestComment>>(){}.getType());
+					if (getView() != null) {
+						RecyclerView commentListView = getView().findViewById(R.id.comments_list);
+						if (commentListView != null) {
+							commentAdapter = new CommentAdapter();
+							commentListView.setLayoutManager(new LinearLayoutManager(getContext()));
+							commentListView.setAdapter(commentAdapter);
+						}
 					}
 					dataLoaded();
 				}
@@ -148,7 +164,7 @@ public class FriendRequestDetailFragment extends LoaderFragment {
 		description.setText(friendRequest.description != null ? friendRequest.description : "");
 
 		if (friendRequest.user != null && friendRequest.user.avatar != null) {
-			me.grishka.appkit.imageloader.ImageLoader.getInstance().loadAsync(avatar, friendRequest.user.avatar, null);
+			ViewImageLoader.loadWithoutAnimation(avatar, null, new UrlImageLoaderRequest(friendRequest.user.avatar, V.dp(56), V.dp(56)));
 		}
 
 		// 显示所有字段
@@ -166,7 +182,7 @@ public class FriendRequestDetailFragment extends LoaderFragment {
 		// 菜单
 		menuBtn.setOnClickListener(v -> {
 			PopupMenu popup = new PopupMenu(getContext(), v);
-			String myUserId = AccountSessionManager.getInstance().getAccount(accountID).getUserId();
+			String myUserId = AccountSessionManager.getInstance().getAccount(accountID).getID();
 			boolean isOwner = friendRequest.user_id != null && friendRequest.user_id.equals(myUserId);
 
 			if (isOwner) {
