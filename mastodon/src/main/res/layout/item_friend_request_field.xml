@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:padding="8dp"
+    android:layout_marginBottom="8dp"
+    android:background="#0A000000"
+    android:gravity="center_vertical">
+
+    <EditText
+        android:id="@+id/field_key_input"
+        android:layout_width="0dp"
+        android:layout_height="40dp"
+        android:layout_weight="1"
+        android:hint="@string/friend_request_field_key_hint"
+        android:inputType="text"
+        android:maxLines="1"
+        android:background="@drawable/search_bg"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        android:textSize="13sp" />
+
+    <EditText
+        android:id="@+id/field_value_input"
+        android:layout_width="0dp"
+        android:layout_height="40dp"
+        android:layout_weight="1"
+        android:hint="@string/friend_request_field_value_hint"
+        android:inputType="text"
+        android:maxLines="1"
+        android:background="@drawable/search_bg"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        android:layout_marginStart="8dp"
+        android:textSize="13sp" />
+
+    <Switch
+        android:id="@+id/field_primary_switch"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="4dp"
+        android:text="@string/friend_request_show_on_list"
+        android:textSize="11sp" />
+
+    <ImageButton
+        android:id="@+id/field_remove_btn"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:src="@drawable/ic_fluent_dismiss_24_regular"
+        android:contentDescription="删除"
+        android:scaleType="centerInside" />
+
+</LinearLayout>

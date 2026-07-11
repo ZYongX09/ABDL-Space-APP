@@ -14,7 +14,6 @@ android {
 	compileSdk 35
 	defaultConfig {
 		manifestPlaceholders = [oAuthScheme:"abdl-space"]
-		archivesBaseName = "abdl-space-app"
 		applicationId "top.abdl_space.app"
 		minSdk 24
 		targetSdk 35

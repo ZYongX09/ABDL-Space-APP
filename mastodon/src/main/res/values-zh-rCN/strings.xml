@@ -872,4 +872,29 @@
 	<string name="settings_github">GitHub</string>
 	<string name="settings_about_blog">开发者博客</string>
 	<string name="settings_cookie_policy">Cookie 政策</string>
+	<!-- 交友请求 -->
+	<string name="friend_request">交友</string>
+	<string name="friend_request_list">交友广场</string>
+	<string name="friend_request_create">发布交友请求</string>
+	<string name="friend_request_detail">交友详情</string>
+	<string name="friend_request_my">我的交友请求</string>
+	<string name="friend_request_report">举报</string>
+	<string name="friend_request_search">搜索交友请求</string>
+	<string name="friend_request_title_hint">输入标题，如"找弟弟，同城优先"</string>
+	<string name="friend_request_description_hint">详细描述你的要求…</string>
+	<string name="friend_request_looking_for">找的类型</string>
+	<string name="friend_request_add_field">添加信息字段</string>
+	<string name="friend_request_field_key_hint">字段名，如"年龄"</string>
+	<string name="friend_request_field_value_hint">字段值</string>
+	<string name="friend_request_show_on_list">在列表展示</string>
+	<string name="friend_request_fraud_warning">⚠️ 交友需谨慎，如发现违法违规行为将封号处理</string>
+	<string name="friend_request_comment_hint">发表评论…</string>
+	<string name="friend_request_no_data">暂无交友请求</string>
+	<string name="friend_request_deleted">已删除</string>
+	<string name="friend_request_report_reason_hint">请详细描述举报原因…</string>
+	<string name="friend_request_report_success">举报已提交，感谢您的反馈</string>
+	<string name="friend_request_create_success">发布成功</string>
+	<string name="friend_request_update_success">更新成功</string>
+	<string name="friend_request_delete_confirm">确定要删除这条交友请求吗？</string>
+	<string name="friend_request_report_evidence">上传证据图片（可选，最多3张）</string>
 </resources>
