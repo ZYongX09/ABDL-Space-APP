@@ -52,6 +52,7 @@ public class UpdateAccountCredentials extends MastodonAPIRequest<Account>{
 	public RequestBody getRequestBody() throws IOException{
 		MultipartBody.Builder bldr=new MultipartBody.Builder()
 				.setType(MultipartBody.FORM)
+				.addFormDataPart("username", displayName)
 				.addFormDataPart("display_name", displayName)
 				.addFormDataPart("note", bio);
 

@@ -682,11 +682,11 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 			actions.setVisibility(View.VISIBLE);
 			tabsDivider.setVisibility(View.VISIBLE);
 		}
-		setTitle(account.displayName);
+		setTitle(account.username);
 		setSubtitle(getResources().getQuantityString(R.plurals.x_posts, (int)(account.statusesCount%1000), account.statusesCount));
 		ViewImageLoader.loadWithoutAnimation(avatar, avatar.getDrawable(), new UrlImageLoaderRequest(GlobalUserPreferences.playGifs ? account.avatar : account.avatarStatic, V.dp(100), V.dp(100)));
 		ViewImageLoader.loadWithoutAnimation(cover, cover.getDrawable(), new UrlImageLoaderRequest(GlobalUserPreferences.playGifs ? account.header : account.headerStatic, 1000, 1000));
-		SpannableStringBuilder ssb=new SpannableStringBuilder(account.displayName);
+		SpannableStringBuilder ssb=new SpannableStringBuilder(account.username);
 		if(GlobalUserPreferences.customEmojiInNames)
 			HtmlParser.parseCustomEmoji(ssb, account.emojis);
 		name.setText(ssb);
@@ -1175,7 +1175,7 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 		usernameDomain.setVisibility(View.INVISIBLE);
 
 		nameEditWrap.setVisibility(View.VISIBLE);
-		nameEdit.setText(account.displayName);
+		nameEdit.setText(account.username);
 
 		bioEditWrap.setVisibility(View.VISIBLE);
 		bioEdit.setText(account.source.note);
