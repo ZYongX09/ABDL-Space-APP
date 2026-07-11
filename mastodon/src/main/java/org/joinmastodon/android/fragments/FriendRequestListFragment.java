@@ -278,6 +278,30 @@ public class FriendRequestListFragment extends LoaderFragment {
 		}
 	}
 
+	private String formatTime(String createdAt) {
+		try {
+			java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.getDefault());
+			java.util.Date date = sdf.parse(createdAt.replace("Z", ""));
+			long diff = System.currentTimeMillis() - date.getTime();
+			long seconds = diff / 1000;
+			long minutes = seconds / 60;
+			long hours = minutes / 60;
+			long days = hours / 24;
+			long weeks = days / 7;
+			long months = days / 30;
+
+			if (seconds < 60) return "刚刚";
+			if (minutes < 60) return minutes + "分钟前";
+			if (hours < 24) return hours + "小时前";
+			if (days < 7) return days + "天前";
+			if (weeks < 4) return weeks + "周前";
+			if (months < 12) return months + "个月前";
+			return (days / 365) + "年前";
+		} catch (Exception e) {
+			return "";
+		}
+	}
+
 	private class FriendRequestAdapter extends RecyclerView.Adapter<FriendRequestAdapter.VH> {
 		private static final int TYPE_ITEM = 0;
 		private static final int TYPE_FOOTER = 1;
@@ -314,7 +338,7 @@ public class FriendRequestListFragment extends LoaderFragment {
 
 		class VH extends RecyclerView.ViewHolder {
 			ImageView avatar;
-			TextView username, lookingFor, primaryFields, secondaryIcons;
+			TextView username, lookingFor, primaryFields, secondaryIcons, publishTime;
 			ImageButton menuBtn;
 
 			VH(View itemView) {
@@ -325,12 +349,21 @@ public class FriendRequestListFragment extends LoaderFragment {
 				lookingFor = itemView.findViewById(R.id.looking_for);
 				primaryFields = itemView.findViewById(R.id.primary_fields);
 				secondaryIcons = itemView.findViewById(R.id.secondary_icons);
+				publishTime = itemView.findViewById(R.id.publish_time);
 				menuBtn = itemView.findViewById(R.id.menu_btn);
 			}
 
 			void bind(FriendRequest item) {
 				username.setText(item.user != null ? item.user.display_name : "");
-				lookingFor.setText(item.looking_for != null ? "找" + item.looking_for : "");
+				lookingFor.setText(item.looking_for != null ? item.looking_for : "");
+
+				// 发布时间
+				if (item.created_at != null) {
+					publishTime.setText(formatTime(item.created_at));
+					publishTime.setVisibility(View.VISIBLE);
+				} else {
+					publishTime.setVisibility(View.GONE);
+				}
 
 				// 加载头像
 				if (item.user != null && item.user.avatar != null) {
@@ -344,7 +377,7 @@ public class FriendRequestListFragment extends LoaderFragment {
 				if (item.fields != null) {
 					for (FriendRequestField f : item.fields) {
 						if ("年龄".equals(f.field_key)) age = f.field_value;
-						else if ("性别".equals(f.field_key)) gender = f.field_value;
+						else if ("生理性别".equals(f.field_key)) gender = f.field_value;
 						else if ("城市".equals(f.field_key)) city = f.field_value;
 					}
 				}
@@ -357,7 +390,7 @@ public class FriendRequestListFragment extends LoaderFragment {
 				List<String> secondaryInfo = new ArrayList<>();
 				if (item.fields != null) {
 					for (FriendRequestField f : item.fields) {
-						if (!"年龄".equals(f.field_key) && !"性别".equals(f.field_key) && !"城市".equals(f.field_key)) {
+						if (!"年龄".equals(f.field_key) && !"生理性别".equals(f.field_key) && !"城市".equals(f.field_key)) {
 							secondaryInfo.add(f.field_key);
 						}
 					}
@@ -367,17 +400,37 @@ public class FriendRequestListFragment extends LoaderFragment {
 				// 菜单
 				menuBtn.setOnClickListener(v -> {
 					PopupMenu popup = new PopupMenu(getContext(), v);
-							String myUserId = AccountSessionManager.getInstance().getAccount(accountID).getID();
+							String myUserId = String.valueOf(AccountSessionManager.getInstance().getAccount(accountID).self.id);
 					boolean isOwner = item.user_id != null && item.user_id.equals(myUserId);
 
 					if (isOwner) {
-						popup.getMenu().add(0, 1, 0, "删除");
+						popup.getMenu().add(0, 1, 0, "编辑");
+						popup.getMenu().add(0, 2, 1, "删除");
 					}
-					popup.getMenu().add(0, 2, 1, "举报");
+					popup.getMenu().add(0, 3, 2, "举报");
 
 					popup.setOnMenuItemClickListener(menuItem -> {
 						if (menuItem.getItemId() == 1) {
-							// 删除
+							// 编辑
+							Bundle args = new Bundle();
+							args.putString("account", accountID);
+							args.putString("editRequestId", item.id);
+							args.putString("editTitle", item.title);
+							args.putString("editLookingFor", item.looking_for);
+							args.putString("editDescription", item.description);
+							// Pass fields as string array
+							if (item.fields != null) {
+								String[] fieldKeys = new String[item.fields.size()];
+								String[] fieldValues = new String[item.fields.size()];
+								for (int i = 0; i < item.fields.size(); i++) {
+									fieldKeys[i] = item.fields.get(i).field_key;
+									fieldValues[i] = item.fields.get(i).field_value;
+								}
+								args.putStringArray("editFieldKeys", fieldKeys);
+								args.putStringArray("editFieldValues", fieldValues);
+							}
+							Nav.go(getActivity(), FriendRequestCreateFragment.class, args);
+						} else if (menuItem.getItemId() == 2) {
 							new DeleteFriendRequest(item.id)
 								.setCallback(new Callback<Map<String, Object>>() {
 									@Override
@@ -393,7 +446,7 @@ public class FriendRequestListFragment extends LoaderFragment {
 									}
 								})
 								.exec(accountID);
-						} else if (menuItem.getItemId() == 2) {
+						} else if (menuItem.getItemId() == 3) {
 							// 举报
 							Bundle args = new Bundle();
 							args.putString("account", accountID);

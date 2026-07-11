@@ -157,11 +157,11 @@ public class FriendRequestDetailFragment extends LoaderFragment {
 		TextView username = getView().findViewById(R.id.detail_username);
 		TextView lookingFor = getView().findViewById(R.id.detail_looking_for);
 		TextView description = getView().findViewById(R.id.detail_description);
-		LinearLayout fieldsContainer = getView().findViewById(R.id.detail_fields);
+		LinearLayout fieldsCard = getView().findViewById(R.id.detail_fields_card);
 		ImageButton menuBtn = getView().findViewById(R.id.detail_menu);
 
 		username.setText(friendRequest.user != null ? friendRequest.user.display_name : "");
-		lookingFor.setText(friendRequest.looking_for != null ? "找" + friendRequest.looking_for : "");
+		lookingFor.setText(friendRequest.looking_for != null ? friendRequest.looking_for : "");
 		description.setText(friendRequest.description != null ? friendRequest.description : "");
 
 		if (friendRequest.user != null && friendRequest.user.avatar != null) {
@@ -169,31 +169,72 @@ public class FriendRequestDetailFragment extends LoaderFragment {
 			ViewImageLoader.loadWithoutAnimation(avatar, null, new UrlImageLoaderRequest(friendRequest.user.avatar, V.dp(56), V.dp(56)));
 		}
 
-		// 显示所有字段
-		fieldsContainer.removeAllViews();
+		// 字段信息卡片
+		fieldsCard.removeAllViews();
 		if (friendRequest.fields != null) {
+			// 字段名到图标的映射
+			String[][] fieldIcons = {
+				{"生理性别", "ic_field_gender"}, {"心理性别", "ic_field_gender_identity"},
+				{"年龄", "ic_field_age"}, {"生日", "ic_field_birthday"},
+				{"城市", "ic_field_city"}, {"QQ", "ic_field_qq"},
+				{"微信", "ic_field_wechat"}, {"手机号", "ic_field_phone"},
+				{"X(原推特)", "ic_field_twitter"}, {"Telegram", "ic_field_telegram"},
+				{"博客", "ic_field_blog"}, {"宝宝新天地", "ic_field_nbw"},
+				{"爱好", "ic_field_hobby"}, {"出生地", "ic_field_birthplace"},
+				{"工作地", "ic_field_workplace"}, {"现居地", "ic_field_city"},
+				{"性取向", "ic_field_orientation"}, {"会玩游戏", "ic_field_game"}
+			};
+
 			for (FriendRequestField field : friendRequest.fields) {
-				TextView tv = new TextView(getContext());
-				tv.setText(field.field_key + "：" + field.field_value);
-				tv.setTextSize(14);
-				tv.setPadding(0, 4, 0, 4);
-				fieldsContainer.addView(tv);
+				View row = LayoutInflater.from(getContext()).inflate(R.layout.item_friend_request_detail_field, fieldsCard, false);
+				ImageView icon = row.findViewById(R.id.field_icon);
+				TextView keyText = row.findViewById(R.id.field_key);
+				TextView valueText = row.findViewById(R.id.field_value);
+
+				// 设置图标
+				int iconRes = 0;
+				for (String[] mapping : fieldIcons) {
+					if (mapping[0].equals(field.field_key)) {
+						iconRes = getResources().getIdentifier(mapping[1], "drawable", getContext().getPackageName());
+						break;
+					}
+				}
+				if (iconRes != 0) {
+					icon.setImageResource(iconRes);
+					icon.setVisibility(View.VISIBLE);
+				} else {
+					icon.setVisibility(View.GONE);
+				}
+
+				keyText.setText(field.field_key);
+				valueText.setText(field.field_value);
+				fieldsCard.addView(row);
 			}
 		}
 
 		// 菜单
 		menuBtn.setOnClickListener(v -> {
 			PopupMenu popup = new PopupMenu(getContext(), v);
-			String myUserId = AccountSessionManager.getInstance().getAccount(accountID).getID();
+			String myUserId = String.valueOf(AccountSessionManager.getInstance().getAccount(accountID).self.id);
 			boolean isOwner = friendRequest.user_id != null && friendRequest.user_id.equals(myUserId);
 
 			if (isOwner) {
-				popup.getMenu().add(0, 1, 0, "删除");
+				popup.getMenu().add(0, 1, 0, "编辑");
+				popup.getMenu().add(0, 2, 1, "删除");
 			}
-			popup.getMenu().add(0, 2, 1, "举报");
+			popup.getMenu().add(0, 3, 2, "举报");
 
 			popup.setOnMenuItemClickListener(menuItem -> {
 				if (menuItem.getItemId() == 1) {
+					// 编辑
+					Bundle args = new Bundle();
+					args.putString("account", accountID);
+					args.putString("editRequestId", friendRequest.id);
+					args.putString("editTitle", friendRequest.title);
+					args.putString("editLookingFor", friendRequest.looking_for);
+					args.putString("editDescription", friendRequest.description);
+					Nav.go(getActivity(), FriendRequestCreateFragment.class, args);
+				} else if (menuItem.getItemId() == 2) {
 					new DeleteFriendRequest(friendRequest.id)
 						.setCallback(new Callback<Map<String, Object>>() {
 							@Override
@@ -208,7 +249,7 @@ public class FriendRequestDetailFragment extends LoaderFragment {
 							}
 						})
 						.exec(accountID);
-				} else if (menuItem.getItemId() == 2) {
+				} else if (menuItem.getItemId() == 3) {
 					Bundle args = new Bundle();
 					args.putString("account", accountID);
 					args.putString("requestId", friendRequest.id);

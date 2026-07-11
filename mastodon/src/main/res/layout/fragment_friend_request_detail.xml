@@ -65,12 +65,15 @@
 
             </LinearLayout>
 
-            <!-- 字段信息 -->
+            <!-- 字段信息卡片 -->
             <LinearLayout
-                android:id="@+id/detail_fields"
+                android:id="@+id/detail_fields_card"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
+                android:background="@drawable/bg_card_blue_border"
+                android:elevation="2dp"
+                android:padding="12dp"
                 android:layout_marginTop="16dp" />
 
             <!-- 详细描述 -->

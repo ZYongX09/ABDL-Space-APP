@@ -35,7 +35,7 @@ public class FriendRequestCreateFragment extends ToolbarFragment {
 	private String accountID;
 	private String editRequestId;
 	private String editTitle, editLookingFor, editDescription;
-	private List<Map<String, Object>> editFields;
+	private String[] editFieldKeys, editFieldValues;
 	private String selectedLookingFor = "";
 	private TextView lookingForLabel;
 
@@ -45,14 +45,14 @@ public class FriendRequestCreateFragment extends ToolbarFragment {
 		"找妹妹", "找游戏搭子", "找基友", "找闺蜜", "找金主"
 	};
 
-	// 字段名选项
+	// 字段名选项（常用在前）
 	private static final String[] FIELD_NAME_OPTIONS = {
-		"性别", "年龄", "城市", "QQ", "微信", "手机号", "推特", "Telegram",
-		"博客", "宝宝新天地", "爱好", "出生地", "工作地", "现居地", "性取向", "会玩游戏"
+		"生理性别", "心理性别", "年龄", "生日", "城市", "QQ", "微信", "手机号",
+		"X(原推特)", "Telegram", "博客", "宝宝新天地", "爱好", "出生地", "工作地", "现居地", "性取向", "会玩游戏"
 	};
 
 	// 默认字段
-	private static final String[] DEFAULT_FIELDS = {"年龄", "性别", "城市"};
+	private static final String[] DEFAULT_FIELDS = {"生理性别", "年龄", "城市"};
 
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
@@ -62,6 +62,8 @@ public class FriendRequestCreateFragment extends ToolbarFragment {
 		editTitle = getArguments().getString("editTitle");
 		editLookingFor = getArguments().getString("editLookingFor");
 		editDescription = getArguments().getString("editDescription");
+		editFieldKeys = getArguments().getStringArray("editFieldKeys");
+		editFieldValues = getArguments().getStringArray("editFieldValues");
 	}
 
 	@Override
@@ -133,9 +135,10 @@ public class FriendRequestCreateFragment extends ToolbarFragment {
 				selectedLookingFor = editLookingFor;
 				lookingForLabel.setText(editLookingFor);
 			}
-			if (editFields != null) {
-				for (Map<String, Object> f : editFields) {
-					addFieldRow((String) f.get("field_key"), (String) f.get("field_value"));
+			// 添加已有字段
+			if (editFieldKeys != null && editFieldValues != null) {
+				for (int i = 0; i < editFieldKeys.length; i++) {
+					addFieldRow(editFieldKeys[i], i < editFieldValues.length ? editFieldValues[i] : null);
 				}
 			}
 		} else {

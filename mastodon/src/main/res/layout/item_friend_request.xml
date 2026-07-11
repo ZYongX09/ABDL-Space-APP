@@ -8,7 +8,8 @@
     android:layout_marginEnd="12dp"
     android:layout_marginTop="4dp"
     android:layout_marginBottom="4dp"
-    android:background="@drawable/bg_card_rounded"
+    android:background="@drawable/bg_card_blue_border"
+    android:elevation="4dp"
     android:gravity="center_vertical">
 
     <ImageView
@@ -61,6 +62,14 @@
             android:layout_marginTop="2dp"
             android:maxLines="1"
             android:ellipsize="end" />
+
+        <TextView
+            android:id="@+id/publish_time"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="11sp"
+            android:textColor="?android:textColorTertiary"
+            android:layout_marginTop="2dp" />
 
     </LinearLayout>
 
