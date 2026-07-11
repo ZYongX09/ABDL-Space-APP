@@ -3,6 +3,9 @@ package org.joinmastodon.android.fragments;
 import android.app.Activity;
 import android.os.Bundle;
 import android.view.LayoutInflater;
+import android.view.Menu;
+import android.view.MenuInflater;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
@@ -69,6 +72,23 @@ public class FriendRequestListFragment extends LoaderFragment {
 	}
 
 	@Override
+	public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
+		menu.add(0, 1, 0, getString(R.string.friend_request_search))
+			.setIcon(R.drawable.ic_fluent_search_24_regular)
+			.setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
+	}
+
+	@Override
+	public boolean onOptionsItemSelected(MenuItem item) {
+		if (item.getItemId() == 1) {
+			// 搜索功能暂未实现
+			Toast.makeText(getContext(), "搜索功能即将上线", Toast.LENGTH_SHORT).show();
+			return true;
+		}
+		return super.onOptionsItemSelected(item);
+	}
+
+	@Override
 	public View onCreateContentView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
 		FrameLayout wrapper = new FrameLayout(getContext());
 		wrapper.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
@@ -80,19 +100,6 @@ public class FriendRequestListFragment extends LoaderFragment {
 		// 防诈骗提示横幅
 		View banner = inflater.inflate(R.layout.friend_request_fraud_banner, root, false);
 		root.addView(banner);
-
-		// 搜索栏
-		View searchBar = inflater.inflate(R.layout.friend_request_search_bar, root, false);
-		searchInput = searchBar.findViewById(R.id.search_input);
-		ImageButton searchBtn = searchBar.findViewById(R.id.search_btn);
-		searchBtn.setOnClickListener(v -> {
-			currentSearch = searchInput.getText().toString().trim();
-			currentPage = 1;
-			data.clear();
-			adapter.notifyDataSetChanged();
-			loadData();
-		});
-		root.addView(searchBar);
 
 		// 下拉刷新
 		swipeRefreshLayout = new SwipeRefreshLayout(getContext());
@@ -139,7 +146,7 @@ public class FriendRequestListFragment extends LoaderFragment {
 
 		// FAB - 发布交友请求
 		ImageButton fab = new ImageButton(getContext());
-		fab.setImageResource(R.drawable.ic_fluent_add_24_regular);
+		fab.setImageResource(R.drawable.ic_fluent_send_24_regular);
 		FrameLayout.LayoutParams fabParams = new FrameLayout.LayoutParams(V.dp(56), V.dp(56));
 		fabParams.gravity = android.view.Gravity.BOTTOM | android.view.Gravity.END;
 		fabParams.setMargins(0, 0, V.dp(16), V.dp(16));

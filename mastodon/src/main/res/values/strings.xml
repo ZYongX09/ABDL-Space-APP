@@ -951,8 +951,8 @@
 	<string name="quote_followers_only_dont_show_again">Don\'t show this message again</string>
 	<string name="more_replies_found">More replies found</string>
 	<!-- Friend Request -->
-	<string name="friend_request">Dating</string>
-	<string name="friend_request_list">Friend Finder</string>
+	<string name="friend_request">Paper Plane</string>
+	<string name="friend_request_list">Space Paper Plane</string>
 	<string name="friend_request_create">Create Friend Request</string>
 	<string name="friend_request_detail">Friend Request Details</string>
 	<string name="friend_request_my">My Friend Requests</string>
