@@ -146,7 +146,7 @@ public class FriendRequestListFragment extends LoaderFragment {
 
 		// FAB - 发布交友请求
 		ImageButton fab = new ImageButton(getContext());
-		fab.setImageResource(R.drawable.ic_fluent_send_24_regular);
+		fab.setImageResource(R.drawable.ic_fluent_add_24_regular);
 		FrameLayout.LayoutParams fabParams = new FrameLayout.LayoutParams(V.dp(56), V.dp(56));
 		fabParams.gravity = android.view.Gravity.BOTTOM | android.view.Gravity.END;
 		fabParams.setMargins(0, 0, V.dp(16), V.dp(16));

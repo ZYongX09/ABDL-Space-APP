@@ -873,8 +873,8 @@
 	<string name="settings_about_blog">开发者博客</string>
 	<string name="settings_cookie_policy">Cookie 政策</string>
 	<!-- 交友请求 -->
-	<string name="friend_request">纸飞机</string>
-	<string name="friend_request_list">Space 纸飞机</string>
+	<string name="friend_request">交友宇宙</string>
+	<string name="friend_request_list">Space 交友宇宙</string>
 	<string name="friend_request_create">发布交友请求</string>
 	<string name="friend_request_detail">交友详情</string>
 	<string name="friend_request_my">我的交友请求</string>
