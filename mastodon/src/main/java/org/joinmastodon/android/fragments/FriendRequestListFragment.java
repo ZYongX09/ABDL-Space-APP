@@ -12,6 +12,7 @@ import android.widget.LinearLayout;
 import android.widget.PopupMenu;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.widget.FrameLayout;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -52,6 +53,7 @@ public class FriendRequestListFragment extends LoaderFragment {
 	private boolean loadingMore = false;
 	private boolean hasMore = true;
 	private String accountID;
+	private TextView emptyView;
 
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
@@ -68,6 +70,9 @@ public class FriendRequestListFragment extends LoaderFragment {
 
 	@Override
 	public View onCreateContentView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+		FrameLayout wrapper = new FrameLayout(getContext());
+		wrapper.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
 		FragmentRootLinearLayout root = new FragmentRootLinearLayout(getContext());
 		root.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 		root.setOrientation(LinearLayout.VERTICAL);
@@ -99,6 +104,14 @@ public class FriendRequestListFragment extends LoaderFragment {
 			loadData();
 		});
 
+		// 空状态提示
+		emptyView = new TextView(getContext());
+		emptyView.setText(R.string.friend_request_no_data);
+		emptyView.setTextSize(15);
+		emptyView.setGravity(android.view.Gravity.CENTER);
+		emptyView.setPadding(0, V.dp(64), 0, 0);
+		emptyView.setVisibility(View.GONE);
+
 		// RecyclerView
 		recyclerView = new RecyclerView(getContext());
 		recyclerView.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
@@ -110,7 +123,7 @@ public class FriendRequestListFragment extends LoaderFragment {
 		recyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
 			@Override
 			public void onScrolled(@NonNull RecyclerView rv, int dx, int dy) {
-			 LinearLayoutManager lm = (LinearLayoutManager) rv.getLayoutManager();
+				LinearLayoutManager lm = (LinearLayoutManager) rv.getLayoutManager();
 				if (lm != null && !loadingMore && hasMore && lm.findLastVisibleItemPosition() >= data.size() - 3) {
 					loadingMore = true;
 					currentPage++;
@@ -122,7 +135,26 @@ public class FriendRequestListFragment extends LoaderFragment {
 		swipeRefreshLayout.addView(recyclerView);
 		root.addView(swipeRefreshLayout);
 
-		return root;
+		wrapper.addView(root);
+
+		// FAB - 发布交友请求
+		ImageButton fab = new ImageButton(getContext());
+		fab.setImageResource(R.drawable.ic_fluent_add_24_regular);
+		FrameLayout.LayoutParams fabParams = new FrameLayout.LayoutParams(V.dp(56), V.dp(56));
+		fabParams.gravity = android.view.Gravity.BOTTOM | android.view.Gravity.END;
+		fabParams.setMargins(0, 0, V.dp(16), V.dp(16));
+		fab.setLayoutParams(fabParams);
+		fab.setBackgroundResource(R.drawable.bg_fab);
+		fab.setScaleType(ImageView.ScaleType.CENTER);
+		fab.setElevation(V.dp(6));
+		fab.setOnClickListener(v -> {
+			Bundle args = new Bundle();
+			args.putString("account", accountID);
+			Nav.go(getActivity(), FriendRequestCreateFragment.class, args);
+		});
+		wrapper.addView(fab);
+
+		return wrapper;
 	}
 
 	@Override
@@ -177,6 +209,7 @@ public class FriendRequestListFragment extends LoaderFragment {
 					}
 
 					adapter.notifyDataSetChanged();
+					updateEmptyState();
 					dataLoaded();
 					swipeRefreshLayout.setRefreshing(false);
 					loadingMore = false;
@@ -228,6 +261,13 @@ public class FriendRequestListFragment extends LoaderFragment {
 				}
 			})
 			.exec(accountID);
+	}
+
+	private void updateEmptyState() {
+		if (emptyView != null) {
+			emptyView.setVisibility(data.isEmpty() ? View.VISIBLE : View.GONE);
+			recyclerView.setVisibility(data.isEmpty() ? View.GONE : View.VISIBLE);
+		}
 	}
 
 	private class FriendRequestAdapter extends RecyclerView.Adapter<FriendRequestAdapter.VH> {
