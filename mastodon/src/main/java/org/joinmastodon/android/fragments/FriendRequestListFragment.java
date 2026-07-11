@@ -129,43 +129,6 @@ public class FriendRequestListFragment extends LoaderFragment {
 			root.addView(banner);
 		}
 
-		// 分类 Chip
-		LinearLayout chipContainer = new LinearLayout(getContext());
-		chipContainer.setOrientation(LinearLayout.HORIZONTAL);
-		chipContainer.setPadding(V.dp(16), V.dp(8), V.dp(16), 0);
-
-		String[] filters = {"推荐", "最新", "同城", "找家长", "找弟弟", "找姐姐", "找哥哥", "找朋友"};
-		for (int i = 0; i < filters.length; i++) {
-			TextView chip = new TextView(getContext());
-			chip.setText(filters[i]);
-			chip.setTextSize(12);
-			chip.setPadding(V.dp(12), V.dp(8), V.dp(12), V.dp(8));
-			chip.setBackgroundResource(i == 0 ? R.drawable.bg_tag_selected : R.drawable.bg_tag);
-			chip.setTextColor(i == 0 ? 0xFFFFFFFF : 0xFF333333);
-			LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-				LinearLayout.LayoutParams.WRAP_CONTENT,
-				LinearLayout.LayoutParams.WRAP_CONTENT
-			);
-			params.setMarginEnd(V.dp(8));
-			chip.setLayoutParams(params);
-			chip.setOnClickListener(v -> {
-				for (int j = 0; j < chipContainer.getChildCount(); j++) {
-					TextView c = (TextView) chipContainer.getChildAt(j);
-					c.setBackgroundResource(R.drawable.bg_tag);
-					c.setTextColor(0xFF333333);
-				}
-				chip.setBackgroundResource(R.drawable.bg_tag_selected);
-				chip.setTextColor(0xFFFFFFFF);
-				currentFilter = chip.getText().toString();
-				currentPage = 1;
-				data.clear();
-				adapter.notifyDataSetChanged();
-				loadData();
-			});
-			chipContainer.addView(chip);
-		}
-		root.addView(chipContainer);
-
 		// 下拉刷新
 		swipeRefreshLayout = new SwipeRefreshLayout(getContext());
 		swipeRefreshLayout.setColorSchemeResources(android.R.color.holo_blue_dark);
@@ -360,8 +323,8 @@ public class FriendRequestListFragment extends LoaderFragment {
 
 	private String formatTime(String createdAt) {
 		try {
-			java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.getDefault());
-			java.util.Date date = sdf.parse(createdAt.replace("Z", ""));
+			java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault());
+			java.util.Date date = sdf.parse(createdAt);
 			long diff = System.currentTimeMillis() - date.getTime();
 			long seconds = diff / 1000;
 			long minutes = seconds / 60;
