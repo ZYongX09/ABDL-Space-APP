@@ -50,6 +50,7 @@ import me.grishka.appkit.imageloader.requests.UrlImageLoaderRequest;
 import me.grishka.appkit.utils.V;
 import me.grishka.appkit.views.FragmentRootLinearLayout;
 import org.joinmastodon.android.ui.OutlineProviders;
+import org.joinmastodon.android.ui.views.FlowLayout;
 
 public class FriendRequestListFragment extends LoaderFragment {
 	private RecyclerView recyclerView;
@@ -426,21 +427,19 @@ public class FriendRequestListFragment extends LoaderFragment {
 
 				// Metadata icons
 				metadataContainer.removeAllViews();
-				int count = 0;
 				if (item.fields != null) {
 					for (FriendRequestField f : item.fields) {
-						if (count >= 6) break;
 						if ("年龄".equals(f.field_key) || "生理性别".equals(f.field_key) || "城市".equals(f.field_key)) continue;
 						int iconRes = getMetadataIconRes(f.field_key);
 						if (iconRes != 0) {
 							ImageView icon = new ImageView(getContext());
-							icon.setLayoutParams(new LinearLayout.LayoutParams(V.dp(24), V.dp(24)));
+							ViewGroup.LayoutParams iconParams = new ViewGroup.LayoutParams(V.dp(24), V.dp(24));
+							icon.setLayoutParams(iconParams);
 							icon.setPadding(0, 0, V.dp(10), 0);
 							icon.setImageResource(iconRes);
 							icon.setColorFilter(getResources().getColor(android.R.color.darker_gray));
 							icon.setContentDescription(f.field_key);
 							metadataContainer.addView(icon);
-							count++;
 						}
 					}
 				}
@@ -481,7 +480,7 @@ public class FriendRequestListFragment extends LoaderFragment {
 						popup.getMenu().add(0, 1, 0, "编辑");
 						popup.getMenu().add(0, 2, 1, "删除");
 					}
-					popup.getMenu().add(0, 3, 2, "发布帖子");
+					// popup.getMenu().add(0, 3, 2, "发布帖子");
 					popup.getMenu().add(0, 4, 3, "举报");
 
 					popup.setOnMenuItemClickListener(menuItem -> {

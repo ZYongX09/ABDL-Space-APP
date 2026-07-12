@@ -77,13 +77,13 @@
         android:includeFontPadding="false" />
 
     <!-- 第三层：Metadata Preview Row -->
-    <LinearLayout
+    <org.joinmastodon.android.ui.views.FlowLayout
         android:id="@+id/metadata_container"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
         android:layout_marginTop="12dp"
-        android:gravity="center_vertical" />
+        android:paddingTop="4dp"
+        android:paddingBottom="4dp" />
 
     <!-- 第四层：时间 -->
     <LinearLayout
