@@ -160,6 +160,7 @@ public class FriendRequestDetailFragment extends LoaderFragment {
 				}
 				if (iconRes != 0) {
 					icon.setImageResource(iconRes);
+					icon.setColorFilter(getResources().getColor(android.R.color.darker_gray));
 					icon.setVisibility(View.VISIBLE);
 				} else {
 					icon.setVisibility(View.GONE);
