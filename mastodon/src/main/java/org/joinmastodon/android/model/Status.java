@@ -42,9 +42,9 @@ public class Status extends BaseModel implements DisplayItemsParent, Searchable 
 	@RequiredField
 	public StatusPrivacy visibility;
 	public boolean sensitive;
-	@RequiredField
+//	@RequiredField
 	public String spoilerText="";
-	@RequiredField
+//	@RequiredField
 	public List<Attachment> mediaAttachments;
 	public Application application;
 	@RequiredField
