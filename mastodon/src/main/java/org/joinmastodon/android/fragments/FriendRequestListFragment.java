@@ -481,7 +481,8 @@ public class FriendRequestListFragment extends LoaderFragment {
 						popup.getMenu().add(0, 1, 0, "编辑");
 						popup.getMenu().add(0, 2, 1, "删除");
 					}
-					popup.getMenu().add(0, 3, 2, "举报");
+					popup.getMenu().add(0, 3, 2, "发布帖子");
+					popup.getMenu().add(0, 4, 3, "举报");
 
 					popup.setOnMenuItemClickListener(menuItem -> {
 						if (menuItem.getItemId() == 1) {
@@ -503,6 +504,7 @@ public class FriendRequestListFragment extends LoaderFragment {
 							}
 							Nav.go(getActivity(), FriendRequestCreateFragment.class, args);
 						} else if (menuItem.getItemId() == 2) {
+							// 删除
 							new DeleteFriendRequest(item.id)
 								.setCallback(new Callback<Map<String, Object>>() {
 									@Override
@@ -520,6 +522,12 @@ public class FriendRequestListFragment extends LoaderFragment {
 								})
 								.exec(accountID);
 						} else if (menuItem.getItemId() == 3) {
+							// 发布帖子 - 跳转到帖子编辑页面，自动填入 [交友]id[/交友]
+							Bundle args = new Bundle();
+							args.putString("account", accountID);
+							args.putString("preFillText", "[交友]" + item.id + "[/交友]");
+							Nav.go(getActivity(), ComposeFragment.class, args);
+						} else if (menuItem.getItemId() == 4) {
 							Bundle args = new Bundle();
 							args.putString("account", accountID);
 							args.putString("requestId", item.id);

@@ -128,6 +128,18 @@ public class FriendRequestDetailFragment extends LoaderFragment {
 			ViewImageLoader.loadWithoutAnimation(avatar, null, new UrlImageLoaderRequest(friendRequest.user.avatar, V.dp(56), V.dp(56)));
 		}
 
+		// 头像和用户名点击跳转个人主页
+		View.OnClickListener profileClickListener = v -> {
+			if (friendRequest.user != null && friendRequest.user_id != null) {
+				Bundle args = new Bundle();
+				args.putString("account", accountID);
+				args.putString("profileAccountID", friendRequest.user_id);
+				Nav.go(getActivity(), ProfileFragment.class, args);
+			}
+		};
+		avatar.setOnClickListener(profileClickListener);
+		username.setOnClickListener(profileClickListener);
+
 		// 字段信息卡片
 		fieldsCard.removeAllViews();
 		if (friendRequest.fields != null) {
