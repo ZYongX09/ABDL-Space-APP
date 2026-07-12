@@ -95,15 +95,13 @@
             android:layout_marginTop="8dp" />
 
         <!-- 发布按钮 -->
-        <TextView
+        <Button
             android:id="@+id/save_btn"
             android:layout_width="match_parent"
             android:layout_height="48dp"
             android:text="发布"
-            android:textSize="16sp"
-            android:textColor="#FFFFFF"
-            android:background="@drawable/bg_btn_md3_blue"
-            android:gravity="center"
+            android:textAllCaps="false"
+            style="@style/Widget.Mastodon.M3.Button.Filled"
             android:layout_marginTop="24dp"
             android:layout_marginBottom="32dp" />
 

@@ -30,7 +30,7 @@ import me.grishka.appkit.api.ErrorResponse;
 import me.grishka.appkit.fragments.ToolbarFragment;
 
 public class FriendRequestCreateFragment extends ToolbarFragment {
-	private EditText titleInput, descriptionInput;
+	private EditText descriptionInput;
 	private LinearLayout fieldsContainer;
 	private String accountID;
 	private String editRequestId;
@@ -128,7 +128,6 @@ public class FriendRequestCreateFragment extends ToolbarFragment {
 
 		// 编辑模式：填充数据
 		if (editRequestId != null) {
-			if (editTitle != null) titleInput.setText(editTitle);
 			if (editDescription != null) descriptionInput.setText(editDescription);
 			if (editLookingFor != null) {
 				selectedLookingFor = editLookingFor;
