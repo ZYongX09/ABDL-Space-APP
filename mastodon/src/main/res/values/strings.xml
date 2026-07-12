@@ -977,13 +977,13 @@
 	<string name="friend_request_report_evidence">Upload evidence images (optional, max 3)</string>
 
 	<!-- Diaper module -->
-	<string name="diaper">Diapers</string>
-	<string name="diaper_list">Diaper List</string>
-	<string name="diaper_detail">Diaper Details</string>
-	<string name="diaper_search">Search diapers...</string>
-	<string name="diaper_all_brands">All</string>
-	<string name="diaper_no_data">No diapers available</string>
-	<string name="diaper_ratings_count">%d ratings</string>
+	<string name="diaper">纸尿裤</string>
+	<string name="diaper_list">纸尿裤列表</string>
+	<string name="diaper_detail">纸尿裤详情</string>
+	<string name="diaper_search">搜索纸尿裤...</string>
+	<string name="diaper_all_brands">全部</string>
+	<string name="diaper_no_data">暂无纸尿裤</string>
+	<string name="diaper_ratings_count">%d 评价</string>
 	<string name="diaper_baby">Baby</string>
 	<string name="diaper_absorbency">%s absorbency</string>
 

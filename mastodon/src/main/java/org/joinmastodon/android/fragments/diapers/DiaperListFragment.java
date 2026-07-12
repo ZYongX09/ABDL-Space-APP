@@ -1,19 +1,18 @@
 package org.joinmastodon.android.fragments.diapers;
 
 import android.app.Activity;
-import android.graphics.Outline;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.ViewOutlineProvider;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -28,7 +27,6 @@ import org.joinmastodon.android.R;
 import org.joinmastodon.android.api.requests.diapers.GetDiaperBrands;
 import org.joinmastodon.android.api.requests.diapers.GetDiaperList;
 import org.joinmastodon.android.model.Diaper;
-import org.joinmastodon.android.ui.OutlineProviders;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -60,6 +58,8 @@ public class DiaperListFragment extends LoaderFragment {
 	private EditText searchInput;
 	private final Handler searchHandler = new Handler(Looper.getMainLooper());
 	private Runnable searchRunnable;
+	private View loadingFooter;
+	private ProgressBar loadingProgress;
 
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
@@ -110,7 +110,6 @@ public class DiaperListFragment extends LoaderFragment {
 				public void onTextChanged(CharSequence s, int start, int before, int count) {}
 				@Override
 				public void afterTextChanged(android.text.Editable s) {
-					// 防抖：300ms延迟
 					if (searchRunnable != null) searchHandler.removeCallbacks(searchRunnable);
 					searchRunnable = () -> {
 						String newSearch = s.toString();
@@ -162,14 +161,19 @@ public class DiaperListFragment extends LoaderFragment {
 		adapter = new DiaperAdapter();
 		recyclerView.setAdapter(adapter);
 
+		// 加载更多底部指示器
+		loadingFooter = inflater.inflate(R.layout.item_loading_footer, recyclerView, false);
+		loadingProgress = loadingFooter.findViewById(R.id.loading_progress);
+
 		// 滚动加载更多
 		recyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
 			@Override
 			public void onScrolled(@NonNull RecyclerView rv, int dx, int dy) {
-				if (dy <= 0) return; // 向上滚动不触发加载
+				if (dy <= 0) return;
 				LinearLayoutManager lm = (LinearLayoutManager) rv.getLayoutManager();
 				if (lm != null && !loadingMore && hasMore && lm.findLastVisibleItemPosition() >= data.size() - 3) {
 					loadingMore = true;
+					adapter.notifyDataSetChanged();
 					currentPage++;
 					loadMore();
 				}
@@ -308,11 +312,13 @@ public class DiaperListFragment extends LoaderFragment {
 						hasMore = false;
 					}
 					loadingMore = false;
+					adapter.notifyDataSetChanged();
 				}
 
 				@Override
 				public void onError(ErrorResponse error) {
 					loadingMore = false;
+					adapter.notifyDataSetChanged();
 				}
 			})
 			.exec(accountID);
@@ -329,7 +335,6 @@ public class DiaperListFragment extends LoaderFragment {
 
 			boolean isSelected = brand.equals(currentBrand);
 			chipText.setBackgroundResource(isSelected ? R.drawable.bg_diaper_chip_selected : R.drawable.bg_diaper_chip);
-			// 使用主题颜色，适配暗色模式
 			if (isSelected) {
 				chipText.setTextColor(0xFFFFFFFF);
 			} else {
@@ -358,94 +363,111 @@ public class DiaperListFragment extends LoaderFragment {
 		}
 	}
 
-	private class DiaperAdapter extends RecyclerView.Adapter<DiaperAdapter.ViewHolder> {
+	private static final int VIEW_TYPE_ITEM = 0;
+	private static final int VIEW_TYPE_LOADING = 1;
+
+	private class DiaperAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
 
 		@NonNull
 		@Override
-		public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+		public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+			if (viewType == VIEW_TYPE_LOADING) {
+				View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_loading_footer, parent, false);
+				return new LoadingViewHolder(view);
+			}
 			View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_diaper_list, parent, false);
-			return new ViewHolder(view);
+			return new ItemViewHolder(view);
 		}
 
 		@Override
-		public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-			Diaper diaper = data.get(position);
+		public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
+			if (holder instanceof ItemViewHolder) {
+				ItemViewHolder itemHolder = (ItemViewHolder) holder;
+				Diaper diaper = data.get(position);
 
-			// 品牌Logo
-			if (diaper.brand_logo != null && !diaper.brand_logo.isEmpty()) {
-				int logoSize = V.dp(48);
-				ViewImageLoader.loadWithoutAnimation(holder.brandLogo, null,
-					new UrlImageLoaderRequest(diaper.brand_logo, logoSize, logoSize));
-				holder.brandLogo.setVisibility(View.VISIBLE);
-			} else {
-				holder.brandLogo.setVisibility(View.GONE);
+				// 纸尿裤图片（优先使用图片数组第一张）
+				if (diaper.images != null && !diaper.images.isEmpty()) {
+					int imgSize = V.dp(56);
+					ViewImageLoader.loadWithoutAnimation(itemHolder.diaperImage, null,
+						new UrlImageLoaderRequest(diaper.images.get(0), imgSize, imgSize));
+					itemHolder.diaperImage.setVisibility(View.VISIBLE);
+				} else {
+					itemHolder.diaperImage.setVisibility(View.GONE);
+				}
+
+				// 品牌 + 型号
+				itemHolder.brandName.setText(diaper.brand + " " + diaper.model);
+
+				// 婴儿标签
+				itemHolder.babyBadge.setVisibility(diaper.is_baby_diaper == 1 ? View.VISIBLE : View.GONE);
+
+				// 评分
+				if (diaper.avg_score > 0) {
+					itemHolder.avgScore.setText(String.format("%.2f", diaper.avg_score));
+					itemHolder.avgScore.setVisibility(View.VISIBLE);
+				} else {
+					itemHolder.avgScore.setText("--");
+					itemHolder.avgScore.setVisibility(View.VISIBLE);
+				}
+
+				// 评价数
+				if (diaper.rating_count > 0) {
+					itemHolder.ratingCount.setText(String.format("%d 评价", diaper.rating_count));
+					itemHolder.ratingCount.setVisibility(View.VISIBLE);
+				} else {
+					itemHolder.ratingCount.setVisibility(View.GONE);
+				}
+
+				// 吸收量
+				if (diaper.absorbency_adult != null && !diaper.absorbency_adult.isEmpty()) {
+					itemHolder.absorbency.setText(diaper.absorbency_adult);
+					itemHolder.absorbency.setVisibility(View.VISIBLE);
+				} else {
+					itemHolder.absorbency.setVisibility(View.GONE);
+				}
+
+				// 点击进入详情
+				itemHolder.itemView.setOnClickListener(v -> {
+					Bundle args = new Bundle();
+					args.putString("account", accountID);
+					args.putInt("diaper_id", diaper.id);
+					Nav.go(getActivity(), DiaperDetailFragment.class, args);
+				});
 			}
-
-			// 品牌 + 型号
-			holder.brandName.setText(diaper.brand + " " + diaper.model);
-
-			// 婴儿标签
-			if (diaper.is_baby_diaper == 1) {
-				holder.babyBadge.setVisibility(View.VISIBLE);
-			} else {
-				holder.babyBadge.setVisibility(View.GONE);
-			}
-
-			// 评分
-			if (diaper.avg_score > 0) {
-				holder.avgScore.setText(String.format("%.2f", diaper.avg_score));
-				holder.avgScore.setVisibility(View.VISIBLE);
-			} else {
-				holder.avgScore.setText("--");
-				holder.avgScore.setVisibility(View.VISIBLE);
-			}
-
-			// 评价数
-			if (diaper.rating_count > 0) {
-				holder.ratingCount.setText(String.format("%d 评价", diaper.rating_count));
-				holder.ratingCount.setVisibility(View.VISIBLE);
-			} else {
-				holder.ratingCount.setVisibility(View.GONE);
-			}
-
-			// 吸收量
-			if (diaper.absorbency_adult != null && !diaper.absorbency_adult.isEmpty()) {
-				holder.absorbency.setText(diaper.absorbency_adult);
-				holder.absorbency.setVisibility(View.VISIBLE);
-			} else {
-				holder.absorbency.setVisibility(View.GONE);
-			}
-
-			// 点击进入详情
-			holder.itemView.setOnClickListener(v -> {
-				Bundle args = new Bundle();
-				args.putString("account", accountID);
-				args.putInt("diaper_id", diaper.id);
-				Nav.go(getActivity(), DiaperDetailFragment.class, args);
-			});
 		}
 
 		@Override
 		public int getItemCount() {
-			return data.size();
+			return data.size() + (loadingMore ? 1 : 0);
 		}
 
-		class ViewHolder extends RecyclerView.ViewHolder {
-			ImageView brandLogo;
+		@Override
+		public int getItemViewType(int position) {
+			return position >= data.size() ? VIEW_TYPE_LOADING : VIEW_TYPE_ITEM;
+		}
+
+		class ItemViewHolder extends RecyclerView.ViewHolder {
+			ImageView diaperImage;
 			TextView brandName;
 			TextView babyBadge;
 			TextView avgScore;
 			TextView ratingCount;
 			TextView absorbency;
 
-			ViewHolder(View itemView) {
+			ItemViewHolder(View itemView) {
 				super(itemView);
-				brandLogo = itemView.findViewById(R.id.brand_logo);
+				diaperImage = itemView.findViewById(R.id.diaper_image);
 				brandName = itemView.findViewById(R.id.brand_name);
 				babyBadge = itemView.findViewById(R.id.baby_badge);
 				avgScore = itemView.findViewById(R.id.avg_score);
 				ratingCount = itemView.findViewById(R.id.rating_count);
 				absorbency = itemView.findViewById(R.id.absorbency);
+			}
+		}
+
+		class LoadingViewHolder extends RecyclerView.ViewHolder {
+			LoadingViewHolder(View itemView) {
+				super(itemView);
 			}
 		}
 	}
