@@ -3,10 +3,13 @@ package org.joinmastodon.android.fragments.diapers;
 import android.app.Activity;
 import android.graphics.Outline;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewOutlineProvider;
+import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
@@ -54,11 +57,28 @@ public class DiaperListFragment extends LoaderFragment {
 	private LinearLayout chipsContainer;
 	private View emptyState;
 	private String accountID;
+	private EditText searchInput;
+	private final Handler searchHandler = new Handler(Looper.getMainLooper());
+	private Runnable searchRunnable;
 
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		accountID = getArguments() != null ? getArguments().getString("account") : null;
+
+		if (savedInstanceState != null) {
+			currentSearch = savedInstanceState.getString("search", "");
+			currentBrand = savedInstanceState.getString("brand", "");
+			currentSort = savedInstanceState.getString("sort", "id");
+		}
+	}
+
+	@Override
+	public void onSaveInstanceState(Bundle outState) {
+		super.onSaveInstanceState(outState);
+		outState.putString("search", currentSearch);
+		outState.putString("brand", currentBrand);
+		outState.putString("sort", currentSort);
 	}
 
 	@Override
@@ -78,26 +98,34 @@ public class DiaperListFragment extends LoaderFragment {
 
 		// 搜索框
 		View searchView = inflater.inflate(R.layout.diaper_search_bar, root, false);
-		if (searchView != null) {
-			android.widget.EditText searchInput = searchView.findViewById(R.id.search_input);
-			if (searchInput != null) {
-				searchInput.addTextChangedListener(new android.text.TextWatcher() {
-					@Override
-					public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-					@Override
-					public void onTextChanged(CharSequence s, int start, int before, int count) {}
-					@Override
-					public void afterTextChanged(android.text.Editable s) {
-						currentSearch = s.toString();
-						currentPage = 1;
-						data.clear();
-						hasMore = true;
-						loadData();
-					}
-				});
+		searchInput = searchView.findViewById(R.id.search_input);
+		if (searchInput != null) {
+			if (!currentSearch.isEmpty()) {
+				searchInput.setText(currentSearch);
 			}
-			root.addView(searchView);
+			searchInput.addTextChangedListener(new android.text.TextWatcher() {
+				@Override
+				public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+				@Override
+				public void onTextChanged(CharSequence s, int start, int before, int count) {}
+				@Override
+				public void afterTextChanged(android.text.Editable s) {
+					// 防抖：300ms延迟
+					if (searchRunnable != null) searchHandler.removeCallbacks(searchRunnable);
+					searchRunnable = () -> {
+						String newSearch = s.toString();
+						if (!newSearch.equals(currentSearch)) {
+							currentSearch = newSearch;
+							currentPage = 1;
+							hasMore = true;
+							loadData();
+						}
+					};
+					searchHandler.postDelayed(searchRunnable, 300);
+				}
+			});
 		}
+		root.addView(searchView);
 
 		// 品牌筛选 chips (HorizontalScrollView)
 		HorizontalScrollView chipsScroll = new HorizontalScrollView(getContext());
@@ -117,7 +145,6 @@ public class DiaperListFragment extends LoaderFragment {
 		swipeRefreshLayout.setColorSchemeResources(android.R.color.holo_blue_dark);
 		swipeRefreshLayout.setOnRefreshListener(() -> {
 			currentPage = 1;
-			data.clear();
 			hasMore = true;
 			loadData();
 		});
@@ -139,6 +166,7 @@ public class DiaperListFragment extends LoaderFragment {
 		recyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
 			@Override
 			public void onScrolled(@NonNull RecyclerView rv, int dx, int dy) {
+				if (dy <= 0) return; // 向上滚动不触发加载
 				LinearLayoutManager lm = (LinearLayoutManager) rv.getLayoutManager();
 				if (lm != null && !loadingMore && hasMore && lm.findLastVisibleItemPosition() >= data.size() - 3) {
 					loadingMore = true;
@@ -172,16 +200,18 @@ public class DiaperListFragment extends LoaderFragment {
 	@Override
 	public void onRefresh() {
 		currentPage = 1;
-		data.clear();
 		hasMore = true;
 		loadData();
 	}
 
 	public void loadData() {
+		boolean isInitialLoad = !loaded && !dataLoading;
 		dataLoading = true;
-		showProgress();
+		if (isInitialLoad) {
+			showProgress();
+		}
 
-		// 加载品牌列表
+		// 加载品牌列表（仅首次）
 		if (brands.isEmpty()) {
 			new GetDiaperBrands()
 				.setCallback(new Callback<Map<String, Object>>() {
@@ -212,6 +242,7 @@ public class DiaperListFragment extends LoaderFragment {
 				public void onSuccess(Map<String, Object> result) {
 					if (getActivity() == null) return;
 					List<Map<String, Object>> diaperList = (List<Map<String, Object>>) result.get("diapers");
+					if (diaperList == null) diaperList = new ArrayList<>();
 					Gson gson = new Gson();
 					List<Diaper> newItems = gson.fromJson(
 						gson.toJson(diaperList),
@@ -258,14 +289,16 @@ public class DiaperListFragment extends LoaderFragment {
 				public void onSuccess(Map<String, Object> result) {
 					if (getActivity() == null) return;
 					List<Map<String, Object>> diaperList = (List<Map<String, Object>>) result.get("diapers");
+					if (diaperList == null) diaperList = new ArrayList<>();
 					Gson gson = new Gson();
 					List<Diaper> newItems = gson.fromJson(
 						gson.toJson(diaperList),
 						new TypeToken<List<Diaper>>(){}.getType()
 					);
 
+					int startPos = data.size();
 					data.addAll(newItems);
-					adapter.notifyItemRangeInserted(data.size() - newItems.size(), newItems.size());
+					adapter.notifyItemRangeInserted(startPos, newItems.size());
 
 					Map<String, Object> pagination = (Map<String, Object>) result.get("pagination");
 					if (pagination != null) {
@@ -286,6 +319,7 @@ public class DiaperListFragment extends LoaderFragment {
 	}
 
 	private void buildChips() {
+		if (chipsContainer == null) return;
 		chipsContainer.removeAllViews();
 		for (int i = 0; i < brands.size(); i++) {
 			String brand = brands.get(i);
@@ -295,12 +329,16 @@ public class DiaperListFragment extends LoaderFragment {
 
 			boolean isSelected = brand.equals(currentBrand);
 			chipText.setBackgroundResource(isSelected ? R.drawable.bg_diaper_chip_selected : R.drawable.bg_diaper_chip);
-			chipText.setTextColor(isSelected ? 0xFFFFFFFF : 0xFF333333);
+			// 使用主题颜色，适配暗色模式
+			if (isSelected) {
+				chipText.setTextColor(0xFFFFFFFF);
+			} else {
+				chipText.setTextColor(getResources().getColor(R.color.diaper_chip_text));
+			}
 
 			chipText.setOnClickListener(v -> {
 				currentBrand = brand;
 				currentPage = 1;
-				data.clear();
 				hasMore = true;
 				buildChips();
 				loadData();
@@ -335,8 +373,9 @@ public class DiaperListFragment extends LoaderFragment {
 
 			// 品牌Logo
 			if (diaper.brand_logo != null && !diaper.brand_logo.isEmpty()) {
+				int logoSize = V.dp(48);
 				ViewImageLoader.loadWithoutAnimation(holder.brandLogo, null,
-					new UrlImageLoaderRequest(diaper.brand_logo, V.dp(56), V.dp(56)));
+					new UrlImageLoaderRequest(diaper.brand_logo, logoSize, logoSize));
 				holder.brandLogo.setVisibility(View.VISIBLE);
 			} else {
 				holder.brandLogo.setVisibility(View.GONE);
@@ -354,7 +393,7 @@ public class DiaperListFragment extends LoaderFragment {
 
 			// 评分
 			if (diaper.avg_score > 0) {
-				holder.avgScore.setText(String.format("%.1f", diaper.avg_score));
+				holder.avgScore.setText(String.format("%.2f", diaper.avg_score));
 				holder.avgScore.setVisibility(View.VISIBLE);
 			} else {
 				holder.avgScore.setText("--");
@@ -407,17 +446,6 @@ public class DiaperListFragment extends LoaderFragment {
 				avgScore = itemView.findViewById(R.id.avg_score);
 				ratingCount = itemView.findViewById(R.id.rating_count);
 				absorbency = itemView.findViewById(R.id.absorbency);
-
-				// 圆角裁剪
-				if (brandLogo != null) {
-					brandLogo.setOutlineProvider(new ViewOutlineProvider() {
-						@Override
-						public void getOutline(View view, Outline outline) {
-							outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), V.dp(8));
-						}
-					});
-					brandLogo.setClipToOutline(true);
-				}
 			}
 		}
 	}

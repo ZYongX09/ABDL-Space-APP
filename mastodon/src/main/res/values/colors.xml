@@ -128,4 +128,10 @@
 	<color name="ext_rich_text_decoration_dark">#7A4152</color>
 
 	<item name="overlay_ripple_alpha" format="float" type="dimen">0.12</item>
+
+	<!-- Diaper module -->
+	<color name="diaper_chip_text">#333333</color>
+	<color name="diaper_card_bg">#0A000000</color>
+	<color name="diaper_logo_bg">#0F000000</color>
+	<color name="diaper_search_bg">#0F000000</color>
 </resources>

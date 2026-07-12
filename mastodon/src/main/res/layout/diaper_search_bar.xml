@@ -18,22 +18,20 @@
             android:layout_gravity="center_vertical|start"
             android:layout_marginStart="14dp"
             android:src="@drawable/ic_fluent_search_24_regular"
-            android:tint="#999999"
             android:importantForAccessibility="no" />
 
         <EditText
             android:id="@+id/search_input"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:background="@drawable/search_bg"
+            android:background="@drawable/bg_diaper_search"
             android:hint="@string/diaper_search"
             android:inputType="text"
             android:maxLines="1"
             android:paddingStart="42dp"
             android:paddingEnd="16dp"
             android:textSize="14sp"
-            android:imeOptions="actionSearch"
-            android:textColorHint="#999999" />
+            android:imeOptions="actionSearch" />
 
     </FrameLayout>
 
