@@ -23,6 +23,7 @@ import org.joinmastodon.android.R;
 import org.joinmastodon.android.api.session.AccountSession;
 import org.joinmastodon.android.api.session.AccountSessionManager;
 import org.joinmastodon.android.fragments.ComposeFragment;
+import org.joinmastodon.android.fragments.ThreadFragment;
 import org.joinmastodon.android.fragments.account_list.StatusFavoritesListFragment;
 import org.joinmastodon.android.fragments.account_list.StatusReblogsListFragment;
 import org.joinmastodon.android.fragments.account_list.StatusRelatedAccountListFragment;
@@ -201,12 +202,11 @@ public class FooterStatusDisplayItem extends StatusDisplayItem{
 		}
 
 		private void onReplyClick(View v){
-			item.callbacks.maybeShowPreReplySheet(item.status, ()->{
-				Bundle args=new Bundle();
-				args.putString("account", item.accountID);
-				args.putParcelable("replyTo", Parcels.wrap(item.status));
-				Nav.go((Activity) item.context, ComposeFragment.class, args);
-			});
+			// 跳转到帖子详情页（而非回复页面）
+			Bundle args=new Bundle();
+			args.putString("account", item.accountID);
+			args.putParcelable("status", Parcels.wrap(item.status));
+			Nav.go((Activity) item.context, ThreadFragment.class, args);
 		}
 
 		private void onBoostClick(View v){
