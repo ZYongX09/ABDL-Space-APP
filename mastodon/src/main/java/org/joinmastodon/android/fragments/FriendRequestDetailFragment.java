@@ -175,7 +175,8 @@ public class FriendRequestDetailFragment extends LoaderFragment {
 		menuBtn.setOnClickListener(v -> {
 			PopupMenu popup = new PopupMenu(getContext(), v);
 			String myUserId = String.valueOf(AccountSessionManager.getInstance().getAccount(accountID).self.id);
-			boolean isOwner = friendRequest.user_id != null && friendRequest.user_id.equals(myUserId);
+			String itemUserId = friendRequest.user_id != null ? friendRequest.user_id.replace(".0", "") : "";
+			boolean isOwner = itemUserId.equals(myUserId);
 
 			if (isOwner) {
 				popup.getMenu().add(0, 1, 0, "编辑");

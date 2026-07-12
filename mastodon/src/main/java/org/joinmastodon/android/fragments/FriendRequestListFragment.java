@@ -324,7 +324,7 @@ public class FriendRequestListFragment extends LoaderFragment {
 	private String formatTime(String createdAt) {
 		try {
 			java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault());
-			sdf.setTimeZone(java.util.TimeZone.getTimeZone("Asia/Shanghai"));
+			sdf.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
 			java.util.Date date = sdf.parse(createdAt);
 			long diff = System.currentTimeMillis() - date.getTime();
 			long seconds = diff / 1000;
@@ -473,7 +473,9 @@ public class FriendRequestListFragment extends LoaderFragment {
 				menuBtn.setOnClickListener(v -> {
 					PopupMenu popup = new PopupMenu(getContext(), v);
 					String myUserId = String.valueOf(AccountSessionManager.getInstance().getAccount(accountID).self.id);
-					boolean isOwner = item.user_id != null && item.user_id.equals(myUserId);
+					// 统一去掉小数点再比较
+					String itemUserId = item.user_id != null ? item.user_id.replace(".0", "") : "";
+					boolean isOwner = itemUserId.equals(myUserId);
 
 					if (isOwner) {
 						popup.getMenu().add(0, 1, 0, "编辑");

@@ -110,7 +110,7 @@ public class FriendRequestCreateFragment extends ToolbarFragment {
 							tv.setBackgroundResource(R.drawable.bg_tag_selected);
 							tv.setTextColor(0xFFFFFFFF);
 						} else {
-							tv.setBackgroundResource(R.drawable.bg_tag);
+							tv.setBackgroundResource(R.drawable.bg_tag_with_border);
 							tv.setTextColor(0xFF333333);
 						}
 					}

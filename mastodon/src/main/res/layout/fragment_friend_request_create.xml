@@ -61,7 +61,7 @@
             android:inputType="textMultiLine"
             android:minLines="4"
             android:gravity="top"
-            android:background="@drawable/search_bg"
+            android:background="@drawable/bg_input_with_border"
             android:padding="12dp"
             android:textSize="15sp" />
 
@@ -94,15 +94,15 @@
             android:gravity="center"
             android:layout_marginTop="8dp" />
 
-        <!-- 保存按钮 -->
+        <!-- 发布按钮 -->
         <TextView
             android:id="@+id/save_btn"
             android:layout_width="match_parent"
             android:layout_height="48dp"
-            android:text="保存"
+            android:text="发布"
             android:textSize="16sp"
             android:textColor="#FFFFFF"
-            android:background="#1976D2"
+            android:background="@drawable/bg_btn_md3_blue"
             android:gravity="center"
             android:layout_marginTop="24dp"
             android:layout_marginBottom="32dp" />
