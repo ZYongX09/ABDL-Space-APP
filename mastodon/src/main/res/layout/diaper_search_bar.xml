@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:paddingHorizontal="16dp"
+    android:paddingVertical="8dp"
+    android:gravity="center_vertical">
+
+    <EditText
+        android:id="@+id/search_input"
+        android:layout_width="0dp"
+        android:layout_height="44dp"
+        android:layout_weight="1"
+        android:background="@drawable/search_bg"
+        android:hint="@string/diaper_search"
+        android:inputType="text"
+        android:maxLines="1"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:textSize="14sp"
+        android:imeOptions="actionSearch"
+        android:textColorHint="#999999" />
+
+</LinearLayout>

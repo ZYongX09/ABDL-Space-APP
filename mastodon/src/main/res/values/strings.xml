@@ -975,4 +975,16 @@
 	<string name="friend_request_update_success">Updated successfully</string>
 	<string name="friend_request_delete_confirm">Are you sure you want to delete this friend request?</string>
 	<string name="friend_request_report_evidence">Upload evidence images (optional, max 3)</string>
+
+	<!-- Diaper module -->
+	<string name="diaper">Diapers</string>
+	<string name="diaper_list">Diaper List</string>
+	<string name="diaper_detail">Diaper Details</string>
+	<string name="diaper_search">Search diapers...</string>
+	<string name="diaper_all_brands">All</string>
+	<string name="diaper_no_data">No diapers available</string>
+	<string name="diaper_ratings_count">%d ratings</string>
+	<string name="diaper_baby">Baby</string>
+	<string name="diaper_absorbency">%s absorbency</string>
+
 </resources>

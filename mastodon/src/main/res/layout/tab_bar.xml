@@ -104,6 +104,24 @@
 		</FrameLayout>
 
 		<FrameLayout
+			android:id="@+id/tab_diaper"
+			android:layout_width="0dp"
+			android:layout_height="match_parent"
+			android:layout_weight="1"
+			android:paddingHorizontal="4dp"
+			android:contentDescription="@string/diaper">
+
+			<ImageView
+				android:layout_width="28dp"
+				android:layout_height="28dp"
+				android:layout_gravity="center"
+				android:scaleType="center"
+				android:importantForAccessibility="no"
+				android:tint="@color/tab_bar_icon"
+				android:src="@drawable/ic_tab_diaper"/>
+		</FrameLayout>
+
+		<FrameLayout
 			android:id="@+id/tab_profile"
 			android:layout_width="0dp"
 			android:layout_height="match_parent"

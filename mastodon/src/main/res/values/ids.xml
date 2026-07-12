@@ -42,4 +42,7 @@
 	<item name="menu_add_timeline" type="id" />
 	<item name="menu_back" type="id" />
 	<item name="menu_add_local_timelines" type="id" />
+
+	<!-- Diaper tab -->
+	<item name="tab_diaper" type="id" />
 </resources>

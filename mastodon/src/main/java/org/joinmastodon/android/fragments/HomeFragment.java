@@ -28,6 +28,7 @@ import org.joinmastodon.android.api.session.AccountSession;
 import org.joinmastodon.android.api.session.AccountSessionManager;
 import org.joinmastodon.android.events.NotificationsMarkerUpdatedEvent;
 import org.joinmastodon.android.events.StatusDisplaySettingsChangedEvent;
+import org.joinmastodon.android.fragments.diapers.DiaperListFragment;
 import org.joinmastodon.android.fragments.discover.DiscoverFragment;
 import org.joinmastodon.android.fragments.onboarding.OnboardingFollowSuggestionsFragment;
 import org.joinmastodon.android.model.Account;
@@ -65,6 +66,7 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 	private DiscoverFragment searchFragment;
 	private ProfileFragment profileFragment;
 	private FriendRequestListFragment friendRequestFragment;
+	private DiaperListFragment diaperListFragment;
 	private TabBar tabBar;
 	private View tabBarWrap;
 	private ImageView tabBarAvatar;
@@ -97,6 +99,9 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 			args=new Bundle(args);
 			friendRequestFragment=new FriendRequestListFragment();
 			friendRequestFragment.setArguments(args);
+			args=new Bundle(args);
+			diaperListFragment=new DiaperListFragment();
+			diaperListFragment.setArguments(args);
 			args=new Bundle(args);
 			args.putParcelable("profileAccount", Parcels.wrap(AccountSessionManager.getInstance().getAccount(accountID).self));
 			args.putBoolean("noAutoLoad", true);
@@ -149,6 +154,7 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 					.add(me.grishka.appkit.R.id.fragment_wrap, searchFragment).hide(searchFragment)
 					.add(me.grishka.appkit.R.id.fragment_wrap, notificationsFragment).hide(notificationsFragment)
 					.add(me.grishka.appkit.R.id.fragment_wrap, friendRequestFragment).hide(friendRequestFragment)
+					.add(me.grishka.appkit.R.id.fragment_wrap, diaperListFragment).hide(diaperListFragment)
 					.add(me.grishka.appkit.R.id.fragment_wrap, profileFragment).hide(profileFragment)
 					.commit();
 
@@ -181,6 +187,7 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 		searchFragment=(DiscoverFragment) getChildFragmentManager().getFragment(savedInstanceState, "searchFragment");
 		notificationsFragment=(NotificationsListFragment) getChildFragmentManager().getFragment(savedInstanceState, "notificationsFragment");
 		friendRequestFragment=(FriendRequestListFragment) getChildFragmentManager().getFragment(savedInstanceState, "friendRequestFragment");
+		diaperListFragment=(DiaperListFragment) getChildFragmentManager().getFragment(savedInstanceState, "diaperListFragment");
 		profileFragment=(ProfileFragment) getChildFragmentManager().getFragment(savedInstanceState, "profileFragment");
 		currentTab=savedInstanceState.getInt("selectedTab");
 		tabBar.selectTab(currentTab);
@@ -190,6 +197,7 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 				.hide(searchFragment)
 				.hide(notificationsFragment)
 				.hide(friendRequestFragment)
+				.hide(diaperListFragment)
 				.hide(profileFragment)
 				.show(current)
 				.commit();
@@ -226,6 +234,7 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 		searchFragment.onApplyWindowInsets(topOnlyInsets);
 		notificationsFragment.onApplyWindowInsets(topOnlyInsets);
 		friendRequestFragment.onApplyWindowInsets(topOnlyInsets);
+		diaperListFragment.onApplyWindowInsets(topOnlyInsets);
 		profileFragment.onApplyWindowInsets(topOnlyInsets);
 	}
 
@@ -238,6 +247,8 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 			return notificationsFragment;
 		}else if(tab==R.id.tab_friend_request){
 			return friendRequestFragment;
+		}else if(tab==R.id.tab_diaper){
+			return diaperListFragment;
 		}else if(tab==R.id.tab_profile){
 			return profileFragment;
 		}
@@ -329,6 +340,8 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 		if (notificationsFragment.isAdded()) getChildFragmentManager().putFragment(outState, "notificationsFragment", notificationsFragment);
 
 		if (friendRequestFragment.isAdded()) getChildFragmentManager().putFragment(outState, "friendRequestFragment", friendRequestFragment);
+
+		if (diaperListFragment.isAdded()) getChildFragmentManager().putFragment(outState, "diaperListFragment", diaperListFragment);
 
 		if (profileFragment.isAdded()) getChildFragmentManager().putFragment(outState, "profileFragment", profileFragment);
 	}
