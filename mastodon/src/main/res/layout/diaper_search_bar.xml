@@ -7,19 +7,34 @@
     android:paddingVertical="8dp"
     android:gravity="center_vertical">
 
-    <EditText
-        android:id="@+id/search_input"
+    <FrameLayout
         android:layout_width="0dp"
         android:layout_height="44dp"
-        android:layout_weight="1"
-        android:background="@drawable/search_bg"
-        android:hint="@string/diaper_search"
-        android:inputType="text"
-        android:maxLines="1"
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp"
-        android:textSize="14sp"
-        android:imeOptions="actionSearch"
-        android:textColorHint="#999999" />
+        android:layout_weight="1">
+
+        <ImageView
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:layout_gravity="center_vertical|start"
+            android:layout_marginStart="14dp"
+            android:src="@drawable/ic_fluent_search_24_regular"
+            android:tint="#999999"
+            android:importantForAccessibility="no" />
+
+        <EditText
+            android:id="@+id/search_input"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/search_bg"
+            android:hint="@string/diaper_search"
+            android:inputType="text"
+            android:maxLines="1"
+            android:paddingStart="42dp"
+            android:paddingEnd="16dp"
+            android:textSize="14sp"
+            android:imeOptions="actionSearch"
+            android:textColorHint="#999999" />
+
+    </FrameLayout>
 
 </LinearLayout>

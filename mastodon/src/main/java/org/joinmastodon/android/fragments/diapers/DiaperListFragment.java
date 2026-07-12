@@ -8,6 +8,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewOutlineProvider;
 import android.widget.FrameLayout;
+import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -98,12 +99,18 @@ public class DiaperListFragment extends LoaderFragment {
 			root.addView(searchView);
 		}
 
-		// 品牌筛选 chips
+		// 品牌筛选 chips (HorizontalScrollView)
+		HorizontalScrollView chipsScroll = new HorizontalScrollView(getContext());
+		chipsScroll.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+		chipsScroll.setHorizontalScrollBarEnabled(false);
+		chipsScroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
+
 		chipsContainer = new LinearLayout(getContext());
-		chipsContainer.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+		chipsContainer.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 		chipsContainer.setOrientation(LinearLayout.HORIZONTAL);
 		chipsContainer.setPadding(V.dp(16), V.dp(8), V.dp(16), V.dp(8));
-		root.addView(chipsContainer);
+		chipsScroll.addView(chipsContainer);
+		root.addView(chipsScroll);
 
 		// 下拉刷新
 		swipeRefreshLayout = new SwipeRefreshLayout(getContext());
