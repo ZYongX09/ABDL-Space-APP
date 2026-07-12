@@ -76,6 +76,17 @@ public class FriendRequestCreateFragment extends ToolbarFragment {
 	public View onCreateContentView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
 		View view = inflater.inflate(R.layout.fragment_friend_request_create, container, false);
 
+		// 首次进入显示隐私提示
+		android.content.SharedPreferences prefs = getContext().getSharedPreferences("friend_request", 0);
+		if (!prefs.getBoolean("privacy_warning_shown", false)) {
+			prefs.edit().putBoolean("privacy_warning_shown", true).apply();
+			new android.app.AlertDialog.Builder(getContext())
+				.setTitle("隐私提醒")
+				.setMessage("发布交友请求时，请谨慎公开自己的真实姓名、手机号、地址等敏感个人信息。如果出现隐私泄露问题，请及时删除相关交友请求。保护好自己的隐私，才能更好地遇见同好。")
+				.setPositiveButton("我知道了", null)
+				.show();
+		}
+
 		descriptionInput = view.findViewById(R.id.create_description);
 		fieldsContainer = view.findViewById(R.id.create_fields);
 		lookingForLabel = view.findViewById(R.id.create_looking_for_label);

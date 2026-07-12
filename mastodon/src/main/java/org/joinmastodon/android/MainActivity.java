@@ -142,6 +142,36 @@ public class MainActivity extends FragmentStackActivity{
 			}
 		}
 
+		// 处理 @username 格式的个人主页链接
+		String path=uri.getPath();
+		if(path!=null && path.startsWith("/@")){
+			String username=path.substring(2);
+			if(!username.isEmpty()){
+				// 通过用户名查找用户并跳转到个人主页
+				final String uname=username;
+				new org.joinmastodon.android.api.requests.search.GetSearchResults(uname, org.joinmastodon.android.api.requests.search.GetSearchResults.Type.ACCOUNTS, true, null, 0, 0)
+					.setCallback(new Callback<>(){
+						@Override
+						public void onSuccess(org.joinmastodon.android.model.SearchResults result){
+							if(result.accounts!=null && !result.accounts.isEmpty()){
+								Bundle args=new Bundle();
+								args.putString("account", accountID);
+								args.putParcelable("profileAccount", org.parceler.Parcels.wrap(result.accounts.get(0)));
+								Nav.go(MainActivity.this, ProfileFragment.class, args);
+							}else{
+								Toast.makeText(MainActivity.this, R.string.link_not_supported, Toast.LENGTH_SHORT).show();
+							}
+						}
+						@Override
+						public void onError(ErrorResponse error){
+							error.showToast(MainActivity.this);
+						}
+					})
+					.exec(accountID);
+				return;
+			}
+		}
+
 		AccountSession session;
 		if(accountID==null)
 			session=AccountSessionManager.getInstance().getLastActiveAccount();
