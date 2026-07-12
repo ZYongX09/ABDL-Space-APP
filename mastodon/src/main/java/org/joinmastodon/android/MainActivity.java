@@ -15,6 +15,7 @@ import android.widget.Toast;
 
 import org.joinmastodon.android.api.ObjectValidationException;
 import org.joinmastodon.android.api.requests.search.GetSearchResults;
+import org.joinmastodon.android.api.requests.accounts.GetAccountByID;
 import org.joinmastodon.android.api.session.AccountSession;
 import org.joinmastodon.android.api.session.AccountSessionManager;
 import org.joinmastodon.android.fragments.AssistContentProviderFragment;
@@ -142,8 +143,33 @@ public class MainActivity extends FragmentStackActivity{
 			}
 		}
 
-		// 处理 @username 格式的个人主页链接
+		// 处理个人主页链接 https://abdl-space.top/profile/userid
 		String path=uri.getPath();
+		if(path!=null && path.startsWith("/profile/")){
+			String userIdStr=path.substring("/profile/".length());
+			if(!userIdStr.isEmpty()){
+				final String userId=userIdStr;
+				// 直接通过用户ID跳转到个人主页
+				new org.joinmastodon.android.api.requests.accounts.GetAccountByID(userId)
+					.setCallback(new Callback<>(){
+						@Override
+						public void onSuccess(org.joinmastodon.android.model.Account result){
+							Bundle args=new Bundle();
+							args.putString("account", accountID);
+							args.putParcelable("profileAccount", org.parceler.Parcels.wrap(result));
+							Nav.go(MainActivity.this, ProfileFragment.class, args);
+						}
+						@Override
+						public void onError(ErrorResponse error){
+							error.showToast(MainActivity.this);
+						}
+					})
+					.exec(accountID);
+				return;
+			}
+		}
+
+		// 处理 @username 格式
 		if(path!=null && path.startsWith("/@")){
 			String username=path.substring(2);
 			if(!username.isEmpty()){
