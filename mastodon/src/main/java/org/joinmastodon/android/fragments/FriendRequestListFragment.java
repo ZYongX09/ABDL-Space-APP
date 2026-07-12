@@ -389,7 +389,7 @@ public class FriendRequestListFragment extends LoaderFragment {
 		class VH extends RecyclerView.ViewHolder {
 			ImageView avatar;
 			TextView username, lookingForChip, basicInfo, publishTime;
-			LinearLayout metadataContainer;
+			ViewGroup metadataContainer;
 			ImageButton menuBtn;
 
 			VH(View itemView) {
