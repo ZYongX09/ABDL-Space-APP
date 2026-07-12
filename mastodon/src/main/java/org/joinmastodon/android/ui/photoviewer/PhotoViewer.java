@@ -219,7 +219,7 @@ public class PhotoViewer implements ZoomPanView.Listener{
 
 		windowView=new WindowRootFrameLayout(activity);
 		windowView.setDispatchKeyEventListener((v, keyCode, event)->{
-			if(Build.VERSION.SDK_INT<Build.VERSION_CODES.TIRAMISU && event.getKeyCode()==KeyEvent.KEYCODE_BACK){
+			if(event.getKeyCode()==KeyEvent.KEYCODE_BACK){
 				if(event.getAction()==KeyEvent.ACTION_DOWN){
 					onStartSwipeToDismissTransition(0f);
 				}
@@ -331,8 +331,7 @@ public class PhotoViewer implements ZoomPanView.Listener{
 		windowView.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
 		wm.addView(windowView, wlp);
 		if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.TIRAMISU){
-			// TODO make use of the progress callback for nicer animation
-			windowView.findOnBackInvokedDispatcher().registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT, ()->onStartSwipeToDismissTransition(0));
+			activity.getOnBackInvokedDispatcher().registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT, ()->onStartSwipeToDismissTransition(0));
 		}
 
 		windowView.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener(){
