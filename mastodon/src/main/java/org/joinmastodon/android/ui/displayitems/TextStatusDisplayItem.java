@@ -15,6 +15,7 @@ import android.widget.TextView;
 import org.joinmastodon.android.R;
 import org.joinmastodon.android.model.Status;
 import org.joinmastodon.android.ui.text.HtmlParser;
+import org.joinmastodon.android.ui.text.FriendRequestTagHandler;
 import org.joinmastodon.android.ui.utils.CustomEmojiHelper;
 import org.joinmastodon.android.ui.utils.UiUtils;
 import org.joinmastodon.android.ui.views.LinkedTextView;
@@ -91,7 +92,14 @@ public class TextStatusDisplayItem extends StatusDisplayItem{
 				}
 				text.setText(item.translatedText);
 			}else{
-				text.setText(item.text);
+				// 处理交友标签
+				CharSequence processedText = FriendRequestTagHandler.processFriendRequestTags(
+					item.text.toString(), text.getContext());
+				if (processedText != null) {
+					text.setText(processedText);
+				} else {
+					text.setText(item.text);
+				}
 			}
 			text.setTextIsSelectable(item.textSelectable);
 			text.setInvalidateOnEveryFrame(false);
