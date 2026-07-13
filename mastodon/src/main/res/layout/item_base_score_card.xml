@@ -3,7 +3,7 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="horizontal"
-    android:background="@drawable/bg_diaper_card"
+    android:background="@drawable/bg_base_score_card"
     android:paddingHorizontal="16dp"
     android:paddingVertical="14dp"
     android:layout_marginHorizontal="12dp"
@@ -12,9 +12,10 @@
 
     <!-- 图标 -->
     <ImageView
-        android:layout_width="24dp"
-        android:layout_height="24dp"
+        android:layout_width="28dp"
+        android:layout_height="28dp"
         android:src="@drawable/ic_fluent_chart_24_regular"
+        android:tint="#1976D2"
         android:importantForAccessibility="no" />
 
     <!-- 内容 -->
@@ -38,7 +39,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:layout_marginTop="6dp"
+            android:layout_marginTop="8dp"
             android:gravity="center_vertical">
 
             <TextView
@@ -46,18 +47,18 @@
                 android:layout_height="wrap_content"
                 android:text="成人"
                 android:textSize="12sp"
-                android:textColor="?android:textColorSecondary"
+                android:textColor="#1976D2"
                 android:background="@drawable/bg_tag_adult"
-                android:paddingHorizontal="8dp"
-                android:paddingVertical="2dp"
+                android:paddingHorizontal="10dp"
+                android:paddingVertical="3dp"
                 android:includeFontPadding="false" />
 
             <TextView
                 android:id="@+id/adult_score"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="6dp"
-                android:textSize="16sp"
+                android:layout_marginStart="8dp"
+                android:textSize="18sp"
                 android:textStyle="bold"
                 android:textColor="?android:textColorPrimary"
                 android:includeFontPadding="false" />
@@ -65,21 +66,21 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="16dp"
+                android:layout_marginStart="20dp"
                 android:text="儿童"
                 android:textSize="12sp"
-                android:textColor="?android:textColorSecondary"
+                android:textColor="#FF6B6B"
                 android:background="@drawable/bg_tag_baby"
-                android:paddingHorizontal="8dp"
-                android:paddingVertical="2dp"
+                android:paddingHorizontal="10dp"
+                android:paddingVertical="3dp"
                 android:includeFontPadding="false" />
 
             <TextView
                 android:id="@+id/baby_score"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="6dp"
-                android:textSize="16sp"
+                android:layout_marginStart="8dp"
+                android:textSize="18sp"
                 android:textStyle="bold"
                 android:textColor="?android:textColorPrimary"
                 android:includeFontPadding="false" />
@@ -88,7 +89,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
+            android:layout_marginTop="8dp"
             android:text="评分人数为 0 时的初始分数，基于全站数据实时计算"
             android:textSize="11sp"
             android:textColor="?android:textColorTertiary"

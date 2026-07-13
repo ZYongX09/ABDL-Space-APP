@@ -4,63 +4,57 @@
     android:layout_height="wrap_content"
     android:orientation="horizontal"
     android:gravity="center_vertical"
-    android:background="@drawable/bg_diaper_card"
+    android:background="@drawable/bg_ranking_item"
     android:paddingHorizontal="16dp"
-    android:paddingVertical="14dp"
+    android:paddingVertical="16dp"
     android:layout_marginHorizontal="12dp"
     android:layout_marginVertical="4dp">
 
     <!-- 排名序号 -->
     <TextView
         android:id="@+id/rank_number"
-        android:layout_width="28dp"
+        android:layout_width="32dp"
         android:layout_height="wrap_content"
-        android:textSize="18sp"
+        android:textSize="20sp"
         android:textStyle="bold"
         android:textColor="?android:textColorPrimary"
         android:gravity="center"
         android:includeFontPadding="false" />
 
-    <!-- 品牌 + 型号 -->
+    <!-- 品牌 + 型号 + 儿童款标签 -->
     <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:orientation="vertical"
-        android:layout_marginStart="8dp">
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginStart="12dp">
 
-        <LinearLayout
-            android:layout_width="match_parent"
+        <TextView
+            android:id="@+id/brand_name"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
+            android:layout_weight="1"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:textColor="?android:textColorPrimary"
+            android:includeFontPadding="false"
+            android:ellipsize="end"
+            android:maxLines="1" />
 
-            <TextView
-                android:id="@+id/brand_name"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:textSize="15sp"
-                android:textStyle="bold"
-                android:textColor="?android:textColorPrimary"
-                android:includeFontPadding="false"
-                android:ellipsize="end"
-                android:maxLines="1" />
-
-            <TextView
-                android:id="@+id/baby_badge"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="6dp"
-                android:text="儿童款"
-                android:textSize="10sp"
-                android:textColor="#FF6B6B"
-                android:background="@drawable/bg_tag_red"
-                android:paddingHorizontal="6dp"
-                android:paddingVertical="2dp"
-                android:includeFontPadding="false"
-                android:visibility="gone" />
-        </LinearLayout>
+        <TextView
+            android:id="@+id/baby_badge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:text="儿童款"
+            android:textSize="11sp"
+            android:textColor="#FF6B6B"
+            android:background="@drawable/bg_tag_red"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="3dp"
+            android:includeFontPadding="false"
+            android:visibility="gone" />
     </LinearLayout>
 
     <!-- 评分 -->
@@ -69,11 +63,11 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:layout_marginStart="8dp">
+        android:layout_marginStart="12dp">
 
         <ImageView
-            android:layout_width="14dp"
-            android:layout_height="14dp"
+            android:layout_width="16dp"
+            android:layout_height="16dp"
             android:src="@drawable/ic_fluent_star_24_filled"
             android:tint="#FFB300"
             android:contentDescription="评分" />
@@ -82,8 +76,8 @@
             android:id="@+id/avg_score"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="3dp"
-            android:textSize="14sp"
+            android:layout_marginStart="4dp"
+            android:textSize="16sp"
             android:textStyle="bold"
             android:textColor="#FFB300"
             android:includeFontPadding="false" />
