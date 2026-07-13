@@ -278,7 +278,7 @@ public class ProfileQrCodeFragment extends AppKitFragment{
 	}
 
 	@Override
-	public void onViewCreated(View view, Bundle savedInstanceState){
+	public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState){
 		super.onViewCreated(view, savedInstanceState);
 		if(savedInstanceState==null){
 			AnimatorSet set=new AnimatorSet();
@@ -449,52 +449,71 @@ public class ProfileQrCodeFragment extends AppKitFragment{
 	}
 
 	private void decodeQrFromUri(Uri uri){
-		final Uri imageUri=uri;
-		MastodonAPIController.runInBackground(()->{
-			Activity activity=getActivity();
-			if(activity==null)
+		new QrImageDecoder(getActivity(), uri, decoded->showToastOnUiThread(()->{
+			Activity a=getActivity();
+			if(a==null)
 				return;
-			try(InputStream is=activity.getContentResolver().openInputStream(imageUri)){
-				if(is==null){
-					showToast(R.string.qr_code_not_found);
-					return;
+			if(decoded!=null){
+				if(decoded.startsWith("https:") || decoded.startsWith("http:")){
+					((MainActivity)a).handleURL(Uri.parse(decoded), accountID);
+					dismiss();
+				}else{
+					Toast.makeText(themeWrapper, R.string.link_not_supported, Toast.LENGTH_SHORT).show();
 				}
-				byte[] fileBytes=readAllBytes(is);
-				BitmapFactory.Options boundsOpts=new BitmapFactory.Options();
-				boundsOpts.inJustDecodeBounds=true;
-				BitmapFactory.decodeByteArray(fileBytes, 0, fileBytes.length, boundsOpts);
-				boundsOpts.inSampleSize=calculateInSampleSize(boundsOpts, 1024, 1024);
-				boundsOpts.inJustDecodeBounds=false;
-				Bitmap bitmap=BitmapFactory.decodeByteArray(fileBytes, 0, fileBytes.length, boundsOpts);
-				if(bitmap==null){
-					showToast(R.string.qr_code_not_found);
-					return;
-				}
-				int w=bitmap.getWidth(), h=bitmap.getHeight();
-				int[] pixels=new int[w*h];
-				bitmap.getPixels(pixels, 0, w, 0, 0, w, h);
-				bitmap.recycle();
-				LuminanceSource source=new SimpleLuminanceSource(pixels, w, h);
-				BinaryBitmap binary=new BinaryBitmap(new HybridBinarizer(source));
-				HashMap<DecodeHintType, Object> hints=new HashMap<>();
-				hints.put(DecodeHintType.POSSIBLE_FORMATS, List.of(BarcodeFormat.QR_CODE));
-				Result result=new MultiFormatReader().decode(binary, hints);
-				String text=result.getText();
-				showToastOnUiThread(()->{
-					Activity a=getActivity();
-					if(a==null)
-						return;
-					if(text.startsWith("https:") || text.startsWith("http:")){
-						((MainActivity)a).handleURL(Uri.parse(text), accountID);
-						dismiss();
-					}else{
-						Toast.makeText(themeWrapper, R.string.link_not_supported, Toast.LENGTH_SHORT).show();
-					}
-				});
-			}catch(Exception e){
-				showToast(R.string.qr_code_not_found);
+			}else{
+				Toast.makeText(themeWrapper, R.string.qr_code_not_found, Toast.LENGTH_SHORT).show();
 			}
-		});
+		})).decode();
+	}
+
+	public static final class QrImageDecoder{
+		private final Activity activity;
+		private final Uri uri;
+		private final java.util.function.Consumer<String> callback;
+
+		public QrImageDecoder(Activity activity, Uri uri, java.util.function.Consumer<String> callback){
+			this.activity=activity;
+			this.uri=uri;
+			this.callback=callback;
+		}
+
+		public void decode(){
+			MastodonAPIController.runInBackground(()->{
+				try(InputStream is=activity.getContentResolver().openInputStream(uri)){
+					if(is==null){
+						postResult(null);
+						return;
+					}
+					byte[] fileBytes=readAllBytes(is);
+					BitmapFactory.Options boundsOpts=new BitmapFactory.Options();
+					boundsOpts.inJustDecodeBounds=true;
+					BitmapFactory.decodeByteArray(fileBytes, 0, fileBytes.length, boundsOpts);
+					boundsOpts.inSampleSize=calculateInSampleSize(boundsOpts, 1024, 1024);
+					boundsOpts.inJustDecodeBounds=false;
+					Bitmap bitmap=BitmapFactory.decodeByteArray(fileBytes, 0, fileBytes.length, boundsOpts);
+					if(bitmap==null){
+						postResult(null);
+						return;
+					}
+					int w=bitmap.getWidth(), h=bitmap.getHeight();
+					int[] pixels=new int[w*h];
+					bitmap.getPixels(pixels, 0, w, 0, 0, w, h);
+					bitmap.recycle();
+					LuminanceSource source=new SimpleLuminanceSource(pixels, w, h);
+					BinaryBitmap binary=new BinaryBitmap(new HybridBinarizer(source));
+					HashMap<DecodeHintType, Object> hints=new HashMap<>();
+					hints.put(DecodeHintType.POSSIBLE_FORMATS, List.of(BarcodeFormat.QR_CODE));
+					Result result=new MultiFormatReader().decode(binary, hints);
+					postResult(result.getText());
+				}catch(Exception e){
+					postResult(null);
+				}
+			});
+		}
+
+		private void postResult(String text){
+			new android.os.Handler(android.os.Looper.getMainLooper()).post(()->callback.accept(text));
+		}
 	}
 
 	private static byte[] readAllBytes(InputStream is) throws IOException{

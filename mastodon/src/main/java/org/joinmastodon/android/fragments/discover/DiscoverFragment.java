@@ -320,13 +320,24 @@ public class DiscoverFragment extends AppKitFragment implements ScrollableToTop{
 
 	@Override
 	public void onActivityResult(int requestCode, int resultCode, Intent data){
-		if(requestCode==SCAN_RESULT && resultCode==Activity.RESULT_OK && BarcodeScanner.isValidResult(data)){
-			Barcode code=BarcodeScanner.getResult(data);
-			if(code!=null){
-				if(code.rawValue.startsWith("https:") || code.rawValue.startsWith("http:")){
-					((MainActivity)getActivity()).handleURL(Uri.parse(code.rawValue), accountID);
-				}else{
-					Toast.makeText(getActivity(), R.string.link_not_supported, Toast.LENGTH_SHORT).show();
+		if(requestCode==SCAN_RESULT && resultCode==Activity.RESULT_OK && data!=null){
+			if(data.hasExtra("barcode_image_uri")){
+				Uri imageUri=Uri.parse(data.getStringExtra("barcode_image_uri"));
+				new org.joinmastodon.android.fragments.ProfileQrCodeFragment.QrImageDecoder(getActivity(), imageUri, decoded->{
+					if(decoded!=null){
+						((MainActivity)getActivity()).handleURL(Uri.parse(decoded), accountID);
+					}else{
+						Toast.makeText(getActivity(), R.string.qr_code_not_found, Toast.LENGTH_SHORT).show();
+					}
+				}).decode();
+			}else if(BarcodeScanner.isValidResult(data)){
+				Barcode code=BarcodeScanner.getResult(data);
+				if(code!=null){
+					if(code.rawValue.startsWith("https:") || code.rawValue.startsWith("http:")){
+						((MainActivity)getActivity()).handleURL(Uri.parse(code.rawValue), accountID);
+					}else{
+						Toast.makeText(getActivity(), R.string.link_not_supported, Toast.LENGTH_SHORT).show();
+					}
 				}
 			}
 		}

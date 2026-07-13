@@ -134,7 +134,7 @@ public class MediaPickerSheet extends BottomSheet{
 		actions.setPadding(V.dp(12), V.dp(8), V.dp(12), V.dp(10));
 		root.addView(actions, new LinearLayout.LayoutParams(-1, V.dp(68)));
 		send=new ImageButton(activity);
-		send.setImageResource(R.drawable.ic_send_24px);
+		send.setImageResource(R.drawable.ic_check_wght700_24px);
 		send.setColorFilter(Color.WHITE);
 		GradientDrawable sendBackground=new GradientDrawable();
 		sendBackground.setShape(GradientDrawable.OVAL);
