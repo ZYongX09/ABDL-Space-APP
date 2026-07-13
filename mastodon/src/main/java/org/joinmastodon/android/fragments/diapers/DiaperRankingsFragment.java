@@ -6,14 +6,14 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
-import android.widget.ImageView;
+import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
-import android.widget.ProgressBar;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
@@ -34,6 +34,7 @@ import me.grishka.appkit.utils.V;
 
 public class DiaperRankingsFragment extends LoaderFragment {
 	private RecyclerView recyclerView;
+	private SwipeRefreshLayout swipeRefreshLayout;
 	private RankingsAdapter adapter;
 	private List<RankingItem> data = new ArrayList<>();
 	private String currentTab = "hot";
@@ -98,12 +99,18 @@ public class DiaperRankingsFragment extends LoaderFragment {
 		totalCountText.setTextColor(getResources().getColor(R.color.diaper_chip_text));
 		root.addView(totalCountText);
 
-		// Tab按钮
+		// Tab按钮 (HorizontalScrollView)
+		HorizontalScrollView chipsScroll = new HorizontalScrollView(getContext());
+		chipsScroll.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+		chipsScroll.setHorizontalScrollBarEnabled(false);
+		chipsScroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
+
 		tabContainer = new LinearLayout(getContext());
-		tabContainer.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+		tabContainer.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 		tabContainer.setOrientation(LinearLayout.HORIZONTAL);
 		tabContainer.setPadding(V.dp(16), 0, V.dp(16), V.dp(12));
-		root.addView(tabContainer);
+		chipsScroll.addView(tabContainer);
+		root.addView(chipsScroll);
 		buildTabs();
 
 		// 基准分卡片
@@ -111,6 +118,15 @@ public class DiaperRankingsFragment extends LoaderFragment {
 		adultScoreText = baseScoreCard.findViewById(R.id.adult_score);
 		babyScoreText = baseScoreCard.findViewById(R.id.baby_score);
 		root.addView(baseScoreCard);
+
+		// 下拉刷新
+		swipeRefreshLayout = new SwipeRefreshLayout(getContext());
+		swipeRefreshLayout.setColorSchemeResources(android.R.color.holo_blue_dark);
+		swipeRefreshLayout.setOnRefreshListener(() -> {
+			currentPage = 0;
+			hasMore = true;
+			loadData();
+		});
 
 		// RecyclerView
 		recyclerView = new RecyclerView(getContext());
@@ -136,7 +152,8 @@ public class DiaperRankingsFragment extends LoaderFragment {
 			}
 		});
 
-		root.addView(recyclerView);
+		swipeRefreshLayout.addView(recyclerView);
+		root.addView(swipeRefreshLayout);
 		wrapper.addView(root);
 		return wrapper;
 	}
@@ -239,12 +256,14 @@ public class DiaperRankingsFragment extends LoaderFragment {
 
 					adapter.notifyDataSetChanged();
 					dataLoaded();
+					swipeRefreshLayout.setRefreshing(false);
 					loadingMore = false;
 				}
 
 				@Override
 				public void onError(ErrorResponse error) {
 					if (getActivity() == null) return;
+					swipeRefreshLayout.setRefreshing(false);
 					loadingMore = false;
 					dataLoaded();
 					error.showToast(getContext());
@@ -288,6 +307,7 @@ public class DiaperRankingsFragment extends LoaderFragment {
 
 	private static final int VIEW_TYPE_ITEM = 0;
 	private static final int VIEW_TYPE_LOADING = 1;
+	private static final int VIEW_TYPE_END = 2;
 
 	private class RankingsAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
 
@@ -297,6 +317,15 @@ public class DiaperRankingsFragment extends LoaderFragment {
 			if (viewType == VIEW_TYPE_LOADING) {
 				View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_loading_footer, parent, false);
 				return new LoadingViewHolder(view);
+			}
+			if (viewType == VIEW_TYPE_END) {
+				TextView endText = new TextView(parent.getContext());
+				endText.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+				endText.setPadding(V.dp(16), V.dp(16), V.dp(16), V.dp(16));
+				endText.setTextSize(12);
+				endText.setTextColor(getResources().getColor(R.color.diaper_chip_text));
+				endText.setGravity(android.view.Gravity.CENTER);
+				return new EndViewHolder(endText);
 			}
 			View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_ranking_list, parent, false);
 			return new ItemViewHolder(view);
@@ -339,17 +368,25 @@ public class DiaperRankingsFragment extends LoaderFragment {
 					args.putInt("diaper_id", item.id);
 					Nav.go(getActivity(), DiaperDetailFragment.class, args);
 				});
+			} else if (holder instanceof EndViewHolder) {
+				((EndViewHolder) holder).endText.setText(String.format("已显示全部 %d 款", totalCount));
 			}
 		}
 
 		@Override
 		public int getItemCount() {
-			return data.size() + (loadingMore ? 1 : 0);
+			int count = data.size();
+			if (loadingMore) count++;
+			else if (!hasMore && data.size() > 0) count++;
+			return count;
 		}
 
 		@Override
 		public int getItemViewType(int position) {
-			return position >= data.size() ? VIEW_TYPE_LOADING : VIEW_TYPE_ITEM;
+			if (position >= data.size()) {
+				return loadingMore ? VIEW_TYPE_LOADING : VIEW_TYPE_END;
+			}
+			return VIEW_TYPE_ITEM;
 		}
 
 		class ItemViewHolder extends RecyclerView.ViewHolder {
@@ -370,6 +407,14 @@ public class DiaperRankingsFragment extends LoaderFragment {
 		class LoadingViewHolder extends RecyclerView.ViewHolder {
 			LoadingViewHolder(View itemView) {
 				super(itemView);
+			}
+		}
+
+		class EndViewHolder extends RecyclerView.ViewHolder {
+			TextView endText;
+			EndViewHolder(View itemView) {
+				super(itemView);
+				endText = (TextView) itemView;
 			}
 		}
 	}

@@ -387,6 +387,7 @@ public class DiaperListFragment extends LoaderFragment {
 
 	private static final int VIEW_TYPE_ITEM = 0;
 	private static final int VIEW_TYPE_LOADING = 1;
+	private static final int VIEW_TYPE_END = 2;
 
 	private class DiaperAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
 
@@ -396,6 +397,15 @@ public class DiaperListFragment extends LoaderFragment {
 			if (viewType == VIEW_TYPE_LOADING) {
 				View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_loading_footer, parent, false);
 				return new LoadingViewHolder(view);
+			}
+			if (viewType == VIEW_TYPE_END) {
+				TextView endText = new TextView(parent.getContext());
+				endText.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+				endText.setPadding(V.dp(16), V.dp(16), V.dp(16), V.dp(16));
+				endText.setTextSize(12);
+				endText.setTextColor(getResources().getColor(R.color.diaper_chip_text));
+				endText.setGravity(android.view.Gravity.CENTER);
+				return new EndViewHolder(endText);
 			}
 			View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_diaper_list, parent, false);
 			return new ItemViewHolder(view);
@@ -455,17 +465,25 @@ public class DiaperListFragment extends LoaderFragment {
 					args.putInt("diaper_id", diaper.id);
 					Nav.go(getActivity(), DiaperDetailFragment.class, args);
 				});
+			} else if (holder instanceof EndViewHolder) {
+				((EndViewHolder) holder).endText.setText(String.format("已显示全部 %d 款", data.size()));
 			}
 		}
 
 		@Override
 		public int getItemCount() {
-			return data.size() + (loadingMore ? 1 : 0);
+			int count = data.size();
+			if (loadingMore) count++;
+			else if (!hasMore && data.size() > 0) count++;
+			return count;
 		}
 
 		@Override
 		public int getItemViewType(int position) {
-			return position >= data.size() ? VIEW_TYPE_LOADING : VIEW_TYPE_ITEM;
+			if (position >= data.size()) {
+				return loadingMore ? VIEW_TYPE_LOADING : VIEW_TYPE_END;
+			}
+			return VIEW_TYPE_ITEM;
 		}
 
 		class ItemViewHolder extends RecyclerView.ViewHolder {
@@ -490,6 +508,14 @@ public class DiaperListFragment extends LoaderFragment {
 		class LoadingViewHolder extends RecyclerView.ViewHolder {
 			LoadingViewHolder(View itemView) {
 				super(itemView);
+			}
+		}
+
+		class EndViewHolder extends RecyclerView.ViewHolder {
+			TextView endText;
+			EndViewHolder(View itemView) {
+				super(itemView);
+				endText = (TextView) itemView;
 			}
 		}
 	}
