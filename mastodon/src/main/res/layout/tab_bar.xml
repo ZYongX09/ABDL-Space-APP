@@ -52,6 +52,42 @@
 		</FrameLayout>
 
 		<FrameLayout
+			android:id="@+id/tab_diaper"
+			android:layout_width="0dp"
+			android:layout_height="match_parent"
+			android:layout_weight="1"
+			android:paddingHorizontal="4dp"
+			android:contentDescription="@string/diaper">
+
+			<ImageView
+				android:layout_width="28dp"
+				android:layout_height="28dp"
+				android:layout_gravity="center"
+				android:scaleType="center"
+				android:importantForAccessibility="no"
+				android:tint="@color/tab_bar_icon"
+				android:src="@drawable/ic_tab_rating"/>
+
+			<TextView
+				android:id="@+id/diaper_new_feature_badge"
+				android:layout_width="wrap_content"
+				android:layout_height="18dp"
+				android:minWidth="18dp"
+				android:layout_gravity="top|end"
+				android:layout_marginTop="4dp"
+				android:layout_marginEnd="1dp"
+				android:paddingHorizontal="5dp"
+				android:background="@drawable/bg_tabbar_badge"
+				android:gravity="center"
+				android:includeFontPadding="false"
+				android:text="新功能"
+				android:textAppearance="@style/m3_label_small"
+				android:textColor="?colorM3OnPrimary"
+				android:visibility="gone"
+				tools:visibility="visible"/>
+		</FrameLayout>
+
+		<FrameLayout
 			android:id="@+id/tab_friend_request"
 			android:layout_width="0dp"
 			android:layout_height="match_parent"
@@ -67,24 +103,6 @@
 				android:importantForAccessibility="no"
 				android:tint="@color/tab_bar_icon"
 				android:src="@drawable/ic_tab_dream"/>
-		</FrameLayout>
-
-		<FrameLayout
-			android:id="@+id/tab_diaper"
-			android:layout_width="0dp"
-			android:layout_height="match_parent"
-			android:layout_weight="1"
-			android:paddingHorizontal="4dp"
-			android:contentDescription="@string/diaper">
-
-			<ImageView
-				android:layout_width="28dp"
-				android:layout_height="28dp"
-				android:layout_gravity="center"
-				android:scaleType="center"
-				android:importantForAccessibility="no"
-				android:tint="@color/tab_bar_icon"
-				android:src="@drawable/ic_tab_diaper"/>
 		</FrameLayout>
 
 		<FrameLayout

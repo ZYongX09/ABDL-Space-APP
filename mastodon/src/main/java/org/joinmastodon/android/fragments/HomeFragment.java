@@ -20,6 +20,7 @@ import com.squareup.otto.Subscribe;
 
 import org.joinmastodon.android.BuildConfig;
 import org.joinmastodon.android.E;
+import org.joinmastodon.android.GlobalUserPreferences;
 import org.joinmastodon.android.PushNotificationReceiver;
 import org.joinmastodon.android.R;
 import org.joinmastodon.android.api.requests.notifications.GetNotificationsV1;
@@ -60,6 +61,8 @@ import me.grishka.appkit.utils.V;
 import me.grishka.appkit.views.FragmentRootLinearLayout;
 
 public class HomeFragment extends AppKitFragment implements AssistContentProviderFragment, HasAccountID {
+	private static final String DIAPER_FEATURE_VERSION="2.3.0";
+	private static final String DIAPER_FEATURE_SEEN_KEY="diaperFeatureSeen_"+DIAPER_FEATURE_VERSION;
 	private FragmentRootLinearLayout content;
 	private HomeTabFragment homeTabFragment;
 	private DiscoverFragment searchFragment;
@@ -72,6 +75,7 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 	@IdRes
 	private int currentTab=R.id.tab_home;
 	private TextView notificationsBadge;
+	private TextView diaperNewFeatureBadge;
 
 	private String accountID;
 
@@ -143,6 +147,8 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 
 		notificationsBadge=tabBar.findViewById(R.id.notifications_badge);
 		notificationsBadge.setVisibility(View.GONE);
+		diaperNewFeatureBadge=tabBar.findViewById(R.id.diaper_new_feature_badge);
+		updateDiaperNewFeatureBadge();
 
 		if(savedInstanceState==null){
 			getChildFragmentManager().beginTransaction()
@@ -255,6 +261,8 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 
 	private void onTabSelected(@IdRes int tab){
 		Fragment newFragment=fragmentForTab(tab);
+		if(tab==R.id.tab_diaper)
+			markDiaperFeatureSeen();
 
 		// MOSHIDON:
 		if(tab==R.id.tab_search && R.id.tab_search==currentTab){
@@ -275,6 +283,20 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 		maybeTriggerLoading(newFragment);
 		currentTab=tab;
 		((FragmentStackActivity)getActivity()).invalidateSystemBarColors(this);
+	}
+
+	private void updateDiaperNewFeatureBadge(){
+		String version=BuildConfig.VERSION_NAME.split("-", 2)[0];
+		boolean visible=DIAPER_FEATURE_VERSION.equals(version)
+				&& !GlobalUserPreferences.getPrefs().getBoolean(DIAPER_FEATURE_SEEN_KEY, false);
+		diaperNewFeatureBadge.setVisibility(visible ? View.VISIBLE : View.GONE);
+	}
+
+	private void markDiaperFeatureSeen(){
+		if(diaperNewFeatureBadge==null || diaperNewFeatureBadge.getVisibility()!=View.VISIBLE)
+			return;
+		GlobalUserPreferences.getPrefs().edit().putBoolean(DIAPER_FEATURE_SEEN_KEY, true).apply();
+		diaperNewFeatureBadge.setVisibility(View.GONE);
 	}
 
 	private void maybeTriggerLoading(Fragment newFragment){
