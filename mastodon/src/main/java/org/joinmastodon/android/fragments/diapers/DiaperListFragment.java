@@ -5,6 +5,9 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.LayoutInflater;
+import android.view.Menu;
+import android.view.MenuInflater;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
@@ -85,6 +88,25 @@ public class DiaperListFragment extends LoaderFragment {
 	public void onAttach(Activity activity) {
 		super.onAttach(activity);
 		setTitle(getString(R.string.diaper_list));
+		setHasOptionsMenu(true);
+	}
+
+	@Override
+	public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
+		menu.add(0, 1, 0, getString(R.string.diaper_rankings))
+			.setIcon(R.drawable.ic_fluent_trophy_24_regular)
+			.setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
+	}
+
+	@Override
+	public boolean onOptionsItemSelected(MenuItem item) {
+		if (item.getItemId() == 1) {
+			Bundle args = new Bundle();
+			args.putString("account", accountID);
+			Nav.go(getActivity(), DiaperRankingsFragment.class, args);
+			return true;
+		}
+		return super.onOptionsItemSelected(item);
 	}
 
 	@Override

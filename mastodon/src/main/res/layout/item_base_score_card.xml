@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:background="@drawable/bg_diaper_card"
+    android:paddingHorizontal="16dp"
+    android:paddingVertical="14dp"
+    android:layout_marginHorizontal="12dp"
+    android:layout_marginVertical="8dp"
+    android:gravity="center_vertical">
+
+    <!-- 图标 -->
+    <ImageView
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:src="@drawable/ic_fluent_chart_24_regular"
+        android:importantForAccessibility="no" />
+
+    <!-- 内容 -->
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:layout_marginStart="12dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="算法基准分"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:textColor="?android:textColorPrimary"
+            android:includeFontPadding="false" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="6dp"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="成人"
+                android:textSize="12sp"
+                android:textColor="?android:textColorSecondary"
+                android:background="@drawable/bg_tag_adult"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="2dp"
+                android:includeFontPadding="false" />
+
+            <TextView
+                android:id="@+id/adult_score"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="?android:textColorPrimary"
+                android:includeFontPadding="false" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:text="儿童"
+                android:textSize="12sp"
+                android:textColor="?android:textColorSecondary"
+                android:background="@drawable/bg_tag_baby"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="2dp"
+                android:includeFontPadding="false" />
+
+            <TextView
+                android:id="@+id/baby_score"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="?android:textColorPrimary"
+                android:includeFontPadding="false" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="评分人数为 0 时的初始分数，基于全站数据实时计算"
+            android:textSize="11sp"
+            android:textColor="?android:textColorTertiary"
+            android:includeFontPadding="false" />
+    </LinearLayout>
+
+</LinearLayout>

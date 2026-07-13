@@ -984,7 +984,9 @@
 	<string name="diaper_all_brands">全部</string>
 	<string name="diaper_no_data">暂无纸尿裤</string>
 	<string name="diaper_ratings_count">%d 评价</string>
-	<string name="diaper_baby">Baby</string>
-	<string name="diaper_absorbency">%s absorbency</string>
+	<string name="diaper_baby">儿童款</string>
+	<string name="diaper_absorbency">%s</string>
+	<string name="diaper_rankings">排行榜</string>
+	<string name="diaper_rankings_info">评分经贝叶斯平均与置信区间修正，评分数越多越接近真实水平</string>
 
 </resources>
