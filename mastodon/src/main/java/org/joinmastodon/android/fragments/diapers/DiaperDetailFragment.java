@@ -1,20 +1,56 @@
 package org.joinmastodon.android.fragments.diapers;
 
 import android.app.Activity;
+import android.content.Intent;
+import android.graphics.Color;
+import android.graphics.Outline;
+import android.graphics.drawable.GradientDrawable;
+import android.net.Uri;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewOutlineProvider;
+import android.widget.EditText;
 import android.widget.FrameLayout;
+import android.widget.HorizontalScrollView;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 
-import org.joinmastodon.android.R;
+import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
+
+import org.joinmastodon.android.R;
+import org.joinmastodon.android.api.requests.diapers.GetDiaperDetail;
+import org.joinmastodon.android.model.DiaperReview;
+import org.joinmastodon.android.ui.OutlineProviders;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+import me.grishka.appkit.api.Callback;
+import me.grishka.appkit.api.ErrorResponse;
 import me.grishka.appkit.fragments.LoaderFragment;
+import me.grishka.appkit.imageloader.ViewImageLoader;
+import me.grishka.appkit.imageloader.requests.UrlImageLoaderRequest;
+import me.grishka.appkit.utils.V;
 
 public class DiaperDetailFragment extends LoaderFragment {
 	private int diaperId;
 	private String accountID;
+	private Map<String, Object> diaperData;
+	private List<DiaperReview> reviews = new ArrayList<>();
+	private LinearLayout imagesContainer;
+	private LinearLayout sizesContainer;
+	private LinearLayout reviewListContainer;
+	private TextView titleText;
 
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
@@ -29,26 +65,359 @@ public class DiaperDetailFragment extends LoaderFragment {
 		setTitle(getString(R.string.diaper_detail));
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
 	public View onCreateContentView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
 		FrameLayout wrapper = new FrameLayout(getContext());
 		wrapper.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
-		TextView placeholder = new TextView(getContext());
-		placeholder.setText("Diaper Detail: " + diaperId);
-		placeholder.setPadding(32, 32, 32, 32);
-		wrapper.addView(placeholder);
+		// ScrollView 包裹整个内容
+		android.widget.ScrollView scrollView = new android.widget.ScrollView(getContext());
+		scrollView.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+		scrollView.setFillViewport(true);
 
+		LinearLayout root = new LinearLayout(getContext());
+		root.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+		root.setOrientation(LinearLayout.VERTICAL);
+		root.setPadding(0, V.dp(4), 0, V.dp(80));
+
+		// 产品图片区域
+		imagesContainer = new LinearLayout(getContext());
+		imagesContainer.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+		imagesContainer.setOrientation(LinearLayout.HORIZONTAL);
+		imagesContainer.setPadding(V.dp(12), 0, V.dp(12), 0);
+		root.addView(imagesContainer);
+
+		// 产品信息卡片
+		View infoCard = inflater.inflate(R.layout.item_diaper_info, root, false);
+		root.addView(infoCard);
+
+		// 尺码标题
+		TextView sizesTitle = new TextView(getContext());
+		sizesTitle.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+		sizesTitle.setPadding(V.dp(16), V.dp(16), V.dp(16), V.dp(8));
+		sizesTitle.setText("尺码");
+		sizesTitle.setTextSize(16);
+		sizesTitle.setTextColor(getResources().getColor(R.color.diaper_chip_text));
+		sizesTitle.setTypeface(null, android.graphics.Typeface.BOLD);
+		root.addView(sizesTitle);
+
+		// 尺码列表
+		sizesContainer = new LinearLayout(getContext());
+		sizesContainer.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+		sizesContainer.setOrientation(LinearLayout.VERTICAL);
+		root.addView(sizesContainer);
+
+		// 用户评价标题
+		TextView reviewsTitle = new TextView(getContext());
+		reviewsTitle.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+		reviewsTitle.setPadding(V.dp(16), V.dp(20), V.dp(16), V.dp(12));
+		reviewsTitle.setTextSize(16);
+		reviewsTitle.setTextColor(getResources().getColor(R.color.diaper_chip_text));
+		reviewsTitle.setTypeface(null, android.graphics.Typeface.BOLD);
+		root.addView(reviewsTitle);
+
+		// 评价列表
+		reviewListContainer = new LinearLayout(getContext());
+		reviewListContainer.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+		reviewListContainer.setOrientation(LinearLayout.VERTICAL);
+		root.addView(reviewListContainer);
+
+		scrollView.addView(root);
+		wrapper.addView(scrollView);
 		return wrapper;
 	}
 
 	@Override
+	protected void onShown() {
+		super.onShown();
+		if (!loaded && !dataLoading) {
+			loadData();
+		}
+	}
+
+	@Override
 	protected void doLoadData() {
-		dataLoaded();
+		loadData();
 	}
 
 	@Override
 	public void onRefresh() {
 		loadData();
+	}
+
+	@SuppressWarnings("unchecked")
+	public void loadData() {
+		dataLoading = true;
+		showProgress();
+
+		new GetDiaperDetail(diaperId)
+			.setCallback(new Callback<Map<String, Object>>() {
+				@Override
+				public void onSuccess(Map<String, Object> result) {
+					if (getActivity() == null) return;
+					diaperData = (Map<String, Object>) result.get("diaper");
+					List<Map<String, Object>> reviewsList = (List<Map<String, Object>>) result.get("reviews");
+					if (reviewsList != null) {
+						Gson gson = new Gson();
+						reviews = gson.fromJson(
+							gson.toJson(reviewsList),
+							new TypeToken<List<DiaperReview>>(){}.getType()
+						);
+					}
+					buildUI();
+					dataLoaded();
+				}
+
+				@Override
+				public void onError(ErrorResponse error) {
+					if (getActivity() == null) return;
+					dataLoaded();
+					error.showToast(getContext());
+				}
+			})
+			.exec(accountID);
+	}
+
+	@SuppressWarnings("unchecked")
+	private void buildUI() {
+		if (diaperData == null) return;
+
+		// 标题
+		String brand = (String) diaperData.getOrDefault("brand", "");
+		String model = (String) diaperData.getOrDefault("model", "");
+		setTitle(brand + " " + model);
+
+		// 图片
+		buildImages();
+
+		// 产品信息
+		buildInfoCard();
+
+		// 尺码
+		buildSizes();
+
+		// 评价列表
+		buildReviews();
+	}
+
+	@SuppressWarnings("unchecked")
+	private void buildImages() {
+		imagesContainer.removeAllViews();
+		List<String> images = (List<String>) diaperData.get("images");
+		if (images == null || images.isEmpty()) return;
+
+		HorizontalScrollView scroll = new HorizontalScrollView(getContext());
+		scroll.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+		scroll.setHorizontalScrollBarEnabled(false);
+		scroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
+		scroll.setPadding(0, V.dp(8), 0, V.dp(8));
+
+		LinearLayout imageRow = new LinearLayout(getContext());
+		imageRow.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+		imageRow.setOrientation(LinearLayout.HORIZONTAL);
+
+		for (String imgUrl : images) {
+			ImageView img = new ImageView(getContext());
+			int imgWidth = V.dp(200);
+			int imgHeight = V.dp(200);
+			LinearLayout.LayoutParams imgParams = new LinearLayout.LayoutParams(imgWidth, imgHeight);
+			imgParams.setMarginEnd(V.dp(8));
+			img.setLayoutParams(imgParams);
+			img.setScaleType(ImageView.ScaleType.CENTER_CROP);
+			img.setBackgroundResource(R.drawable.bg_diaper_logo);
+			img.setOutlineProvider(new ViewOutlineProvider() {
+				@Override
+				public void getOutline(View view, Outline outline) {
+					outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), V.dp(12));
+				}
+			});
+			img.setClipToOutline(true);
+			ViewImageLoader.loadWithoutAnimation(img, null,
+				new UrlImageLoaderRequest(imgUrl, imgWidth, imgHeight));
+			imageRow.addView(img);
+		}
+
+		scroll.addView(imageRow);
+		imagesContainer.addView(scroll);
+	}
+
+	@SuppressWarnings("unchecked")
+	private void buildInfoCard() {
+		// 品牌Logo
+		ImageView brandLogo = getView().findViewById(R.id.brand_logo);
+		TextView brandText = getView().findViewById(R.id.brand_text);
+		TextView modelText = getView().findViewById(R.id.model_text);
+
+		if (brandLogo != null && brandText != null) {
+			String brandLogoUrl = (String) diaperData.get("brand_logo");
+			if (brandLogoUrl != null && !brandLogoUrl.isEmpty()) {
+				brandLogo.setVisibility(View.VISIBLE);
+				brandText.setVisibility(View.GONE);
+				ViewImageLoader.loadWithoutAnimation(brandLogo, null,
+					new UrlImageLoaderRequest(brandLogoUrl, V.dp(60), V.dp(24)));
+			} else {
+				brandLogo.setVisibility(View.GONE);
+				brandText.setVisibility(View.VISIBLE);
+				brandText.setText((String) diaperData.getOrDefault("brand", ""));
+			}
+		}
+
+		if (modelText != null) {
+			modelText.setText((String) diaperData.getOrDefault("model", ""));
+		}
+
+		// 类型
+		setInfoRow(R.id.row_type, R.id.type_text, "product_type");
+
+		// 厚度
+		LinearLayout rowThickness = getView().findViewById(R.id.row_thickness);
+		TextView thicknessText = getView().findViewById(R.id.thickness_text);
+		if (rowThickness != null && thicknessText != null) {
+			Object thickness = diaperData.get("thickness");
+			if (thickness != null) {
+				rowThickness.setVisibility(View.VISIBLE);
+				thicknessText.setText(thickness + "mm");
+			}
+		}
+
+		// 成人实际吸收
+		setInfoRow(R.id.row_absorbency_adult, R.id.absorbency_adult_text, "absorbency_adult");
+
+		// 厂家标称吸收
+		setInfoRow(R.id.row_absorbency_mfr, R.id.absorbency_mfr_text, "absorbency_mfr");
+
+		// 参考价
+		setInfoRow(R.id.row_price, R.id.price_text, "avg_price");
+
+		// 官网
+		LinearLayout rowUrl = getView().findViewById(R.id.row_url);
+		TextView visitUrlBtn = getView().findViewById(R.id.visit_url_btn);
+		if (rowUrl != null && visitUrlBtn != null) {
+			String officialUrl = (String) diaperData.get("official_url");
+			if (officialUrl != null && !officialUrl.isEmpty()) {
+				rowUrl.setVisibility(View.VISIBLE);
+				visitUrlBtn.setOnClickListener(v -> {
+					Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(officialUrl));
+					startActivity(intent);
+				});
+			}
+		}
+	}
+
+	private void setInfoRow(int rowId, int textId, String key) {
+		LinearLayout row = getView().findViewById(rowId);
+		TextView text = getView().findViewById(textId);
+		if (row != null && text != null) {
+			String value = (String) diaperData.get(key);
+			if (value != null && !value.isEmpty()) {
+				row.setVisibility(View.VISIBLE);
+				text.setText(value);
+			}
+		}
+	}
+
+	@SuppressWarnings("unchecked")
+	private void buildSizes() {
+		sizesContainer.removeAllViews();
+		List<Map<String, Object>> sizes = (List<Map<String, Object>>) diaperData.get("sizes");
+		if (sizes == null || sizes.isEmpty()) {
+			// 隐藏尺码标题
+			View sizesTitle = getView().findViewById(android.R.id.content);
+			return;
+		}
+
+		for (Map<String, Object> size : sizes) {
+			View sizeView = LayoutInflater.from(getContext()).inflate(R.layout.item_diaper_size, sizesContainer, false);
+			TextView label = sizeView.findViewById(R.id.size_label);
+			TextView info = sizeView.findViewById(R.id.size_info);
+
+			label.setText((String) size.getOrDefault("label", ""));
+			int waistMin = ((Number) size.getOrDefault("waist_min", 0)).intValue();
+			int waistMax = ((Number) size.getOrDefault("waist_max", 0)).intValue();
+			int hipMin = ((Number) size.getOrDefault("hip_min", 0)).intValue();
+			int hipMax = ((Number) size.getOrDefault("hip_max", 0)).intValue();
+			info.setText(String.format("腰围 %d-%dcm · 臀围 %d-%dcm", waistMin, waistMax, hipMin, hipMax));
+
+			sizesContainer.addView(sizeView);
+		}
+	}
+
+	private void buildReviews() {
+		reviewListContainer.removeAllViews();
+
+		// 更新评价标题
+		for (int i = 0; i < ((LinearLayout) getView().getParent()).getChildCount(); i++) {
+			View child = ((LinearLayout) getView().getParent()).getChildAt(i);
+			if (child instanceof TextView) {
+				String text = ((TextView) child).getText().toString();
+				if (text.contains("用户评价")) {
+					((TextView) child).setText(String.format("用户评价 (%d)", reviews.size()));
+					break;
+				}
+			}
+		}
+
+		if (reviews.isEmpty()) {
+			TextView emptyText = new TextView(getContext());
+			emptyText.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+			emptyText.setPadding(V.dp(16), V.dp(24), V.dp(16), V.dp(24));
+			emptyText.setText("暂无评价");
+			emptyText.setTextSize(14);
+			emptyText.setGravity(android.view.Gravity.CENTER);
+			emptyText.setTextColor(getResources().getColor(R.color.diaper_chip_text));
+			reviewListContainer.addView(emptyText);
+			return;
+		}
+
+		for (DiaperReview review : reviews) {
+			View reviewView = LayoutInflater.from(getContext()).inflate(R.layout.item_diaper_review, reviewListContainer, false);
+			TextView username = reviewView.findViewById(R.id.username);
+			TextView reviewDate = reviewView.findViewById(R.id.review_date);
+			TextView reviewText = reviewView.findViewById(R.id.review_text);
+			LinearLayout scoresContainer = reviewView.findViewById(R.id.scores_container);
+
+			// 用户名
+			if (review.user != null) {
+				username.setText(review.user.username);
+			}
+
+			// 日期
+			if (review.created_at != null) {
+				String date = review.created_at.replace("T", " ").substring(0, 10);
+				reviewDate.setText(date);
+			}
+
+			// 评价文字
+			if (review.review != null && !review.review.isEmpty()) {
+				reviewText.setVisibility(View.VISIBLE);
+				reviewText.setText(review.review);
+			}
+
+			// 5维度评分标签
+			addScoreTag(scoresContainer, "吸收性", review.absorption_score, "#1976D2");
+			addScoreTag(scoresContainer, "舒适度", review.comfort_score, "#4CAF50");
+			addScoreTag(scoresContainer, "厚度", review.thickness_score, "#FF9800");
+			addScoreTag(scoresContainer, "外观", review.appearance_score, "#9C27B0");
+			addScoreTag(scoresContainer, "性价比", review.value_score, "#F44336");
+
+			reviewListContainer.addView(reviewView);
+		}
+	}
+
+	private void addScoreTag(LinearLayout container, String label, int score, String color) {
+		TextView tag = new TextView(getContext());
+		tag.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+		tag.setPadding(V.dp(8), V.dp(4), V.dp(8), V.dp(4));
+		tag.setTextSize(11);
+		tag.setText(String.format("%s %d/10", label, score));
+
+		GradientDrawable bg = new GradientDrawable();
+		bg.setColor(Color.parseColor("#1A" + color.substring(1)));
+		bg.setCornerRadius(V.dp(4));
+		tag.setBackground(bg);
+		tag.setTextColor(Color.parseColor(color));
+
+		container.addView(tag);
 	}
 }

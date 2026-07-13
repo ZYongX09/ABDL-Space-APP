@@ -988,5 +988,8 @@
 	<string name="diaper_absorbency">%s</string>
 	<string name="diaper_rankings">排行榜</string>
 	<string name="diaper_rankings_info">评分经贝叶斯平均与置信区间修正，评分数越多越接近真实水平</string>
+	<string name="diaper_product_info">产品信息</string>
+	<string name="diaper_sizes">尺码</string>
+	<string name="diaper_reviews">用户评价</string>
 
 </resources>
