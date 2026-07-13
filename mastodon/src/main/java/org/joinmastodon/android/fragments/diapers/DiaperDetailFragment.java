@@ -158,12 +158,14 @@ public class DiaperDetailFragment extends LoaderFragment {
 		compareBtn.setLayoutParams(compareParams);
 		compareBtn.setText("⚖ 加入对比");
 		compareBtn.setTextSize(14);
-		compareBtn.setTextColor(getResources().getColor(R.color.diaper_chip_text));
+		compareBtn.setTextColor(0xFF999999);
 		compareBtn.setGravity(android.view.Gravity.CENTER);
 		compareBtn.setBackgroundResource(R.drawable.bg_diaper_chip);
 		compareBtn.setPadding(V.dp(12), V.dp(10), V.dp(12), V.dp(10));
+		compareBtn.setEnabled(true);
+		compareBtn.setAlpha(0.6f);
 		compareBtn.setOnClickListener(v -> {
-			// TODO: 加入对比
+			android.widget.Toast.makeText(getContext(), "即将开放，敬请期待", android.widget.Toast.LENGTH_SHORT).show();
 		});
 		bottomBar.addView(compareBtn);
 
