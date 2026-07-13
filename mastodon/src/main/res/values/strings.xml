@@ -717,6 +717,8 @@
 	<string name="handle_copied">Handle copied to clipboard.</string>
 	<string name="qr_code">QR code</string>
 	<string name="scan_qr_code">Scan QR code</string>
+	<string name="scan_qr_from_image">Scan from image</string>
+	<string name="qr_code_not_found">No QR code found in image</string>
 	<!-- Shown on a button that saves a file, after it was successfully saved -->
 	<string name="saved">Saved</string>
 	<string name="image_saved">Image saved.</string>

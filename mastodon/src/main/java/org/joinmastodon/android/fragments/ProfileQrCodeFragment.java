@@ -18,6 +18,7 @@ import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.ColorFilter;
 import android.graphics.DashPathEffect;
@@ -57,9 +58,14 @@ import android.window.OnBackInvokedCallback;
 import android.window.OnBackInvokedDispatcher;
 
 import com.google.zxing.BarcodeFormat;
+import com.google.zxing.BinaryBitmap;
+import com.google.zxing.DecodeHintType;
 import com.google.zxing.EncodeHintType;
+import com.google.zxing.MultiFormatReader;
+import com.google.zxing.Result;
 import com.google.zxing.WriterException;
 import com.google.zxing.common.BitMatrix;
+import com.google.zxing.common.HybridBinarizer;
 import com.google.zxing.qrcode.QRCodeWriter;
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel;
 
@@ -79,12 +85,16 @@ import org.joinmastodon.android.ui.utils.UiUtils;
 import org.joinmastodon.android.ui.views.FixedAspectRatioFrameLayout;
 import org.parceler.Parcels;
 
+import com.google.zxing.LuminanceSource;
+
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.InputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.List;
 import java.util.Map;
+import java.util.HashMap;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -102,6 +112,7 @@ public class ProfileQrCodeFragment extends AppKitFragment{
 	private static final String TAG="ProfileQrCodeFragment";
 	private static final int PERMISSION_RESULT=388;
 	private static final int SCAN_RESULT=439;
+	private static final int IMAGE_SCAN_RESULT=440;
 
 	private Context themeWrapper;
 	private GradientDrawable scrim=new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{0xE6000000, 0xD9000000});
@@ -287,14 +298,24 @@ public class ProfileQrCodeFragment extends AppKitFragment{
 			item.setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
 			item.setIcon(R.drawable.ic_qr_code_scanner_24px);
 		}
+		MenuItem imageItem=menu.add(0, 1, 0, R.string.scan_qr_from_image);
+		imageItem.setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
+		imageItem.setIcon(R.drawable.ic_qr_code_20px);
 	}
 
 	@Override
 	public boolean onOptionsItemSelected(MenuItem item){
-		if(scannerIntent.resolveActivity(getActivity().getPackageManager())!=null){
-			startActivityForResult(scannerIntent, SCAN_RESULT);
-		}else{
-			BarcodeScanner.installScannerModule(themeWrapper, ()->startActivityForResult(scannerIntent, SCAN_RESULT));
+		if(item.getItemId()==0){
+			if(scannerIntent.resolveActivity(getActivity().getPackageManager())!=null){
+				startActivityForResult(scannerIntent, SCAN_RESULT);
+			}else{
+				BarcodeScanner.installScannerModule(themeWrapper, ()->startActivityForResult(scannerIntent, SCAN_RESULT));
+			}
+		}else if(item.getItemId()==1){
+			Intent intent=new Intent(Intent.ACTION_GET_CONTENT);
+			intent.setType("image/*");
+			intent.addCategory(Intent.CATEGORY_OPENABLE);
+			startActivityForResult(intent, IMAGE_SCAN_RESULT);
 		}
 		return true;
 	}
@@ -357,7 +378,96 @@ public class ProfileQrCodeFragment extends AppKitFragment{
 					Toast.makeText(themeWrapper, R.string.link_not_supported, Toast.LENGTH_SHORT).show();
 				}
 			}
+		}else if(requestCode==IMAGE_SCAN_RESULT && resultCode==Activity.RESULT_OK && data!=null && data.getData()!=null){
+			decodeQrFromUri(data.getData());
 		}
+	}
+
+	private void decodeQrFromUri(Uri uri){
+		MastodonAPIController.runInBackground(()->{
+			try(InputStream is=getActivity().getContentResolver().openInputStream(uri)){
+				if(is==null){
+					showToast(R.string.qr_code_not_found);
+					return;
+				}
+				BitmapFactory.Options opts=new BitmapFactory.Options();
+				opts.inJustDecodeBounds=true;
+				byte[] data=readAllBytes(is);
+				BitmapFactory.decodeByteArray(data, 0, data.length, opts);
+				opts.inSampleSize=calculateInSampleSize(opts, 1024, 1024);
+				opts.inJustDecodeBounds=false;
+				Bitmap bitmap=BitmapFactory.decodeByteArray(data, 0, data.length, opts);
+				if(bitmap==null){
+					showToast(R.string.qr_code_not_found);
+					return;
+				}
+				int w=bitmap.getWidth(), h=bitmap.getHeight();
+				int[] pixels=new int[w*h];
+				bitmap.getPixels(pixels, 0, w, 0, 0, w, h);
+				bitmap.recycle();
+				LuminanceSource source=new SimpleLuminanceSource(pixels, w, h);
+				BinaryBitmap binary=new BinaryBitmap(new HybridBinarizer(source));
+				HashMap<DecodeHintType, Object> hints=new HashMap<>();
+				hints.put(DecodeHintType.POSSIBLE_FORMATS, List.of(BarcodeFormat.QR_CODE));
+				Result result=new MultiFormatReader().decode(binary, hints);
+				String text=result.getText();
+				showToastOnUiThread(()->{
+					if(text.startsWith("https:") || text.startsWith("http:")){
+						((MainActivity)getActivity()).handleURL(Uri.parse(text), accountID);
+						dismiss();
+					}else{
+						Toast.makeText(themeWrapper, R.string.link_not_supported, Toast.LENGTH_SHORT).show();
+					}
+				});
+			}catch(Exception e){
+				showToast(R.string.qr_code_not_found);
+			}
+		});
+	}
+
+	private static byte[] readAllBytes(InputStream is) throws IOException{
+		java.io.ByteArrayOutputStream buffer=new java.io.ByteArrayOutputStream();
+		byte[] tmp=new byte[4096];
+		int len;
+		while((len=is.read(tmp))>0)
+			buffer.write(tmp, 0, len);
+		return buffer.toByteArray();
+	}
+
+	private static int calculateInSampleSize(BitmapFactory.Options opts, int reqW, int reqH){
+		int h=opts.outHeight, w=opts.outWidth;
+		int inSampleSize=1;
+		if(h>reqH || w>reqW){
+			int halfH=h/2, halfW=w/2;
+			while((halfH/inSampleSize)>=reqH && (halfW/inSampleSize)>=reqW)
+				inSampleSize*=2;
+		}
+		return inSampleSize;
+	}
+
+	private void showToast(int resId){
+		showToastOnUiThread(()->Toast.makeText(themeWrapper, resId, Toast.LENGTH_SHORT).show());
+	}
+
+	private void showToastOnUiThread(Runnable action){
+		View v=getView();
+		if(v!=null)
+			v.post(action);
+	}
+
+	private static final class SimpleLuminanceSource extends LuminanceSource{
+		private final byte[] pixels;
+		SimpleLuminanceSource(int[] argb, int w, int h){
+			super(w, h);
+			pixels=new byte[w*h];
+			for(int i=0;i<argb.length;i++)
+				pixels[i]=(byte)(((argb[i]>>16)&0xff)*0.299+((argb[i]>>8)&0xff)*0.587+(argb[i]&0xff)*0.114);
+		}
+		@Override public byte[] getRow(int y, byte[] row){
+			System.arraycopy(pixels, y*getWidth(), row, 0, getWidth());
+			return row;
+		}
+		@Override public byte[] getMatrix(){ return pixels; }
 	}
 
 	private void dismissWithAnimation(Runnable onDone, boolean animateTranslationDown){

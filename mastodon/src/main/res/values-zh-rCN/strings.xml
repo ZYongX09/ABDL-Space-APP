@@ -655,6 +655,8 @@
 	<string name="handle_copied">代号已复制到剪贴板。</string>
 	<string name="qr_code">二维码</string>
 	<string name="scan_qr_code">扫描二维码</string>
+	<string name="scan_qr_from_image">从图片识别</string>
+	<string name="qr_code_not_found">图片中未找到二维码</string>
 	<!-- Shown on a button that saves a file, after it was successfully saved -->
 	<string name="saved">已保存</string>
 	<string name="image_saved">图片已保存。</string>
