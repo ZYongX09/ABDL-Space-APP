@@ -36,6 +36,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import me.grishka.appkit.Nav;
 import me.grishka.appkit.api.Callback;
 import me.grishka.appkit.api.ErrorResponse;
 import me.grishka.appkit.fragments.LoaderFragment;
@@ -52,6 +53,7 @@ public class DiaperDetailFragment extends LoaderFragment {
 	private LinearLayout sizesContainer;
 	private LinearLayout reviewListContainer;
 	private TextView reviewsTitleText;
+	private boolean refreshAfterRating;
 
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
@@ -152,7 +154,7 @@ public class DiaperDetailFragment extends LoaderFragment {
 		rateBtn.setBackgroundResource(R.drawable.bg_diaper_chip_selected);
 		rateBtn.setPadding(V.dp(12), V.dp(12), V.dp(12), V.dp(12));
 		rateBtn.setOnClickListener(v -> {
-			android.widget.Toast.makeText(getContext(), "评分功能即将上线", android.widget.Toast.LENGTH_SHORT).show();
+			openRatingPage();
 		});
 		bottomBar.addView(rateBtn);
 
@@ -184,6 +186,9 @@ public class DiaperDetailFragment extends LoaderFragment {
 		super.onShown();
 		if (!loaded && !dataLoading) {
 			loadData();
+		} else if (refreshAfterRating && !dataLoading) {
+			refreshAfterRating = false;
+			loadData();
 		}
 	}
 
@@ -200,7 +205,9 @@ public class DiaperDetailFragment extends LoaderFragment {
 	@SuppressWarnings("unchecked")
 	public void loadData() {
 		dataLoading = true;
-		showProgress();
+		if (!loaded) {
+			showProgress();
+		}
 
 		new GetDiaperDetail(diaperId)
 			.setCallback(new Callback<Map<String, Object>>() {
@@ -474,5 +481,28 @@ public class DiaperDetailFragment extends LoaderFragment {
 		tag.setTextColor(Color.parseColor(color));
 
 		container.addView(tag);
+	}
+
+	private void openRatingPage() {
+		if (diaperData == null) {
+			android.widget.Toast.makeText(getContext(), "请稍候，产品信息加载中", android.widget.Toast.LENGTH_SHORT).show();
+			return;
+		}
+		Bundle args = new Bundle();
+		args.putString("account", accountID);
+		args.putInt("diaper_id", diaperId);
+		args.putString("brand", (String) diaperData.getOrDefault("brand", ""));
+		args.putString("model", (String) diaperData.getOrDefault("model", ""));
+		args.putString("product_type", (String) diaperData.getOrDefault("product_type", "纸尿裤"));
+		Object avgScore = diaperData.get("avg_score");
+		if (avgScore instanceof Number) {
+			args.putDouble("avg_score", ((Number) avgScore).doubleValue());
+		}
+		Object ratingCount = diaperData.get("rating_count");
+		if (ratingCount instanceof Number) {
+			args.putInt("rating_count", ((Number) ratingCount).intValue());
+		}
+		refreshAfterRating = true;
+		Nav.go(getActivity(), DiaperRatingFragment.class, args);
 	}
 }
