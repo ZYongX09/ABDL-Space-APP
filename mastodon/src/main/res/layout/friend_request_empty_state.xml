@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
+    android:layout_height="match_parent"
     android:orientation="vertical"
     android:gravity="center"
     android:padding="48dp">
@@ -10,6 +10,7 @@
         android:layout_width="64dp"
         android:layout_height="64dp"
         android:src="@drawable/ic_dream_lit"
+        android:tint="?android:textColorTertiary"
         android:alpha="0.5"
         android:contentDescription="暂无数据" />
 

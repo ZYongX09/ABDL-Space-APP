@@ -132,7 +132,7 @@ public class FriendRequestListFragment extends LoaderFragment {
 
 		// 下拉刷新
 		swipeRefreshLayout = new SwipeRefreshLayout(getContext());
-		swipeRefreshLayout.setColorSchemeResources(android.R.color.holo_blue_dark);
+		swipeRefreshLayout.setColorSchemeColors(0xFFA1D9F7);
 		swipeRefreshLayout.setOnRefreshListener(() -> {
 			currentPage = 1;
 			data.clear();
@@ -149,7 +149,7 @@ public class FriendRequestListFragment extends LoaderFragment {
 		recyclerView.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 		recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
 		recyclerView.setClipToPadding(false);
-		recyclerView.setPadding(0, V.dp(8), 0, V.dp(80));
+		recyclerView.setPadding(0, V.dp(8), 0, V.dp(72));
 		adapter = new FriendRequestAdapter();
 		recyclerView.setAdapter(adapter);
 
@@ -165,14 +165,6 @@ public class FriendRequestListFragment extends LoaderFragment {
 					currentPage++;
 					loadMore();
 				}
-				// FAB 隐藏/显示
-				if (dy > V.dp(24) && !fabHidden) {
-					fabHidden = true;
-					fab.animate().scaleX(0f).scaleY(0f).setDuration(200).setInterpolator(new DecelerateInterpolator()).start();
-				} else if (dy < -V.dp(24) && fabHidden) {
-					fabHidden = false;
-					fab.animate().scaleX(1f).scaleY(1f).setDuration(200).setInterpolator(new DecelerateInterpolator()).start();
-				}
 			}
 
 			@Override
@@ -183,9 +175,12 @@ public class FriendRequestListFragment extends LoaderFragment {
 			}
 		});
 
-		swipeRefreshLayout.addView(recyclerView);
-		swipeRefreshLayout.addView(emptyState);
-		root.addView(swipeRefreshLayout);
+		FrameLayout content=new FrameLayout(getContext());
+		content.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+		content.addView(recyclerView);
+		content.addView(emptyState);
+		swipeRefreshLayout.addView(content);
+		root.addView(swipeRefreshLayout, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
 
 		wrapper.addView(root);
 
@@ -199,6 +194,7 @@ public class FriendRequestListFragment extends LoaderFragment {
 		fab.setBackgroundResource(R.drawable.bg_fab);
 		fab.setScaleType(ImageView.ScaleType.CENTER);
 		fab.setElevation(V.dp(6));
+		fab.setContentDescription("发布交友请求");
 		fab.setOnClickListener(v -> {
 			Bundle args = new Bundle();
 			args.putString("account", accountID);
@@ -388,7 +384,7 @@ public class FriendRequestListFragment extends LoaderFragment {
 
 		class VH extends RecyclerView.ViewHolder {
 			ImageView avatar;
-			TextView username, lookingForChip, basicInfo, publishTime;
+			TextView username, lookingForChip, requestTitle, requestDescription, basicInfo, publishTime;
 			ViewGroup metadataContainer;
 			ImageButton menuBtn;
 
@@ -398,6 +394,8 @@ public class FriendRequestListFragment extends LoaderFragment {
 				avatar = itemView.findViewById(R.id.avatar);
 				username = itemView.findViewById(R.id.username);
 				lookingForChip = itemView.findViewById(R.id.looking_for_chip);
+				requestTitle = itemView.findViewById(R.id.request_title);
+				requestDescription = itemView.findViewById(R.id.request_description);
 				basicInfo = itemView.findViewById(R.id.basic_info);
 				metadataContainer = itemView.findViewById(R.id.metadata_container);
 				publishTime = itemView.findViewById(R.id.publish_time);
@@ -407,15 +405,20 @@ public class FriendRequestListFragment extends LoaderFragment {
 			void bind(FriendRequest item) {
 				username.setText(item.user != null ? item.user.username : "");
 				lookingForChip.setText(item.looking_for != null ? item.looking_for : "");
+				requestTitle.setText(item.title);
+				requestTitle.setVisibility(item.title == null || item.title.isBlank() ? View.GONE : View.VISIBLE);
+				requestDescription.setText(item.description);
+				requestDescription.setVisibility(item.description == null || item.description.isBlank() ? View.GONE : View.VISIBLE);
 
 				// 头像
+				avatar.setImageResource(R.drawable.image_placeholder);
 				if (item.user != null && item.user.avatar != null) {
 					avatar.setOutlineProvider(OutlineProviders.roundedRect(16));
 					ViewImageLoader.loadWithoutAnimation(avatar, null, new UrlImageLoaderRequest(item.user.avatar, V.dp(64), V.dp(64)));
 				}
 
 				// 基础信息：年龄·性别·城市
-				String age = "未知", gender = "未知", city = "未知";
+				String age = null, gender = null, city = null;
 				if (item.fields != null) {
 					for (FriendRequestField f : item.fields) {
 						if ("年龄".equals(f.field_key)) age = f.field_value;
@@ -423,7 +426,12 @@ public class FriendRequestListFragment extends LoaderFragment {
 						else if ("城市".equals(f.field_key)) city = f.field_value;
 					}
 				}
-				basicInfo.setText(age + "岁 · " + gender + " · " + city);
+				List<String> basicParts=new ArrayList<>();
+				if(age!=null && !age.isBlank() && !"未知".equals(age)) basicParts.add(age.matches("\\d+") ? age+"岁" : age);
+				if(gender!=null && !gender.isBlank() && !"未知".equals(gender)) basicParts.add(gender);
+				if(city!=null && !city.isBlank() && !"未知".equals(city)) basicParts.add(city);
+				basicInfo.setText(String.join(" · ", basicParts));
+				basicInfo.setVisibility(basicParts.isEmpty() ? View.GONE : View.VISIBLE);
 
 				// Metadata icons
 				metadataContainer.removeAllViews();
@@ -437,7 +445,7 @@ public class FriendRequestListFragment extends LoaderFragment {
 							icon.setLayoutParams(iconParams);
 							icon.setPadding(0, 0, V.dp(10), 0);
 							icon.setImageResource(iconRes);
-							icon.setColorFilter(getResources().getColor(android.R.color.darker_gray));
+							icon.setColorFilter(getResources().getColor(R.color.diaper_chip_text));
 							icon.setContentDescription(f.field_key);
 							metadataContainer.addView(icon);
 						}
