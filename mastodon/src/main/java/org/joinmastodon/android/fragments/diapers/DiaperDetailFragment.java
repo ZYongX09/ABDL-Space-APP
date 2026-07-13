@@ -58,6 +58,7 @@ public class DiaperDetailFragment extends LoaderFragment {
 	private TextView reviewsTitleText;
 	private TextView sizesTitleText;
 	private boolean checkingOwnRating;
+	private boolean refreshAfterRating;
 
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
@@ -188,16 +189,18 @@ public class DiaperDetailFragment extends LoaderFragment {
 	@Override
 	protected void onShown() {
 		super.onShown();
-		if (!loaded && !dataLoading) {
+		if(refreshAfterRating && !dataLoading){
+			refreshAfterRating=false;
+			loadData();
+		}else if (!loaded && !dataLoading) {
 			loadData();
 		}
 	}
 
 	@Override
 	public void onFragmentResult(int reqCode, boolean success, Bundle result){
-		if(reqCode==RATING_RESULT && success && !dataLoading){
-			loadData();
-		}
+		if(reqCode==RATING_RESULT && success)
+			refreshAfterRating=true;
 	}
 
 	@Override
