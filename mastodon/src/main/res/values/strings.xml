@@ -190,6 +190,17 @@
 	<string name="media_picker_title">Select media</string>
 	<string name="media_picker_no_media">No media found</string>
 	<string name="media_picker_confirm">Select %d</string>
+	<string name="media_picker_all_media">All</string>
+	<plurals name="media_picker_selected">
+		<item quantity="one">%d photo selected</item>
+		<item quantity="other">%d photos selected</item>
+	</plurals>
+	<string name="media_picker_tap_album">Tap to choose another album</string>
+	<string name="media_picker_add_description">Add a description…</string>
+	<string name="media_picker_clear_selection">Clear selection</string>
+	<string name="media_picker_discard_title">Discard selected items</string>
+	<string name="media_picker_discard_message">Are you sure you want to close the attachment menu?</string>
+	<string name="media_picker_camera_failed">Couldn’t open the camera</string>
 	<string name="media_attachment_too_big">File %1$s exceeds the size limit of %2$s MB</string>
 	<string name="settings_theme">Appearance</string>
 	<string name="theme_auto">Use device appearance</string>

@@ -169,6 +169,16 @@
 	<string name="media_picker_title">选择媒体</string>
 	<string name="media_picker_no_media">没有找到媒体文件</string>
 	<string name="media_picker_confirm">选择 %d 项</string>
+	<string name="media_picker_all_media">全部</string>
+	<plurals name="media_picker_selected">
+		<item quantity="other">已选中 %d 张图片</item>
+	</plurals>
+	<string name="media_picker_tap_album">点击选择其他相册</string>
+	<string name="media_picker_add_description">添加说明…</string>
+	<string name="media_picker_clear_selection">清除所选内容</string>
+	<string name="media_picker_discard_title">放弃所选内容</string>
+	<string name="media_picker_discard_message">您确定要关闭附件菜单吗？</string>
+	<string name="media_picker_camera_failed">无法打开相机</string>
 	<string name="media_attachment_too_big">文件 %1$s 的大小超出 %2$s MB的限制</string>
 	<string name="settings_theme">外观</string>
 	<string name="theme_auto">跟随设备偏好</string>

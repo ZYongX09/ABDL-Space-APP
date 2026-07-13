@@ -82,6 +82,9 @@ import org.joinmastodon.android.ui.Snackbar;
 import org.joinmastodon.android.ui.drawables.FancyQrCodeDrawable;
 import org.joinmastodon.android.ui.drawables.RadialParticleSystemDrawable;
 import org.joinmastodon.android.ui.utils.UiUtils;
+import org.joinmastodon.android.ui.media.MediaPickerConfig;
+import org.joinmastodon.android.ui.media.MediaStoreLoader;
+import org.joinmastodon.android.ui.sheets.MediaPickerSheet;
 import org.joinmastodon.android.ui.views.FixedAspectRatioFrameLayout;
 import org.parceler.Parcels;
 
@@ -95,6 +98,7 @@ import java.io.OutputStream;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.ArrayList;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -113,6 +117,8 @@ public class ProfileQrCodeFragment extends AppKitFragment{
 	private static final int PERMISSION_RESULT=388;
 	private static final int SCAN_RESULT=439;
 	private static final int IMAGE_SCAN_RESULT=440;
+	private static final int MEDIA_PERMISSION_RESULT=441;
+	private static final int IMAGE_CAMERA_RESULT=442;
 
 	private Context themeWrapper;
 	private GradientDrawable scrim=new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{0xE6000000, 0xD9000000});
@@ -130,6 +136,8 @@ public class ProfileQrCodeFragment extends AppKitFragment{
 	private Intent scannerIntent;
 	private boolean dismissing;
 	private int accentColor;
+	private Uri pendingCameraUri;
+	private MediaPickerConfig pendingMediaPickerConfig;
 	private static final int QR_BG_COLOR = 0xFFCEE5FF; // blue_primary_100 浅蓝色
 	private static final int QR_DOT_COLOR = 0xFF004A76; // blue_primary_700 深蓝色
 
@@ -312,10 +320,7 @@ public class ProfileQrCodeFragment extends AppKitFragment{
 				BarcodeScanner.installScannerModule(themeWrapper, ()->startActivityForResult(scannerIntent, SCAN_RESULT));
 			}
 		}else if(item.getItemId()==1){
-			Intent intent=new Intent(Intent.ACTION_GET_CONTENT);
-			intent.setType("image/*");
-			intent.addCategory(Intent.CATEGORY_OPENABLE);
-			startActivityForResult(intent, IMAGE_SCAN_RESULT);
+			openQrImagePicker();
 		}
 		return true;
 	}
@@ -363,6 +368,11 @@ public class ProfileQrCodeFragment extends AppKitFragment{
 						.setNegativeButton(R.string.cancel, null)
 						.show();
 			}
+		}else if(requestCode==MEDIA_PERMISSION_RESULT){
+			MediaPickerConfig config=pendingMediaPickerConfig;
+			pendingMediaPickerConfig=null;
+			if(config!=null && new MediaStoreLoader(getActivity()).hasPermission(config))
+				showQrImagePicker(config);
 		}
 	}
 
@@ -378,8 +388,58 @@ public class ProfileQrCodeFragment extends AppKitFragment{
 					Toast.makeText(themeWrapper, R.string.link_not_supported, Toast.LENGTH_SHORT).show();
 				}
 			}
+		}else if(requestCode==IMAGE_CAMERA_RESULT && resultCode==Activity.RESULT_OK && pendingCameraUri!=null){
+			decodeQrFromUri(pendingCameraUri);
+			pendingCameraUri=null;
 		}else if(requestCode==IMAGE_SCAN_RESULT && resultCode==Activity.RESULT_OK && data!=null && data.getData()!=null){
 			decodeQrFromUri(data.getData());
+		}
+	}
+
+	private void openQrImagePicker(){
+		MediaPickerConfig config=new MediaPickerConfig();
+		config.allowImages=true;
+		config.allowVideos=false;
+		config.maxCount=1;
+		ArrayList<String> missing=new ArrayList<>();
+		if(Build.VERSION.SDK_INT>=33){
+			if(getActivity().checkSelfPermission(Manifest.permission.READ_MEDIA_IMAGES)!=PackageManager.PERMISSION_GRANTED)
+				missing.add(Manifest.permission.READ_MEDIA_IMAGES);
+		}else if(!new MediaStoreLoader(getActivity()).hasPermission(config)){
+			missing.add(Manifest.permission.READ_EXTERNAL_STORAGE);
+		}
+		if(getActivity().checkSelfPermission(Manifest.permission.CAMERA)!=PackageManager.PERMISSION_GRANTED)
+			missing.add(Manifest.permission.CAMERA);
+		if(!missing.isEmpty()){
+			pendingMediaPickerConfig=config;
+			requestPermissions(missing.toArray(new String[0]), MEDIA_PERMISSION_RESULT);
+			return;
+		}
+		showQrImagePicker(config);
+	}
+
+	private void showQrImagePicker(MediaPickerConfig config){
+		new MediaPickerSheet(getActivity(), config, new MediaPickerSheet.Listener(){
+			@Override public void onMediaSelected(ArrayList<Uri> uris, String caption){
+				if(!uris.isEmpty())
+					decodeQrFromUri(uris.get(0));
+			}
+			@Override public void onCameraRequested(){ openCameraForQr(); }
+		}).show();
+	}
+
+	private void openCameraForQr(){
+		try{
+			File dir=new File(getActivity().getCacheDir(), "images");
+			dir.mkdirs();
+			File file=File.createTempFile("qr_camera_", ".jpg", dir);
+			pendingCameraUri=UiUtils.getFileProviderUri(getActivity(), file);
+			Intent intent=new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+			intent.putExtra(MediaStore.EXTRA_OUTPUT, pendingCameraUri);
+			intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+			startActivityForResult(intent, IMAGE_CAMERA_RESULT);
+		}catch(Exception x){
+			Toast.makeText(getActivity(), R.string.media_picker_camera_failed, Toast.LENGTH_SHORT).show();
 		}
 	}
 

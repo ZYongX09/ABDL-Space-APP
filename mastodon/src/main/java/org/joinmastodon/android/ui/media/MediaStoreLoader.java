@@ -32,8 +32,9 @@ public class MediaStoreLoader {
 		if(Build.VERSION.SDK_INT<23)
 			return true;
 		if(Build.VERSION.SDK_INT>=33){
-			boolean images=!config.allowImages || context.checkSelfPermission(Manifest.permission.READ_MEDIA_IMAGES)==PackageManager.PERMISSION_GRANTED;
-			boolean videos=!config.allowVideos || context.checkSelfPermission(Manifest.permission.READ_MEDIA_VIDEO)==PackageManager.PERMISSION_GRANTED;
+			boolean selected=Build.VERSION.SDK_INT>=34 && context.checkSelfPermission(Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED)==PackageManager.PERMISSION_GRANTED;
+			boolean images=config.allowImages && (selected || context.checkSelfPermission(Manifest.permission.READ_MEDIA_IMAGES)==PackageManager.PERMISSION_GRANTED);
+			boolean videos=config.allowVideos && (selected || context.checkSelfPermission(Manifest.permission.READ_MEDIA_VIDEO)==PackageManager.PERMISSION_GRANTED);
 			return images || videos;
 		}
 		return context.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE)==PackageManager.PERMISSION_GRANTED;
@@ -68,7 +69,8 @@ public class MediaStoreLoader {
 	}
 
 	private void queryImages(MediaPickerConfig config, Map<Long, MediaAlbum> byAlbum, MediaAlbum all){
-		if(Build.VERSION.SDK_INT>=33 && context.checkSelfPermission(Manifest.permission.READ_MEDIA_IMAGES)!=PackageManager.PERMISSION_GRANTED)
+		if(Build.VERSION.SDK_INT>=33 && context.checkSelfPermission(Manifest.permission.READ_MEDIA_IMAGES)!=PackageManager.PERMISSION_GRANTED &&
+				(Build.VERSION.SDK_INT<34 || context.checkSelfPermission(Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED)!=PackageManager.PERMISSION_GRANTED))
 			return;
 		String[] projection={
 				MediaStore.Images.Media._ID,
@@ -102,7 +104,8 @@ public class MediaStoreLoader {
 	}
 
 	private void queryVideos(MediaPickerConfig config, Map<Long, MediaAlbum> byAlbum, MediaAlbum all){
-		if(Build.VERSION.SDK_INT>=33 && context.checkSelfPermission(Manifest.permission.READ_MEDIA_VIDEO)!=PackageManager.PERMISSION_GRANTED)
+		if(Build.VERSION.SDK_INT>=33 && context.checkSelfPermission(Manifest.permission.READ_MEDIA_VIDEO)!=PackageManager.PERMISSION_GRANTED &&
+				(Build.VERSION.SDK_INT<34 || context.checkSelfPermission(Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED)!=PackageManager.PERMISSION_GRANTED))
 			return;
 		String[] projection={
 				MediaStore.Video.Media._ID,

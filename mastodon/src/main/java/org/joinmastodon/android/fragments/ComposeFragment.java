@@ -1,5 +1,6 @@
 package org.joinmastodon.android.fragments;
 
+import android.Manifest;
 import android.animation.Animator;
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
@@ -9,6 +10,7 @@ import android.app.AlertDialog;
 import android.content.ClipData;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.graphics.Insets;
 import android.graphics.PixelFormat;
@@ -49,6 +51,7 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.twitter.twittertext.TwitterTextEmojiRegex;
 
@@ -64,7 +67,6 @@ import org.joinmastodon.android.events.StatusCountersUpdatedEvent;
 import org.joinmastodon.android.events.StatusCreatedEvent;
 import org.joinmastodon.android.events.StatusUpdatedEvent;
 import org.joinmastodon.android.fragments.account_list.AccountSearchFragment;
-import org.joinmastodon.android.fragments.media.MediaAlbumPickerFragment;
 import org.joinmastodon.android.model.Account;
 import org.joinmastodon.android.model.Emoji;
 import org.joinmastodon.android.model.EmojiCategory;
@@ -94,8 +96,9 @@ import org.joinmastodon.android.ui.utils.UiUtils;
 import org.joinmastodon.android.ui.viewcontrollers.ComposeAutocompleteViewController;
 import org.joinmastodon.android.ui.viewcontrollers.ComposeLanguageAlertViewController;
 import org.joinmastodon.android.ui.viewcontrollers.ComposeMediaViewController;
-import org.joinmastodon.android.ui.media.MediaPickerResult;
 import org.joinmastodon.android.ui.media.MediaPickerConfig;
+import org.joinmastodon.android.ui.media.MediaStoreLoader;
+import org.joinmastodon.android.ui.sheets.MediaPickerSheet;
 import org.joinmastodon.android.ui.viewcontrollers.ComposePollViewController;
 import org.joinmastodon.android.ui.views.ComposeEditText;
 import org.joinmastodon.android.ui.views.CustomScrollView;
@@ -128,7 +131,8 @@ import me.grishka.appkit.utils.V;
 public class ComposeFragment extends MastodonToolbarFragment implements ComposeEditText.SelectionListener, CustomTransitionsFragment{
 
 	private static final int MEDIA_RESULT=717;
-	private static final int LOCAL_MEDIA_RESULT=718;
+	private static final int MEDIA_PERMISSION_RESULT=718;
+	private static final int CAMERA_CAPTURE_RESULT=719;
 	public static final int IMAGE_DESCRIPTION_RESULT=363;
 	private static final int AUTOCOMPLETE_ACCOUNT_RESULT=779;
 	private static final String TAG="ComposeFragment";
@@ -199,6 +203,8 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	private Runnable discardConfirmationCallback=this::confirmDiscardDraftBackCallback;
 	private boolean prevHadDraft;
 	private boolean keyboardVisible;
+	private Uri pendingCameraUri;
+	private MediaPickerConfig pendingMediaPickerConfig;
 
 	public ComposeFragment(){
 		super(R.layout.toolbar_fragment_with_progressbar);
@@ -966,14 +972,6 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 
 	@Override
 	public void onFragmentResult(int reqCode, boolean success, Bundle result){
-		if(reqCode==LOCAL_MEDIA_RESULT && success){
-			ArrayList<Uri> uris=result.getParcelableArrayList(MediaPickerResult.KEY_URIS);
-			if(uris!=null){
-				for(Uri uri:uris)
-					mediaViewController.addMediaAttachment(uri, null);
-			}
-			return;
-		}
 		if(reqCode==IMAGE_DESCRIPTION_RESULT && success){
 			String attID=result.getString("attachment");
 			String text=result.getString("text");
@@ -1062,12 +1060,69 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	private void openLocalMediaPicker(){
 		MediaPickerConfig config=new MediaPickerConfig();
 		config.maxCount=mediaViewController.getMaxAttachments()-mediaViewController.getMediaAttachmentsCount();
-		Nav.goForResult(getActivity(), MediaAlbumPickerFragment.class, config.toBundle(), LOCAL_MEDIA_RESULT, this);
+		ArrayList<String> missing=new ArrayList<>();
+		if(Build.VERSION.SDK_INT>=33){
+			if(config.allowImages && getActivity().checkSelfPermission(Manifest.permission.READ_MEDIA_IMAGES)!=PackageManager.PERMISSION_GRANTED)
+				missing.add(Manifest.permission.READ_MEDIA_IMAGES);
+			if(config.allowVideos && getActivity().checkSelfPermission(Manifest.permission.READ_MEDIA_VIDEO)!=PackageManager.PERMISSION_GRANTED)
+				missing.add(Manifest.permission.READ_MEDIA_VIDEO);
+		}else if(!new MediaStoreLoader(getActivity()).hasPermission(config)){
+			missing.add(Manifest.permission.READ_EXTERNAL_STORAGE);
+		}
+		if(getActivity().checkSelfPermission(Manifest.permission.CAMERA)!=PackageManager.PERMISSION_GRANTED)
+			missing.add(Manifest.permission.CAMERA);
+		if(!missing.isEmpty()){
+			pendingMediaPickerConfig=config;
+			requestPermissions(missing.toArray(new String[0]), MEDIA_PERMISSION_RESULT);
+			return;
+		}
+		showLocalMediaPicker(config);
+	}
+
+	private void showLocalMediaPicker(MediaPickerConfig config){
+		new MediaPickerSheet(getActivity(), config, new MediaPickerSheet.Listener(){
+			@Override public void onMediaSelected(ArrayList<Uri> uris, String caption){
+				for(Uri uri:uris)
+					mediaViewController.addMediaAttachment(uri, null);
+				if(!TextUtils.isEmpty(caption) && TextUtils.isEmpty(mainEditText.getText()))
+					mainEditText.setText(caption);
+			}
+			@Override public void onCameraRequested(){ openCameraForAttachment(); }
+		}).show();
+	}
+
+	private void openCameraForAttachment(){
+		try{
+			java.io.File dir=new java.io.File(getActivity().getCacheDir(), "images");
+			dir.mkdirs();
+			java.io.File file=java.io.File.createTempFile("camera_", ".jpg", dir);
+			pendingCameraUri=UiUtils.getFileProviderUri(getActivity(), file);
+			Intent intent=new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+			intent.putExtra(MediaStore.EXTRA_OUTPUT, pendingCameraUri);
+			intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+			startActivityForResult(intent, CAMERA_CAPTURE_RESULT);
+		}catch(Exception x){
+			Toast.makeText(getActivity(), R.string.media_picker_camera_failed, Toast.LENGTH_SHORT).show();
+		}
+	}
+
+	@Override
+	public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults){
+		super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+		if(requestCode==MEDIA_PERMISSION_RESULT){
+			MediaPickerConfig config=pendingMediaPickerConfig;
+			pendingMediaPickerConfig=null;
+			if(config!=null && new MediaStoreLoader(getActivity()).hasPermission(config))
+				showLocalMediaPicker(config);
+		}
 	}
 
 	@Override
 	public void onActivityResult(int requestCode, int resultCode, Intent data){
-		if(requestCode==MEDIA_RESULT && resultCode==Activity.RESULT_OK){
+		if(requestCode==CAMERA_CAPTURE_RESULT && resultCode==Activity.RESULT_OK && pendingCameraUri!=null){
+			mediaViewController.addMediaAttachment(pendingCameraUri, null);
+			pendingCameraUri=null;
+		}else if(requestCode==MEDIA_RESULT && resultCode==Activity.RESULT_OK){
 			Uri single=data.getData();
 			if(single!=null){
 				mediaViewController.addMediaAttachment(single, null);
