@@ -384,19 +384,23 @@ public class ProfileQrCodeFragment extends AppKitFragment{
 	}
 
 	private void decodeQrFromUri(Uri uri){
+		final Uri imageUri=uri;
 		MastodonAPIController.runInBackground(()->{
-			try(InputStream is=getActivity().getContentResolver().openInputStream(uri)){
+			Activity activity=getActivity();
+			if(activity==null)
+				return;
+			try(InputStream is=activity.getContentResolver().openInputStream(imageUri)){
 				if(is==null){
 					showToast(R.string.qr_code_not_found);
 					return;
 				}
-				BitmapFactory.Options opts=new BitmapFactory.Options();
-				opts.inJustDecodeBounds=true;
-				byte[] data=readAllBytes(is);
-				BitmapFactory.decodeByteArray(data, 0, data.length, opts);
-				opts.inSampleSize=calculateInSampleSize(opts, 1024, 1024);
-				opts.inJustDecodeBounds=false;
-				Bitmap bitmap=BitmapFactory.decodeByteArray(data, 0, data.length, opts);
+				byte[] fileBytes=readAllBytes(is);
+				BitmapFactory.Options boundsOpts=new BitmapFactory.Options();
+				boundsOpts.inJustDecodeBounds=true;
+				BitmapFactory.decodeByteArray(fileBytes, 0, fileBytes.length, boundsOpts);
+				boundsOpts.inSampleSize=calculateInSampleSize(boundsOpts, 1024, 1024);
+				boundsOpts.inJustDecodeBounds=false;
+				Bitmap bitmap=BitmapFactory.decodeByteArray(fileBytes, 0, fileBytes.length, boundsOpts);
 				if(bitmap==null){
 					showToast(R.string.qr_code_not_found);
 					return;
@@ -412,8 +416,11 @@ public class ProfileQrCodeFragment extends AppKitFragment{
 				Result result=new MultiFormatReader().decode(binary, hints);
 				String text=result.getText();
 				showToastOnUiThread(()->{
+					Activity a=getActivity();
+					if(a==null)
+						return;
 					if(text.startsWith("https:") || text.startsWith("http:")){
-						((MainActivity)getActivity()).handleURL(Uri.parse(text), accountID);
+						((MainActivity)a).handleURL(Uri.parse(text), accountID);
 						dismiss();
 					}else{
 						Toast.makeText(themeWrapper, R.string.link_not_supported, Toast.LENGTH_SHORT).show();
@@ -435,11 +442,10 @@ public class ProfileQrCodeFragment extends AppKitFragment{
 	}
 
 	private static int calculateInSampleSize(BitmapFactory.Options opts, int reqW, int reqH){
-		int h=opts.outHeight, w=opts.outWidth;
+		int rawH=opts.outHeight, rawW=opts.outWidth;
 		int inSampleSize=1;
-		if(h>reqH || w>reqW){
-			int halfH=h/2, halfW=w/2;
-			while((halfH/inSampleSize)>=reqH && (halfW/inSampleSize)>=reqW)
+		if(rawH>reqH || rawW>reqW){
+			while((rawH/inSampleSize)/2>=reqH && (rawW/inSampleSize)/2>=reqW)
 				inSampleSize*=2;
 		}
 		return inSampleSize;

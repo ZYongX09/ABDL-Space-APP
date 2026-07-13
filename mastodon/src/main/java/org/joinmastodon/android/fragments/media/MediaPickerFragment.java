@@ -1,5 +1,6 @@
 package org.joinmastodon.android.fragments.media;
 
+import android.app.Activity;
 import android.graphics.Color;
 import android.media.MediaMetadataRetriever;
 import android.os.Bundle;
@@ -114,6 +115,7 @@ public class MediaPickerFragment extends ToolbarFragment{
 	private class PickerHolder extends RecyclerView.ViewHolder{
 		private final ImageView image;
 		private final TextView badge;
+		private MediaItem currentItem;
 		PickerHolder(FrameLayout cell){
 			super(cell);
 			int size=(getResources().getDisplayMetrics().widthPixels-V.dp(8)-V.dp(8))/3;
@@ -128,9 +130,15 @@ public class MediaPickerFragment extends ToolbarFragment{
 			FrameLayout.LayoutParams bp=new FrameLayout.LayoutParams(V.dp(26), V.dp(26), Gravity.RIGHT|Gravity.TOP);
 			bp.setMargins(0, V.dp(4), V.dp(4), 0);
 			cell.addView(badge, bp);
-			cell.setOnClickListener(v->toggle(album.items.get(getBindingAdapterPosition())));
+			cell.setOnClickListener(v->{
+				int pos=getBindingAdapterPosition();
+				if(pos!=RecyclerView.NO_POSITION && album!=null)
+					toggle(album.items.get(pos));
+			});
 		}
 		void bind(MediaItem item){
+			currentItem=item;
+			image.setImageBitmap(null);
 			if(item.video)
 				loadVideoThumbnail(item);
 			else
@@ -143,11 +151,17 @@ public class MediaPickerFragment extends ToolbarFragment{
 		private void loadVideoThumbnail(MediaItem item){
 			new Thread(()->{
 				try{
+					Activity activity=getActivity();
+					if(activity==null)
+						return;
 					MediaMetadataRetriever retriever=new MediaMetadataRetriever();
-					retriever.setDataSource(getActivity(), item.uri);
+					retriever.setDataSource(activity, item.uri);
 					android.graphics.Bitmap bitmap=retriever.getFrameAtTime(0);
 					retriever.release();
-					image.post(()->image.setImageBitmap(bitmap));
+					image.post(()->{
+						if(currentItem==item)
+							image.setImageBitmap(bitmap);
+					});
 				}catch(Exception ignored){ }
 			}, "media-video-thumbnail").start();
 		}

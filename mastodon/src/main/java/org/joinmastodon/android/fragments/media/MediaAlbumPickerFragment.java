@@ -83,7 +83,7 @@ public class MediaAlbumPickerFragment extends ToolbarFragment{
 				return;
 			loading=false;
 			albums=result;
-			emptyView.setText(result.isEmpty() ? R.string.media_picker_no_media : R.string.media_picker_no_media);
+			emptyView.setText(R.string.media_picker_no_media);
 			emptyView.setVisibility(result.isEmpty() ? View.VISIBLE : View.GONE);
 			adapter.notifyDataSetChanged();
 		});
@@ -153,7 +153,10 @@ public class MediaAlbumPickerFragment extends ToolbarFragment{
 			count.setPadding(0, 0, V.dp(8), V.dp(8));
 			cell.addView(count, titleParams);
 			cell.setOnClickListener(v->{
-				MediaAlbum album=albums.get(getBindingAdapterPosition());
+				int pos=getBindingAdapterPosition();
+				if(pos==RecyclerView.NO_POSITION)
+					return;
+				MediaAlbum album=albums.get(pos);
 				Bundle args=config.toBundle();
 				args.putLong(MediaPickerFragment.KEY_ALBUM_ID, album.id);
 				Nav.goForResult(getActivity(), MediaPickerFragment.class, args, ALBUM_RESULT, MediaAlbumPickerFragment.this);
