@@ -28,6 +28,7 @@ import com.google.gson.reflect.TypeToken;
 
 import org.joinmastodon.android.R;
 import org.joinmastodon.android.api.requests.diapers.GetDiaperDetail;
+import org.joinmastodon.android.api.requests.diapers.GetMyDiaperRating;
 import org.joinmastodon.android.model.DiaperReview;
 import org.joinmastodon.android.ui.OutlineProviders;
 import org.joinmastodon.android.ui.views.FlowLayout;
@@ -45,6 +46,7 @@ import me.grishka.appkit.imageloader.requests.UrlImageLoaderRequest;
 import me.grishka.appkit.utils.V;
 
 public class DiaperDetailFragment extends LoaderFragment {
+	private static final int RATING_RESULT=1;
 	private int diaperId;
 	private String accountID;
 	private Map<String, Object> diaperData;
@@ -53,7 +55,7 @@ public class DiaperDetailFragment extends LoaderFragment {
 	private LinearLayout sizesContainer;
 	private LinearLayout reviewListContainer;
 	private TextView reviewsTitleText;
-	private boolean refreshAfterRating;
+	private boolean checkingOwnRating;
 
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
@@ -186,8 +188,12 @@ public class DiaperDetailFragment extends LoaderFragment {
 		super.onShown();
 		if (!loaded && !dataLoading) {
 			loadData();
-		} else if (refreshAfterRating && !dataLoading) {
-			refreshAfterRating = false;
+		}
+	}
+
+	@Override
+	public void onFragmentResult(int reqCode, boolean success, Bundle result){
+		if(reqCode==RATING_RESULT && success && !dataLoading){
 			loadData();
 		}
 	}
@@ -484,10 +490,38 @@ public class DiaperDetailFragment extends LoaderFragment {
 	}
 
 	private void openRatingPage() {
-		if (diaperData == null) {
+		if (diaperData == null || dataLoading) {
 			android.widget.Toast.makeText(getContext(), "请稍候，产品信息加载中", android.widget.Toast.LENGTH_SHORT).show();
 			return;
 		}
+		if(checkingOwnRating)
+			return;
+		checkingOwnRating=true;
+		new GetMyDiaperRating(diaperId)
+			.setCallback(new Callback<Map<String, Object>>(){
+				@Override
+				public void onSuccess(Map<String, Object> result){
+					checkingOwnRating=false;
+					if(getActivity()==null)
+						return;
+					if(result.get("rating")!=null){
+						android.widget.Toast.makeText(getContext(), "你已经评价过这款纸尿裤", android.widget.Toast.LENGTH_SHORT).show();
+						return;
+					}
+					openRatingForm();
+				}
+
+				@Override
+				public void onError(ErrorResponse error){
+					checkingOwnRating=false;
+					if(getActivity()!=null)
+						error.showToast(getContext());
+				}
+			})
+			.exec(accountID);
+	}
+
+	private void openRatingForm(){
 		Bundle args = new Bundle();
 		args.putString("account", accountID);
 		args.putInt("diaper_id", diaperId);
@@ -502,7 +536,6 @@ public class DiaperDetailFragment extends LoaderFragment {
 		if (ratingCount instanceof Number) {
 			args.putInt("rating_count", ((Number) ratingCount).intValue());
 		}
-		refreshAfterRating = true;
-		Nav.go(getActivity(), DiaperRatingFragment.class, args);
+		Nav.goForResult(getActivity(), DiaperRatingFragment.class, args, RATING_RESULT, this);
 	}
 }

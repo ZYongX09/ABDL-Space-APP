@@ -339,6 +339,7 @@ public class DiaperRatingFragment extends MastodonToolbarFragment{
 			public void onSuccess(Map<String, Object> result){
 				if(getActivity()==null) return;
 				Toast.makeText(getContext(), "评分成功", Toast.LENGTH_SHORT).show();
+				setResult(true, null);
 				Nav.finish(DiaperRatingFragment.this);
 			}
 
