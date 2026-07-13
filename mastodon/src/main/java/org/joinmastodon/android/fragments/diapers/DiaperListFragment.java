@@ -30,6 +30,7 @@ import org.joinmastodon.android.R;
 import org.joinmastodon.android.api.requests.diapers.GetDiaperBrands;
 import org.joinmastodon.android.api.requests.diapers.GetDiaperList;
 import org.joinmastodon.android.model.Diaper;
+import org.joinmastodon.android.ui.utils.UiUtils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -365,7 +366,7 @@ public class DiaperListFragment extends LoaderFragment {
 			if (isSelected) {
 				chipText.setTextColor(0xFF163247);
 			} else {
-				chipText.setTextColor(getResources().getColor(R.color.diaper_chip_text));
+				chipText.setTextColor(UiUtils.getThemeColor(getActivity(), R.attr.colorM3OnSurface));
 			}
 
 			chipText.setOnClickListener(v -> {
@@ -408,7 +409,7 @@ public class DiaperListFragment extends LoaderFragment {
 				endText.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 				endText.setPadding(V.dp(16), V.dp(16), V.dp(16), V.dp(16));
 				endText.setTextSize(12);
-				endText.setTextColor(getResources().getColor(R.color.diaper_chip_text));
+				endText.setTextColor(UiUtils.getThemeColor(getActivity(), R.attr.colorM3OnSurfaceVariant));
 				endText.setGravity(android.view.Gravity.CENTER);
 				return new EndViewHolder(endText);
 			}

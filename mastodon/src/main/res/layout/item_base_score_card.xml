@@ -15,7 +15,7 @@
         android:layout_width="28dp"
         android:layout_height="28dp"
         android:src="@drawable/ic_fluent_chart_24_regular"
-        android:tint="#1976D2"
+        android:tint="?colorM3Primary"
         android:importantForAccessibility="no" />
 
     <!-- 内容 -->
@@ -47,7 +47,7 @@
                 android:layout_height="wrap_content"
                 android:text="成人"
                 android:textSize="12sp"
-                android:textColor="#1976D2"
+                android:textColor="?colorM3Primary"
                 android:background="@drawable/bg_tag_adult"
                 android:paddingHorizontal="10dp"
                 android:paddingVertical="3dp"

@@ -32,6 +32,7 @@ import org.joinmastodon.android.api.requests.diapers.GetMyDiaperRating;
 import org.joinmastodon.android.model.DiaperReview;
 import org.joinmastodon.android.ui.OutlineProviders;
 import org.joinmastodon.android.ui.views.FlowLayout;
+import org.joinmastodon.android.ui.utils.UiUtils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -104,7 +105,7 @@ public class DiaperDetailFragment extends LoaderFragment {
 		sizesTitleText.setPadding(V.dp(16), V.dp(16), V.dp(16), V.dp(8));
 		sizesTitleText.setText("尺码");
 		sizesTitleText.setTextSize(17);
-		sizesTitleText.setTextColor(getResources().getColor(R.color.diaper_chip_text));
+		sizesTitleText.setTextColor(UiUtils.getThemeColor(getActivity(), R.attr.colorM3OnSurface));
 		sizesTitleText.setTypeface(null, android.graphics.Typeface.BOLD);
 		root.addView(sizesTitleText);
 
@@ -119,7 +120,7 @@ public class DiaperDetailFragment extends LoaderFragment {
 		reviewsTitleText.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 		reviewsTitleText.setPadding(V.dp(16), V.dp(20), V.dp(16), V.dp(12));
 		reviewsTitleText.setTextSize(16);
-		reviewsTitleText.setTextColor(getResources().getColor(R.color.diaper_chip_text));
+		reviewsTitleText.setTextColor(UiUtils.getThemeColor(getActivity(), R.attr.colorM3OnSurface));
 		reviewsTitleText.setTypeface(null, android.graphics.Typeface.BOLD);
 		root.addView(reviewsTitleText);
 
@@ -168,7 +169,7 @@ public class DiaperDetailFragment extends LoaderFragment {
 		compareBtn.setLayoutParams(compareParams);
 		compareBtn.setText("⚖ 加入对比");
 		compareBtn.setTextSize(14);
-		compareBtn.setTextColor(0xFF999999);
+		compareBtn.setTextColor(UiUtils.getThemeColor(getActivity(), R.attr.colorM3OnSurfaceVariant));
 		compareBtn.setGravity(android.view.Gravity.CENTER);
 		compareBtn.setBackgroundResource(R.drawable.bg_diaper_chip);
 		compareBtn.setPadding(V.dp(12), V.dp(12), V.dp(12), V.dp(12));
@@ -434,7 +435,7 @@ public class DiaperDetailFragment extends LoaderFragment {
 			emptyText.setText("暂无评价");
 			emptyText.setTextSize(14);
 			emptyText.setGravity(android.view.Gravity.CENTER);
-			emptyText.setTextColor(getResources().getColor(R.color.diaper_chip_text));
+			emptyText.setTextColor(UiUtils.getThemeColor(getActivity(), R.attr.colorM3OnSurfaceVariant));
 			reviewListContainer.addView(emptyText);
 			return;
 		}

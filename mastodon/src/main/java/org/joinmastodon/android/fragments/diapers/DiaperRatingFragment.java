@@ -24,6 +24,7 @@ import org.joinmastodon.android.R;
 import org.joinmastodon.android.api.MastodonErrorResponse;
 import org.joinmastodon.android.api.requests.diapers.SubmitDiaperRating;
 import org.joinmastodon.android.fragments.MastodonToolbarFragment;
+import org.joinmastodon.android.ui.utils.UiUtils;
 
 import java.util.HashMap;
 import java.util.Locale;
@@ -35,7 +36,6 @@ import me.grishka.appkit.Nav;
 import me.grishka.appkit.utils.V;
 
 public class DiaperRatingFragment extends MastodonToolbarFragment{
-	private static final int ACCENT=0xFFA1D9F7;
 	private int diaperId;
 	private String accountID;
 	private String brand;
@@ -111,10 +111,10 @@ public class DiaperRatingFragment extends MastodonToolbarFragment{
 		submitButton.setText("提交评分");
 		submitButton.setTextSize(20);
 		submitButton.setTypeface(null, Typeface.BOLD);
-		submitButton.setTextColor(getResources().getColor(R.color.diaper_accent_text));
+		submitButton.setTextColor(UiUtils.getThemeColor(getActivity(), R.attr.colorM3OnPrimary));
 		submitButton.setGravity(android.view.Gravity.CENTER);
 		submitButton.setPadding(0, V.dp(16), 0, V.dp(16));
-		submitButton.setBackground(createRoundedDrawable(ACCENT, 0, V.dp(28)));
+		submitButton.setBackground(createRoundedDrawable(UiUtils.getThemeColor(getActivity(), R.attr.colorM3Primary), 0, V.dp(28)));
 		submitButton.setOnClickListener(v->submitRating());
 		root.addView(submitButton);
 
@@ -136,7 +136,7 @@ public class DiaperRatingFragment extends MastodonToolbarFragment{
 		TextView score=new TextView(getContext());
 		score.setText(avgScore>0 ? String.format(Locale.US, "%.1f", avgScore) : "--");
 		score.setTextSize(48);
-		score.setTextColor(ACCENT);
+		score.setTextColor(UiUtils.getThemeColor(getActivity(), R.attr.colorM3Primary));
 		score.setTypeface(null, Typeface.BOLD);
 		score.setPadding(0, V.dp(8), 0, 0);
 		card.addView(score);
@@ -144,7 +144,7 @@ public class DiaperRatingFragment extends MastodonToolbarFragment{
 		TextView stars=new TextView(getContext());
 		stars.setText(buildStars(avgScore));
 		stars.setTextSize(24);
-		stars.setTextColor(ACCENT);
+		stars.setTextColor(UiUtils.getThemeColor(getActivity(), R.attr.colorM3Primary));
 		card.addView(stars);
 
 		TextView count=new TextView(getContext());
@@ -175,9 +175,9 @@ public class DiaperRatingFragment extends MastodonToolbarFragment{
 		reviewInput.setHint("分享你的使用体验...\n例如：\n吸收速度不错，夜间使用也比较安心，整体很舒适...");
 		reviewInput.setTextSize(15);
 		reviewInput.setTextColor(getPrimaryTextColor());
-		reviewInput.setHintTextColor(0xFF91A0B5);
+		reviewInput.setHintTextColor(UiUtils.getThemeColor(getActivity(), R.attr.colorM3OnSurfaceVariant));
 		reviewInput.setPadding(V.dp(12), V.dp(12), V.dp(12), V.dp(12));
-		reviewInput.setBackground(createRoundedDrawable(0x00FFFFFF, getResources().getColor(R.color.diaper_card_border), V.dp(10)));
+		reviewInput.setBackground(createRoundedDrawable(0x00FFFFFF, UiUtils.getThemeColor(getActivity(), R.attr.colorM3OutlineVariant), V.dp(10)));
 		reviewInput.setFilters(new InputFilter[]{new InputFilter.LengthFilter(500)});
 		reviewInput.addTextChangedListener(new TextWatcher(){
 			@Override
@@ -226,7 +226,7 @@ public class DiaperRatingFragment extends MastodonToolbarFragment{
 		LinearLayout.LayoutParams indicatorParams=new LinearLayout.LayoutParams(V.dp(4), V.dp(20));
 		indicatorParams.setMarginEnd(V.dp(10));
 		indicator.setLayoutParams(indicatorParams);
-		indicator.setBackground(createRoundedDrawable(ACCENT, 0, V.dp(2)));
+		indicator.setBackground(createRoundedDrawable(UiUtils.getThemeColor(getActivity(), R.attr.colorM3Primary), 0, V.dp(2)));
 		titleRow.addView(indicator);
 
 		TextView titleText=new TextView(getContext());
@@ -258,9 +258,9 @@ public class DiaperRatingFragment extends MastodonToolbarFragment{
 		seekBar.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 		seekBar.setMax(9);
 		seekBar.setProgress(scores.get(key)-1);
-		seekBar.setProgressTintList(ColorStateList.valueOf(ACCENT));
-		seekBar.setThumbTintList(ColorStateList.valueOf(ACCENT));
-		seekBar.setProgressBackgroundTintList(ColorStateList.valueOf(getResources().getColor(R.color.diaper_weak_track)));
+		seekBar.setProgressTintList(ColorStateList.valueOf(UiUtils.getThemeColor(getActivity(), R.attr.colorM3Primary)));
+		seekBar.setThumbTintList(ColorStateList.valueOf(UiUtils.getThemeColor(getActivity(), R.attr.colorM3Primary)));
+		seekBar.setProgressBackgroundTintList(ColorStateList.valueOf(UiUtils.getThemeColor(getActivity(), R.attr.colorM3OutlineVariant)));
 		row.addView(seekBar);
 
 		TextView value=new TextView(getContext());
@@ -309,12 +309,11 @@ public class DiaperRatingFragment extends MastodonToolbarFragment{
 	}
 
 	private int getPrimaryTextColor(){
-		return getResources().getColor(R.color.diaper_chip_text);
+		return UiUtils.getThemeColor(getActivity(), R.attr.colorM3OnSurface);
 	}
 
 	private int getSecondaryTextColor(){
-		boolean dark=(getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK)==android.content.res.Configuration.UI_MODE_NIGHT_YES;
-		return dark ? 0xFF9AA7B6 : 0xFF64748B;
+		return UiUtils.getThemeColor(getActivity(), R.attr.colorM3OnSurfaceVariant);
 	}
 
 	private void submitRating(){

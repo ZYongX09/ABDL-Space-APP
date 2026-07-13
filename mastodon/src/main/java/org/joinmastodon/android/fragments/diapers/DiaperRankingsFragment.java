@@ -21,6 +21,7 @@ import com.google.gson.reflect.TypeToken;
 import org.joinmastodon.android.R;
 import org.joinmastodon.android.api.requests.diapers.GetRankings;
 import org.joinmastodon.android.model.RankingItem;
+import org.joinmastodon.android.ui.utils.UiUtils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -89,7 +90,7 @@ public class DiaperRankingsFragment extends LoaderFragment {
 		infoText.setPadding(V.dp(16), V.dp(12), V.dp(16), V.dp(4));
 		infoText.setText(R.string.diaper_rankings_info);
 		infoText.setTextSize(12);
-		infoText.setTextColor(getResources().getColor(R.color.diaper_chip_text));
+		infoText.setTextColor(UiUtils.getThemeColor(getActivity(), R.attr.colorM3OnSurfaceVariant));
 		root.addView(infoText);
 
 		// 总数
@@ -97,7 +98,7 @@ public class DiaperRankingsFragment extends LoaderFragment {
 		totalCountText.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 		totalCountText.setPadding(V.dp(16), V.dp(4), V.dp(16), V.dp(8));
 		totalCountText.setTextSize(12);
-		totalCountText.setTextColor(getResources().getColor(R.color.diaper_chip_text));
+		totalCountText.setTextColor(UiUtils.getThemeColor(getActivity(), R.attr.colorM3OnSurfaceVariant));
 		root.addView(totalCountText);
 
 		// Tab按钮 (HorizontalScrollView)
@@ -196,7 +197,7 @@ public class DiaperRankingsFragment extends LoaderFragment {
 			if (isSelected) {
 				chipText.setTextColor(0xFF163247);
 			} else {
-				chipText.setTextColor(getResources().getColor(R.color.diaper_chip_text));
+				chipText.setTextColor(UiUtils.getThemeColor(getActivity(), R.attr.colorM3OnSurface));
 			}
 
 			chipText.setOnClickListener(v -> {
@@ -330,7 +331,7 @@ public class DiaperRankingsFragment extends LoaderFragment {
 				endText.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 				endText.setPadding(V.dp(16), V.dp(16), V.dp(16), V.dp(16));
 				endText.setTextSize(12);
-				endText.setTextColor(getResources().getColor(R.color.diaper_chip_text));
+				endText.setTextColor(UiUtils.getThemeColor(getActivity(), R.attr.colorM3OnSurfaceVariant));
 				endText.setGravity(android.view.Gravity.CENTER);
 				return new EndViewHolder(endText);
 			}
@@ -350,7 +351,7 @@ public class DiaperRankingsFragment extends LoaderFragment {
 				if (rank <= 3) {
 					itemHolder.rankNumber.setTextColor(0xFFFFB300);
 				} else {
-					itemHolder.rankNumber.setTextColor(getResources().getColor(R.color.diaper_chip_text));
+					itemHolder.rankNumber.setTextColor(UiUtils.getThemeColor(getActivity(), R.attr.colorM3OnSurface));
 				}
 
 				// 品牌 + 型号

@@ -51,6 +51,7 @@ import me.grishka.appkit.utils.V;
 import me.grishka.appkit.views.FragmentRootLinearLayout;
 import org.joinmastodon.android.ui.OutlineProviders;
 import org.joinmastodon.android.ui.views.FlowLayout;
+import org.joinmastodon.android.ui.utils.UiUtils;
 
 public class FriendRequestListFragment extends LoaderFragment {
 	private RecyclerView recyclerView;
@@ -445,7 +446,7 @@ public class FriendRequestListFragment extends LoaderFragment {
 							icon.setLayoutParams(iconParams);
 							icon.setPadding(0, 0, V.dp(10), 0);
 							icon.setImageResource(iconRes);
-							icon.setColorFilter(getResources().getColor(R.color.diaper_chip_text));
+							icon.setColorFilter(UiUtils.getThemeColor(getActivity(), R.attr.colorM3OnSurfaceVariant));
 							icon.setContentDescription(f.field_key);
 							metadataContainer.addView(icon);
 						}
