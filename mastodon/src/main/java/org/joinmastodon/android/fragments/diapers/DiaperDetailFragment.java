@@ -51,7 +51,7 @@ public class DiaperDetailFragment extends LoaderFragment {
 	private LinearLayout imagesContainer;
 	private LinearLayout sizesContainer;
 	private LinearLayout reviewListContainer;
-	private TextView titleText;
+	private TextView reviewsTitleText;
 
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
@@ -110,13 +110,13 @@ public class DiaperDetailFragment extends LoaderFragment {
 		root.addView(sizesContainer);
 
 		// 用户评价标题
-		TextView reviewsTitle = new TextView(getContext());
-		reviewsTitle.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-		reviewsTitle.setPadding(V.dp(16), V.dp(20), V.dp(16), V.dp(12));
-		reviewsTitle.setTextSize(16);
-		reviewsTitle.setTextColor(getResources().getColor(R.color.diaper_chip_text));
-		reviewsTitle.setTypeface(null, android.graphics.Typeface.BOLD);
-		root.addView(reviewsTitle);
+		reviewsTitleText = new TextView(getContext());
+		reviewsTitleText.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+		reviewsTitleText.setPadding(V.dp(16), V.dp(20), V.dp(16), V.dp(12));
+		reviewsTitleText.setTextSize(16);
+		reviewsTitleText.setTextColor(getResources().getColor(R.color.diaper_chip_text));
+		reviewsTitleText.setTypeface(null, android.graphics.Typeface.BOLD);
+		root.addView(reviewsTitleText);
 
 		// 评价列表
 		reviewListContainer = new LinearLayout(getContext());
@@ -400,15 +400,8 @@ public class DiaperDetailFragment extends LoaderFragment {
 		reviewListContainer.removeAllViews();
 
 		// 更新评价标题
-		for (int i = 0; i < ((LinearLayout) getView().getParent()).getChildCount(); i++) {
-			View child = ((LinearLayout) getView().getParent()).getChildAt(i);
-			if (child instanceof TextView) {
-				String text = ((TextView) child).getText().toString();
-				if (text.contains("用户评价")) {
-					((TextView) child).setText(String.format("用户评价 (%d)", reviews.size()));
-					break;
-				}
-			}
+		if (reviewsTitleText != null) {
+			reviewsTitleText.setText(String.format("用户评价 (%d)", reviews.size()));
 		}
 
 		if (reviews.isEmpty()) {
