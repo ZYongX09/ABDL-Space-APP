@@ -64,6 +64,7 @@ import org.joinmastodon.android.events.StatusCountersUpdatedEvent;
 import org.joinmastodon.android.events.StatusCreatedEvent;
 import org.joinmastodon.android.events.StatusUpdatedEvent;
 import org.joinmastodon.android.fragments.account_list.AccountSearchFragment;
+import org.joinmastodon.android.fragments.media.MediaAlbumPickerFragment;
 import org.joinmastodon.android.model.Account;
 import org.joinmastodon.android.model.Emoji;
 import org.joinmastodon.android.model.EmojiCategory;
@@ -93,6 +94,8 @@ import org.joinmastodon.android.ui.utils.UiUtils;
 import org.joinmastodon.android.ui.viewcontrollers.ComposeAutocompleteViewController;
 import org.joinmastodon.android.ui.viewcontrollers.ComposeLanguageAlertViewController;
 import org.joinmastodon.android.ui.viewcontrollers.ComposeMediaViewController;
+import org.joinmastodon.android.ui.media.MediaPickerResult;
+import org.joinmastodon.android.ui.media.MediaPickerConfig;
 import org.joinmastodon.android.ui.viewcontrollers.ComposePollViewController;
 import org.joinmastodon.android.ui.views.ComposeEditText;
 import org.joinmastodon.android.ui.views.CustomScrollView;
@@ -125,6 +128,7 @@ import me.grishka.appkit.utils.V;
 public class ComposeFragment extends MastodonToolbarFragment implements ComposeEditText.SelectionListener, CustomTransitionsFragment{
 
 	private static final int MEDIA_RESULT=717;
+	private static final int LOCAL_MEDIA_RESULT=718;
 	public static final int IMAGE_DESCRIPTION_RESULT=363;
 	private static final int AUTOCOMPLETE_ACCOUNT_RESULT=779;
 	private static final String TAG="ComposeFragment";
@@ -310,7 +314,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		replyWrap=view.findViewById(R.id.reply_wrap);
 		quotedPostWrap=view.findViewById(R.id.quoted_post_wrap);
 
-		mediaBtn.setOnClickListener(v->openFilePicker(false));
+		mediaBtn.setOnClickListener(v->openLocalMediaPicker());
 		if(UiUtils.isPhotoPickerAvailable()){
 			mediaBtn.setOnLongClickListener(v->{
 				openFilePicker(true);
@@ -962,6 +966,14 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 
 	@Override
 	public void onFragmentResult(int reqCode, boolean success, Bundle result){
+		if(reqCode==LOCAL_MEDIA_RESULT && success){
+			ArrayList<Uri> uris=result.getParcelableArrayList(MediaPickerResult.KEY_URIS);
+			if(uris!=null){
+				for(Uri uri:uris)
+					mediaViewController.addMediaAttachment(uri, null);
+			}
+			return;
+		}
 		if(reqCode==IMAGE_DESCRIPTION_RESULT && success){
 			String attID=result.getString("attachment");
 			String text=result.getString("text");
@@ -1045,6 +1057,12 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		}
 		intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
 		startActivityForResult(intent, MEDIA_RESULT);
+	}
+
+	private void openLocalMediaPicker(){
+		MediaPickerConfig config=new MediaPickerConfig();
+		config.maxCount=mediaViewController.getMaxAttachments()-mediaViewController.getMediaAttachmentsCount();
+		Nav.goForResult(getActivity(), MediaAlbumPickerFragment.class, config.toBundle(), LOCAL_MEDIA_RESULT, this);
 	}
 
 	@Override

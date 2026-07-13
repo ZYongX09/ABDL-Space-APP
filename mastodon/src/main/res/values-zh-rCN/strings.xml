@@ -165,6 +165,10 @@
 		<item quantity="other">你不能添加超过 %d 个媒体附件</item>
 	</plurals>
 	<string name="media_attachment_unsupported_type">文件 %s 是不支持的类型</string>
+	<string name="media_picker_albums">相册</string>
+	<string name="media_picker_title">选择媒体</string>
+	<string name="media_picker_no_media">没有找到媒体文件</string>
+	<string name="media_picker_confirm">选择 %d 项</string>
 	<string name="media_attachment_too_big">文件 %1$s 的大小超出 %2$s MB的限制</string>
 	<string name="settings_theme">外观</string>
 	<string name="theme_auto">跟随设备偏好</string>

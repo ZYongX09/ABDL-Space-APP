@@ -186,6 +186,10 @@
 		<item quantity="other">You can’t add more than %d media attachments</item>
 	</plurals>
 	<string name="media_attachment_unsupported_type">File %s is of an unsupported type</string>
+	<string name="media_picker_albums">Albums</string>
+	<string name="media_picker_title">Select media</string>
+	<string name="media_picker_no_media">No media found</string>
+	<string name="media_picker_confirm">Select %d</string>
 	<string name="media_attachment_too_big">File %1$s exceeds the size limit of %2$s MB</string>
 	<string name="settings_theme">Appearance</string>
 	<string name="theme_auto">Use device appearance</string>
