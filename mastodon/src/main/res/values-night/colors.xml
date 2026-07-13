@@ -10,4 +10,6 @@
 	<color name="diaper_card_border">#333333</color>
 	<color name="diaper_logo_bg">#2A2A2A</color>
 	<color name="diaper_search_bg">#2A2A2A</color>
+	<color name="diaper_weak_track">#3B444C</color>
+	<color name="diaper_accent_text">#163247</color>
 </resources>

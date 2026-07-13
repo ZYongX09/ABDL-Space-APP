@@ -52,7 +52,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="6dp"
-                android:text="婴儿"
+        android:text="儿童款"
                 android:textSize="10sp"
                 android:textColor="#FF6B6B"
                 android:background="@drawable/bg_tag_red"
@@ -113,7 +113,7 @@
         android:layout_height="16dp"
         android:layout_marginStart="8dp"
         android:src="@drawable/ic_fluent_chevron_right_24_regular"
-        android:tint="#666666"
+        android:tint="?android:textColorTertiary"
         android:contentDescription="详情" />
 
 </LinearLayout>

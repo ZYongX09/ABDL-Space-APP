@@ -50,6 +50,7 @@ public class DiaperRankingsFragment extends LoaderFragment {
 	private TextView babyScoreText;
 	private View baseScoreCard;
 	private LinearLayout tabContainer;
+	private int requestGeneration;
 
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
@@ -121,7 +122,7 @@ public class DiaperRankingsFragment extends LoaderFragment {
 
 		// 下拉刷新
 		swipeRefreshLayout = new SwipeRefreshLayout(getContext());
-		swipeRefreshLayout.setColorSchemeResources(android.R.color.holo_blue_dark);
+		swipeRefreshLayout.setColorSchemeColors(0xFFA1D9F7);
 		swipeRefreshLayout.setOnRefreshListener(() -> {
 			currentPage = 0;
 			hasMore = true;
@@ -133,7 +134,7 @@ public class DiaperRankingsFragment extends LoaderFragment {
 		recyclerView.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 		recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
 		recyclerView.setClipToPadding(false);
-		recyclerView.setPadding(0, V.dp(4), 0, V.dp(80));
+		recyclerView.setPadding(0, V.dp(4), 0, V.dp(16));
 		adapter = new RankingsAdapter();
 		recyclerView.setAdapter(adapter);
 
@@ -153,7 +154,7 @@ public class DiaperRankingsFragment extends LoaderFragment {
 		});
 
 		swipeRefreshLayout.addView(recyclerView);
-		root.addView(swipeRefreshLayout);
+		root.addView(swipeRefreshLayout, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
 		wrapper.addView(root);
 		return wrapper;
 	}
@@ -193,7 +194,7 @@ public class DiaperRankingsFragment extends LoaderFragment {
 			boolean isSelected = tab[0].equals(currentTab);
 			chipText.setBackgroundResource(isSelected ? R.drawable.bg_diaper_chip_selected : R.drawable.bg_diaper_chip);
 			if (isSelected) {
-				chipText.setTextColor(0xFFFFFFFF);
+				chipText.setTextColor(0xFF163247);
 			} else {
 				chipText.setTextColor(getResources().getColor(R.color.diaper_chip_text));
 			}
@@ -211,18 +212,22 @@ public class DiaperRankingsFragment extends LoaderFragment {
 	}
 
 	public void loadData() {
+		final int generation=++requestGeneration;
+		final String requestedTab=currentTab;
+		final int requestedPage=currentPage;
 		boolean isInitialLoad = !loaded && !dataLoading;
 		dataLoading = true;
 		if (isInitialLoad) {
 			showProgress();
 		}
 
-		new GetRankings(currentTab, 20, currentPage * 20)
+		new GetRankings(requestedTab, 20, requestedPage * 20)
 			.setCallback(new Callback<Map<String, Object>>() {
 				@Override
 				@SuppressWarnings("unchecked")
 				public void onSuccess(Map<String, Object> result) {
 					if (getActivity() == null) return;
+					if(generation!=requestGeneration) return;
 					List<Map<String, Object>> rankingsList = (List<Map<String, Object>>) result.get("rankings");
 					if (rankingsList == null) rankingsList = new ArrayList<>();
 					Gson gson = new Gson();
@@ -231,7 +236,7 @@ public class DiaperRankingsFragment extends LoaderFragment {
 						new TypeToken<List<RankingItem>>(){}.getType()
 					);
 
-					if (currentPage == 0) {
+					if (requestedPage == 0) {
 						data.clear();
 					}
 					data.addAll(newItems);
@@ -263,6 +268,7 @@ public class DiaperRankingsFragment extends LoaderFragment {
 				@Override
 				public void onError(ErrorResponse error) {
 					if (getActivity() == null) return;
+					if(generation!=requestGeneration) return;
 					swipeRefreshLayout.setRefreshing(false);
 					loadingMore = false;
 					dataLoaded();
@@ -298,6 +304,7 @@ public class DiaperRankingsFragment extends LoaderFragment {
 
 				@Override
 				public void onError(ErrorResponse error) {
+					currentPage=Math.max(0, currentPage-1);
 					loadingMore = false;
 					adapter.notifyDataSetChanged();
 				}

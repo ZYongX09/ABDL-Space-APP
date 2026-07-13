@@ -9,7 +9,7 @@
 
     <FrameLayout
         android:layout_width="0dp"
-        android:layout_height="44dp"
+        android:layout_height="48dp"
         android:layout_weight="1">
 
         <ImageView

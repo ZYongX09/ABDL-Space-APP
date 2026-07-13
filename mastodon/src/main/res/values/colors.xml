@@ -135,4 +135,6 @@
 	<color name="diaper_card_border">#E0E0E0</color>
 	<color name="diaper_logo_bg">#EEEEEE</color>
 	<color name="diaper_search_bg">#F0F0F0</color>
+	<color name="diaper_weak_track">#DCE5EC</color>
+	<color name="diaper_accent_text">#163247</color>
 </resources>

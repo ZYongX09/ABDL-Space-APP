@@ -241,9 +241,10 @@
             android:includeFontPadding="false" />
 
         <TextView
-            android:id="@+id/visit_url_btn"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+        android:id="@+id/visit_url_btn"
+        android:layout_width="wrap_content"
+        android:layout_height="48dp"
+        android:gravity="center"
             android:text="访问官网"
             android:textSize="12sp"
             android:textColor="#1976D2"

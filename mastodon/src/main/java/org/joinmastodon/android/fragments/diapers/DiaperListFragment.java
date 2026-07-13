@@ -61,8 +61,7 @@ public class DiaperListFragment extends LoaderFragment {
 	private EditText searchInput;
 	private final Handler searchHandler = new Handler(Looper.getMainLooper());
 	private Runnable searchRunnable;
-	private View loadingFooter;
-	private ProgressBar loadingProgress;
+	private int requestGeneration;
 
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
@@ -163,7 +162,7 @@ public class DiaperListFragment extends LoaderFragment {
 
 		// 下拉刷新
 		swipeRefreshLayout = new SwipeRefreshLayout(getContext());
-		swipeRefreshLayout.setColorSchemeResources(android.R.color.holo_blue_dark);
+		swipeRefreshLayout.setColorSchemeColors(0xFFA1D9F7);
 		swipeRefreshLayout.setOnRefreshListener(() -> {
 			currentPage = 1;
 			hasMore = true;
@@ -171,7 +170,7 @@ public class DiaperListFragment extends LoaderFragment {
 		});
 
 		// 空状态
-		emptyState = inflater.inflate(R.layout.friend_request_empty_state, swipeRefreshLayout, false);
+		emptyState = inflater.inflate(R.layout.diaper_empty_state, swipeRefreshLayout, false);
 		emptyState.setVisibility(View.GONE);
 
 		// RecyclerView
@@ -179,13 +178,9 @@ public class DiaperListFragment extends LoaderFragment {
 		recyclerView.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 		recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
 		recyclerView.setClipToPadding(false);
-		recyclerView.setPadding(0, V.dp(4), 0, V.dp(80));
+		recyclerView.setPadding(0, V.dp(4), 0, V.dp(16));
 		adapter = new DiaperAdapter();
 		recyclerView.setAdapter(adapter);
-
-		// 加载更多底部指示器
-		loadingFooter = inflater.inflate(R.layout.item_loading_footer, recyclerView, false);
-		loadingProgress = loadingFooter.findViewById(R.id.loading_progress);
 
 		// 滚动加载更多
 		recyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
@@ -202,9 +197,12 @@ public class DiaperListFragment extends LoaderFragment {
 			}
 		});
 
-		swipeRefreshLayout.addView(recyclerView);
-		swipeRefreshLayout.addView(emptyState);
-		root.addView(swipeRefreshLayout);
+		FrameLayout content = new FrameLayout(getContext());
+		content.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+		content.addView(recyclerView);
+		content.addView(emptyState);
+		swipeRefreshLayout.addView(content);
+		root.addView(swipeRefreshLayout, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
 
 		wrapper.addView(root);
 		return wrapper;
@@ -231,6 +229,10 @@ public class DiaperListFragment extends LoaderFragment {
 	}
 
 	public void loadData() {
+		final int generation=++requestGeneration;
+		final int requestedPage=currentPage;
+		final String requestedSearch=currentSearch;
+		final String requestedBrand=currentBrand;
 		boolean isInitialLoad = !loaded && !dataLoading;
 		dataLoading = true;
 		if (isInitialLoad) {
@@ -261,12 +263,13 @@ public class DiaperListFragment extends LoaderFragment {
 		}
 
 		// 加载纸尿裤列表
-		new GetDiaperList(currentPage, 20, currentSearch, currentBrand, currentSort)
+		new GetDiaperList(requestedPage, 20, requestedSearch, requestedBrand, currentSort)
 			.setCallback(new Callback<Map<String, Object>>() {
 				@Override
 				@SuppressWarnings("unchecked")
 				public void onSuccess(Map<String, Object> result) {
 					if (getActivity() == null) return;
+					if(generation!=requestGeneration) return;
 					List<Map<String, Object>> diaperList = (List<Map<String, Object>>) result.get("diapers");
 					if (diaperList == null) diaperList = new ArrayList<>();
 					Gson gson = new Gson();
@@ -275,7 +278,7 @@ public class DiaperListFragment extends LoaderFragment {
 						new TypeToken<List<Diaper>>(){}.getType()
 					);
 
-					if (currentPage == 1) {
+					if (requestedPage == 1) {
 						data.clear();
 					}
 					data.addAll(newItems);
@@ -298,6 +301,7 @@ public class DiaperListFragment extends LoaderFragment {
 				@Override
 				public void onError(ErrorResponse error) {
 					if (getActivity() == null) return;
+					if(generation!=requestGeneration) return;
 					swipeRefreshLayout.setRefreshing(false);
 					loadingMore = false;
 					dataLoaded();
@@ -339,6 +343,7 @@ public class DiaperListFragment extends LoaderFragment {
 
 				@Override
 				public void onError(ErrorResponse error) {
+					currentPage=Math.max(1, currentPage-1);
 					loadingMore = false;
 					adapter.notifyDataSetChanged();
 				}
@@ -358,7 +363,7 @@ public class DiaperListFragment extends LoaderFragment {
 			boolean isSelected = brand.equals(currentBrand);
 			chipText.setBackgroundResource(isSelected ? R.drawable.bg_diaper_chip_selected : R.drawable.bg_diaper_chip);
 			if (isSelected) {
-				chipText.setTextColor(0xFFFFFFFF);
+				chipText.setTextColor(0xFF163247);
 			} else {
 				chipText.setTextColor(getResources().getColor(R.color.diaper_chip_text));
 			}

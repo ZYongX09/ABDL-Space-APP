@@ -55,6 +55,7 @@ public class DiaperDetailFragment extends LoaderFragment {
 	private LinearLayout sizesContainer;
 	private LinearLayout reviewListContainer;
 	private TextView reviewsTitleText;
+	private TextView sizesTitleText;
 	private boolean checkingOwnRating;
 
 	@Override
@@ -98,14 +99,14 @@ public class DiaperDetailFragment extends LoaderFragment {
 		root.addView(infoCard);
 
 		// 尺码标题
-		TextView sizesTitle = new TextView(getContext());
-		sizesTitle.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-		sizesTitle.setPadding(V.dp(16), V.dp(16), V.dp(16), V.dp(8));
-		sizesTitle.setText("尺码");
-		sizesTitle.setTextSize(16);
-		sizesTitle.setTextColor(getResources().getColor(R.color.diaper_chip_text));
-		sizesTitle.setTypeface(null, android.graphics.Typeface.BOLD);
-		root.addView(sizesTitle);
+		sizesTitleText = new TextView(getContext());
+		sizesTitleText.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+		sizesTitleText.setPadding(V.dp(16), V.dp(16), V.dp(16), V.dp(8));
+		sizesTitleText.setText("尺码");
+		sizesTitleText.setTextSize(17);
+		sizesTitleText.setTextColor(getResources().getColor(R.color.diaper_chip_text));
+		sizesTitleText.setTypeface(null, android.graphics.Typeface.BOLD);
+		root.addView(sizesTitleText);
 
 		// 尺码列表
 		sizesContainer = new LinearLayout(getContext());
@@ -151,7 +152,7 @@ public class DiaperDetailFragment extends LoaderFragment {
 		rateBtn.setLayoutParams(rateParams);
 		rateBtn.setText("★ 写评分");
 		rateBtn.setTextSize(14);
-		rateBtn.setTextColor(0xFFFFFFFF);
+		rateBtn.setTextColor(getResources().getColor(R.color.diaper_accent_text));
 		rateBtn.setGravity(android.view.Gravity.CENTER);
 		rateBtn.setBackgroundResource(R.drawable.bg_diaper_chip_selected);
 		rateBtn.setPadding(V.dp(12), V.dp(12), V.dp(12), V.dp(12));
@@ -221,6 +222,7 @@ public class DiaperDetailFragment extends LoaderFragment {
 				public void onSuccess(Map<String, Object> result) {
 					if (getActivity() == null) return;
 					diaperData = (Map<String, Object>) result.get("diaper");
+					reviews.clear();
 					List<Map<String, Object>> reviewsList = (List<Map<String, Object>>) result.get("reviews");
 					if (reviewsList != null) {
 						Gson gson = new Gson();
@@ -346,6 +348,7 @@ public class DiaperDetailFragment extends LoaderFragment {
 		LinearLayout rowThickness = getView().findViewById(R.id.row_thickness);
 		TextView thicknessText = getView().findViewById(R.id.thickness_text);
 		if (rowThickness != null && thicknessText != null) {
+			rowThickness.setVisibility(View.GONE);
 			Object thickness = diaperData.get("thickness");
 			if (thickness != null) {
 				rowThickness.setVisibility(View.VISIBLE);
@@ -366,6 +369,7 @@ public class DiaperDetailFragment extends LoaderFragment {
 		LinearLayout rowUrl = getView().findViewById(R.id.row_url);
 		TextView visitUrlBtn = getView().findViewById(R.id.visit_url_btn);
 		if (rowUrl != null && visitUrlBtn != null) {
+			rowUrl.setVisibility(View.GONE);
 			String officialUrl = (String) diaperData.get("official_url");
 			if (officialUrl != null && !officialUrl.isEmpty()) {
 				rowUrl.setVisibility(View.VISIBLE);
@@ -381,6 +385,7 @@ public class DiaperDetailFragment extends LoaderFragment {
 		LinearLayout row = getView().findViewById(rowId);
 		TextView text = getView().findViewById(textId);
 		if (row != null && text != null) {
+			row.setVisibility(View.GONE);
 			String value = (String) diaperData.get(key);
 			if (value != null && !value.isEmpty()) {
 				row.setVisibility(View.VISIBLE);
@@ -393,9 +398,8 @@ public class DiaperDetailFragment extends LoaderFragment {
 	private void buildSizes() {
 		sizesContainer.removeAllViews();
 		List<Map<String, Object>> sizes = (List<Map<String, Object>>) diaperData.get("sizes");
+		sizesTitleText.setVisibility(sizes == null || sizes.isEmpty() ? View.GONE : View.VISIBLE);
 		if (sizes == null || sizes.isEmpty()) {
-			// 隐藏尺码标题
-			View sizesTitle = getView().findViewById(android.R.id.content);
 			return;
 		}
 
@@ -448,9 +452,11 @@ public class DiaperDetailFragment extends LoaderFragment {
 			}
 
 			// 日期
-			if (review.created_at != null) {
-				String date = review.created_at.replace("T", " ").substring(0, 10);
+			if (review.created_at != null && review.created_at.length() >= 10) {
+				String date = review.created_at.substring(0, 10);
 				reviewDate.setText(date);
+			} else {
+				reviewDate.setVisibility(View.GONE);
 			}
 
 			// 评价文字

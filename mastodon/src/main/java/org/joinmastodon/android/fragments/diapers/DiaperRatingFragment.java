@@ -82,12 +82,12 @@ public class DiaperRatingFragment extends MastodonToolbarFragment{
 		LinearLayout root=new LinearLayout(getContext());
 		root.setLayoutParams(new ScrollView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 		root.setOrientation(LinearLayout.VERTICAL);
-		root.setPadding(V.dp(22), V.dp(28), V.dp(22), V.dp(28));
+		root.setPadding(V.dp(16), V.dp(20), V.dp(16), V.dp(28));
 
 		TextView title=new TextView(getContext());
 		title.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 		title.setText((brand + " " + model).trim());
-		title.setTextSize(26);
+		title.setTextSize(22);
 		title.setTextColor(getPrimaryTextColor());
 		title.setTypeface(null, Typeface.BOLD);
 		root.addView(title);
@@ -111,7 +111,7 @@ public class DiaperRatingFragment extends MastodonToolbarFragment{
 		submitButton.setText("提交评分");
 		submitButton.setTextSize(20);
 		submitButton.setTypeface(null, Typeface.BOLD);
-		submitButton.setTextColor(Color.WHITE);
+		submitButton.setTextColor(getResources().getColor(R.color.diaper_accent_text));
 		submitButton.setGravity(android.view.Gravity.CENTER);
 		submitButton.setPadding(0, V.dp(16), 0, V.dp(16));
 		submitButton.setBackground(createRoundedDrawable(ACCENT, 0, V.dp(28)));
@@ -177,7 +177,7 @@ public class DiaperRatingFragment extends MastodonToolbarFragment{
 		reviewInput.setTextColor(getPrimaryTextColor());
 		reviewInput.setHintTextColor(0xFF91A0B5);
 		reviewInput.setPadding(V.dp(12), V.dp(12), V.dp(12), V.dp(12));
-		reviewInput.setBackground(createRoundedDrawable(0x00FFFFFF, 0xFFD7E2F0, V.dp(10)));
+		reviewInput.setBackground(createRoundedDrawable(0x00FFFFFF, getResources().getColor(R.color.diaper_card_border), V.dp(10)));
 		reviewInput.setFilters(new InputFilter[]{new InputFilter.LengthFilter(500)});
 		reviewInput.addTextChangedListener(new TextWatcher(){
 			@Override
@@ -260,7 +260,7 @@ public class DiaperRatingFragment extends MastodonToolbarFragment{
 		seekBar.setProgress(scores.get(key)-1);
 		seekBar.setProgressTintList(ColorStateList.valueOf(ACCENT));
 		seekBar.setThumbTintList(ColorStateList.valueOf(ACCENT));
-		seekBar.setProgressBackgroundTintList(ColorStateList.valueOf(0xFFE7EDF5));
+		seekBar.setProgressBackgroundTintList(ColorStateList.valueOf(getResources().getColor(R.color.diaper_weak_track)));
 		row.addView(seekBar);
 
 		TextView value=new TextView(getContext());
