@@ -48,11 +48,10 @@
         android:visibility="gone" />
 
     <!-- 5维度评分标签 -->
-    <LinearLayout
+    <org.joinmastodon.android.ui.views.FlowLayout
         android:id="@+id/scores_container"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="start" />
+        android:paddingTop="4dp" />
 
 </LinearLayout>

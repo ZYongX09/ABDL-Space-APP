@@ -30,6 +30,7 @@ import org.joinmastodon.android.R;
 import org.joinmastodon.android.api.requests.diapers.GetDiaperDetail;
 import org.joinmastodon.android.model.DiaperReview;
 import org.joinmastodon.android.ui.OutlineProviders;
+import org.joinmastodon.android.ui.views.FlowLayout;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -125,6 +126,48 @@ public class DiaperDetailFragment extends LoaderFragment {
 
 		scrollView.addView(root);
 		wrapper.addView(scrollView);
+
+		// 底部操作按钮（固定在底部）
+		LinearLayout bottomBar = new LinearLayout(getContext());
+		FrameLayout.LayoutParams bottomParams = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+		bottomParams.gravity = android.view.Gravity.BOTTOM;
+		bottomBar.setLayoutParams(bottomParams);
+		bottomBar.setOrientation(LinearLayout.HORIZONTAL);
+		bottomBar.setGravity(android.view.Gravity.CENTER);
+		bottomBar.setPadding(V.dp(16), V.dp(12), V.dp(16), V.dp(12));
+
+		// 写评分按钮
+		TextView rateBtn = new TextView(getContext());
+		LinearLayout.LayoutParams rateParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+		rateBtn.setLayoutParams(rateParams);
+		rateBtn.setText("★ 写评分");
+		rateBtn.setTextSize(14);
+		rateBtn.setTextColor(0xFFFFFFFF);
+		rateBtn.setGravity(android.view.Gravity.CENTER);
+		rateBtn.setBackgroundResource(R.drawable.bg_diaper_chip_selected);
+		rateBtn.setPadding(V.dp(12), V.dp(10), V.dp(12), V.dp(10));
+		rateBtn.setOnClickListener(v -> {
+			// TODO: 展开评分表单
+		});
+		bottomBar.addView(rateBtn);
+
+		// 加入对比按钮
+		TextView compareBtn = new TextView(getContext());
+		LinearLayout.LayoutParams compareParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+		compareParams.setMarginStart(V.dp(8));
+		compareBtn.setLayoutParams(compareParams);
+		compareBtn.setText("⚖ 加入对比");
+		compareBtn.setTextSize(14);
+		compareBtn.setTextColor(getResources().getColor(R.color.diaper_chip_text));
+		compareBtn.setGravity(android.view.Gravity.CENTER);
+		compareBtn.setBackgroundResource(R.drawable.bg_diaper_chip);
+		compareBtn.setPadding(V.dp(12), V.dp(10), V.dp(12), V.dp(10));
+		compareBtn.setOnClickListener(v -> {
+			// TODO: 加入对比
+		});
+		bottomBar.addView(compareBtn);
+
+		wrapper.addView(bottomBar);
 		return wrapper;
 	}
 
@@ -207,11 +250,18 @@ public class DiaperDetailFragment extends LoaderFragment {
 		List<String> images = (List<String>) diaperData.get("images");
 		if (images == null || images.isEmpty()) return;
 
+		// 图片卡片容器
+		LinearLayout imageCard = new LinearLayout(getContext());
+		imageCard.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+		imageCard.setOrientation(LinearLayout.VERTICAL);
+		imageCard.setBackgroundResource(R.drawable.bg_diaper_card);
+		imageCard.setPadding(V.dp(12), V.dp(12), V.dp(12), V.dp(12));
+		imageCard.setClipToOutline(true);
+
 		HorizontalScrollView scroll = new HorizontalScrollView(getContext());
 		scroll.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 		scroll.setHorizontalScrollBarEnabled(false);
 		scroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
-		scroll.setPadding(0, V.dp(8), 0, V.dp(8));
 
 		LinearLayout imageRow = new LinearLayout(getContext());
 		imageRow.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
@@ -219,8 +269,8 @@ public class DiaperDetailFragment extends LoaderFragment {
 
 		for (String imgUrl : images) {
 			ImageView img = new ImageView(getContext());
-			int imgWidth = V.dp(200);
-			int imgHeight = V.dp(200);
+			int imgWidth = V.dp(180);
+			int imgHeight = V.dp(180);
 			LinearLayout.LayoutParams imgParams = new LinearLayout.LayoutParams(imgWidth, imgHeight);
 			imgParams.setMarginEnd(V.dp(8));
 			img.setLayoutParams(imgParams);
@@ -239,7 +289,8 @@ public class DiaperDetailFragment extends LoaderFragment {
 		}
 
 		scroll.addView(imageRow);
-		imagesContainer.addView(scroll);
+		imageCard.addView(scroll);
+		imagesContainer.addView(imageCard);
 	}
 
 	@SuppressWarnings("unchecked")
@@ -375,7 +426,7 @@ public class DiaperDetailFragment extends LoaderFragment {
 			TextView username = reviewView.findViewById(R.id.username);
 			TextView reviewDate = reviewView.findViewById(R.id.review_date);
 			TextView reviewText = reviewView.findViewById(R.id.review_text);
-			LinearLayout scoresContainer = reviewView.findViewById(R.id.scores_container);
+			ViewGroup scoresContainer = reviewView.findViewById(R.id.scores_container);
 
 			// 用户名
 			if (review.user != null) {
@@ -405,16 +456,19 @@ public class DiaperDetailFragment extends LoaderFragment {
 		}
 	}
 
-	private void addScoreTag(LinearLayout container, String label, int score, String color) {
+	private void addScoreTag(ViewGroup container, String label, int score, String color) {
 		TextView tag = new TextView(getContext());
-		tag.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-		tag.setPadding(V.dp(8), V.dp(4), V.dp(8), V.dp(4));
-		tag.setTextSize(11);
+		ViewGroup.MarginLayoutParams tagParams = new ViewGroup.MarginLayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+		tagParams.setMarginEnd(V.dp(6));
+		tagParams.bottomMargin = V.dp(6);
+		tag.setLayoutParams(tagParams);
+		tag.setPadding(V.dp(10), V.dp(6), V.dp(10), V.dp(6));
+		tag.setTextSize(12);
 		tag.setText(String.format("%s %d/10", label, score));
 
 		GradientDrawable bg = new GradientDrawable();
 		bg.setColor(Color.parseColor("#1A" + color.substring(1)));
-		bg.setCornerRadius(V.dp(4));
+		bg.setCornerRadius(V.dp(6));
 		tag.setBackground(bg);
 		tag.setTextColor(Color.parseColor(color));
 
