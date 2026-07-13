@@ -6,7 +6,8 @@
 
 	<!-- Diaper module dark mode -->
 	<color name="diaper_chip_text">#CCCCCC</color>
-	<color name="diaper_card_bg">#1AFFFFFF</color>
-	<color name="diaper_logo_bg">#1AFFFFFF</color>
-	<color name="diaper_search_bg">#1AFFFFFF</color>
+	<color name="diaper_card_bg">#1E1E1E</color>
+	<color name="diaper_card_border">#333333</color>
+	<color name="diaper_logo_bg">#2A2A2A</color>
+	<color name="diaper_search_bg">#2A2A2A</color>
 </resources>

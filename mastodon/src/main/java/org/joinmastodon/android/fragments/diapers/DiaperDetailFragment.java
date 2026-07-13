@@ -127,14 +127,19 @@ public class DiaperDetailFragment extends LoaderFragment {
 		scrollView.addView(root);
 		wrapper.addView(scrollView);
 
-		// 底部操作按钮（固定在底部）
+		// 底部操作按钮（固定在底部，带背景）
+		LinearLayout bottomBarWrapper = new LinearLayout(getContext());
+		FrameLayout.LayoutParams bottomWrapperParams = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+		bottomWrapperParams.gravity = android.view.Gravity.BOTTOM;
+		bottomBarWrapper.setLayoutParams(bottomWrapperParams);
+		bottomBarWrapper.setOrientation(LinearLayout.VERTICAL);
+		bottomBarWrapper.setBackgroundResource(R.drawable.bg_diaper_card);
+		bottomBarWrapper.setPadding(V.dp(16), V.dp(12), V.dp(16), V.dp(12));
+
 		LinearLayout bottomBar = new LinearLayout(getContext());
-		FrameLayout.LayoutParams bottomParams = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-		bottomParams.gravity = android.view.Gravity.BOTTOM;
-		bottomBar.setLayoutParams(bottomParams);
+		bottomBar.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 		bottomBar.setOrientation(LinearLayout.HORIZONTAL);
 		bottomBar.setGravity(android.view.Gravity.CENTER);
-		bottomBar.setPadding(V.dp(16), V.dp(12), V.dp(16), V.dp(12));
 
 		// 写评分按钮
 		TextView rateBtn = new TextView(getContext());
@@ -145,23 +150,23 @@ public class DiaperDetailFragment extends LoaderFragment {
 		rateBtn.setTextColor(0xFFFFFFFF);
 		rateBtn.setGravity(android.view.Gravity.CENTER);
 		rateBtn.setBackgroundResource(R.drawable.bg_diaper_chip_selected);
-		rateBtn.setPadding(V.dp(12), V.dp(10), V.dp(12), V.dp(10));
+		rateBtn.setPadding(V.dp(12), V.dp(12), V.dp(12), V.dp(12));
 		rateBtn.setOnClickListener(v -> {
-			// TODO: 展开评分表单
+			android.widget.Toast.makeText(getContext(), "评分功能即将上线", android.widget.Toast.LENGTH_SHORT).show();
 		});
 		bottomBar.addView(rateBtn);
 
 		// 加入对比按钮
 		TextView compareBtn = new TextView(getContext());
 		LinearLayout.LayoutParams compareParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
-		compareParams.setMarginStart(V.dp(8));
+		compareParams.setMarginStart(V.dp(10));
 		compareBtn.setLayoutParams(compareParams);
 		compareBtn.setText("⚖ 加入对比");
 		compareBtn.setTextSize(14);
 		compareBtn.setTextColor(0xFF999999);
 		compareBtn.setGravity(android.view.Gravity.CENTER);
 		compareBtn.setBackgroundResource(R.drawable.bg_diaper_chip);
-		compareBtn.setPadding(V.dp(12), V.dp(10), V.dp(12), V.dp(10));
+		compareBtn.setPadding(V.dp(12), V.dp(12), V.dp(12), V.dp(12));
 		compareBtn.setEnabled(true);
 		compareBtn.setAlpha(0.6f);
 		compareBtn.setOnClickListener(v -> {
@@ -169,7 +174,8 @@ public class DiaperDetailFragment extends LoaderFragment {
 		});
 		bottomBar.addView(compareBtn);
 
-		wrapper.addView(bottomBar);
+		bottomBarWrapper.addView(bottomBar);
+		wrapper.addView(bottomBarWrapper);
 		return wrapper;
 	}
 
@@ -454,16 +460,16 @@ public class DiaperDetailFragment extends LoaderFragment {
 	private void addScoreTag(ViewGroup container, String label, int score, String color) {
 		TextView tag = new TextView(getContext());
 		ViewGroup.MarginLayoutParams tagParams = new ViewGroup.MarginLayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-		tagParams.setMarginEnd(V.dp(6));
-		tagParams.bottomMargin = V.dp(6);
+		tagParams.setMarginEnd(V.dp(8));
+		tagParams.bottomMargin = V.dp(8);
 		tag.setLayoutParams(tagParams);
-		tag.setPadding(V.dp(10), V.dp(6), V.dp(10), V.dp(6));
+		tag.setPadding(V.dp(12), V.dp(6), V.dp(12), V.dp(6));
 		tag.setTextSize(12);
 		tag.setText(String.format("%s %d/10", label, score));
 
 		GradientDrawable bg = new GradientDrawable();
 		bg.setColor(Color.parseColor("#1A" + color.substring(1)));
-		bg.setCornerRadius(V.dp(6));
+		bg.setCornerRadius(V.dp(8));
 		tag.setBackground(bg);
 		tag.setTextColor(Color.parseColor(color));
 

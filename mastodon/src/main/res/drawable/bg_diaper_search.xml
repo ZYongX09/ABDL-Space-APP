@@ -3,5 +3,5 @@
     android:shape="rectangle">
     <solid android:color="@color/diaper_search_bg" />
     <corners android:radius="22dp" />
-    <stroke android:width="1dp" android:color="@color/diaper_card_bg" />
+    <stroke android:width="1dp" android:color="@color/diaper_card_border" />
 </shape>
