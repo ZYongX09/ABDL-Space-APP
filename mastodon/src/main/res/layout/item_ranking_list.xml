@@ -13,8 +13,9 @@
     <!-- 排名序号 -->
     <TextView
         android:id="@+id/rank_number"
-        android:layout_width="32dp"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:minWidth="32dp"
         android:textSize="20sp"
         android:textStyle="bold"
         android:textColor="?android:textColorPrimary"
