@@ -4,6 +4,8 @@ import android.annotation.SuppressLint;
 import android.app.Application;
 import android.content.Context;
 import android.content.res.Configuration;
+import android.app.ActivityManager;
+import android.os.Process;
 import android.util.Log;
 import android.webkit.WebView;
 
@@ -26,6 +28,12 @@ public class MastodonApp extends Application{
 	public void onCreate(){
 		super.onCreate();
 		context=getApplicationContext();
+		String processName=getCurrentProcessName();
+		if(BuildConfig.DEBUG && processName!=null){
+			if(!processName.equals(getPackageName()))
+				WebView.setDataDirectorySuffix(processName.substring(processName.lastIndexOf(':')+1));
+			WebView.setWebContentsDebuggingEnabled(true);
+		}
 		V.setApplicationContext(context);
 		ImageCache.Parameters params=new ImageCache.Parameters();
 		params.diskCacheSize=100*1024*1024;
@@ -46,16 +54,23 @@ public class MastodonApp extends Application{
 			// 快捷方式发布失败不影响正常功能（SplashActivity 改变了 LAUNCHER 入口）
 		}
 		GlobalUserPreferences.load();
-		if(BuildConfig.DEBUG){
-			WebView.setWebContentsDebuggingEnabled(true);
-		}
-
 		// 初始化 NSFW 本地检测模型
 		try{
 			org.joinmastodon.android.nsfw.NsfwDetector.init(this);
 		}catch(Throwable t){
 			// 模型加载失败不影响正常功能
 		}
+	}
+
+	private String getCurrentProcessName(){
+		ActivityManager manager=getSystemService(ActivityManager.class);
+		if(manager==null)
+			return null;
+		for(ActivityManager.RunningAppProcessInfo process:manager.getRunningAppProcesses()){
+			if(process.pid==Process.myPid())
+				return process.processName;
+		}
+		return null;
 	}
 
 	@Override

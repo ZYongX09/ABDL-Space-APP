@@ -116,7 +116,6 @@ public class ProfileQrCodeFragment extends AppKitFragment{
 	private static final String TAG="ProfileQrCodeFragment";
 	private static final int PERMISSION_RESULT=388;
 	private static final int SCAN_RESULT=439;
-	private static final int IMAGE_SCAN_RESULT=440;
 	private static final int MEDIA_PERMISSION_RESULT=441;
 	private static final int IMAGE_CAMERA_RESULT=442;
 
@@ -150,6 +149,14 @@ public class ProfileQrCodeFragment extends AppKitFragment{
 		account=Parcels.unwrap(getArguments().getParcelable("targetAccount"));
 		setCancelable(false);
 		scannerIntent=BarcodeScanner.createIntent(Barcode.FORMAT_QR_CODE, false, true);
+		if(savedInstanceState!=null)
+			pendingCameraUri=savedInstanceState.getParcelable("pendingCameraUri");
+	}
+
+	@Override
+	public void onSaveInstanceState(@NonNull Bundle outState){
+		super.onSaveInstanceState(outState);
+		outState.putParcelable("pendingCameraUri", pendingCameraUri);
 	}
 
 	@Override
@@ -308,7 +315,7 @@ public class ProfileQrCodeFragment extends AppKitFragment{
 		}
 		MenuItem imageItem=menu.add(0, 1, 0, R.string.scan_qr_from_image);
 		imageItem.setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
-		imageItem.setIcon(R.drawable.ic_qr_code_20px);
+		imageItem.setIcon(R.drawable.ic_photo_library_wght700_20px);
 	}
 
 	@Override
@@ -391,8 +398,6 @@ public class ProfileQrCodeFragment extends AppKitFragment{
 		}else if(requestCode==IMAGE_CAMERA_RESULT && resultCode==Activity.RESULT_OK && pendingCameraUri!=null){
 			decodeQrFromUri(pendingCameraUri);
 			pendingCameraUri=null;
-		}else if(requestCode==IMAGE_SCAN_RESULT && resultCode==Activity.RESULT_OK && data!=null && data.getData()!=null){
-			decodeQrFromUri(data.getData());
 		}
 	}
 
@@ -420,7 +425,7 @@ public class ProfileQrCodeFragment extends AppKitFragment{
 
 	private void showQrImagePicker(MediaPickerConfig config){
 		new MediaPickerSheet(getActivity(), config, new MediaPickerSheet.Listener(){
-			@Override public void onMediaSelected(ArrayList<Uri> uris, String caption){
+			@Override public void onMediaSelected(ArrayList<Uri> uris){
 				if(!uris.isEmpty())
 					decodeQrFromUri(uris.get(0));
 			}

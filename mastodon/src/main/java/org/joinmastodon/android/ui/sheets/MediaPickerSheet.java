@@ -1,6 +1,7 @@
 package org.joinmastodon.android.ui.sheets;
 
 import android.app.Activity;
+import android.animation.ValueAnimator;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.GradientDrawable;
@@ -9,7 +10,6 @@ import android.net.Uri;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.ImageView;
@@ -40,7 +40,7 @@ import me.grishka.appkit.views.BottomSheet;
 
 public class MediaPickerSheet extends BottomSheet{
 	public interface Listener{
-		void onMediaSelected(ArrayList<Uri> uris, String caption);
+		void onMediaSelected(ArrayList<Uri> uris);
 		void onCameraRequested();
 	}
 
@@ -55,12 +55,15 @@ public class MediaPickerSheet extends BottomSheet{
 	private final GridAdapter adapter=new GridAdapter();
 	private final TextView title;
 	private final TextView subtitle;
-	private final EditText caption;
 	private final ImageButton send;
 	private final RecyclerView grid;
+	private final LinearLayout root;
+	private final int collapsedGridHeight;
 	private int selectedAlbumIndex;
 	private boolean resultDelivered;
 	private boolean forceDismiss;
+	private boolean expanded;
+	private float dragStartY;
 
 	public MediaPickerSheet(Activity activity, MediaPickerConfig config, Listener listener){
 		super(activity);
@@ -68,13 +71,29 @@ public class MediaPickerSheet extends BottomSheet{
 		this.config=config;
 		this.listener=listener;
 
-		LinearLayout root=new LinearLayout(activity);
+		root=new LinearLayout(activity);
 		root.setOrientation(LinearLayout.VERTICAL);
 		root.setBackgroundResource(R.drawable.bg_bottom_sheet);
 
 		View handle=new View(activity);
 		handle.setBackgroundResource(R.drawable.bg_bottom_sheet_handle);
 		root.addView(handle, new LinearLayout.LayoutParams(-1, V.dp(28)));
+		handle.setOnClickListener(v->setExpanded(!expanded));
+		handle.setOnTouchListener((v, event)->{
+			switch(event.getActionMasked()){
+				case android.view.MotionEvent.ACTION_DOWN -> dragStartY=event.getRawY();
+				case android.view.MotionEvent.ACTION_UP -> {
+					float distance=event.getRawY()-dragStartY;
+					if(distance<-V.dp(32))
+						setExpanded(true);
+					else if(distance>V.dp(32))
+						setExpanded(false);
+					else
+						v.performClick();
+				}
+			}
+			return true;
+		});
 
 		FrameLayout header=new FrameLayout(activity);
 		root.addView(header, new LinearLayout.LayoutParams(-1, V.dp(52)));
@@ -108,23 +127,12 @@ public class MediaPickerSheet extends BottomSheet{
 		grid.setLayoutManager(new GridLayoutManager(activity, 3));
 		grid.setAdapter(adapter);
 		grid.setClipToPadding(false);
-		int gridHeight=Math.min(activity.getResources().getDisplayMetrics().heightPixels*3/5, V.dp(570));
-		root.addView(grid, new LinearLayout.LayoutParams(-1, gridHeight));
+		collapsedGridHeight=Math.min(activity.getResources().getDisplayMetrics().heightPixels*3/5, V.dp(570));
+		root.addView(grid, new LinearLayout.LayoutParams(-1, collapsedGridHeight));
 
-		FrameLayout composer=new FrameLayout(activity);
-		composer.setPadding(V.dp(12), V.dp(8), V.dp(12), V.dp(10));
-		root.addView(composer, new LinearLayout.LayoutParams(-1, V.dp(68)));
-		caption=new EditText(activity);
-		caption.setSingleLine(true);
-		caption.setHint(R.string.media_picker_add_description);
-		caption.setTextColor(color(R.attr.colorM3OnSurface));
-		caption.setHintTextColor(color(R.attr.colorM3OnSurfaceVariant));
-		GradientDrawable captionBackground=new GradientDrawable();
-		captionBackground.setColor(color(R.attr.colorM3Surface));
-		captionBackground.setCornerRadius(V.dp(24));
-		caption.setBackground(captionBackground);
-		caption.setPadding(V.dp(16), 0, V.dp(64), 0);
-		composer.addView(caption, new FrameLayout.LayoutParams(-1, -1));
+		FrameLayout actions=new FrameLayout(activity);
+		actions.setPadding(V.dp(12), V.dp(8), V.dp(12), V.dp(10));
+		root.addView(actions, new LinearLayout.LayoutParams(-1, V.dp(68)));
 		send=new ImageButton(activity);
 		send.setImageResource(R.drawable.ic_send_24px);
 		send.setColorFilter(Color.WHITE);
@@ -135,12 +143,38 @@ public class MediaPickerSheet extends BottomSheet{
 		send.setEnabled(false);
 		send.setAlpha(0.5f);
 		FrameLayout.LayoutParams sendParams=new FrameLayout.LayoutParams(V.dp(50), V.dp(50), Gravity.END|Gravity.CENTER_VERTICAL);
-		composer.addView(send, sendParams);
+		actions.addView(send, sendParams);
 		send.setOnClickListener(v->deliver());
 
 		setContentView(root);
 		setNavigationBarBackground(new ColorDrawable(color(R.attr.colorM3Surface)), !UiUtils.isDarkTheme());
 		loadMedia();
+	}
+
+	private void setExpanded(boolean expanded){
+		if(this.expanded==expanded)
+			return;
+		this.expanded=expanded;
+		int screenHeight=activity.getResources().getDisplayMetrics().heightPixels;
+		int expandedTopMargin=V.dp(8);
+		int collapsedTopMargin=V.dp(72);
+		int expandedHeight=Math.max(collapsedGridHeight, screenHeight-expandedTopMargin-V.dp(28+52+68));
+		LinearLayout.LayoutParams gridParams=(LinearLayout.LayoutParams)grid.getLayoutParams();
+		FrameLayout.LayoutParams sheetParams=(FrameLayout.LayoutParams)content.getLayoutParams();
+		int startGridHeight=gridParams.height;
+		int startTopMargin=sheetParams.topMargin;
+		int targetGridHeight=expanded ? expandedHeight : collapsedGridHeight;
+		int targetTopMargin=expanded ? expandedTopMargin : collapsedTopMargin;
+		ValueAnimator animator=ValueAnimator.ofFloat(0f, 1f);
+		animator.setDuration(220);
+		animator.addUpdateListener(value->{
+			float progress=(Float)value.getAnimatedValue();
+			gridParams.height=startGridHeight+Math.round((targetGridHeight-startGridHeight)*progress);
+			sheetParams.topMargin=startTopMargin+Math.round((targetTopMargin-startTopMargin)*progress);
+			grid.setLayoutParams(gridParams);
+			content.setLayoutParams(sheetParams);
+		});
+		animator.start();
 	}
 
 	private int color(int attr){
@@ -272,7 +306,7 @@ public class MediaPickerSheet extends BottomSheet{
 		for(MediaItem item:selectedOrder)
 			uris.add(item.uri);
 		resultDelivered=true;
-		listener.onMediaSelected(uris, caption.getText().toString().trim());
+		listener.onMediaSelected(uris);
 		forceDismiss=true;
 		super.dismiss();
 	}

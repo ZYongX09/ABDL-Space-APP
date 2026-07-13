@@ -240,8 +240,10 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 			charLimit=500;
 
 		setTitle(editingStatus==null ? R.string.new_post : R.string.edit_post);
-		if(savedInstanceState!=null)
+		if(savedInstanceState!=null){
 			postLang=Parcels.unwrap(savedInstanceState.getParcelable("postLang"));
+			pendingCameraUri=savedInstanceState.getParcelable("pendingCameraUri");
+		}
 
 		if(getArguments().containsKey("quote"))
 			quotedStatus=Parcels.unwrap(getArguments().getParcelable("quote"));
@@ -450,6 +452,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		outState.putBoolean("hasSpoiler", hasSpoiler);
 		outState.putSerializable("visibility", statusVisibility);
 		outState.putParcelable("postLang", Parcels.wrap(postLang));
+		outState.putParcelable("pendingCameraUri", pendingCameraUri);
 		if(currentAutocompleteSpan!=null){
 			Editable e=mainEditText.getText();
 			outState.putInt("autocompleteStart", e.getSpanStart(currentAutocompleteSpan));
@@ -1081,11 +1084,9 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 
 	private void showLocalMediaPicker(MediaPickerConfig config){
 		new MediaPickerSheet(getActivity(), config, new MediaPickerSheet.Listener(){
-			@Override public void onMediaSelected(ArrayList<Uri> uris, String caption){
+			@Override public void onMediaSelected(ArrayList<Uri> uris){
 				for(Uri uri:uris)
 					mediaViewController.addMediaAttachment(uri, null);
-				if(!TextUtils.isEmpty(caption) && TextUtils.isEmpty(mainEditText.getText()))
-					mainEditText.setText(caption);
 			}
 			@Override public void onCameraRequested(){ openCameraForAttachment(); }
 		}).show();
