@@ -1,5 +1,10 @@
 # Diaper Rating Page Implementation Plan
 
+> [!NOTE]
+> This document may not reflect the current implementation.
+> See the final report for up-to-date state:
+> [Final Report](../reports/diaper-rating-page.md)
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use compose:subagent (recommended) or compose:execute to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build a standalone Android diaper rating page that submits 5 score dimensions and an optional review to `/api/ratings` from the diaper detail page.
