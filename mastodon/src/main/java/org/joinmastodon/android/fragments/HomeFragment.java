@@ -62,7 +62,6 @@ import me.grishka.appkit.views.FragmentRootLinearLayout;
 public class HomeFragment extends AppKitFragment implements AssistContentProviderFragment, HasAccountID {
 	private FragmentRootLinearLayout content;
 	private HomeTabFragment homeTabFragment;
-	private NotificationsListFragment notificationsFragment;
 	private DiscoverFragment searchFragment;
 	private ProfileFragment profileFragment;
 	private FriendRequestListFragment friendRequestFragment;
@@ -94,9 +93,6 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 			args.putBoolean("noAutoLoad", true);
 			searchFragment=new DiscoverFragment();
 			searchFragment.setArguments(args);
-			notificationsFragment=new NotificationsListFragment();
-			notificationsFragment.setArguments(args);
-			args=new Bundle(args);
 			friendRequestFragment=new FriendRequestListFragment();
 			friendRequestFragment.setArguments(args);
 			args=new Bundle(args);
@@ -152,7 +148,6 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 			getChildFragmentManager().beginTransaction()
 					.add(me.grishka.appkit.R.id.fragment_wrap, homeTabFragment)
 					.add(me.grishka.appkit.R.id.fragment_wrap, searchFragment).hide(searchFragment)
-					.add(me.grishka.appkit.R.id.fragment_wrap, notificationsFragment).hide(notificationsFragment)
 					.add(me.grishka.appkit.R.id.fragment_wrap, friendRequestFragment).hide(friendRequestFragment)
 					.add(me.grishka.appkit.R.id.fragment_wrap, diaperListFragment).hide(diaperListFragment)
 					.add(me.grishka.appkit.R.id.fragment_wrap, profileFragment).hide(profileFragment)
@@ -160,12 +155,13 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 
 			String defaultTab=getArguments().getString("tab");
 			if("notifications".equals(defaultTab)){
-				tabBar.selectTab(R.id.tab_notifications);
 				fragmentContainer.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener(){
 					@Override
 					public boolean onPreDraw(){
 						fragmentContainer.getViewTreeObserver().removeOnPreDrawListener(this);
-						onTabSelected(R.id.tab_notifications);
+						Bundle args=new Bundle();
+						args.putString("account", accountID);
+						Nav.go(getActivity(), NotificationsListFragment.class, args);
 						return true;
 					}
 				});
@@ -185,7 +181,6 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 			return;
 		homeTabFragment=(HomeTabFragment) getChildFragmentManager().getFragment(savedInstanceState, "homeTabFragment");
 		searchFragment=(DiscoverFragment) getChildFragmentManager().getFragment(savedInstanceState, "searchFragment");
-		notificationsFragment=(NotificationsListFragment) getChildFragmentManager().getFragment(savedInstanceState, "notificationsFragment");
 		friendRequestFragment=(FriendRequestListFragment) getChildFragmentManager().getFragment(savedInstanceState, "friendRequestFragment");
 		diaperListFragment=(DiaperListFragment) getChildFragmentManager().getFragment(savedInstanceState, "diaperListFragment");
 		profileFragment=(ProfileFragment) getChildFragmentManager().getFragment(savedInstanceState, "profileFragment");
@@ -195,7 +190,6 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 		getChildFragmentManager().beginTransaction()
 				.hide(homeTabFragment)
 				.hide(searchFragment)
-				.hide(notificationsFragment)
 				.hide(friendRequestFragment)
 				.hide(diaperListFragment)
 				.hide(profileFragment)
@@ -232,7 +226,6 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 		WindowInsets topOnlyInsets=insets.replaceSystemWindowInsets(0, insets.getSystemWindowInsetTop(), 0, 0);
 		homeTabFragment.onApplyWindowInsets(topOnlyInsets);
 		searchFragment.onApplyWindowInsets(topOnlyInsets);
-		notificationsFragment.onApplyWindowInsets(topOnlyInsets);
 		friendRequestFragment.onApplyWindowInsets(topOnlyInsets);
 		diaperListFragment.onApplyWindowInsets(topOnlyInsets);
 		profileFragment.onApplyWindowInsets(topOnlyInsets);
@@ -243,8 +236,6 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 			return homeTabFragment;
 		}else if(tab==R.id.tab_search){
 			return searchFragment;
-		}else if(tab==R.id.tab_notifications){
-			return notificationsFragment;
 		}else if(tab==R.id.tab_friend_request){
 			return friendRequestFragment;
 		}else if(tab==R.id.tab_diaper){
@@ -293,10 +284,6 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 		}else if(newFragment instanceof DiscoverFragment){
 			((DiscoverFragment) newFragment).loadData();
 		}
-		if(newFragment instanceof NotificationsListFragment){
-			NotificationManager nm=getActivity().getSystemService(NotificationManager.class);
-			nm.cancel(accountID, PushNotificationReceiver.NOTIFICATION_ID);
-		}
 	}
 
 	private boolean onTabLongClick(@IdRes int tab){
@@ -336,8 +323,6 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 		if (homeTabFragment.isAdded()) getChildFragmentManager().putFragment(outState, "homeTabFragment", homeTabFragment);
 
 		if (searchFragment.isAdded()) getChildFragmentManager().putFragment(outState, "searchFragment", searchFragment);
-
-		if (notificationsFragment.isAdded()) getChildFragmentManager().putFragment(outState, "notificationsFragment", notificationsFragment);
 
 		if (friendRequestFragment.isAdded()) getChildFragmentManager().putFragment(outState, "friendRequestFragment", friendRequestFragment);
 
@@ -415,12 +400,15 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 	}
 
 	private void updateUnreadNotificationsBadge(int count, boolean more){
+		String badgeText=count==0 ? null : String.format(more ? "%d+" : "%d", count);
 		if(count==0){
 			notificationsBadge.setVisibility(View.GONE);
 		}else{
 			notificationsBadge.setVisibility(View.VISIBLE);
-			notificationsBadge.setText(String.format(more ? "%d+" : "%d", count));
+			notificationsBadge.setText(badgeText);
 		}
+		if(profileFragment!=null)
+			profileFragment.setUnreadNotificationsBadge(badgeText);
 	}
 
 	@Subscribe
@@ -428,7 +416,7 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 		if(!ev.accountID.equals(accountID))
 			return;
 		if(ev.clearUnread)
-			notificationsBadge.setVisibility(View.GONE);
+			updateUnreadNotificationsBadge(0, false);
 	}
 
 	@Subscribe
@@ -439,8 +427,6 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 		// FIXME: figure this out
 //		if(homeTabFragment.loaded)
 //			homeTabFragment.rebuildAllDisplayItems();
-		if(notificationsFragment.loaded)
-			notificationsFragment.rebuildAllDisplayItems();
 	}
 
 	@Override

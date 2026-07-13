@@ -176,6 +176,8 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 	private boolean tabBarIsAtTop;
 	private Animator tabBarColorAnim;
 	private MenuItem editSaveMenuItem;
+	private TextView profileNotificationsBadge;
+	private String unreadNotificationsBadgeText;
 	private boolean savingEdits;
 	private Runnable editModeBackCallback=this::onEditModeBackCallback;
 	private HashSet<APIRequest<?>> relationshipRequests=new HashSet<>();
@@ -795,8 +797,15 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 			return;
 		inflater.inflate(isOwnProfile ? R.menu.profile_own : R.menu.profile, menu);
 		menu.findItem(R.id.share).setTitle(R.string.share_user);
-		if(isOwnProfile)
+		if(isOwnProfile){
+			MenuItem notificationsItem=menu.findItem(R.id.profile_notifications);
+			View actionView=LayoutInflater.from(getActivity()).inflate(R.layout.action_profile_notifications, getToolbar(), false);
+			notificationsItem.setActionView(actionView);
+			profileNotificationsBadge=actionView.findViewById(R.id.profile_notifications_badge);
+			actionView.setOnClickListener(v->openNotifications());
+			updateProfileNotificationsBadge();
 			return;
+		}
 
 		menu.findItem(R.id.mute).setTitle(getString(relationship.muting ? R.string.unmute_user : R.string.mute_user, account.getDisplayUsername()));
 		menu.findItem(R.id.block).setTitle(makeRedString(getString(relationship.blocking ? R.string.unblock_user : R.string.block_user, account.getDisplayUsername())));
@@ -891,6 +900,25 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 			UiUtils.maybeShowTextCopiedToast(getActivity());
 		}
 		return true;
+	}
+
+	public void setUnreadNotificationsBadge(String text){
+		unreadNotificationsBadgeText=text;
+		updateProfileNotificationsBadge();
+	}
+
+	private void updateProfileNotificationsBadge(){
+		if(profileNotificationsBadge==null)
+			return;
+		boolean visible=!TextUtils.isEmpty(unreadNotificationsBadgeText);
+		profileNotificationsBadge.setVisibility(visible ? View.VISIBLE : View.GONE);
+		profileNotificationsBadge.setText(visible ? unreadNotificationsBadgeText : "");
+	}
+
+	private void openNotifications(){
+		Bundle args=new Bundle();
+		args.putString("account", accountID);
+		Nav.go(getActivity(), NotificationsListFragment.class, args);
 	}
 
 	private void loadRelationship(){
