@@ -1,6 +1,7 @@
 package org.joinmastodon.android.fragments;
 
 import android.annotation.SuppressLint;
+import android.app.AlertDialog;
 import android.app.Fragment;
 import android.app.NotificationManager;
 import android.app.assist.AssistContent;
@@ -36,6 +37,7 @@ import org.joinmastodon.android.model.Account;
 import org.joinmastodon.android.model.Instance;
 import org.joinmastodon.android.model.Notification;
 import org.joinmastodon.android.model.NotificationType;
+import org.joinmastodon.android.ui.M3AlertDialogBuilder;
 import org.joinmastodon.android.ui.OutlineProviders;
 import org.joinmastodon.android.ui.sheets.AccountSwitcherSheet;
 import org.joinmastodon.android.ui.utils.UiUtils;
@@ -63,6 +65,7 @@ import me.grishka.appkit.views.FragmentRootLinearLayout;
 public class HomeFragment extends AppKitFragment implements AssistContentProviderFragment, HasAccountID {
 	private static final String DIAPER_FEATURE_VERSION="2.3.0";
 	private static final String DIAPER_FEATURE_SEEN_KEY="diaperFeatureSeen_"+DIAPER_FEATURE_VERSION;
+	private static final String FEATURE_DIALOG_SEEN_KEY="featureDialogSeen_"+DIAPER_FEATURE_VERSION;
 	private FragmentRootLinearLayout content;
 	private HomeTabFragment homeTabFragment;
 	private DiscoverFragment searchFragment;
@@ -76,6 +79,7 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 	private int currentTab=R.id.tab_home;
 	private TextView notificationsBadge;
 	private TextView diaperNewFeatureBadge;
+	private AlertDialog featureDialog;
 
 	private String accountID;
 
@@ -116,6 +120,15 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 	public void onDestroy(){
 		super.onDestroy();
 		E.unregister(this);
+	}
+
+	@Override
+	public void onDestroyView(){
+		if(featureDialog!=null){
+			featureDialog.dismiss();
+			featureDialog=null;
+		}
+		super.onDestroyView();
 	}
 
 	@Nullable
@@ -356,7 +369,27 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 	@Override
 	protected void onShown(){
 		super.onShown();
+		showFeatureDialogIfNeeded();
 		reloadNotificationsForUnreadCount();
+	}
+
+	private void showFeatureDialogIfNeeded(){
+		if(featureDialog!=null || getActivity()==null)
+			return;
+		String version=BuildConfig.VERSION_NAME.split("-", 2)[0];
+		if(!DIAPER_FEATURE_VERSION.equals(version)
+				|| GlobalUserPreferences.getPrefs().getBoolean(FEATURE_DIALOG_SEEN_KEY, false))
+			return;
+
+		featureDialog=new M3AlertDialogBuilder(getActivity())
+				.setTitle("功能上新啦！")
+				.setMessage("欢迎来到2.3.0版本！在此版本中纸尿裤评分与排行榜功能上线APP啦！欢迎各位小宝宝进入纸尿裤列表页给自己穿过的裤裤进行评分，方便其他同好选择优质的裤裤，给圈内发展贡献出自己的力量！")
+				.setPositiveButton("关闭", (dialog, which)->
+						GlobalUserPreferences.getPrefs().edit().putBoolean(FEATURE_DIALOG_SEEN_KEY, true).apply())
+				.setCancelable(false)
+				.create();
+		featureDialog.setOnDismissListener(dialog->featureDialog=null);
+		featureDialog.show();
 	}
 
 	private void reloadNotificationsForUnreadCount(){
