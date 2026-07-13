@@ -222,6 +222,7 @@ public class DiaperDetailFragment extends LoaderFragment {
 				@Override
 				public void onSuccess(Map<String, Object> result) {
 					if (getActivity() == null) return;
+					dataLoading = false;
 					diaperData = (Map<String, Object>) result.get("diaper");
 					reviews.clear();
 					List<Map<String, Object>> reviewsList = (List<Map<String, Object>>) result.get("reviews");
@@ -239,6 +240,7 @@ public class DiaperDetailFragment extends LoaderFragment {
 				@Override
 				public void onError(ErrorResponse error) {
 					if (getActivity() == null) return;
+					dataLoading = false;
 					dataLoaded();
 					error.showToast(getContext());
 				}
