@@ -5,6 +5,7 @@ import android.app.AlertDialog;
 import android.app.Fragment;
 import android.app.NotificationManager;
 import android.app.assist.AssistContent;
+import android.content.Intent;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.LayoutInflater;
@@ -370,6 +371,7 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 	protected void onShown(){
 		super.onShown();
 		showFeatureDialogIfNeeded();
+		showAutoStartGuideIfNeeded();
 		reloadNotificationsForUnreadCount();
 	}
 
@@ -390,6 +392,29 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 				.create();
 		featureDialog.setOnDismissListener(dialog->featureDialog=null);
 		featureDialog.show();
+	}
+
+	private void showAutoStartGuideIfNeeded(){
+		if(getActivity()==null)
+			return;
+		org.joinmastodon.android.ui.utils.OemUtils.Vendor vendor=org.joinmastodon.android.ui.utils.OemUtils.detectVendor();
+		if(vendor==org.joinmastodon.android.ui.utils.OemUtils.Vendor.OTHER)
+			return;
+		if(org.joinmastodon.android.ui.utils.OemUtils.isAutoStartGranted())
+			return;
+		if(GlobalUserPreferences.getPrefs().getBoolean("autoStartGuideShown_"+BuildConfig.VERSION_NAME, false))
+			return;
+		new M3AlertDialogBuilder(getActivity())
+				.setTitle("开启实时通知")
+				.setMessage("您当前使用的是"+vendor.displayName+"手机，需要允许后台运行才能尽可能保证您能实时收到通知")
+				.setPositiveButton("去设置", (dialog, which)->{
+					GlobalUserPreferences.getPrefs().edit().putBoolean("autoStartGuideShown_"+BuildConfig.VERSION_NAME, true).apply();
+					startActivity(new Intent(getActivity(), org.joinmastodon.android.ui.NotificationGuideActivity.class));
+				})
+				.setNegativeButton("以后再说", (dialog, which)->
+						GlobalUserPreferences.getPrefs().edit().putBoolean("autoStartGuideShown_"+BuildConfig.VERSION_NAME, true).apply())
+				.setCancelable(false)
+				.show();
 	}
 
 	private void reloadNotificationsForUnreadCount(){

@@ -21,6 +21,7 @@
 	<uses-permission android:name="android.permission.CAMERA"/>
 	<uses-permission android:name="android.permission.RECORD_AUDIO"/>
 	<uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
+	<uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
 	<uses-feature android:name="android.hardware.camera" android:required="false"/>
 
 	<permission android:name="${applicationId}.permission.C2D_MESSAGE" android:protectionLevel="signature"/>
@@ -77,6 +78,7 @@
 			</intent-filter>
 		</activity>
 		<activity android:name=".ui.MediaCameraActivity" android:exported="false" android:screenOrientation="portrait" android:theme="@style/Theme.Mastodon.AutoLightDark"/>
+		<activity android:name=".ui.NotificationGuideActivity" android:exported="false" android:theme="@style/Theme.Mastodon.AutoLightDark"/>
 		<activity android:name=".ui.SplashActivity" android:exported="true" android:configChanges="orientation|screenSize" android:theme="@style/Theme.Mastodon.SplashScreen">
 			<intent-filter>
 				<action android:name="android.intent.action.MAIN"/>

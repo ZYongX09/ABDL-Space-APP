@@ -138,12 +138,12 @@ public class PushNotificationReceiver extends BroadcastReceiver{
 					break;
 				}
 			}
-			if(!hasGroup || version!=2){
+			if(!hasGroup || version!=3){
 				NotificationChannelGroup group=new NotificationChannelGroup(accountID, accountName);
 				nm.createNotificationChannelGroup(group);
 				List<NotificationChannel> channels=Arrays.stream(PushNotification.Type.values())
 						.map(type->{
-							NotificationChannel channel=new NotificationChannel(accountID+"_"+type, context.getString(type.localizedName), NotificationManager.IMPORTANCE_DEFAULT);
+							NotificationChannel channel=new NotificationChannel(accountID+"_"+type, context.getString(type.localizedName), NotificationManager.IMPORTANCE_HIGH);
 							channel.setLightColor(context.getColor(R.color.primary_700));
 							channel.enableLights(true);
 							channel.setGroup(accountID);
@@ -151,7 +151,7 @@ public class PushNotificationReceiver extends BroadcastReceiver{
 						})
 						.collect(Collectors.toList());
 				nm.createNotificationChannels(channels);
-				AccountSessionManager.get(accountID).getRawLocalPreferences().edit().putInt("notificationChannelsVersion", 2).apply();
+				AccountSessionManager.get(accountID).getRawLocalPreferences().edit().putInt("notificationChannelsVersion", 3).apply();
 			}
 			builder=new Notification.Builder(context, accountID+"_"+pn.notificationType);
 		}else{

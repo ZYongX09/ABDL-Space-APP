@@ -46,6 +46,17 @@ public class MastodonApp extends Application{
 		JPushInterface.setDebugMode(BuildConfig.DEBUG);
 		JCollectionAuth.setAuth(this, true);
 		JPushInterface.init(this);
+		// 设置 JPush 通知通道为 HIGH 以显示 heads-up 横幅
+		try{
+			android.app.NotificationManager nm=getSystemService(android.app.NotificationManager.class);
+			if(nm!=null && android.os.Build.VERSION.SDK_INT>=android.os.Build.VERSION_CODES.O){
+				android.app.NotificationChannel ch=new android.app.NotificationChannel("jpush_high", "推送通知", android.app.NotificationManager.IMPORTANCE_HIGH);
+				ch.setDescription("接收推送通知时显示横幅");
+				nm.createNotificationChannel(ch);
+			}
+		}catch(Exception e){
+			Log.e(TAG, "Failed to create JPush HIGH channel", e);
+		}
 		Log.i(TAG, "JPush initialized");
 
 		try{

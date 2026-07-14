@@ -870,6 +870,8 @@
 	<string name="user_quoted_post">%s 引用了你的帖子：</string>
 	<string name="user_edited_quoted_post">%s 编辑了你引用的一则帖子</string>
 	<string name="notification_type_quote">引用</string>
+	<string name="notification_background_guide">后台通知设置</string>
+	<string name="notification_background_guide_desc">确保在后台时也能收到推送通知</string>
 	<string name="create_quote">引用</string>
 	<string name="cannot_quote_post">你没有引用该帖子的权限</string>
 	<string name="cannot_quote_post_followers_only">引用该帖子前需要先关注</string>

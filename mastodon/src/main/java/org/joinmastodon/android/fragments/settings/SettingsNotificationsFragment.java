@@ -64,7 +64,9 @@ public class SettingsNotificationsFragment extends BaseSettingsFragment<Void>{
 				followersItem=new CheckableListItem<>(R.string.notification_type_follow, 0, CheckableListItem.Style.CHECKBOX, pushSubscription.alerts.follow, this::toggleCheckableItem),
 				pollsItem=new CheckableListItem<>(R.string.notification_type_poll, 0, CheckableListItem.Style.CHECKBOX, pushSubscription.alerts.poll, this::toggleCheckableItem),
 				statusesItem=new CheckableListItem<>(R.string.notification_type_status, 0, CheckableListItem.Style.CHECKBOX, pushSubscription.alerts.status, this::toggleCheckableItem),
-				quotesItem=new CheckableListItem<>(R.string.notification_type_quote, 0, CheckableListItem.Style.CHECKBOX, pushSubscription.alerts.quote, this::toggleCheckableItem)
+				quotesItem=new CheckableListItem<>(R.string.notification_type_quote, 0, CheckableListItem.Style.CHECKBOX, pushSubscription.alerts.quote, this::toggleCheckableItem),
+
+				new ListItem<>(R.string.notification_background_guide, R.string.notification_background_guide_desc, R.drawable.ic_fluent_phone_24_regular, i->startActivity(new Intent(getActivity(), org.joinmastodon.android.ui.NotificationGuideActivity.class)))
 		));
 
 		typeItems=List.of(mentionsItem, boostsItem, favoritesItem, followersItem, pollsItem, statusesItem, quotesItem);
