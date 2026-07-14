@@ -44,7 +44,7 @@
 			android:id="@+id/camera_back"
 			android:layout_width="48dp"
 			android:layout_height="48dp"
-			android:background="@drawable/bg_media_camera_control"
+			android:background="@android:color/transparent"
 			android:contentDescription="@string/back"
 			android:padding="12dp"
 			android:src="@drawable/ic_fluent_arrow_left_24_filled"
@@ -66,7 +66,7 @@
 			android:id="@+id/camera_flash"
 			android:layout_width="48dp"
 			android:layout_height="48dp"
-			android:background="@drawable/bg_media_camera_control"
+			android:background="@android:color/transparent"
 			android:contentDescription="@string/media_camera_flash_off"
 			android:padding="12dp"
 			android:src="@drawable/ic_fluent_flash_off_24_filled"
@@ -79,6 +79,15 @@
 		android:layout_height="132dp"
 		android:layout_gravity="bottom"
 		android:background="#66000000">
+
+		<TextView
+			android:layout_width="wrap_content"
+			android:layout_height="wrap_content"
+			android:layout_gravity="top|center_horizontal"
+			android:layout_marginTop="8dp"
+			android:text="@string/media_camera_capture_hint"
+			android:textColor="#CCFFFFFF"
+			android:textSize="12sp"/>
 
 		<ImageButton
 			android:id="@+id/camera_gallery"
@@ -96,7 +105,8 @@
 			android:id="@+id/camera_shutter"
 			android:layout_width="84dp"
 			android:layout_height="84dp"
-			android:layout_gravity="center"/>
+			android:layout_gravity="bottom|center_horizontal"
+			android:layout_marginBottom="8dp"/>
 
 		<ImageButton
 			android:id="@+id/camera_switch"

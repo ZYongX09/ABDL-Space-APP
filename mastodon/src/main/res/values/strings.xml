@@ -202,8 +202,9 @@
 	<string name="media_picker_camera_failed">Couldn’t open the camera</string>
 	<string name="media_camera_switch">Switch camera</string>
 	<string name="media_camera_flash_off">Flash off</string>
-	<string name="media_camera_flash_auto">Flash auto</string>
 	<string name="media_camera_flash_on">Flash on</string>
+	<string name="media_camera_flash_torch">Flashlight on</string>
+	<string name="media_camera_capture_hint">Tap to take photo  Hold to record</string>
 	<string name="media_camera_retake">Retake</string>
 	<string name="media_camera_use_photo">Use photo</string>
 	<string name="media_camera_use_video">Use video</string>

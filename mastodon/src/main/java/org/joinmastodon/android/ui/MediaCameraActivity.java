@@ -72,10 +72,10 @@ public class MediaCameraActivity extends Activity implements MediaCameraControll
 		getWindow().setStatusBarColor(0x00000000);
 		getWindow().setNavigationBarColor(0xff000000);
 		getWindow().setDecorFitsSystemWindows(false);
+		setContentView(R.layout.activity_media_camera);
 		WindowInsetsController insetsController=getWindow().getInsetsController();
 		if(insetsController!=null)
 			insetsController.setSystemBarsAppearance(0, WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS|WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS);
-		setContentView(R.layout.activity_media_camera);
 
 		preview=findViewById(R.id.camera_preview);
 		reviewImage=findViewById(R.id.camera_review_image);
@@ -344,13 +344,13 @@ public class MediaCameraActivity extends Activity implements MediaCameraControll
 				flashButton.setImageResource(R.drawable.ic_fluent_flash_off_24_filled);
 				flashButton.setContentDescription(getString(R.string.media_camera_flash_off));
 			}
-			case AUTO -> {
-				flashButton.setImageResource(R.drawable.ic_fluent_flash_auto_24_filled);
-				flashButton.setContentDescription(getString(R.string.media_camera_flash_auto));
-			}
 			case ON -> {
 				flashButton.setImageResource(R.drawable.ic_fluent_flash_24_filled);
 				flashButton.setContentDescription(getString(R.string.media_camera_flash_on));
+			}
+			case TORCH -> {
+				flashButton.setImageResource(R.drawable.ic_fluent_flashlight_24_filled);
+				flashButton.setContentDescription(getString(R.string.media_camera_flash_torch));
 			}
 		}
 	}

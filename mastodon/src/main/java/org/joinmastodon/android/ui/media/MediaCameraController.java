@@ -4,6 +4,7 @@ import android.Manifest;
 import android.app.Activity;
 import android.content.pm.PackageManager;
 import android.graphics.ImageFormat;
+import android.graphics.Matrix;
 import android.graphics.Rect;
 import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraAccessException;
@@ -45,7 +46,7 @@ public class MediaCameraController{
 	}
 
 	public enum State{ CLOSED, OPENING, PREVIEW, CAPTURING, RECORDING, CLOSING }
-	public enum FlashMode{ OFF, AUTO, ON }
+	public enum FlashMode{ OFF, ON, TORCH }
 
 	private final Activity activity;
 	private final Callback callback;
@@ -60,6 +61,7 @@ public class MediaCameraController{
 	private TextureView textureView;
 	private Surface previewSurface;
 	private CaptureRequest.Builder previewRequest;
+	private Size previewSize;
 	private String backCameraId;
 	private String frontCameraId;
 	private String cameraId;
@@ -168,9 +170,10 @@ public class MediaCameraController{
 			}
 			StreamConfigurationMap map=characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
 			Size[] sizes=map==null ? null : map.getOutputSizes(SurfaceTexture.class);
-			Size previewSize=chooseSize(sizes, 1920, 1080, textureView.getWidth()/(float)Math.max(1, textureView.getHeight()));
+			previewSize=chooseSize(sizes, 1920, 1080, textureView.getHeight()/(float)Math.max(1, textureView.getWidth()));
 			if(previewSize!=null)
 				texture.setDefaultBufferSize(previewSize.getWidth(), previewSize.getHeight());
+			configurePreviewTransform();
 			previewSurface=new Surface(texture);
 			previewRequest=camera.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
 			previewRequest.addTarget(previewSurface);
@@ -214,7 +217,7 @@ public class MediaCameraController{
 				CaptureRequest.Builder request=camera.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
 				request.addTarget(imageReader.getSurface());
 				request.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
-				applyFlash(request);
+				applyFlash(request, false);
 				applyCrop(request);
 				Integer sensor=characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION);
 				request.set(CaptureRequest.JPEG_ORIENTATION, MediaCameraContract.jpegOrientation(sensor==null ? 0 : sensor, activity.getDisplay().getRotation(), isFrontFacing()));
@@ -365,9 +368,9 @@ public class MediaCameraController{
 
 	public FlashMode cycleFlashMode(){
 		flashMode=switch(flashMode){
-			case OFF -> FlashMode.AUTO;
-			case AUTO -> FlashMode.ON;
-			case ON -> FlashMode.OFF;
+			case OFF -> FlashMode.ON;
+			case ON -> FlashMode.TORCH;
+			case TORCH -> FlashMode.OFF;
 		};
 		updatePreview();
 		return flashMode;
@@ -424,19 +427,42 @@ public class MediaCameraController{
 
 	private void applyPreviewSettings(){
 		previewRequest.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
-		applyFlash(previewRequest);
+		applyFlash(previewRequest, true);
 		applyCrop(previewRequest);
 	}
 
-	private void applyFlash(CaptureRequest.Builder request){
+	private void applyFlash(CaptureRequest.Builder request, boolean preview){
 		switch(flashMode){
 			case OFF -> {
 				request.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON);
 				request.set(CaptureRequest.FLASH_MODE, CaptureRequest.FLASH_MODE_OFF);
 			}
-			case AUTO -> request.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON_AUTO_FLASH);
-			case ON -> request.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON_ALWAYS_FLASH);
+			case ON -> {
+				request.set(CaptureRequest.CONTROL_AE_MODE, preview ? CaptureRequest.CONTROL_AE_MODE_ON : CaptureRequest.CONTROL_AE_MODE_ON_ALWAYS_FLASH);
+				request.set(CaptureRequest.FLASH_MODE, CaptureRequest.FLASH_MODE_OFF);
+			}
+			case TORCH -> {
+				request.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON);
+				request.set(CaptureRequest.FLASH_MODE, CaptureRequest.FLASH_MODE_TORCH);
+			}
 		}
+	}
+
+	private void configurePreviewTransform(){
+		if(previewSize==null || textureView==null)
+			return;
+		int viewWidth=textureView.getWidth();
+		int viewHeight=textureView.getHeight();
+		if(viewWidth==0 || viewHeight==0)
+			return;
+		float sourceWidth=previewSize.getHeight();
+		float sourceHeight=previewSize.getWidth();
+		float fillScale=Math.max(viewWidth/sourceWidth, viewHeight/sourceHeight);
+		float scaleX=fillScale/(viewWidth/sourceWidth);
+		float scaleY=fillScale/(viewHeight/sourceHeight);
+		Matrix matrix=new Matrix();
+		matrix.setScale(scaleX, scaleY, viewWidth/2f, viewHeight/2f);
+		mainHandler.post(()->textureView.setTransform(matrix));
 	}
 
 	private void applyCrop(CaptureRequest.Builder request){

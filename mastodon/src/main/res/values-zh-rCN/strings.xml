@@ -178,6 +178,15 @@
 	<string name="media_picker_discard_title">放弃所选内容</string>
 	<string name="media_picker_discard_message">您确定要关闭附件菜单吗？</string>
 	<string name="media_picker_camera_failed">无法打开相机</string>
+	<string name="media_camera_switch">切换摄像头</string>
+	<string name="media_camera_flash_off">关闭闪光灯</string>
+	<string name="media_camera_flash_on">拍照时开启闪光灯</string>
+	<string name="media_camera_flash_torch">闪光灯常亮</string>
+	<string name="media_camera_capture_hint">短按拍照  长按录像</string>
+	<string name="media_camera_retake">重拍</string>
+	<string name="media_camera_use_photo">使用照片</string>
+	<string name="media_camera_use_video">使用视频</string>
+	<string name="media_camera_audio_required">录制视频需要麦克风权限</string>
 	<string name="media_attachment_too_big">文件 %1$s 的大小超出 %2$s MB的限制</string>
 	<string name="settings_theme">外观</string>
 	<string name="theme_auto">跟随设备偏好</string>

@@ -27,24 +27,24 @@
             android:scaleType="centerInside"
             android:contentDescription="Close" />
 
-        <ImageButton
-            android:id="@+id/btn_gallery"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:background="@android:color/transparent"
-            android:src="@drawable/ic_photo_library_wght700_20px"
-            android:scaleType="centerInside"
-            android:contentDescription="@string/scan_qr_from_image" />
-
-        <TextView
+		<TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="扫描二维码"
             android:textColor="#FFFFFF"
             android:textSize="18sp"
-            android:textStyle="bold"
-            android:gravity="center" />
+			android:textStyle="bold"
+			android:gravity="center" />
+
+		<ImageButton
+			android:id="@+id/btn_gallery"
+			android:layout_width="40dp"
+			android:layout_height="40dp"
+			android:background="@android:color/transparent"
+			android:src="@drawable/ic_photo_library_wght700_20px"
+			android:scaleType="centerInside"
+			android:contentDescription="@string/scan_qr_from_image" />
 
     </LinearLayout>
 
