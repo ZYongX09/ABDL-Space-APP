@@ -75,6 +75,7 @@
 				<data android:scheme="https" android:host="abdl-space.top" android:pathPrefix="/qr-login"/>
 			</intent-filter>
 		</activity>
+		<activity android:name=".ui.MediaCameraActivity" android:exported="false" android:screenOrientation="portrait" android:theme="@style/Theme.Mastodon.AutoLightDark"/>
 		<activity android:name=".ui.SplashActivity" android:exported="true" android:configChanges="orientation|screenSize" android:theme="@style/Theme.Mastodon.SplashScreen">
 			<intent-filter>
 				<action android:name="android.intent.action.MAIN"/>

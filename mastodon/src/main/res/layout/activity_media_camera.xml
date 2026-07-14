@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+	android:layout_width="match_parent"
+	android:layout_height="match_parent"
+	android:background="#000000">
+
+	<TextureView
+		android:id="@+id/camera_preview"
+		android:layout_width="match_parent"
+		android:layout_height="match_parent"/>
+
+	<ImageView
+		android:id="@+id/camera_review_image"
+		android:layout_width="match_parent"
+		android:layout_height="match_parent"
+		android:scaleType="fitCenter"
+		android:visibility="gone"/>
+
+	<VideoView
+		android:id="@+id/camera_review_video"
+		android:layout_width="match_parent"
+		android:layout_height="match_parent"
+		android:visibility="gone"/>
+
+	<View
+		android:id="@+id/camera_focus"
+		android:layout_width="64dp"
+		android:layout_height="64dp"
+		android:background="@drawable/bg_media_camera_focus"
+		android:visibility="gone"/>
+
+	<LinearLayout
+		android:id="@+id/camera_top_controls"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:layout_gravity="top"
+		android:gravity="center_vertical"
+		android:orientation="horizontal"
+		android:paddingStart="12dp"
+		android:paddingTop="12dp"
+		android:paddingEnd="12dp">
+
+		<ImageButton
+			android:id="@+id/camera_back"
+			android:layout_width="48dp"
+			android:layout_height="48dp"
+			android:background="@drawable/bg_media_camera_control"
+			android:contentDescription="@string/back"
+			android:padding="12dp"
+			android:src="@drawable/ic_fluent_arrow_left_24_filled"
+			android:tint="#FFFFFF"/>
+
+		<TextView
+			android:id="@+id/recording_timer"
+			android:layout_width="0dp"
+			android:layout_height="48dp"
+			android:layout_weight="1"
+			android:gravity="center"
+			android:text="00:00"
+			android:textColor="#FFFFFF"
+			android:textSize="16sp"
+			android:textStyle="bold"
+			android:visibility="gone"/>
+
+		<ImageButton
+			android:id="@+id/camera_flash"
+			android:layout_width="48dp"
+			android:layout_height="48dp"
+			android:background="@drawable/bg_media_camera_control"
+			android:contentDescription="@string/media_camera_flash_off"
+			android:padding="12dp"
+			android:src="@drawable/ic_fluent_flash_off_24_filled"
+			android:tint="#FFFFFF"/>
+	</LinearLayout>
+
+	<FrameLayout
+		android:id="@+id/camera_capture_controls"
+		android:layout_width="match_parent"
+		android:layout_height="132dp"
+		android:layout_gravity="bottom"
+		android:background="#66000000">
+
+		<ImageButton
+			android:id="@+id/camera_gallery"
+			android:layout_width="48dp"
+			android:layout_height="48dp"
+			android:layout_gravity="start|center_vertical"
+			android:layout_marginStart="28dp"
+			android:background="@drawable/bg_media_camera_control"
+			android:contentDescription="@string/media_picker_title"
+			android:padding="12dp"
+			android:src="@drawable/ic_photo_library_wght700_20px"
+			android:tint="#FFFFFF"/>
+
+		<org.joinmastodon.android.ui.views.MediaCameraShutterView
+			android:id="@+id/camera_shutter"
+			android:layout_width="84dp"
+			android:layout_height="84dp"
+			android:layout_gravity="center"/>
+
+		<ImageButton
+			android:id="@+id/camera_switch"
+			android:layout_width="48dp"
+			android:layout_height="48dp"
+			android:layout_gravity="end|center_vertical"
+			android:layout_marginEnd="28dp"
+			android:background="@drawable/bg_media_camera_control"
+			android:contentDescription="@string/media_camera_switch"
+			android:padding="12dp"
+			android:src="@drawable/ic_fluent_camera_switch_24_filled"
+			android:tint="#FFFFFF"/>
+	</FrameLayout>
+
+	<LinearLayout
+		android:id="@+id/camera_review_controls"
+		android:layout_width="match_parent"
+		android:layout_height="104dp"
+		android:layout_gravity="bottom"
+		android:background="#99000000"
+		android:gravity="center"
+		android:orientation="horizontal"
+		android:padding="16dp"
+		android:visibility="gone">
+
+		<Button
+			android:id="@+id/camera_retake"
+			android:layout_width="0dp"
+			android:layout_height="52dp"
+			android:layout_marginEnd="8dp"
+			android:layout_weight="1"
+			android:text="@string/media_camera_retake"/>
+
+		<Button
+			android:id="@+id/camera_use"
+			android:layout_width="0dp"
+			android:layout_height="52dp"
+			android:layout_marginStart="8dp"
+			android:layout_weight="1"
+			android:text="@string/media_camera_use_photo"/>
+	</LinearLayout>
+</FrameLayout>
