@@ -5,6 +5,7 @@ import static org.junit.Assert.assertFalse;
 
 import android.content.Intent;
 import android.net.Uri;
+import android.util.Size;
 import android.view.Surface;
 
 import org.junit.Test;
@@ -29,5 +30,17 @@ public class MediaCameraContractTest{
 		assertEquals(uri, MediaCameraContract.getUri(result));
 		assertFalse(MediaCameraContract.isVideo(result));
 		assertEquals("image/jpeg", MediaCameraContract.getMimeType(result));
+	}
+
+	@Test
+	public void chooseSizePrefersLargestMatchingRatioWithinBounds(){
+		Size result=MediaCameraController.chooseSize(new Size[]{new Size(4000, 3000), new Size(1920, 1080), new Size(1280, 720)}, 1920, 1080, 16f/9f);
+		assertEquals(new Size(1920, 1080), result);
+	}
+
+	@Test
+	public void chooseSizeFallsBackToLargestBoundedSize(){
+		Size result=MediaCameraController.chooseSize(new Size[]{new Size(1600, 1200), new Size(1280, 960)}, 1280, 960, 16f/9f);
+		assertEquals(new Size(1280, 960), result);
 	}
 }
