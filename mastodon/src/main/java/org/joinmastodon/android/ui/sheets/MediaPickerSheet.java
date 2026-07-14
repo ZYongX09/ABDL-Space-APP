@@ -50,6 +50,7 @@ public class MediaPickerSheet extends BottomSheet{
 	private final Listener listener;
 	private final ArrayList<MediaAlbum> albums=new ArrayList<>();
 	private final ArrayList<MediaItem> displayItems=new ArrayList<>();
+	private final ArrayList<MediaCameraPreviewView> cameraPreviews=new ArrayList<>();
 	private final HashMap<String, MediaItem> selected=new HashMap<>();
 	private final ArrayList<MediaItem> selectedOrder=new ArrayList<>();
 	private final GridAdapter adapter=new GridAdapter();
@@ -259,9 +260,24 @@ public class MediaPickerSheet extends BottomSheet{
 	}
 
 	private void openCameraAndDismiss(){
+		releaseGridResources();
 		forceDismiss=true;
 		super.dismiss();
-		listener.onCameraRequested();
+		grid.postDelayed(listener::onCameraRequested, 300);
+	}
+
+	private void releaseGridResources(){
+		for(MediaCameraPreviewView preview:cameraPreviews)
+			preview.setPreviewEnabled(false);
+		cameraPreviews.clear();
+		for(int i=0;i<grid.getChildCount();i++){
+			RecyclerView.ViewHolder holder=grid.getChildViewHolder(grid.getChildAt(i));
+			if(holder instanceof GridHolder gridHolder)
+				gridHolder.image.setImageDrawable(null);
+		}
+		grid.setAdapter(null);
+		displayItems.clear();
+		albums.clear();
 	}
 
 	private void clearSelection(){
@@ -340,6 +356,11 @@ public class MediaPickerSheet extends BottomSheet{
 			else
 				holder.bind(position);
 		}
+		@Override public void onViewRecycled(GridHolder holder){
+			holder.cameraPreview.setPreviewEnabled(false);
+			holder.image.setImageDrawable(null);
+			super.onViewRecycled(holder);
+		}
 		@Override public int getItemCount(){ return displayItems.size()+(showCamera() ? 1 : 0); }
 	}
 
@@ -358,6 +379,7 @@ public class MediaPickerSheet extends BottomSheet{
 			image.setScaleType(ImageView.ScaleType.CENTER_CROP);
 			cell.addView(image, new FrameLayout.LayoutParams(-1, -1));
 			cameraPreview=new MediaCameraPreviewView(activity);
+			cameraPreviews.add(cameraPreview);
 			cell.addView(cameraPreview, new FrameLayout.LayoutParams(-1, -1));
 			cameraIcon=new ImageView(activity);
 			cameraIcon.setImageResource(R.drawable.ic_fluent_camera_28_filled);
