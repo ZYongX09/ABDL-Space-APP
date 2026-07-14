@@ -119,6 +119,24 @@ public class MediaPickerSheet extends BottomSheet{
 		collapsedGridHeight=Math.min(activity.getResources().getDisplayMetrics().heightPixels*3/5, V.dp(570));
 		root.addView(grid, new LinearLayout.LayoutParams(-1, collapsedGridHeight));
 
+		FrameLayout actions=new FrameLayout(activity);
+		actions.setPadding(V.dp(12), V.dp(8), V.dp(12), V.dp(10));
+		root.addView(actions, new LinearLayout.LayoutParams(-1, V.dp(68)));
+		send=new ImageButton(activity);
+		send.setImageResource(R.drawable.ic_check_wght700_24px);
+		send.setColorFilter(Color.WHITE);
+		GradientDrawable sendBackground=new GradientDrawable();
+		sendBackground.setShape(GradientDrawable.OVAL);
+		sendBackground.setColor(0xff4f7cff);
+		send.setBackground(sendBackground);
+		send.setEnabled(false);
+		send.setAlpha(0.5f);
+		FrameLayout.LayoutParams sendParams=new FrameLayout.LayoutParams(V.dp(50), V.dp(50), Gravity.END|Gravity.CENTER_VERTICAL);
+		actions.addView(send, sendParams);
+		send.setOnClickListener(v->deliver());
+
+		setContentView(root);
+
 		int dragZoneHeight=V.dp(28+52);
 		int touchSlop=ViewConfiguration.get(activity).getScaledTouchSlop();
 		final View sheetContent=content;
@@ -175,23 +193,6 @@ public class MediaPickerSheet extends BottomSheet{
 			return false;
 		});
 
-		FrameLayout actions=new FrameLayout(activity);
-		actions.setPadding(V.dp(12), V.dp(8), V.dp(12), V.dp(10));
-		root.addView(actions, new LinearLayout.LayoutParams(-1, V.dp(68)));
-		send=new ImageButton(activity);
-		send.setImageResource(R.drawable.ic_check_wght700_24px);
-		send.setColorFilter(Color.WHITE);
-		GradientDrawable sendBackground=new GradientDrawable();
-		sendBackground.setShape(GradientDrawable.OVAL);
-		sendBackground.setColor(0xff4f7cff);
-		send.setBackground(sendBackground);
-		send.setEnabled(false);
-		send.setAlpha(0.5f);
-		FrameLayout.LayoutParams sendParams=new FrameLayout.LayoutParams(V.dp(50), V.dp(50), Gravity.END|Gravity.CENTER_VERTICAL);
-		actions.addView(send, sendParams);
-		send.setOnClickListener(v->deliver());
-
-		setContentView(root);
 		setNavigationBarBackground(new ColorDrawable(color(R.attr.colorM3Surface)), !UiUtils.isDarkTheme());
 		loadMedia();
 	}

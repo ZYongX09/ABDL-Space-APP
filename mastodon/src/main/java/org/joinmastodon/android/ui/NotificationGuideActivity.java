@@ -83,7 +83,7 @@ public class NotificationGuideActivity extends Activity {
 		public void finish() {
 			runOnUiThread(() -> {
 				setResult(RESULT_OK);
-				finish();
+				NotificationGuideActivity.this.finish();
 			});
 		}
 
@@ -91,7 +91,7 @@ public class NotificationGuideActivity extends Activity {
 		public void goBack() {
 			runOnUiThread(() -> {
 				setResult(RESULT_CANCELED);
-				finish();
+				NotificationGuideActivity.this.finish();
 			});
 		}
 

@@ -29,9 +29,7 @@ public class MastodonApp extends Application{
 		super.onCreate();
 		context=getApplicationContext();
 		String processName=getCurrentProcessName();
-		if(BuildConfig.DEBUG && processName!=null){
-			if(!processName.equals(getPackageName()))
-				WebView.setDataDirectorySuffix(processName.substring(processName.lastIndexOf(':')+1));
+		if(BuildConfig.DEBUG && getPackageName().equals(processName)){
 			WebView.setWebContentsDebuggingEnabled(true);
 		}
 		V.setApplicationContext(context);
