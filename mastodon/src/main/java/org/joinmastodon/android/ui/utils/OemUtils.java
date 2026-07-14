@@ -33,15 +33,20 @@ public class OemUtils {
 
 	public static Vendor detectVendor() {
 		if (cachedVendor != null) return cachedVendor;
-		if (!TextUtils.isEmpty(getSystemProp("ro.miui.ui.version.name"))) {
+		String manufacturer = Build.MANUFACTURER != null ? Build.MANUFACTURER.toLowerCase() : "";
+		String brand = Build.BRAND != null ? Build.BRAND.toLowerCase() : "";
+		// MIUI: check system prop first, then manufacturer
+		String miuiVer = getSystemProp("ro.miui.ui.version.name");
+		if (!TextUtils.isEmpty(miuiVer) || "xiaomi".equals(manufacturer) || "xiaomi".equals(brand) || "redmi".equals(brand)) {
 			cachedVendor = Vendor.MIUI;
-		} else if (isHarmony()) {
+		} else if ("huawei".equals(manufacturer) || "huawei".equals(brand)) {
 			cachedVendor = Vendor.HARMONY;
-		} else if (isHonor()) {
+		} else if ("honor".equals(manufacturer) || "honor".equals(brand)) {
 			cachedVendor = Vendor.HONOR;
-		} else if (isColorOS()) {
+		} else if ("oppo".equals(manufacturer) || "oneplus".equals(manufacturer) || "realme".equals(manufacturer)
+				|| "oppo".equals(brand) || "oneplus".equals(brand) || "realme".equals(brand)) {
 			cachedVendor = Vendor.COLOROS;
-		} else if (isFuntouchOS()) {
+		} else if ("vivo".equals(manufacturer) || "iqoo".equals(manufacturer) || "vivo".equals(brand) || "iqoo".equals(brand)) {
 			cachedVendor = Vendor.FUNTOUCHOS;
 		} else if (isOneUI()) {
 			cachedVendor = Vendor.ONEUI;
@@ -105,24 +110,6 @@ public class OemUtils {
 	public static Intent getAppSettingsIntent(Context ctx) {
 		return new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
 				Uri.parse("package:" + ctx.getPackageName()));
-	}
-
-	private static boolean isHarmony() {
-		String m = Build.MANUFACTURER;
-		return "HUAWEI".equalsIgnoreCase(m) || "HUAWEI".equals(getSystemProp("ro.build.display.id"));
-	}
-
-	private static boolean isHonor() {
-		return "HONOR".equalsIgnoreCase(Build.MANUFACTURER);
-	}
-
-	private static boolean isColorOS() {
-		String m = Build.MANUFACTURER;
-		return "OPPO".equalsIgnoreCase(m) || "OnePlus".equalsIgnoreCase(m) || "realme".equalsIgnoreCase(m);
-	}
-
-	private static boolean isFuntouchOS() {
-		return "vivo".equalsIgnoreCase(Build.MANUFACTURER) || "IQOO".equalsIgnoreCase(Build.MANUFACTURER);
 	}
 
 	private static boolean isOneUI() {
