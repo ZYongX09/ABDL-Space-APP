@@ -28,6 +28,7 @@ import org.joinmastodon.android.ui.views.MediaCameraShutterView;
 import java.io.File;
 
 public class MediaCameraActivity extends Activity implements MediaCameraController.Callback{
+	private static final int AUDIO_PERMISSION_REQUEST=733;
 	private static final String STATE_REVIEW_FILE="review_file";
 	private static final String STATE_REVIEW_VIDEO="review_video";
 
@@ -41,12 +42,29 @@ public class MediaCameraActivity extends Activity implements MediaCameraControll
 	private ImageButton switchButton;
 	private Button useButton;
 	private MediaCameraShutterView shutter;
+	private android.widget.TextView recordingTimer;
 	private MediaCameraController controller;
 	private ScaleGestureDetector scaleDetector;
 	private float zoom=1f;
 	private boolean scaling;
 	private File reviewFile;
 	private boolean reviewIsVideo;
+	private long recordingStartedAt;
+	private boolean recording;
+	private boolean recordingStarting;
+	private final Runnable recordingTick=new Runnable(){
+		@Override public void run(){
+			if(!recording)
+				return;
+			long elapsed=System.currentTimeMillis()-recordingStartedAt;
+			recordingTimer.setText(String.format(java.util.Locale.US, "%02d:%02d", elapsed/60_000, elapsed/1000%60));
+			shutter.setProgress(elapsed/60_000f);
+			if(elapsed>=60_000)
+				stopRecording(true);
+			else
+				recordingTimer.postDelayed(this, 200);
+		}
+	};
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState){
@@ -69,6 +87,7 @@ public class MediaCameraActivity extends Activity implements MediaCameraControll
 		switchButton=findViewById(R.id.camera_switch);
 		useButton=findViewById(R.id.camera_use);
 		shutter=findViewById(R.id.camera_shutter);
+		recordingTimer=findViewById(R.id.recording_timer);
 		controller=new MediaCameraController(this, this);
 
 		View topControls=findViewById(R.id.camera_top_controls);
@@ -88,8 +107,8 @@ public class MediaCameraActivity extends Activity implements MediaCameraControll
 		});
 		shutter.setListener(new MediaCameraShutterView.Listener(){
 			@Override public void onTap(){ capturePhoto(); }
-			@Override public void onHoldStart(){ }
-			@Override public void onHoldEnd(){ }
+			@Override public void onHoldStart(){ startRecording(); }
+			@Override public void onHoldEnd(){ stopRecording(true); }
 		});
 
 		scaleDetector=new ScaleGestureDetector(this, new ScaleGestureDetector.SimpleOnScaleGestureListener(){
@@ -156,6 +175,8 @@ public class MediaCameraActivity extends Activity implements MediaCameraControll
 	}
 
 	@Override protected void onPause(){
+		if(recording)
+			stopRecording(false);
 		controller.close();
 		super.onPause();
 	}
@@ -189,6 +210,58 @@ public class MediaCameraActivity extends Activity implements MediaCameraControll
 		reviewFile=file;
 		reviewIsVideo=false;
 		showReview();
+	}
+
+	@Override public void onVideoRecorded(File file){
+		recording=false;
+		recordingTimer.removeCallbacks(recordingTick);
+		reviewFile=file;
+		reviewIsVideo=true;
+		showReview();
+	}
+
+	private void startRecording(){
+		if(!getIntent().getBooleanExtra(MediaCameraContract.EXTRA_ALLOW_VIDEO, false) || recordingStarting || controller.getState()!=MediaCameraController.State.PREVIEW)
+			return;
+		if(checkSelfPermission(Manifest.permission.RECORD_AUDIO)!=PackageManager.PERMISSION_GRANTED){
+			requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, AUDIO_PERMISSION_REQUEST);
+			return;
+		}
+		try{
+			File dir=new File(getCacheDir(), "videos");
+			dir.mkdirs();
+			controller.startRecording(File.createTempFile("camera_", ".mp4", dir));
+			recordingStarting=true;
+		}catch(Exception x){
+			onError(R.string.media_picker_camera_failed);
+		}
+	}
+
+	private void stopRecording(boolean keep){
+		if(!recording && !recordingStarting)
+			return;
+		recording=false;
+		recordingStarting=false;
+		recordingTimer.removeCallbacks(recordingTick);
+		recordingTimer.setVisibility(View.GONE);
+		shutter.setRecording(false);
+		shutter.setProgress(0f);
+		controller.stopRecording(keep);
+	}
+
+	@Override public void onRecordingStarted(){
+		recordingStarting=false;
+		recording=true;
+		recordingStartedAt=System.currentTimeMillis();
+		recordingTimer.setVisibility(View.VISIBLE);
+		shutter.setRecording(true);
+		recordingTick.run();
+	}
+
+	@Override public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults){
+		super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+		if(requestCode==AUDIO_PERMISSION_REQUEST && (grantResults.length==0 || grantResults[0]!=PackageManager.PERMISSION_GRANTED))
+			Toast.makeText(this, R.string.media_camera_audio_required, Toast.LENGTH_SHORT).show();
 	}
 
 	private void showReview(){

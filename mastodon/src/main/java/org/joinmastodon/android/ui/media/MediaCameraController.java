@@ -17,6 +17,7 @@ import android.hardware.camera2.params.MeteringRectangle;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.Image;
 import android.media.ImageReader;
+import android.media.MediaRecorder;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
@@ -38,10 +39,12 @@ public class MediaCameraController{
 	public interface Callback{
 		void onCameraReady(boolean frontFacing, boolean flashAvailable, boolean switchAvailable);
 		void onPhotoCaptured(File file);
+		void onRecordingStarted();
+		void onVideoRecorded(File file);
 		void onError(int messageRes);
 	}
 
-	public enum State{ CLOSED, OPENING, PREVIEW, CAPTURING, CLOSING }
+	public enum State{ CLOSED, OPENING, PREVIEW, CAPTURING, RECORDING, CLOSING }
 	public enum FlashMode{ OFF, AUTO, ON }
 
 	private final Activity activity;
@@ -53,6 +56,7 @@ public class MediaCameraController{
 	private CameraDevice camera;
 	private CameraCaptureSession session;
 	private ImageReader imageReader;
+	private MediaRecorder mediaRecorder;
 	private TextureView textureView;
 	private Surface previewSurface;
 	private CaptureRequest.Builder previewRequest;
@@ -65,6 +69,10 @@ public class MediaCameraController{
 	private float zoom=1f;
 	private int generation;
 	private File pendingPhoto;
+	private File pendingVideo;
+	private boolean recordingStarted;
+	private boolean recordingStopRequested;
+	private boolean keepRequestedRecording;
 
 	public MediaCameraController(Activity activity, Callback callback){
 		this.activity=activity;
@@ -223,6 +231,113 @@ public class MediaCameraController{
 		});
 	}
 
+	public void startRecording(File file){
+		if(state!=State.PREVIEW || cameraHandler==null)
+			return;
+		state=State.OPENING;
+		pendingVideo=file;
+		recordingStopRequested=false;
+		keepRequestedRecording=false;
+		cameraHandler.post(()->{
+			try{
+				if(session!=null){ session.close(); session=null; }
+				prepareRecorder(file);
+				CaptureRequest.Builder request=camera.createCaptureRequest(CameraDevice.TEMPLATE_RECORD);
+				request.addTarget(previewSurface);
+				request.addTarget(mediaRecorder.getSurface());
+				request.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_VIDEO);
+				applyCrop(request);
+				camera.createCaptureSession(List.of(previewSurface, mediaRecorder.getSurface()), new CameraCaptureSession.StateCallback(){
+					@Override public void onConfigured(CameraCaptureSession captureSession){
+						session=captureSession;
+						try{
+							session.setRepeatingRequest(request.build(), null, cameraHandler);
+							mediaRecorder.start();
+							recordingStarted=true;
+							state=State.RECORDING;
+							mainHandler.post(callback::onRecordingStarted);
+							if(recordingStopRequested)
+								stopRecordingInternal(keepRequestedRecording);
+						}catch(Exception x){
+							stopRecordingInternal(false);
+							fail(R.string.media_picker_camera_failed);
+						}
+					}
+					@Override public void onConfigureFailed(CameraCaptureSession captureSession){
+						stopRecordingInternal(false);
+						fail(R.string.media_picker_camera_failed);
+					}
+				}, cameraHandler);
+			}catch(Exception x){
+				stopRecordingInternal(false);
+				fail(R.string.media_picker_camera_failed);
+			}
+		});
+	}
+
+	private void prepareRecorder(File file) throws Exception{
+		mediaRecorder=new MediaRecorder();
+		mediaRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
+		mediaRecorder.setVideoSource(MediaRecorder.VideoSource.SURFACE);
+		mediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
+		mediaRecorder.setOutputFile(file.getAbsolutePath());
+		mediaRecorder.setVideoEncodingBitRate(8_000_000);
+		mediaRecorder.setVideoFrameRate(30);
+		mediaRecorder.setVideoSize(1280, 720);
+		mediaRecorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264);
+		mediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
+		mediaRecorder.setMaxDuration(60_000);
+		Integer sensor=characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION);
+		mediaRecorder.setOrientationHint(MediaCameraContract.jpegOrientation(sensor==null ? 0 : sensor, activity.getDisplay().getRotation(), isFrontFacing()));
+		mediaRecorder.setOnInfoListener((recorder, what, extra)->{
+			if(what==MediaRecorder.MEDIA_RECORDER_INFO_MAX_DURATION_REACHED)
+				stopRecording(true);
+		});
+		mediaRecorder.prepare();
+	}
+
+	public void stopRecording(boolean keep){
+		if(state==State.OPENING && pendingVideo!=null){
+			recordingStopRequested=true;
+			keepRequestedRecording=keep;
+			return;
+		}
+		if(state!=State.RECORDING)
+			return;
+		if(cameraHandler!=null)
+			cameraHandler.post(()->stopRecordingInternal(keep));
+	}
+
+	private void stopRecordingInternal(boolean keep){
+		recordingStopRequested=false;
+		keepRequestedRecording=false;
+		File file=pendingVideo;
+		pendingVideo=null;
+		try{
+			if(recordingStarted && mediaRecorder!=null)
+				mediaRecorder.stop();
+		}catch(Exception x){
+			keep=false;
+		}finally{
+			recordingStarted=false;
+			if(mediaRecorder!=null){
+				mediaRecorder.reset();
+				mediaRecorder.release();
+				mediaRecorder=null;
+			}
+		}
+		if(!keep || file==null || file.length()==0){
+			if(file!=null)
+				file.delete();
+			state=State.OPENING;
+			createPreviewSession(generation);
+			return;
+		}
+		state=State.PREVIEW;
+		File result=file;
+		mainHandler.post(()->callback.onVideoRecorded(result));
+	}
+
 	private void savePhoto(ImageReader reader){
 		Image image=null;
 		File file=pendingPhoto;
@@ -348,6 +463,8 @@ public class MediaCameraController{
 		generation++;
 		if(cameraHandler!=null)
 			cameraHandler.post(()->{
+				if(mediaRecorder!=null)
+					stopRecordingInternal(false);
 				closeCameraObjects();
 				state=State.CLOSED;
 				HandlerThread thread=cameraThread;
@@ -363,6 +480,11 @@ public class MediaCameraController{
 		if(camera!=null){ camera.close(); camera=null; }
 		if(imageReader!=null){ imageReader.close(); imageReader=null; }
 		if(previewSurface!=null){ previewSurface.release(); previewSurface=null; }
+		if(mediaRecorder!=null){
+			try{ mediaRecorder.reset(); }catch(Exception ignored){ }
+			mediaRecorder.release();
+			mediaRecorder=null;
+		}
 		previewRequest=null;
 	}
 

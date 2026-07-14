@@ -207,6 +207,7 @@
 	<string name="media_camera_retake">Retake</string>
 	<string name="media_camera_use_photo">Use photo</string>
 	<string name="media_camera_use_video">Use video</string>
+	<string name="media_camera_audio_required">Microphone permission is required to record video</string>
 	<string name="media_attachment_too_big">File %1$s exceeds the size limit of %2$s MB</string>
 	<string name="settings_theme">Appearance</string>
 	<string name="theme_auto">Use device appearance</string>
