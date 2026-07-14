@@ -23,7 +23,6 @@ import androidx.recyclerview.widget.RecyclerView;
 import org.joinmastodon.android.R;
 import org.joinmastodon.android.ui.M3AlertDialogBuilder;
 import org.joinmastodon.android.ui.media.MediaAlbum;
-import org.joinmastodon.android.ui.media.MediaCameraPreviewView;
 import org.joinmastodon.android.ui.media.MediaItem;
 import org.joinmastodon.android.ui.media.MediaPickerConfig;
 import org.joinmastodon.android.ui.media.MediaStoreLoader;
@@ -50,7 +49,6 @@ public class MediaPickerSheet extends BottomSheet{
 	private final Listener listener;
 	private final ArrayList<MediaAlbum> albums=new ArrayList<>();
 	private final ArrayList<MediaItem> displayItems=new ArrayList<>();
-	private final ArrayList<MediaCameraPreviewView> cameraPreviews=new ArrayList<>();
 	private final HashMap<String, MediaItem> selected=new HashMap<>();
 	private final ArrayList<MediaItem> selectedOrder=new ArrayList<>();
 	private final GridAdapter adapter=new GridAdapter();
@@ -263,13 +261,10 @@ public class MediaPickerSheet extends BottomSheet{
 		releaseGridResources();
 		forceDismiss=true;
 		super.dismiss();
-		grid.postDelayed(listener::onCameraRequested, 300);
+		listener.onCameraRequested();
 	}
 
 	private void releaseGridResources(){
-		for(MediaCameraPreviewView preview:cameraPreviews)
-			preview.setPreviewEnabled(false);
-		cameraPreviews.clear();
 		for(int i=0;i<grid.getChildCount();i++){
 			RecyclerView.ViewHolder holder=grid.getChildViewHolder(grid.getChildAt(i));
 			if(holder instanceof GridHolder gridHolder)
@@ -357,7 +352,6 @@ public class MediaPickerSheet extends BottomSheet{
 				holder.bind(position);
 		}
 		@Override public void onViewRecycled(GridHolder holder){
-			holder.cameraPreview.setPreviewEnabled(false);
 			holder.image.setImageDrawable(null);
 			super.onViewRecycled(holder);
 		}
@@ -366,7 +360,6 @@ public class MediaPickerSheet extends BottomSheet{
 
 	private class GridHolder extends RecyclerView.ViewHolder{
 		private final ImageView image;
-		private final MediaCameraPreviewView cameraPreview;
 		private final ImageView cameraIcon;
 		private final TextView badge;
 		private MediaItem currentItem;
@@ -378,9 +371,6 @@ public class MediaPickerSheet extends BottomSheet{
 			image=new ImageView(activity);
 			image.setScaleType(ImageView.ScaleType.CENTER_CROP);
 			cell.addView(image, new FrameLayout.LayoutParams(-1, -1));
-			cameraPreview=new MediaCameraPreviewView(activity);
-			cameraPreviews.add(cameraPreview);
-			cell.addView(cameraPreview, new FrameLayout.LayoutParams(-1, -1));
 			cameraIcon=new ImageView(activity);
 			cameraIcon.setImageResource(R.drawable.ic_fluent_camera_28_filled);
 			cameraIcon.setColorFilter(Color.WHITE);
@@ -402,8 +392,6 @@ public class MediaPickerSheet extends BottomSheet{
 
 		void bind(int adapterPosition){
 			boolean camera=showCamera() && adapterPosition==0;
-			cameraPreview.setPreviewEnabled(camera);
-			cameraPreview.setVisibility(camera ? View.VISIBLE : View.GONE);
 			cameraIcon.setVisibility(camera ? View.VISIBLE : View.GONE);
 			image.setVisibility(camera ? View.GONE : View.VISIBLE);
 			if(camera){
