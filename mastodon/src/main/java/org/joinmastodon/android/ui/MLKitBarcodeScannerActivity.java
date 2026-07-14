@@ -13,6 +13,7 @@ import android.widget.ImageButton;
 import android.widget.Toast;
 
 import org.joinmastodon.android.ui.media.MediaPickerConfig;
+import org.joinmastodon.android.ui.media.MediaCameraContract;
 import org.joinmastodon.android.ui.media.MediaStoreLoader;
 import org.joinmastodon.android.ui.sheets.MediaPickerSheet;
 
@@ -33,7 +34,6 @@ public class MLKitBarcodeScannerActivity extends Activity {
     private static final int MEDIA_PERMISSION_REQUEST = 101;
     private static final int IMAGE_SCAN_REQUEST = 102;
     private DecoratedBarcodeView barcodeView;
-    private Uri pendingCameraUri;
     private MediaPickerConfig pendingMediaPickerConfig;
 
     @Override
@@ -127,31 +127,14 @@ public class MLKitBarcodeScannerActivity extends Activity {
     private void showQrImagePicker(MediaPickerConfig config){
         new MediaPickerSheet(this, config, new MediaPickerSheet.Listener(){
             @Override public void onMediaSelected(ArrayList<Uri> uris){
-                if(!uris.isEmpty()){
-                    Intent data=new Intent();
-                    data.putExtra("barcode_result", uris.get(0).toString());
-                    data.putExtra("barcode_image_uri", uris.get(0).toString());
-                    setResult(RESULT_OK, data);
-                    finish();
-                }
+                if(!uris.isEmpty()) decodeQrImage(uris.get(0));
             }
             @Override public void onCameraRequested(){ openCameraForQr(); }
         }).show();
     }
 
     private void openCameraForQr(){
-        try{
-            java.io.File dir=new java.io.File(getCacheDir(), "images");
-            dir.mkdirs();
-            java.io.File file=java.io.File.createTempFile("qr_camera_", ".jpg", dir);
-            pendingCameraUri=UiUtils.getFileProviderUri(this, file);
-            Intent intent=new Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE);
-            intent.putExtra(android.provider.MediaStore.EXTRA_OUTPUT, pendingCameraUri);
-            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
-            startActivityForResult(intent, IMAGE_SCAN_REQUEST);
-        }catch(Exception x){
-            Toast.makeText(this, R.string.media_picker_camera_failed, Toast.LENGTH_SHORT).show();
-        }
+        startActivityForResult(MediaCameraContract.createIntent(this, false), IMAGE_SCAN_REQUEST);
     }
 
     @Override
@@ -173,13 +156,21 @@ public class MLKitBarcodeScannerActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data){
         super.onActivityResult(requestCode, resultCode, data);
-        if(requestCode==IMAGE_SCAN_REQUEST && resultCode==RESULT_OK && pendingCameraUri!=null){
-            Intent intent=new Intent();
-            intent.putExtra("barcode_result", pendingCameraUri.toString());
-            intent.putExtra("barcode_image_uri", pendingCameraUri.toString());
-            setResult(RESULT_OK, intent);
+        if(requestCode==IMAGE_SCAN_REQUEST && resultCode==RESULT_OK && MediaCameraContract.getUri(data)!=null)
+            decodeQrImage(MediaCameraContract.getUri(data));
+    }
+
+    private void decodeQrImage(Uri uri){
+        new org.joinmastodon.android.fragments.ProfileQrCodeFragment.QrImageDecoder(this, uri, decoded->runOnUiThread(()->{
+            if(decoded==null){
+                Toast.makeText(this, R.string.qr_code_not_found, Toast.LENGTH_SHORT).show();
+                return;
+            }
+            Intent result=new Intent();
+            result.putExtra("barcode_result", decoded);
+            setResult(RESULT_OK, result);
             finish();
-        }
+        })).decode();
     }
 
     @Override

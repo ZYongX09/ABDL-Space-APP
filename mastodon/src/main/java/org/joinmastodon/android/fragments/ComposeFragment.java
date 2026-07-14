@@ -97,6 +97,7 @@ import org.joinmastodon.android.ui.viewcontrollers.ComposeAutocompleteViewContro
 import org.joinmastodon.android.ui.viewcontrollers.ComposeLanguageAlertViewController;
 import org.joinmastodon.android.ui.viewcontrollers.ComposeMediaViewController;
 import org.joinmastodon.android.ui.media.MediaPickerConfig;
+import org.joinmastodon.android.ui.media.MediaCameraContract;
 import org.joinmastodon.android.ui.media.MediaStoreLoader;
 import org.joinmastodon.android.ui.sheets.MediaPickerSheet;
 import org.joinmastodon.android.ui.viewcontrollers.ComposePollViewController;
@@ -203,7 +204,6 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	private Runnable discardConfirmationCallback=this::confirmDiscardDraftBackCallback;
 	private boolean prevHadDraft;
 	private boolean keyboardVisible;
-	private Uri pendingCameraUri;
 	private MediaPickerConfig pendingMediaPickerConfig;
 
 	public ComposeFragment(){
@@ -242,7 +242,6 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		setTitle(editingStatus==null ? R.string.new_post : R.string.edit_post);
 		if(savedInstanceState!=null){
 			postLang=Parcels.unwrap(savedInstanceState.getParcelable("postLang"));
-			pendingCameraUri=savedInstanceState.getParcelable("pendingCameraUri");
 		}
 
 		if(getArguments().containsKey("quote"))
@@ -452,7 +451,6 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		outState.putBoolean("hasSpoiler", hasSpoiler);
 		outState.putSerializable("visibility", statusVisibility);
 		outState.putParcelable("postLang", Parcels.wrap(postLang));
-		outState.putParcelable("pendingCameraUri", pendingCameraUri);
 		if(currentAutocompleteSpan!=null){
 			Editable e=mainEditText.getText();
 			outState.putInt("autocompleteStart", e.getSpanStart(currentAutocompleteSpan));
@@ -1093,18 +1091,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	}
 
 	private void openCameraForAttachment(){
-		try{
-			java.io.File dir=new java.io.File(getActivity().getCacheDir(), "images");
-			dir.mkdirs();
-			java.io.File file=java.io.File.createTempFile("camera_", ".jpg", dir);
-			pendingCameraUri=UiUtils.getFileProviderUri(getActivity(), file);
-			Intent intent=new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-			intent.putExtra(MediaStore.EXTRA_OUTPUT, pendingCameraUri);
-			intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
-			startActivityForResult(intent, CAMERA_CAPTURE_RESULT);
-		}catch(Exception x){
-			Toast.makeText(getActivity(), R.string.media_picker_camera_failed, Toast.LENGTH_SHORT).show();
-		}
+		startActivityForResult(MediaCameraContract.createIntent(getActivity(), true), CAMERA_CAPTURE_RESULT);
 	}
 
 	@Override
@@ -1120,9 +1107,8 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 
 	@Override
 	public void onActivityResult(int requestCode, int resultCode, Intent data){
-		if(requestCode==CAMERA_CAPTURE_RESULT && resultCode==Activity.RESULT_OK && pendingCameraUri!=null){
-			mediaViewController.addMediaAttachment(pendingCameraUri, null);
-			pendingCameraUri=null;
+		if(requestCode==CAMERA_CAPTURE_RESULT && resultCode==Activity.RESULT_OK && MediaCameraContract.getUri(data)!=null){
+			mediaViewController.addMediaAttachment(MediaCameraContract.getUri(data), null);
 		}else if(requestCode==MEDIA_RESULT && resultCode==Activity.RESULT_OK){
 			Uri single=data.getData();
 			if(single!=null){
