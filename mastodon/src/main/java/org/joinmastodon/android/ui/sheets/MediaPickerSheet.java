@@ -392,6 +392,7 @@ public class MediaPickerSheet extends BottomSheet{
 
 		void bind(int adapterPosition){
 			boolean camera=showCamera() && adapterPosition==0;
+			itemView.setBackgroundColor(camera ? 0xff2b2b2b : Color.TRANSPARENT);
 			cameraIcon.setVisibility(camera ? View.VISIBLE : View.GONE);
 			image.setVisibility(camera ? View.GONE : View.VISIBLE);
 			if(camera){
