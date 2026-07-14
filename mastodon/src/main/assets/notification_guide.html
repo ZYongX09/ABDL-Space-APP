@@ -3,16 +3,21 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <style>
-:root{--bg:#1a1a2e;--card:#16213e;--text:#e0e0e0;--sub:#a0a0b0;--accent:#a1d9f7;--accent-text:#163247;--step-bg:#2a2a4a;--dot:#555;--dot-active:#a1d9f7}
-@media(prefers-color-scheme:light){:root{--bg:#f5f5f5;--card:#fff;--text:#222;--sub:#666;--accent:#a1d9f7;--accent-text:#163247;--step-bg:#e8f4fd;--dot:#ccc;--dot-active:#a1d9f7}}
+:root{--bg:#1a1a2e;--card:#16213e;--text:#e0e0e0;--sub:#a0a0b0;--accent:#a1d9f7;--accent-text:#163247;--step-bg:#2a2a4a;--dot:#555;--dot-active:#a1d9f7;--chip-bg:#2a2a4a;--chip-active:#a1d9f7}
+@media(prefers-color-scheme:light){:root{--bg:#f5f5f5;--card:#fff;--text:#222;--sub:#666;--accent:#a1d9f7;--accent-text:#163247;--step-bg:#e8f4fd;--dot:#ccc;--dot-active:#a1d9f7;--chip-bg:#e0e0e0;--chip-active:#a1d9f7}}
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{height:100%;overflow:hidden;font-family:-apple-system,system-ui,sans-serif;background:var(--bg);color:var(--text)}
 .container{display:flex;flex-direction:column;height:100%;max-width:400px;margin:0 auto;padding:24px 20px}
-.header{text-align:center;padding:32px 0 16px}
+.header{text-align:center;padding:24px 0 12px}
 .header .icon{font-size:48px;margin-bottom:12px}
 .header h1{font-size:22px;font-weight:700;margin-bottom:8px}
-.header p{font-size:14px;color:var(--sub);line-height:1.5}
+.header p{font-size:14px;color:var(--sub);line-height:1.5;margin-bottom:16px}
+.vendor-bar{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin-bottom:16px}
+.vendor-chip{padding:6px 14px;border-radius:16px;font-size:12px;font-weight:500;background:var(--chip-bg);color:var(--sub);border:1px solid transparent;cursor:pointer;transition:all .2s;white-space:nowrap}
+.vendor-chip:active{opacity:.7}
+.vendor-chip.active{background:var(--chip-active);color:var(--accent-text);border-color:var(--accent);font-weight:600}
 .steps{flex:1;overflow:hidden;position:relative}
 .step{display:none;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;padding:0 16px;animation:fadeIn .3s}
 .step.active{display:flex}
@@ -38,84 +43,117 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,system-ui,sans-s
 <body>
 <div class="container">
   <div class="header">
-    <div class="icon">&#128276;</div>
-    <h1>&#24320;&#21551;&#23454;&#26102;&#36890;&#30693;</h1>
+    <div class="icon"><i class="fas fa-bell"></i></div>
+    <h1>开启实时通知</h1>
     <p id="vendorDesc"></p>
+    <div class="vendor-bar" id="vendorBar"></div>
   </div>
   <div class="steps" id="steps"></div>
   <div class="done-screen" id="doneScreen">
-    <div class="check">&#9989;</div>
-    <h2>&#35774;&#32622;&#23436;&#25104;</h2>
-    <p>&#24744;&#30340;&#24212;&#29992;&#29616;&#22312;&#21487;&#20197;&#22312;&#21518;&#21488;&#32487;&#32493;&#25509;&#25910;&#36890;&#30693;</p>
-    <button class="btn btn-primary" onclick="Android.finish()">&#23436;&#25104;</button>
+    <div class="check"><i class="fas fa-check-circle" style="color:var(--accent)"></i></div>
+    <h2>设置完成</h2>
+    <p>您的应用现在可以在后台继续接收通知</p>
+    <button class="btn btn-primary" onclick="Android.finish()">完成</button>
   </div>
   <div class="footer">
     <div class="dots" id="dots"></div>
     <div id="footerBtns">
-      <button class="btn btn-primary" id="nextBtn" onclick="nextStep()">&#19979;&#19968;&#27493;</button>
-      <button class="btn btn-secondary" onclick="Android.finish()">&#20197;&#21518;&#20877;&#35828;</button>
+      <button class="btn btn-primary" id="nextBtn" onclick="nextStep()">下一步</button>
+      <button class="btn btn-secondary" onclick="Android.finish()">以后再说</button>
     </div>
   </div>
 </div>
 <script>
 var vendorData={
 MIUI:{name:"小米手机",desc:"您使用的是小米手机，需要完成以下设置以确保实时通知",steps:[
-{title:"忽略电池优化",text:"点击下方按钮打开设置，选择"无限制"，以保证可以及时收到通知消息",type:"battery"},
+{title:"忽略电池优化",text:"点击下方按钮打开设置，选择\u201c无限制\u201d，以保证可以及时收到通知消息",type:"battery"},
 {title:"允许应用自启动",text:"点击下方按钮进入自启动管理，开启 ABDL Space 的自启动开关",type:"autostart"},
-{title:"锁定后台进程",text:"从屏幕底部向上滑动进入多任务页面，找到 ABDL Space 并长按，点击"锁定"",type:"manual"}
+{title:"锁定后台进程",text:"从屏幕底部向上滑动进入多任务页面，找到 ABDL Space 并长按，点击\u201c锁定\u201d",type:"manual"}
 ]},
-HARMONY:{name:"华为手机",desc:"您使用的是华为手机，需要完成以下设置以确保实时通知",steps:[
-{title:"允许应用自启动",text:"在手机"设置"中搜索"应用自启动管理"，开启 ABDL Space",type:"appsettings"},
-{title:"锁定后台进程",text:"从屏幕底部向上滑动进入多任务页面，找到 ABDL Space 并长按，点击"锁定"",type:"manual"},
-{title:"忽略电池优化",text:"点击下方按钮打开设置，搜索"电池优化"，找到 ABDL Space 并选择"不允许"",type:"battery"}
+HARMONY:{name:"华为",desc:"您使用的是华为手机，需要完成以下设置以确保实时通知",steps:[
+{title:"允许应用自启动",text:"在手机\u201c设置\u201d中搜索\u201c应用自启动管理\u201d，开启 ABDL Space",type:"appsettings"},
+{title:"锁定后台进程",text:"从屏幕底部向上滑动进入多任务页面，找到 ABDL Space 并长按，点击\u201c锁定\u201d",type:"manual"},
+{title:"忽略电池优化",text:"点击下方按钮打开设置，搜索\u201c电池优化\u201d，找到 ABDL Space 并选择\u201c不允许\u201d",type:"battery"}
 ]},
-HONOR:{name:"荣耀手机",desc:"您使用的是荣耀手机，需要完成以下设置以确保实时通知",steps:[
-{title:"忽略电池优化",text:"点击下方按钮打开设置，搜索"电池优化"，找到 ABDL Space 并选择"不允许"",type:"battery"},
-{title:"允许应用自启动",text:"在手机"设置"中搜索"应用自启动管理"，开启 ABDL Space",type:"appsettings"},
-{title:"锁定后台进程",text:"从屏幕底部向上滑动进入多任务页面，找到 ABDL Space 并长按，点击"锁定"",type:"manual"}
+HONOR:{name:"荣耀",desc:"您使用的是荣耀手机，需要完成以下设置以确保实时通知",steps:[
+{title:"忽略电池优化",text:"点击下方按钮打开设置，搜索\u201c电池优化\u201d，找到 ABDL Space 并选择\u201c不允许\u201d",type:"battery"},
+{title:"允许应用自启动",text:"在手机\u201c设置\u201d中搜索\u201c应用自启动管理\u201d，开启 ABDL Space",type:"appsettings"},
+{title:"锁定后台进程",text:"从屏幕底部向上滑动进入多任务页面，找到 ABDL Space 并长按，点击\u201c锁定\u201d",type:"manual"}
 ]},
-COLOROS:{name:"OPPO/一加/realme",desc:"您使用的是 OPPO 系手机，需要完成以下设置以确保实时通知",steps:[
-{title:"允许后台活动",text:"在手机"设置"中搜索"应用耗电管理"，开启 ABDL Space",type:"appsettings"},
-{title:"允许应用自启动",text:"在手机"设置"中搜索"自启动"，开启 ABDL Space",type:"autostart"},
-{title:"锁定后台任务",text:"从屏幕底部向上滑动进入多任务页面，找到 ABDL Space 并长按，点击"锁定"",type:"manual"}
+COLOROS:{name:"OPPO/一加",desc:"您使用的是 OPPO 系手机，需要完成以下设置以确保实时通知",steps:[
+{title:"允许后台活动",text:"在手机\u201c设置\u201d中搜索\u201c应用耗电管理\u201d，开启 ABDL Space",type:"appsettings"},
+{title:"允许应用自启动",text:"在手机\u201c设置\u201d中搜索\u201c自启动\u201d，开启 ABDL Space",type:"autostart"},
+{title:"锁定后台任务",text:"从屏幕底部向上滑动进入多任务页面，找到 ABDL Space 并长按，点击\u201c锁定\u201d",type:"manual"}
 ]},
 FUNTOUCHOS:{name:"vivo/iQOO",desc:"您使用的是 vivo 系手机，需要完成以下设置以确保实时通知",steps:[
-{title:"允许后台活动",text:"在手机"设置"中搜索"后台耗电管理"，开启 ABDL Space",type:"appsettings"},
-{title:"允许应用自启动",text:"在手机"设置"中搜索"自启动"，开启 ABDL Space",type:"autostart"},
-{title:"锁定后台进程",text:"从屏幕底部向上滑动进入多任务页面，找到 ABDL Space 并长按，点击"锁定"",type:"manual"}
+{title:"允许后台活动",text:"在手机\u201c设置\u201d中搜索\u201c后台耗电管理\u201d，开启 ABDL Space",type:"appsettings"},
+{title:"允许应用自启动",text:"在手机\u201c设置\u201d中搜索\u201c自启动\u201d，开启 ABDL Space",type:"autostart"},
+{title:"锁定后台进程",text:"从屏幕底部向上滑动进入多任务页面，找到 ABDL Space 并长按，点击\u201c锁定\u201d",type:"manual"}
 ]},
-ONEUI:{name:"三星手机",desc:"您使用的是三星手机，需要完成以下设置以确保实时通知",steps:[
-{title:"忽略电池优化",text:"点击下方按钮打开应用设置，找到"电池"，选择"不受限制"",type:"battery"},
-{title:"允许后台活动",text:"在手机设置中搜索"后台控制"，找到 ABDL Space 选择"不受限制"",type:"appsettings"},
-{title:"锁定后台任务",text:"点击下方按钮打开电池设置，选择"不受限制"，关闭电池优化",type:"manual"}
+ONEUI:{name:"三星",desc:"您使用的是三星手机，需要完成以下设置以确保实时通知",steps:[
+{title:"忽略电池优化",text:"点击下方按钮打开应用设置，找到\u201c电池\u201d，选择\u201c不受限制\u201d",type:"battery"},
+{title:"允许后台活动",text:"在手机设置中搜索\u201c后台控制\u201d，找到 ABDL Space 选择\u201c不受限制\u201d",type:"appsettings"},
+{title:"锁定后台任务",text:"点击下方按钮打开电池设置，选择\u201c不受限制\u201d，关闭电池优化",type:"manual"}
 ]},
 OTHER:{name:"其他手机",desc:"为确保实时通知，请完成以下设置",steps:[
 {title:"检查后台运行权限",text:"在系统设置中找到 ABDL Space，确保允许后台运行和自启动",type:"appsettings"}
 ]}
 };
-var vendor="OTHER";
-try{vendor=Android.getVendor()}catch(e){}
-var data=vendorData[vendor]||vendorData.OTHER;
-document.getElementById("vendorDesc").textContent=data.desc;
+var vendorOrder=["MIUI","HARMONY","HONOR","COLOROS","FUNTOUCHOS","ONEUI","OTHER"];
+var detectedVendor="OTHER";
+try{detectedVendor=Android.getVendor()}catch(e){}
+var currentVendor=detectedVendor;
 var stepsEl=document.getElementById("steps");
 var dotsEl=document.getElementById("dots");
 var currentStep=0;
+function buildVendorBar(){
+var bar=document.getElementById("vendorBar");
+bar.innerHTML="";
+vendorOrder.forEach(function(key){
+var d=vendorData[key];
+var chip=document.createElement("div");
+chip.className="vendor-chip"+(key===currentVendor?" active":"");
+chip.textContent=d.name;
+chip.onclick=function(){switchVendor(key)};
+bar.appendChild(chip);
+});
+}
+function switchVendor(key){
+if(key===currentVendor)return;
+currentVendor=key;
+var chips=document.querySelectorAll(".vendor-chip");
+chips.forEach(function(c){c.classList.remove("active")});
+chips[vendorOrder.indexOf(key)].classList.add("active");
+renderSteps();
+}
+function renderSteps(){
+stepsEl.innerHTML="";
+dotsEl.innerHTML="";
+currentStep=0;
+var data=vendorData[currentVendor];
+document.getElementById("vendorDesc").textContent=data.desc;
+document.getElementById("nextBtn").textContent="下一步";
+document.getElementById("steps").style.display="";
+document.querySelector(".footer").style.display="";
+document.getElementById("doneScreen").classList.remove("active");
 data.steps.forEach(function(s,i){
 var div=document.createElement("div");
 div.className="step"+(i===0?" active":"");
-div.innerHTML='<div class="step-num">'+(i+1)+'</div><h2>'+s.title+'</h2><p>'+s.text+'</p>'+(s.type!=='manual'?'<button class="btn btn-primary" onclick="openSetting(\''+s.type+'\')">&#21435;&#35774;&#32622;</button>':'<button class="btn btn-primary" onclick="nextStep()">&#25105;&#24050;&#23436;&#25104;</button>');
+div.innerHTML='<div class="step-num">'+(i+1)+'</div><h2>'+s.title+'</h2><p>'+s.text+'</p>'+(s.type!=='manual'?'<button class="btn btn-primary" onclick="openSetting(\''+s.type+'\')">去设置</button>':'<button class="btn btn-primary" onclick="nextStep()">我已完成</button>');
 stepsEl.appendChild(div);
 var dot=document.createElement("div");
 dot.className="dot"+(i===0?" active":"");
 dotsEl.appendChild(dot);
 });
+}
 function openSetting(type){try{Android.openSettings(type)}catch(e){}}
 function nextStep(){
 var steps=stepsEl.children;
 if(currentStep<steps.length-1){steps[currentStep].classList.remove("active");dotsEl.children[currentStep].classList.remove("active");currentStep++;steps[currentStep].classList.add("active");dotsEl.children[currentStep].classList.add("active");if(currentStep===steps.length-1)document.getElementById("nextBtn").textContent="完成"}
 else{document.getElementById("steps").style.display="none";document.querySelector(".footer").style.display="none";document.getElementById("doneScreen").classList.add("active")}
 }
-document.getElementById("nextBtn").addEventListener("click",function(){if(currentStep===data.steps.length-1){document.getElementById("steps").style.display="none";document.querySelector(".footer").style.display="none";document.getElementById("doneScreen").classList.add("active")}});
+buildVendorBar();
+renderSteps();
 </script>
 </body>
 </html>
