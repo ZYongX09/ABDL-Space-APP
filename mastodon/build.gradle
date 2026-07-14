@@ -107,6 +107,7 @@ android {
 			// Note: if Android Studio complains that "module not specified", select "screenshotsUiTest" in the "build variants" panel
 			// None of this makes sense, I know. Google enjoys making developers suffer for no good reason.
 			initWith debug
+			matchingFallbacks = ['debug']
 			debuggable false
 		}
 		fdroidRelease {
