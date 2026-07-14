@@ -8,7 +8,9 @@ import android.graphics.drawable.GradientDrawable;
 import android.media.MediaMetadataRetriever;
 import android.net.Uri;
 import android.view.Gravity;
+import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.ImageButton;
@@ -23,6 +25,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import org.joinmastodon.android.R;
 import org.joinmastodon.android.ui.M3AlertDialogBuilder;
 import org.joinmastodon.android.ui.media.MediaAlbum;
+import org.joinmastodon.android.ui.media.MediaCameraPreviewView;
 import org.joinmastodon.android.ui.media.MediaItem;
 import org.joinmastodon.android.ui.media.MediaPickerConfig;
 import org.joinmastodon.android.ui.media.MediaStoreLoader;
@@ -63,6 +66,9 @@ public class MediaPickerSheet extends BottomSheet{
 	private boolean forceDismiss;
 	private boolean expanded;
 	private float dragStartY;
+	private int dragStartSheetMargin;
+	private int dragStartGridHeight;
+	private boolean dragging;
 
 	public MediaPickerSheet(Activity activity, MediaPickerConfig config, Listener listener){
 		super(activity);
@@ -77,22 +83,6 @@ public class MediaPickerSheet extends BottomSheet{
 		View handle=new View(activity);
 		handle.setBackgroundResource(R.drawable.bg_bottom_sheet_handle);
 		root.addView(handle, new LinearLayout.LayoutParams(-1, V.dp(28)));
-		handle.setOnClickListener(v->setExpanded(!expanded));
-		handle.setOnTouchListener((v, event)->{
-			switch(event.getActionMasked()){
-				case android.view.MotionEvent.ACTION_DOWN -> dragStartY=event.getRawY();
-				case android.view.MotionEvent.ACTION_UP -> {
-					float distance=event.getRawY()-dragStartY;
-					if(distance<-V.dp(32))
-						setExpanded(true);
-					else if(distance>V.dp(32))
-						setExpanded(false);
-					else
-						v.performClick();
-				}
-			}
-			return true;
-		});
 
 		FrameLayout header=new FrameLayout(activity);
 		root.addView(header, new LinearLayout.LayoutParams(-1, V.dp(52)));
@@ -128,6 +118,62 @@ public class MediaPickerSheet extends BottomSheet{
 		grid.setClipToPadding(false);
 		collapsedGridHeight=Math.min(activity.getResources().getDisplayMetrics().heightPixels*3/5, V.dp(570));
 		root.addView(grid, new LinearLayout.LayoutParams(-1, collapsedGridHeight));
+
+		int dragZoneHeight=V.dp(28+52);
+		int touchSlop=ViewConfiguration.get(activity).getScaledTouchSlop();
+		final View sheetContent=content;
+		root.setOnTouchListener((v, event)->{
+			if(event.getY()>dragZoneHeight)
+				return false;
+			switch(event.getActionMasked()){
+				case MotionEvent.ACTION_DOWN -> {
+					dragStartY=event.getRawY();
+					FrameLayout.LayoutParams p=(FrameLayout.LayoutParams)sheetContent.getLayoutParams();
+					dragStartSheetMargin=p.topMargin;
+					dragStartGridHeight=((LinearLayout.LayoutParams)grid.getLayoutParams()).height;
+					dragging=false;
+					return true;
+				}
+				case MotionEvent.ACTION_MOVE -> {
+					float dy=event.getRawY()-dragStartY;
+					if(!dragging && Math.abs(dy)>touchSlop)
+						dragging=true;
+					if(dragging){
+						int screenHeight=activity.getResources().getDisplayMetrics().heightPixels;
+						int expandedTopMargin=V.dp(8);
+						int collapsedTopMargin=V.dp(72);
+						int expandedHeight=Math.max(collapsedGridHeight, screenHeight-expandedTopMargin-V.dp(28+52+68));
+						int newMargin=dragStartSheetMargin+(int)dy;
+						newMargin=Math.max(expandedTopMargin, Math.min(collapsedTopMargin, newMargin));
+						float fraction=1f-(float)(newMargin-expandedTopMargin)/(collapsedTopMargin-expandedTopMargin);
+						int newGridHeight=dragStartGridHeight+(int)((expandedHeight-dragStartGridHeight)*fraction);
+						FrameLayout.LayoutParams p=(FrameLayout.LayoutParams)sheetContent.getLayoutParams();
+						p.topMargin=newMargin;
+						sheetContent.setLayoutParams(p);
+						LinearLayout.LayoutParams gp=(LinearLayout.LayoutParams)grid.getLayoutParams();
+						gp.height=newGridHeight;
+						grid.setLayoutParams(gp);
+					}
+					return true;
+				}
+				case MotionEvent.ACTION_UP -> {
+					if(dragging){
+						FrameLayout.LayoutParams p=(FrameLayout.LayoutParams)sheetContent.getLayoutParams();
+						int mid=V.dp((8+72)/2);
+						setExpanded(p.topMargin<mid);
+						dragging=false;
+					}else{
+						setExpanded(!expanded);
+					}
+					return true;
+				}
+				case MotionEvent.ACTION_CANCEL -> {
+					dragging=false;
+					return true;
+				}
+			}
+			return false;
+		});
 
 		FrameLayout actions=new FrameLayout(activity);
 		actions.setPadding(V.dp(12), V.dp(8), V.dp(12), V.dp(10));
@@ -267,8 +313,10 @@ public class MediaPickerSheet extends BottomSheet{
 	private void releaseGridResources(){
 		for(int i=0;i<grid.getChildCount();i++){
 			RecyclerView.ViewHolder holder=grid.getChildViewHolder(grid.getChildAt(i));
-			if(holder instanceof GridHolder gridHolder)
+			if(holder instanceof GridHolder gridHolder){
+				gridHolder.cameraPreview.setPreviewEnabled(false);
 				gridHolder.image.setImageDrawable(null);
+			}
 		}
 		grid.setAdapter(null);
 		displayItems.clear();
@@ -352,6 +400,7 @@ public class MediaPickerSheet extends BottomSheet{
 				holder.bind(position);
 		}
 		@Override public void onViewRecycled(GridHolder holder){
+			holder.cameraPreview.setPreviewEnabled(false);
 			holder.image.setImageDrawable(null);
 			super.onViewRecycled(holder);
 		}
@@ -361,6 +410,7 @@ public class MediaPickerSheet extends BottomSheet{
 	private class GridHolder extends RecyclerView.ViewHolder{
 		private final ImageView image;
 		private final ImageView cameraIcon;
+		private final MediaCameraPreviewView cameraPreview;
 		private final TextView badge;
 		private MediaItem currentItem;
 
@@ -368,13 +418,15 @@ public class MediaPickerSheet extends BottomSheet{
 			super(cell);
 			int size=(activity.getResources().getDisplayMetrics().widthPixels-V.dp(4))/3;
 			cell.setLayoutParams(new RecyclerView.LayoutParams(-1, size));
-			image=new ImageView(activity);
-			image.setScaleType(ImageView.ScaleType.CENTER_CROP);
-			cell.addView(image, new FrameLayout.LayoutParams(-1, -1));
+			cameraPreview=new MediaCameraPreviewView(activity);
+			cell.addView(cameraPreview, new FrameLayout.LayoutParams(-1, -1));
 			cameraIcon=new ImageView(activity);
 			cameraIcon.setImageResource(R.drawable.ic_fluent_camera_28_filled);
 			cameraIcon.setColorFilter(Color.WHITE);
 			cell.addView(cameraIcon, new FrameLayout.LayoutParams(V.dp(36), V.dp(36), Gravity.CENTER));
+			image=new ImageView(activity);
+			image.setScaleType(ImageView.ScaleType.CENTER_CROP);
+			cell.addView(image, new FrameLayout.LayoutParams(-1, -1));
 			badge=new TextView(activity);
 			badge.setGravity(Gravity.CENTER);
 			badge.setTextColor(Color.WHITE);
@@ -392,7 +444,8 @@ public class MediaPickerSheet extends BottomSheet{
 
 		void bind(int adapterPosition){
 			boolean camera=showCamera() && adapterPosition==0;
-			itemView.setBackgroundColor(camera ? 0xff2b2b2b : Color.TRANSPARENT);
+			cameraPreview.setPreviewEnabled(camera);
+			cameraPreview.setVisibility(camera ? View.VISIBLE : View.GONE);
 			cameraIcon.setVisibility(camera ? View.VISIBLE : View.GONE);
 			image.setVisibility(camera ? View.GONE : View.VISIBLE);
 			if(camera){
