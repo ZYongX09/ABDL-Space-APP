@@ -1,5 +1,10 @@
 # Chat UI Polish Implementation Plan
 
+> [!NOTE]
+> This document may not reflect the current implementation.
+> See the final report for up-to-date state:
+> [Final Report](../reports/chat-ui-polish.md)
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use compose:subagent (recommended) or compose:execute to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 将现有私信列表和聊天页优化成清晰、现代、完整适配明暗主题的聊天界面，同时保持消息数据与交互逻辑不变。
