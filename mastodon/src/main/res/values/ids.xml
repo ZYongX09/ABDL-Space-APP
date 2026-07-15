@@ -45,4 +45,6 @@
 
 	<!-- Diaper tab -->
 	<item name="tab_diaper" type="id" />
+	<!-- Messages tab -->
+	<item name="tab_messages" type="id" />
 </resources>

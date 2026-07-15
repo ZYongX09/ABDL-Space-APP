@@ -33,6 +33,7 @@ import org.joinmastodon.android.events.NotificationsMarkerUpdatedEvent;
 import org.joinmastodon.android.events.StatusDisplaySettingsChangedEvent;
 import org.joinmastodon.android.fragments.diapers.DiaperListFragment;
 import org.joinmastodon.android.fragments.discover.DiscoverFragment;
+import org.joinmastodon.android.chat.ui.ConversationsFragment;
 import org.joinmastodon.android.fragments.onboarding.OnboardingFollowSuggestionsFragment;
 import org.joinmastodon.android.model.Account;
 import org.joinmastodon.android.model.Instance;
@@ -73,6 +74,7 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 	private ProfileFragment profileFragment;
 	private FriendRequestListFragment friendRequestFragment;
 	private DiaperListFragment diaperListFragment;
+	private ConversationsFragment conversationsFragment;
 	private TabBar tabBar;
 	private View tabBarWrap;
 	private ImageView tabBarAvatar;
@@ -105,9 +107,12 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 			friendRequestFragment=new FriendRequestListFragment();
 			friendRequestFragment.setArguments(args);
 			args=new Bundle(args);
-			diaperListFragment=new DiaperListFragment();
-			diaperListFragment.setArguments(args);
-			args=new Bundle(args);
+		diaperListFragment=new DiaperListFragment();
+		diaperListFragment.setArguments(args);
+		args=new Bundle(args);
+		conversationsFragment=new ConversationsFragment();
+		conversationsFragment.setArguments(args);
+		args=new Bundle(args);
 			args.putParcelable("profileAccount", Parcels.wrap(AccountSessionManager.getInstance().getAccount(accountID).self));
 			args.putBoolean("noAutoLoad", true);
 			profileFragment=new ProfileFragment();
@@ -168,8 +173,9 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 			getChildFragmentManager().beginTransaction()
 					.add(me.grishka.appkit.R.id.fragment_wrap, homeTabFragment)
 					.add(me.grishka.appkit.R.id.fragment_wrap, searchFragment).hide(searchFragment)
-					.add(me.grishka.appkit.R.id.fragment_wrap, friendRequestFragment).hide(friendRequestFragment)
-					.add(me.grishka.appkit.R.id.fragment_wrap, diaperListFragment).hide(diaperListFragment)
+				.add(me.grishka.appkit.R.id.fragment_wrap, friendRequestFragment).hide(friendRequestFragment)
+				.add(me.grishka.appkit.R.id.fragment_wrap, conversationsFragment).hide(conversationsFragment)
+				.add(me.grishka.appkit.R.id.fragment_wrap, diaperListFragment).hide(diaperListFragment)
 					.add(me.grishka.appkit.R.id.fragment_wrap, profileFragment).hide(profileFragment)
 					.commit();
 
@@ -256,6 +262,8 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 			return homeTabFragment;
 		}else if(tab==R.id.tab_search){
 			return searchFragment;
+		}else if(tab==R.id.tab_messages){
+			return conversationsFragment;
 		}else if(tab==R.id.tab_friend_request){
 			return friendRequestFragment;
 		}else if(tab==R.id.tab_diaper){
@@ -277,6 +285,8 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 		Fragment newFragment=fragmentForTab(tab);
 		if(tab==R.id.tab_diaper)
 			markDiaperFeatureSeen();
+		if(tab==R.id.tab_messages)
+			conversationsFragment.onResume();
 
 		// MOSHIDON:
 		if(tab==R.id.tab_search && R.id.tab_search==currentTab){

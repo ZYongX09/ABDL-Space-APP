@@ -1,12 +1,13 @@
 package org.joinmastodon.android.chat.ui;
 
-import android.content.Context;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
+import org.joinmastodon.android.R;
 import org.joinmastodon.android.chat.model.ChatMessage;
 
 import java.util.ArrayList;
@@ -16,8 +17,8 @@ public class ChatMessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHo
 	private static final int TYPE_MESSAGE = 0;
 	private static final int TYPE_DATE = 1;
 
-	private List<Object> items = new ArrayList<>();
-	private List<ChatMessage> messages = new ArrayList<>();
+	private final List<Object> items = new ArrayList<>();
+	private final List<ChatMessage> messages = new ArrayList<>();
 
 	public void setMessages(List<ChatMessage> msgs) {
 		this.messages.clear();
@@ -73,47 +74,42 @@ public class ChatMessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHo
 
 	@NonNull @Override
 	public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-		Context ctx = parent.getContext();
+		LayoutInflater inflater = LayoutInflater.from(parent.getContext());
 		if (viewType == TYPE_DATE) {
-			return new DateViewHolder(new MessageBubbleView.DateDividerView(ctx));
+			MessageBubbleView.DateDividerView dv = new MessageBubbleView.DateDividerView(parent.getContext());
+			dv.setLayoutParams(new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+			return new DateViewHolder(dv);
 		}
-		return new MessageViewHolder(new MessageBubbleView(ctx));
+		return new MessageViewHolder(new MessageBubbleView(parent.getContext()));
 	}
 
 	@Override
 	public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
 		if (holder instanceof DateViewHolder) {
-			((DateViewHolder) holder).dividerView.setDate((String) items.get(position));
+			((DateViewHolder) holder).view.setDate((String) items.get(position));
 		} else if (holder instanceof MessageViewHolder) {
 			ChatMessage msg = (ChatMessage) items.get(position);
-			boolean showTail = position == 0 || getItemViewType(position - 1) == TYPE_DATE;
-			((MessageViewHolder) holder).bubbleView.bind(msg, showTail, 0);
+			boolean isOut = msg.out;
+			((MessageViewHolder) holder).view.bind(msg, isOut, true);
 		}
 	}
 
 	@Override
 	public int getItemCount() { return items.size(); }
 
-	public int getFirstMessagePosition() {
-		for (int i = 0; i < items.size(); i++) {
-			if (items.get(i) instanceof ChatMessage) return i;
-		}
-		return 0;
-	}
-
 	private static class MessageViewHolder extends RecyclerView.ViewHolder {
-		MessageBubbleView bubbleView;
+		MessageBubbleView view;
 		MessageViewHolder(View itemView) {
 			super(itemView);
-			bubbleView = (MessageBubbleView) itemView;
+			view = (MessageBubbleView) itemView;
 		}
 	}
 
 	private static class DateViewHolder extends RecyclerView.ViewHolder {
-		MessageBubbleView.DateDividerView dividerView;
+		MessageBubbleView.DateDividerView view;
 		DateViewHolder(View itemView) {
 			super(itemView);
-			dividerView = (MessageBubbleView.DateDividerView) itemView;
+			view = (MessageBubbleView.DateDividerView) itemView;
 		}
 	}
 
