@@ -71,15 +71,6 @@
 			android:paddingTop="10dp"
 			android:paddingBottom="10dp" />
 
-		<com.google.android.material.floatingactionbutton.FloatingActionButton
-			android:id="@+id/scroll_to_bottom"
-			android:layout_width="wrap_content"
-			android:layout_height="wrap_content"
-			android:layout_gravity="bottom|end"
-			android:layout_margin="16dp"
-			android:visibility="gone"
-			android:src="@android:drawable/ic_menu_sort_by_size"
-			android:contentDescription="scroll to bottom" />
 	</FrameLayout>
 
 	<LinearLayout
