@@ -51,6 +51,7 @@ import android.widget.Toolbar;
 
 import org.joinmastodon.android.BuildConfig;
 import org.joinmastodon.android.GlobalUserPreferences;
+import org.joinmastodon.android.MainActivity;
 import org.joinmastodon.android.R;
 import org.joinmastodon.android.api.MastodonAPIRequest;
 import org.joinmastodon.android.api.requests.accounts.GetAccountByID;
@@ -837,6 +838,14 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 		int id=item.getItemId();
 		if(id==R.id.share){
 			UiUtils.openSystemShareSheet(getActivity(), account);
+		}else if(id==R.id.send_message){
+			Intent chatIntent=new Intent(getActivity(), MainActivity.class);
+			chatIntent.putExtra("navigate_to", "chat");
+			chatIntent.putExtra("peer_id", account.id!=null ? Long.parseLong(account.id) : 0);
+			chatIntent.putExtra("peer_name", account.displayName!=null ? account.displayName : account.username);
+			chatIntent.putExtra("peer_avatar", account.avatar);
+			chatIntent.putExtra("account", accountID);
+			startActivity(chatIntent);
 		}else if(id==R.id.mute){
 			confirmToggleMuted();
 		}else if(id==R.id.block){

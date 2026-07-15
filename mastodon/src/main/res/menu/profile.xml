@@ -8,6 +8,7 @@
 		tools:ignore="MenuTitle" />
 
 	<group android:orderInCategory="1" android:id="@+id/menu_group1">
+		<item android:id="@+id/send_message" android:title="发私信"/>
 		<item android:id="@+id/share" android:title="@string/share_user"/>
 		<item android:id="@+id/copy_link" android:title="@string/copy_profile_link"/>
 		<item android:id="@+id/open_in_browser" android:title="@string/open_in_browser"/>
