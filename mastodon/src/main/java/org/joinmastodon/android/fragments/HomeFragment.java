@@ -288,8 +288,6 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 		Fragment newFragment=fragmentForTab(tab);
 		if(tab==R.id.tab_diaper)
 			markDiaperFeatureSeen();
-		if(tab==R.id.tab_messages)
-			conversationsFragment.onResume();
 
 		// MOSHIDON:
 		if(tab==R.id.tab_search && R.id.tab_search==currentTab){
