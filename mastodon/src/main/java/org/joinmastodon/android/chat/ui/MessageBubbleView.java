@@ -50,7 +50,7 @@ public class MessageBubbleView extends FrameLayout {
 		bubbleContainer.setBackgroundResource(bgRes);
 
 		// Alignment
-		LayoutParams lp = (LayoutParams) bubbleContainer.getLayoutParams();
+		LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) bubbleContainer.getLayoutParams();
 		lp.gravity = isOut ? android.view.Gravity.END : android.view.Gravity.START;
 		bubbleContainer.setLayoutParams(lp);
 	}

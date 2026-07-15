@@ -23,11 +23,10 @@
 			android:contentDescription="返回"
 			android:src="@drawable/ic_arrow_back_24" />
 
-	<ImageView
+		<ImageView
 			android:id="@+id/peer_avatar"
 			android:layout_width="40dp"
 			android:layout_height="40dp"
-			android:background="@drawable/image_placeholder"
 			android:scaleType="centerCrop" />
 
 		<LinearLayout
