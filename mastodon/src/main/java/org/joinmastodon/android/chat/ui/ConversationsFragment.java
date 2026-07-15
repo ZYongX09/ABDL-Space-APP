@@ -125,13 +125,11 @@ public class ConversationsFragment extends Fragment {
 	}
 
 	private void openChat(Conversation c) {
-		// TODO: Task 11 - 实现 ChatFragment 后取消注释
-		// ChatFragment fragment = new ChatFragment();
-		// Bundle args = new Bundle();
-		// args.putLong("peer_id", c.peerId);
-		// args.putString("peer_name", c.username);
-		// args.putString("peer_avatar", c.avatar);
-		// fragment.setArguments(args);
-		// me.grishka.appkit.Nav.showFragment(fragment);
+		Bundle args = new Bundle();
+		args.putString("account", accountId);
+		args.putLong("peer_id", c.peerId);
+		args.putString("peer_name", c.username);
+		args.putString("peer_avatar", c.avatar != null ? c.avatar : "");
+		me.grishka.appkit.Nav.go(getActivity(), ChatFragment.class, args);
 	}
 }
