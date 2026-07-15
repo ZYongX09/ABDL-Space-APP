@@ -1,14 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+	xmlns:tools="http://schemas.android.com/tools"
 	android:layout_width="match_parent"
 	android:layout_height="match_parent"
 	android:orientation="vertical"
 	android:background="?attr/colorM3Surface">
+	<TextView
+		android:id="@+id/page_title"
+		android:layout_width="match_parent"
+		android:layout_height="64dp"
+		android:gravity="center_vertical"
+		android:paddingStart="20dp"
+		android:paddingEnd="20dp"
+		android:fontFamily="sans-serif-medium"
+		android:text="私信"
+		android:textColor="?attr/colorM3OnSurface"
+		android:textSize="24sp" />
 
 	<androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 		android:id="@+id/swipe_refresh"
 		android:layout_width="match_parent"
-		android:layout_height="match_parent">
+		android:layout_height="0dp"
+		android:layout_weight="1">
 
 		<FrameLayout
 			android:layout_width="match_parent"
@@ -19,8 +32,8 @@
 				android:layout_width="match_parent"
 				android:layout_height="match_parent"
 				android:clipToPadding="false"
-				android:paddingTop="8dp"
-				android:paddingBottom="8dp" />
+				android:paddingBottom="8dp"
+				tools:listitem="@layout/item_conversation" />
 
 			<LinearLayout
 				android:id="@+id/empty_state"
@@ -41,19 +54,11 @@
 					android:layout_width="wrap_content"
 					android:layout_height="wrap_content"
 					android:layout_marginTop="8dp"
-					android:text="点击右下角按钮开始新对话"
+					android:text="可从用户主页发起私信"
 					android:textSize="14sp"
 					android:textColor="?attr/colorM3OnSurfaceVariant" />
 			</LinearLayout>
 
-			<com.google.android.material.floatingactionbutton.FloatingActionButton
-				android:id="@+id/fab"
-				android:layout_width="wrap_content"
-				android:layout_height="wrap_content"
-				android:layout_gravity="bottom|end"
-				android:layout_margin="16dp"
-				android:src="@drawable/ic_mail_24px"
-				android:contentDescription="新私信" />
 		</FrameLayout>
 	</androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 </LinearLayout>

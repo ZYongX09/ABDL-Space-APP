@@ -5,7 +5,7 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.TextView;
+import android.view.WindowInsets;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -15,6 +15,7 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 import com.squareup.otto.Subscribe;
 
 import org.joinmastodon.android.E;
+import org.joinmastodon.android.R;
 import org.joinmastodon.android.chat.ChatController;
 import org.joinmastodon.android.chat.ChatEvents;
 import org.joinmastodon.android.chat.model.Conversation;
@@ -32,6 +33,7 @@ public class ConversationsFragment extends Fragment {
 	private List<Conversation> data = new ArrayList<>();
 	private String accountId;
 	private View emptyState;
+	private View pageTitle;
 
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
@@ -41,25 +43,27 @@ public class ConversationsFragment extends Fragment {
 
 	@Override
 	public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
-		View root = new android.widget.FrameLayout(getActivity());
-		root.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-
-		swipeRefreshLayout = new SwipeRefreshLayout(getActivity());
-		swipeRefreshLayout.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-
-		recyclerView = new RecyclerView(getActivity());
-		recyclerView.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+		View root = inflater.inflate(R.layout.fragment_conversations, container, false);
+		swipeRefreshLayout = root.findViewById(R.id.swipe_refresh);
+		recyclerView = root.findViewById(R.id.recycler);
+		emptyState = root.findViewById(R.id.empty_state);
+		pageTitle = root.findViewById(R.id.page_title);
 		recyclerView.setLayoutManager(new LinearLayoutManager(getActivity()));
 		adapter = new ConversationsAdapter();
 		recyclerView.setAdapter(adapter);
-
-		swipeRefreshLayout.addView(recyclerView);
-		((ViewGroup) root).addView(swipeRefreshLayout);
 
 		swipeRefreshLayout.setOnRefreshListener(this::loadData);
 
 		loadData();
 		return root;
+	}
+
+	public void onApplyWindowInsets(WindowInsets insets) {
+		if (pageTitle == null) return;
+		pageTitle.setPadding(pageTitle.getPaddingLeft(), insets.getSystemWindowInsetTop(), pageTitle.getPaddingRight(), 0);
+		ViewGroup.LayoutParams lp = pageTitle.getLayoutParams();
+		lp.height = V.dp(64) + insets.getSystemWindowInsetTop();
+		pageTitle.setLayoutParams(lp);
 	}
 
 	@Override
@@ -82,6 +86,8 @@ public class ConversationsFragment extends Fragment {
 				data.clear();
 				data.addAll(result);
 				adapter.notifyDataSetChanged();
+				emptyState.setVisibility(data.isEmpty() ? View.VISIBLE : View.GONE);
+				recyclerView.setVisibility(data.isEmpty() ? View.GONE : View.VISIBLE);
 				swipeRefreshLayout.setRefreshing(false);
 			}
 			@Override public void onError(me.grishka.appkit.api.ErrorResponse error) {

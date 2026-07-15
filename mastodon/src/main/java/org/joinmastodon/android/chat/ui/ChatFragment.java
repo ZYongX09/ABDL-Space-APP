@@ -2,6 +2,7 @@ package org.joinmastodon.android.chat.ui;
 
 import android.app.Fragment;
 import android.graphics.Rect;
+import android.content.res.ColorStateList;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -13,11 +14,10 @@ import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
 import android.widget.EditText;
 import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
-import android.app.Activity;
-import android.view.Window;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -31,14 +31,20 @@ import org.joinmastodon.android.chat.ChatStorage;
 import org.joinmastodon.android.chat.MessageSendHelper;
 import org.joinmastodon.android.chat.model.ChatMessage;
 import org.joinmastodon.android.api.session.AccountSessionManager;
+import org.joinmastodon.android.ui.utils.UiUtils;
 
 import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
 
+import me.grishka.appkit.imageloader.ViewImageLoader;
+import me.grishka.appkit.imageloader.requests.UrlImageLoaderRequest;
+import me.grishka.appkit.utils.V;
+
 public class ChatFragment extends Fragment {
 	private long peerId;
 	private String peerName;
+	private String peerAvatar;
 	private String accountId;
 
 	private RecyclerView recyclerView;
@@ -61,6 +67,7 @@ public class ChatFragment extends Fragment {
 		if (args != null) {
 			peerId = args.getLong("peer_id");
 			peerName = args.getString("peer_name", "");
+			peerAvatar = args.getString("peer_avatar", "");
 		}
 		accountId = AccountSessionManager.getInstance().getLastActiveAccountID();
 	}
@@ -74,15 +81,28 @@ public class ChatFragment extends Fragment {
 	public void onViewCreated(View view, Bundle savedInstanceState) {
 		super.onViewCreated(view, savedInstanceState);
 
-		// Toolbar with safe area
 		View toolbar = view.findViewById(R.id.toolbar);
+		View inputBar = view.findViewById(R.id.input_bar);
+		view.setOnApplyWindowInsetsListener((v, insets) -> {
+			int top = insets.getSystemWindowInsetTop();
+			int bottom = insets.getStableInsetBottom();
+			toolbar.setPadding(toolbar.getPaddingLeft(), top, toolbar.getPaddingRight(), toolbar.getPaddingBottom());
+			ViewGroup.LayoutParams toolbarParams = toolbar.getLayoutParams();
+			toolbarParams.height = V.dp(64) + top;
+			toolbar.setLayoutParams(toolbarParams);
+			inputBar.setPadding(inputBar.getPaddingLeft(), inputBar.getPaddingTop(), inputBar.getPaddingRight(), V.dp(8) + bottom);
+			return insets;
+		});
 
-		// Back button
-		ImageButton backBtn = new ImageButton(getActivity());
-		backBtn.setImageResource(android.R.drawable.ic_menu_revert);
-		backBtn.setBackground(null);
+		ImageButton backBtn = view.findViewById(R.id.back_btn);
+		backBtn.setImageTintList(ColorStateList.valueOf(UiUtils.getThemeColor(getActivity(), R.attr.colorM3OnSurface)));
 		backBtn.setOnClickListener(v -> getActivity().onBackPressed());
-		((android.view.ViewGroup) toolbar).addView(backBtn, 0);
+		TextView peerNameView = view.findViewById(R.id.peer_name);
+		peerNameView.setText(peerName == null || peerName.isEmpty() ? "私信" : peerName);
+		ImageView peerAvatarView = view.findViewById(R.id.peer_avatar);
+		if (peerAvatar != null && !peerAvatar.isEmpty()) {
+			ViewImageLoader.loadWithoutAnimation(peerAvatarView, peerAvatarView.getDrawable(), new UrlImageLoaderRequest(peerAvatar, V.dp(40), V.dp(40)));
+		}
 
 		// Keyboard inset
 		view.getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {

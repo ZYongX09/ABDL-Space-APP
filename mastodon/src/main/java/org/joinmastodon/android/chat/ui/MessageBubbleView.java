@@ -10,7 +10,6 @@ import android.widget.TextView;
 
 import org.joinmastodon.android.R;
 import org.joinmastodon.android.chat.model.ChatMessage;
-import org.joinmastodon.android.chat.model.SendState;
 import org.joinmastodon.android.ui.utils.UiUtils;
 
 import java.text.SimpleDateFormat;
@@ -30,7 +29,7 @@ public class MessageBubbleView extends FrameLayout {
 		bubbleText = findViewById(R.id.bubble_text);
 		timeView = findViewById(R.id.time);
 		statusView = findViewById(R.id.status);
-		bubbleContainer = (LinearLayout) bubbleText.getParent();
+		bubbleContainer = findViewById(R.id.bubble_container);
 		setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 	}
 
@@ -69,9 +68,13 @@ public class MessageBubbleView extends FrameLayout {
 			dateText = new TextView(context);
 			dateText.setTextSize(12);
 			dateText.setGravity(android.view.Gravity.CENTER);
+			dateText.setTextColor(UiUtils.getThemeColor(context, R.attr.colorM3OnSurfaceVariant));
+			dateText.setBackgroundResource(R.drawable.bg_chat_date);
 			int pad = (int) (16 * context.getResources().getDisplayMetrics().density);
 			setPadding(pad, pad / 2, pad, pad / 2);
-			addView(dateText, new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
+			LayoutParams lp = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
+			lp.gravity = android.view.Gravity.CENTER;
+			addView(dateText, lp);
 		}
 
 		public void setDate(String date) {

@@ -1,17 +1,63 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+	xmlns:app="http://schemas.android.com/apk/res-auto"
 	android:layout_width="match_parent"
 	android:layout_height="match_parent"
 	android:orientation="vertical"
-	android:fitsSystemWindows="true"
 	android:background="?attr/colorM3Surface">
 
-	<androidx.appcompat.widget.Toolbar
+	<LinearLayout
 		android:id="@+id/toolbar"
 		android:layout_width="match_parent"
-		android:layout_height="56dp"
+		android:layout_height="64dp"
 		android:background="?attr/colorM3Surface"
-		android:elevation="2dp" />
+		android:elevation="1dp"
+		android:gravity="center_vertical"
+		android:orientation="horizontal"
+		android:paddingEnd="16dp">
+
+		<ImageButton
+			android:id="@+id/back_btn"
+			android:layout_width="48dp"
+			android:layout_height="48dp"
+			android:background="?android:attr/selectableItemBackgroundBorderless"
+			android:contentDescription="返回"
+			android:src="@drawable/ic_arrow_back_24" />
+
+		<me.grishka.appkit.views.RoundedImageView
+			android:id="@+id/peer_avatar"
+			android:layout_width="40dp"
+			android:layout_height="40dp"
+			android:background="@drawable/image_placeholder"
+			android:scaleType="centerCrop"
+			app:cornerRadius="20dp" />
+
+		<LinearLayout
+			android:layout_width="0dp"
+			android:layout_height="wrap_content"
+			android:layout_marginStart="12dp"
+			android:layout_weight="1"
+			android:orientation="vertical">
+
+			<TextView
+				android:id="@+id/peer_name"
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:ellipsize="end"
+				android:fontFamily="sans-serif-medium"
+				android:maxLines="1"
+				android:textColor="?attr/colorM3OnSurface"
+				android:textSize="17sp" />
+
+			<TextView
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:layout_marginTop="1dp"
+				android:text="私密对话"
+				android:textColor="?attr/colorM3OnSurfaceVariant"
+				android:textSize="12sp" />
+		</LinearLayout>
+	</LinearLayout>
 
 	<FrameLayout
 		android:layout_width="match_parent"
@@ -22,7 +68,10 @@
 			android:id="@+id/recycler"
 			android:layout_width="match_parent"
 			android:layout_height="match_parent"
-			android:clipToPadding="false" />
+			android:background="?attr/colorM3SurfaceVariant"
+			android:clipToPadding="false"
+			android:paddingTop="10dp"
+			android:paddingBottom="10dp" />
 
 		<com.google.android.material.floatingactionbutton.FloatingActionButton
 			android:id="@+id/scroll_to_bottom"
@@ -36,31 +85,46 @@
 	</FrameLayout>
 
 	<LinearLayout
+		android:id="@+id/input_bar"
 		android:layout_width="match_parent"
 		android:layout_height="wrap_content"
 		android:orientation="horizontal"
 		android:gravity="center_vertical"
-		android:paddingHorizontal="12dp"
-		android:paddingVertical="8dp"
+		android:paddingStart="12dp"
+		android:paddingTop="8dp"
+		android:paddingEnd="8dp"
+		android:paddingBottom="8dp"
 		android:background="?attr/colorM3Surface"
 		android:elevation="8dp">
 
-		<EditText
-			android:id="@+id/input"
+		<FrameLayout
 			android:layout_width="0dp"
 			android:layout_height="wrap_content"
 			android:layout_weight="1"
-			android:hint="输入消息..."
-			android:textSize="15sp"
-			android:maxLines="5"
-			android:background="@null"
-			android:inputType="textMultiLine" />
+			android:background="@drawable/bg_chat_input">
+
+			<EditText
+				android:id="@+id/input"
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:background="@null"
+				android:hint="输入消息"
+				android:inputType="textCapSentences|textMultiLine"
+				android:maxLines="5"
+				android:minHeight="48dp"
+				android:paddingHorizontal="16dp"
+				android:paddingVertical="11dp"
+				android:textColor="?attr/colorM3OnSurface"
+				android:textColorHint="?attr/colorM3OnSurfaceVariant"
+				android:textSize="15sp" />
+		</FrameLayout>
 
 		<ImageButton
 			android:id="@+id/send_btn"
-			android:layout_width="48dp"
-			android:layout_height="48dp"
-			android:background="?android:attr/selectableItemBackgroundBorderless"
+			android:layout_width="44dp"
+			android:layout_height="44dp"
+			android:layout_marginStart="8dp"
+			android:background="@drawable/bg_chat_send"
 			android:src="@drawable/ic_send_24px"
 			android:contentDescription="发送" />
 	</LinearLayout>

@@ -209,6 +209,7 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 		searchFragment=(DiscoverFragment) getChildFragmentManager().getFragment(savedInstanceState, "searchFragment");
 		friendRequestFragment=(FriendRequestListFragment) getChildFragmentManager().getFragment(savedInstanceState, "friendRequestFragment");
 		diaperListFragment=(DiaperListFragment) getChildFragmentManager().getFragment(savedInstanceState, "diaperListFragment");
+		conversationsFragment=(ConversationsFragment) getChildFragmentManager().getFragment(savedInstanceState, "conversationsFragment");
 		profileFragment=(ProfileFragment) getChildFragmentManager().getFragment(savedInstanceState, "profileFragment");
 		currentTab=savedInstanceState.getInt("selectedTab");
 		tabBar.selectTab(currentTab);
@@ -218,6 +219,7 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 				.hide(searchFragment)
 				.hide(friendRequestFragment)
 				.hide(diaperListFragment)
+				.hide(conversationsFragment)
 				.hide(profileFragment)
 				.show(current)
 				.commit();
@@ -255,6 +257,7 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 		friendRequestFragment.onApplyWindowInsets(topOnlyInsets);
 		diaperListFragment.onApplyWindowInsets(topOnlyInsets);
 		profileFragment.onApplyWindowInsets(topOnlyInsets);
+		conversationsFragment.onApplyWindowInsets(topOnlyInsets);
 	}
 
 	private Fragment fragmentForTab(@IdRes int tab){
@@ -373,6 +376,8 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 		if (friendRequestFragment.isAdded()) getChildFragmentManager().putFragment(outState, "friendRequestFragment", friendRequestFragment);
 
 		if (diaperListFragment.isAdded()) getChildFragmentManager().putFragment(outState, "diaperListFragment", diaperListFragment);
+
+		if (conversationsFragment.isAdded()) getChildFragmentManager().putFragment(outState, "conversationsFragment", conversationsFragment);
 
 		if (profileFragment.isAdded()) getChildFragmentManager().putFragment(outState, "profileFragment", profileFragment);
 	}

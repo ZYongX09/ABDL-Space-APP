@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+	xmlns:app="http://schemas.android.com/apk/res-auto"
 	xmlns:tools="http://schemas.android.com/tools"
 	android:layout_width="match_parent"
-	android:layout_height="72dp"
+	android:layout_height="76dp"
 	android:gravity="center_vertical"
 	android:orientation="horizontal"
 	android:paddingStart="16dp"
@@ -10,12 +11,15 @@
 	android:paddingVertical="8dp"
 	android:background="?android:attr/selectableItemBackground">
 
-	<ImageView
+	<me.grishka.appkit.views.RoundedImageView
 		android:id="@+id/avatar"
-		android:layout_width="54dp"
-		android:layout_height="54dp"
-		android:layout_marginEnd="12dp"
+		android:layout_width="52dp"
+		android:layout_height="52dp"
+		android:layout_marginEnd="14dp"
+		android:background="@drawable/image_placeholder"
 		android:scaleType="centerCrop"
+		app:cornerRadius="26dp"
+		android:contentDescription="头像"
 		tools:background="#888" />
 
 	<LinearLayout
@@ -36,7 +40,7 @@
 				android:layout_height="wrap_content"
 				android:layout_weight="1"
 				android:textSize="16sp"
-				android:textStyle="bold"
+				android:fontFamily="sans-serif-medium"
 				android:ellipsize="end"
 				android:maxLines="1"
 				android:textColor="?attr/colorM3OnSurface" />
@@ -53,7 +57,7 @@
 		<LinearLayout
 			android:layout_width="match_parent"
 			android:layout_height="wrap_content"
-			android:layout_marginTop="2dp"
+				android:layout_marginTop="3dp"
 			android:orientation="horizontal"
 			android:gravity="center_vertical">
 

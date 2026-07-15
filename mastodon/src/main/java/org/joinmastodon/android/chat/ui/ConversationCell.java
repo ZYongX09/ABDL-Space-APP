@@ -1,7 +1,8 @@
 package org.joinmastodon.android.chat.ui;
 
 import android.content.Context;
-import android.text.TextUtils;
+import android.graphics.drawable.Drawable;
+import android.graphics.Typeface;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -11,6 +12,11 @@ import android.widget.TextView;
 import org.joinmastodon.android.R;
 import org.joinmastodon.android.chat.model.Conversation;
 import org.joinmastodon.android.chat.model.SendState;
+import org.joinmastodon.android.ui.utils.UiUtils;
+
+import me.grishka.appkit.imageloader.ViewImageLoader;
+import me.grishka.appkit.imageloader.requests.UrlImageLoaderRequest;
+import me.grishka.appkit.utils.V;
 
 public class ConversationCell extends android.widget.FrameLayout {
 	private final TextView nameView;
@@ -36,6 +42,24 @@ public class ConversationCell extends android.widget.FrameLayout {
 		nameView.setText(c.username != null ? c.username : "未知用户");
 		timeView.setText(formatTime(c.lastMessageAt));
 		previewView.setText(getPreviewText());
+		boolean unread = c.unreadCount > 0;
+		nameView.setTypeface(Typeface.DEFAULT, unread ? Typeface.BOLD : Typeface.NORMAL);
+		previewView.setTypeface(Typeface.DEFAULT, unread ? Typeface.BOLD : Typeface.NORMAL);
+		timeView.setTextColor(UiUtils.getThemeColor(getContext(), unread ? R.attr.colorM3Primary : R.attr.colorM3OnSurfaceVariant));
+		avatarView.setImageResource(R.drawable.image_placeholder);
+		if (c.avatar != null && !c.avatar.isEmpty()) {
+			ViewImageLoader.load(new ViewImageLoader.Target() {
+				@Override
+				public void setImageDrawable(Drawable drawable) {
+					if (conversation == c) avatarView.setImageDrawable(drawable);
+				}
+
+				@Override
+				public View getView() {
+					return avatarView;
+				}
+			}, avatarView.getDrawable(), new UrlImageLoaderRequest(c.avatar, V.dp(52), V.dp(52)), false);
+		}
 		if (c.unreadCount > 0) {
 			badgeView.setVisibility(View.VISIBLE);
 			badgeView.setText(c.unreadCount > 99 ? "99+" : String.valueOf(c.unreadCount));
@@ -45,6 +69,7 @@ public class ConversationCell extends android.widget.FrameLayout {
 	}
 
 	private String getPreviewText() {
+		if (conversation.draft != null && !conversation.draft.isEmpty()) return "草稿：" + conversation.draft;
 		if (conversation.lastMessage == null || conversation.lastMessage.isEmpty()) return "";
 		String prefix = "";
 		if (conversation.lastOutState == SendState.SENDING) prefix = "\u23F3 ";

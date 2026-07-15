@@ -1,13 +1,11 @@
 package org.joinmastodon.android.chat.ui;
 
-import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
-import org.joinmastodon.android.R;
 import org.joinmastodon.android.chat.model.ChatMessage;
 
 import java.util.ArrayList;
@@ -74,7 +72,6 @@ public class ChatMessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHo
 
 	@NonNull @Override
 	public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-		LayoutInflater inflater = LayoutInflater.from(parent.getContext());
 		if (viewType == TYPE_DATE) {
 			MessageBubbleView.DateDividerView dv = new MessageBubbleView.DateDividerView(parent.getContext());
 			dv.setLayoutParams(new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
