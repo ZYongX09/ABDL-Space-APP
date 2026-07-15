@@ -18,6 +18,9 @@ import org.joinmastodon.android.api.requests.search.GetSearchResults;
 import org.joinmastodon.android.api.requests.accounts.GetAccountByID;
 import org.joinmastodon.android.api.session.AccountSession;
 import org.joinmastodon.android.api.session.AccountSessionManager;
+import org.joinmastodon.android.chat.ChatRealtimeClient;
+import org.joinmastodon.android.chat.ui.ConversationsFragment;
+import org.joinmastodon.android.chat.ui.ChatFragment;
 import org.joinmastodon.android.fragments.AssistContentProviderFragment;
 import org.joinmastodon.android.fragments.ComposeFragment;
 import org.joinmastodon.android.fragments.HomeFragment;
@@ -42,6 +45,7 @@ import me.grishka.appkit.api.ErrorResponse;
 
 public class MainActivity extends FragmentStackActivity{
 	private static final String TAG="MainActivity";
+	private ChatRealtimeClient chatWsClient;
 
 	@Override
 	protected void onCreate(@Nullable Bundle savedInstanceState){
@@ -51,6 +55,7 @@ public class MainActivity extends FragmentStackActivity{
 
 		if(savedInstanceState==null){
 			restartHomeFragment();
+			connectChatWebSocket();
 		}
 
 		if(BuildConfig.BUILD_TYPE.startsWith("appcenter")){
@@ -113,6 +118,13 @@ public class MainActivity extends FragmentStackActivity{
 			}
 		}else if(intent.getBooleanExtra("compose", false)){
 			showCompose();
+		}else if("conversations".equals(intent.getStringExtra("navigate_to"))){
+			showChatConversations();
+		}else if("chat".equals(intent.getStringExtra("navigate_to"))){
+			long peerId=intent.getLongExtra("peer_id", 0);
+			String peerName=intent.getStringExtra("peer_name");
+			String peerAvatar=intent.getStringExtra("peer_avatar");
+			if(peerId>0) showChatFragment(peerId, peerName!=null?peerName:"", peerAvatar);
 		}else if(intent.hasExtra("lan_login_session")){
 			// LAN 登录通知点击 - 显示授权弹窗
 			String sessionId=intent.getStringExtra("lan_login_session");
@@ -285,6 +297,57 @@ public class MainActivity extends FragmentStackActivity{
 		composeArgs.putString("account", session.getID());
 		compose.setArguments(composeArgs);
 		showFragment(compose);
+	}
+
+	@Override
+	protected void onResume(){
+		super.onResume();
+		if(chatWsClient!=null) chatWsClient.connect();
+	}
+
+	@Override
+	protected void onPause(){
+		super.onPause();
+		if(chatWsClient!=null) chatWsClient.disconnect();
+	}
+
+	@Override
+	protected void onDestroy(){
+		super.onDestroy();
+		if(chatWsClient!=null){
+			chatWsClient.disconnect();
+			chatWsClient=null;
+		}
+	}
+
+	private void connectChatWebSocket(){
+		AccountSession session=AccountSessionManager.getInstance().getLastActiveAccount();
+		if(session==null || !session.activated) return;
+		chatWsClient=new ChatRealtimeClient(session.getID());
+		chatWsClient.connect();
+	}
+
+	private void showChatConversations(){
+		AccountSession session=AccountSessionManager.getInstance().getLastActiveAccount();
+		if(session==null) return;
+		ConversationsFragment fragment=new ConversationsFragment();
+		Bundle args=new Bundle();
+		args.putString("account", session.getID());
+		fragment.setArguments(args);
+		showFragment(fragment);
+	}
+
+	private void showChatFragment(long peerId, String peerName, String peerAvatar){
+		AccountSession session=AccountSessionManager.getInstance().getLastActiveAccount();
+		if(session==null) return;
+		ChatFragment fragment=new ChatFragment();
+		Bundle args=new Bundle();
+		args.putString("account", session.getID());
+		args.putLong("peer_id", peerId);
+		args.putString("peer_name", peerName);
+		args.putString("peer_avatar", peerAvatar!=null ? peerAvatar : "");
+		fragment.setArguments(args);
+		showFragment(fragment);
 	}
 
 	private void maybeRequestNotificationsPermission(){
