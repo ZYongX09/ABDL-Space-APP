@@ -22,6 +22,9 @@ ABDL Space Android 客户端需要 1v1 私信，用户体验目标是**尽可能
 6. 实时：Cloudflare Durable Object（每用户）+ WebSocket Hibernation
 7. 离线：JPush 通知点击进入对应会话
 8. UI/动画：对标 Telegram 的关键交互（发送文字飞入、列表插入、键盘适配、右滑返回）
+9. 多账号隔离：缓存、草稿、WebSocket、推送和深链全部绑定明确的 `account_id`
+10. 可靠恢复：WebSocket 仅负责低延迟提示；断线后必须通过持久化事件游标补齐
+11. 安全：JPush 凭据只存在于 Wrangler Secret，推送发送能力不得暴露为公开接口
 
 ### Non-goals（第一版明确不做）
 
@@ -65,8 +68,11 @@ ABDL Space Android 客户端需要 1v1 私信，用户体验目标是**尽可能
 - 无 WebSocket / 无 Durable Objects
 - 无 typing
 - 无 client_msg_id（乐观发送去重）
-- 无 message 删除接口（第一版可先本地隐藏 + 后续补）
+- 无 message/conversation 删除或隐藏接口（第一版不展示删除入口，后续补服务端协议）
 - 发送后无推送到对端
+- 无全局用户事件游标，无法可靠恢复断线期间的消息和已读状态
+- 已读只有布尔值，没有 `read_up_to_id` watermark
+- JPush 发送接口当前无鉴权且凭据已进入源码，实施前必须轮换并移除
 
 ## [S4] Architecture overview
 
@@ -87,7 +93,7 @@ ABDL Space Android 客户端需要 1v1 私信，用户体验目标是**尽可能
                       │                           ▼
 ┌──────── Cloudflare Worker (api.abdl-space.top) ─────────────┐
 │ /api/messages/*  ──► D1 messages                            │
-│ 发送成功后 ──► UserPresenceDO(receiver) + DO(sender) push   │
+│ D1 message + outbox ──► dispatch ──► UserPresenceDO/JPush  │
 │ /api/ws  ──► upgrade ──► UserPresenceDO(userId)             │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -98,6 +104,9 @@ ABDL Space Android 客户端需要 1v1 私信，用户体验目标是**尽可能
 2. **DO 只做在线连接与推送**，不做消息主存储
 3. **Android 本地缓存**保证秒开与离线可读
 4. **事件总线驱动 UI**，避免 Fragment 直接耦合网络
+5. **可靠性不依赖 WS/JPush**：持久化事件使用全局单调递增 `event_id`；对单个用户跳号是正常现象，重连以服务端同步边界补齐，绝不使用 `last+1` 判断缺口
+6. **全链路去重**：命令用 `client_msg_id` 幂等；更新用 `event_id` 去重；消息用 `message_id` 合并
+7. **多账号显式隔离**：Android 的任何聊天状态都以 `AccountSession.getID()` 为第一维
 
 ## [S5] Backend design
 
@@ -108,35 +117,45 @@ ABDL Space Android 客户端需要 1v1 私信，用户体验目标是**尽可能
 1. `GET /api/messages/conversations`
    - 返回：`user_id, username, avatar, last_message, last_message_at, unread_count`
 2. `GET /api/messages/:userId?before_id=&limit=`
-   - 历史分页改为 **cursor（before_id）** 优先，兼容 page
-3. `POST /api/messages`
+   - 历史分页按 `id DESC` 使用 **cursor（before_id）**，避免过滤键与排序键不一致
+3. `GET /api/messages/sync?after_event_id=&limit=`（新增）
+   - 返回当前用户在游标之后的持久化事件，以及 `next_event_id`、`sync_boundary`、`has_more`
+   - 事件包括 `message.new`、`message.read`、`conversation.hidden`
+4. `POST /api/messages`
    - body：`receiver_id, content, client_msg_id`
-   - 返回：`id, client_msg_id, created_at, sender_id, receiver_id`
-   - 幂等：同 `sender_id + client_msg_id` 不重复插入
-4. `POST /api/messages/:userId/read`
-   - 标记来自该用户的未读为已读
-   - 成功后通过 DO 推 `message.read` 给对方
-5. `POST /api/messages/typing`（新增）
+   - 返回：完整消息和对应的 `event_id`
+   - 以数据库唯一约束 + `INSERT ... ON CONFLICT DO NOTHING` 原子实现幂等；冲突后读取已有行
+   - 重用 `client_msg_id` 时必须验证 receiver/content 一致，否则返回 409
+5. `POST /api/messages/:userId/read`
+   - body：`read_up_to_id`
+   - 只标记来自该用户且 `id <= read_up_to_id` 的消息
+   - 返回并广播持久化 `message.read` 事件，包含 `read_up_to_id`
+6. `POST /api/messages/typing`（新增）
    - body：`receiver_id`
    - 不落库，直接 DO 推 `typing`
-6. `GET /api/users/:id/can-message`（若缺失则补齐）
+7. `GET /api/users/:id/can-message`（若缺失则补齐）
+   - 同时执行 `allow_messages` 与 `allow_messages_from` 规则
 
 发送后副作用：
 
-- 写 D1
-- 推 JPush（对方离线时）
-- 推 WS：`message.new` 到双方 UserPresence DO
+- 单个 D1 `batch()` 条件写入 message、双方 `message_events` 和 outbox；`message.new` 事件以 `(user_id, event_type, message_id)` 唯一约束去重，并发重复命令不得生成重复事件
+- Worker 在提交后把 outbox ID 投递到 Cloudflare Queue；Queue consumer 负责 WS/JPush、指数退避和完成标记
+- Cron 每分钟扫描未完成 outbox 并重新投递，覆盖 Worker 在 D1 提交后、Queue send 前终止的窗口
+- JPush 可始终发送以保证离线可达；前台客户端按 `message_id/account_id` 抑制重复通知
 
 ### [S5.2] Durable Object：UserPresence
 
 - 一个用户一个 DO：`idFromName("user:" + userId)`
 - 使用 **WebSocket Hibernation API**（`acceptWebSocket` / `webSocketMessage` / `serializeAttachment`）
-- 连接鉴权：Worker 升级前校验 JWT，把 `userId` 作为 tag 附加
+- 新 namespace 使用 Wrangler `new_sqlite_classes`
+- 连接鉴权：Worker 升级前复用 REST 的完整 token 解析（JWT + OAuth access token），无效请求不进入 DO
+- 每条连接通过 `serializeAttachment` 保存 `accountId/deviceId/connectedAt`，DO 唤醒后可恢复
+- 使用 `setWebSocketAutoResponse(new WebSocketRequestResponsePair("ping", "pong"))`，避免心跳唤醒 DO
 - 事件：
   - `message.new`
   - `message.read`
   - `typing`
-  - `ping/pong`（客户端心跳；DO 可用 auto-response 降本）
+  - `sync.required`（部署断线、事件缺口时要求客户端 REST 同步）
 
 ### [S5.3] Schema 增量
 
@@ -144,6 +163,26 @@ ABDL Space Android 客户端需要 1v1 私信，用户体验目标是**尽可能
 ALTER TABLE messages ADD COLUMN client_msg_id TEXT;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_client_msg
   ON messages(sender_id, client_msg_id) WHERE client_msg_id IS NOT NULL;
+
+CREATE TABLE message_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  event_type TEXT NOT NULL,
+  message_id INTEGER,
+  peer_id INTEGER NOT NULL,
+  read_up_to_id INTEGER,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX idx_message_events_sync ON message_events(user_id, id);
+CREATE UNIQUE INDEX idx_message_event_new
+  ON message_events(user_id, event_type, message_id)
+  WHERE event_type = 'message.new';
+
+CREATE TABLE message_outbox (
+  event_id INTEGER PRIMARY KEY,
+  dispatched_at DATETIME,
+  attempts INTEGER NOT NULL DEFAULT 0
+);
 ```
 
 可选（后续）：
@@ -200,6 +239,7 @@ org.joinmastodon.android.chat/
 - `out`（是否自己发送）
 - `sendState`: `SENDING | SENT | READ | FAILED`
 - `clientMsgId`
+- `eventId`（事件记录 ID，仅去重/诊断）
 
 `Conversation`：
 
@@ -208,6 +248,8 @@ org.joinmastodon.android.chat/
 - `unreadCount`
 - `draft`
 - `lastOutState`（用于列表勾）
+- `readOutboxMaxId`（对方已读到的最大消息 ID）
+- 所有模型在 Storage/Controller 中必须绑定 `accountId`
 
 ### [S6.3] 发送状态机（对齐 SendMessagesHelper）
 
@@ -215,27 +257,29 @@ org.joinmastodon.android.chat/
 2. 生成 `tempId/clientMsgId`，`sendState=SENDING`，写入 Storage + 通知 UI（乐观插入）
 3. 触发 `TextSendEnterTransition`（输入文字飞到气泡位置）
 4. REST `POST /api/messages`
-5. 成功：映射 `tempId → serverId`，`sendState=SENT`，更新会话预览
+5. 成功：按 `clientMsgId` 映射 `tempId → serverId/eventId`，`sendState=SENT`，更新会话预览
 6. 失败：`sendState=FAILED`，点击重试走同一 helper
-7. 收到对方 `message.read`：对应消息/会话 `SENT → READ`（✓✓）
+7. 收到自己 WS 回显：以 `clientMsgId` 合并，不新建第二条消息
+8. 收到对方 `message.read(read_up_to_id)`：仅 `id <= watermark` 的消息 `SENT → READ`（✓✓）
 
 ### [S6.4] 实时更新路径（对齐 processUpdate）
 
 `ChatRealtimeClient` 收到 WS 事件 → `ChatController.applyUpdate`：
 
 - `message.new`：若非自己 temp 回显则插入；更新会话列表顺序/预览/未读
-- `message.read`：更新自己发出消息的勾
+- `message.read`：按 `read_up_to_id` 更新自己发出消息的勾
 - `typing`：聊天顶栏短暂显示“对方正在输入…”
 
-App 回前台/WS 重连：拉会话列表 + 当前会话增量历史，避免丢消息。
+每个账号持久化 `last_event_id`。WS 建连后服务端先发送 `sync.ready(sync_boundary)`，其中 boundary 是该用户建连时可见的最大事件 ID；客户端进入 SYNCING，缓冲其后到达的 WS 持久化事件，循环调用 `/api/messages/sync?after_event_id=&through_event_id=sync_boundary`，按 `event_id` 应用到边界，再合并缓冲事件并进入 LIVE。由于其他用户事件会形成合法跳号，客户端只要求事件 ID 单调增加并去重，不用 `last+1` 判断缺口；socket 断开、App 回前台或服务端 `sync.required` 时重新执行边界同步。typing 无 event_id，可直接丢弃或短暂显示。
 
 ### [S6.5] 本地缓存（对齐 MessagesStorage 子集）
 
 SQLite 表：
 
-- `chat_conversations`
-- `chat_messages`
-- `chat_drafts`
+- `chat_conversations`：主键 `(account_id, peer_id)`
+- `chat_messages`：独立 `local_id` 主键；唯一 `(account_id, server_id)`（server_id 非空）和 `(account_id, client_msg_id)`（client_msg_id 非空）
+- `chat_drafts`：主键 `(account_id, peer_id)`
+- `chat_sync_state`：主键 `account_id`，保存 `last_event_id`
 
 策略：
 
@@ -253,7 +297,7 @@ SQLite 表：
 - 自己最后一条：预览前缀状态图标（时钟/✓/✓✓/！）
 - 未读角标：圆角胶囊，品牌色
 - 点击进入 `ChatFragment`
-- 左滑：标已读、删除会话（第一版删除=本地隐藏 + 可选服务端后续）
+- 左滑：标已读；删除会话在服务端隐藏协议落地前不提供，避免刷新后复现
 - 顶部：搜索（可先过滤本地会话）
 
 #### 聊天页
@@ -277,22 +321,23 @@ SQLite 表：
   - 复制输入文字到 overlay
   - 动画位移/缩放至目标气泡区域
   - 结束后真正绑定气泡 view
-- 长按消息：复制、删除（失败消息额外“重试”）
+- 长按消息：复制（失败消息额外“重试”）；第一版无服务端删除协议，不提供删除
 - 顶栏：头像 + 名称；typing 时副标题切换
 
 ### [S6.7] 入口位置
 
 - 个人主页：发私信按钮 → `ChatFragment(peerId)`
 - “我的”页或通知相关入口：会话列表
-- JPush payload 带 `type=message&peer_id=` → 打开对应聊天
+- JPush payload 必须带 `type=message&account_id=&peer_id=&message_id=`；点击后先选择对应 AccountSession 再打开聊天
+- `account_id` 必须由服务端按受信任的实例域名和已认证 `user_id` 生成（格式与 Android `AccountSession.getID()` 一致），禁止客户端任意声明；设备注册按 `(user_id, reg_id)` 管理，账号登出时注销该绑定
 
 ## [S7] API contracts（客户端视角）
 
 ### WS 消息示例
 
 ```json
-{"type":"message.new","message":{"id":123,"sender_id":1,"receiver_id":2,"content":"hi","created_at":"...","client_msg_id":"..."}}
-{"type":"message.read","peer_id":2,"reader_id":2,"read_at":"..."}
+{"event_id":1001,"type":"message.new","message":{"id":123,"sender_id":1,"receiver_id":2,"content":"hi","created_at":"...","client_msg_id":"..."}}
+{"event_id":1002,"type":"message.read","peer_id":2,"reader_id":2,"read_up_to_id":123,"read_at":"..."}
 {"type":"typing","from_user_id":2}
 ```
 
@@ -304,14 +349,20 @@ POST /api/messages
 ```
 
 ```json
-{"id":123,"client_msg_id":"uuid","created_at":"...","sender_id":1,"receiver_id":2}
+{"event_id":1001,"message":{"id":123,"client_msg_id":"uuid","created_at":"...","sender_id":1,"receiver_id":2,"content":"hi"}}
 ```
 
 ## [S8] Phased delivery
 
+### Phase 0 — 安全与可靠协议（阻断项）
+
+- 轮换已暴露的 JPush Master Secret，迁移到 Wrangler Secret
+- 移除公开无鉴权推送接口
+- 落地 account scope、event cursor/sync boundary、read watermark、Queue-backed outbox 和幂等协议
+
 ### Phase 1 — 基础可聊（优先）
 
-- 后端：`client_msg_id`、发送后 JPush、基础 REST 修正
+- 后端：`client_msg_id`、message events/outbox、sync、read watermark、发送后 JPush、基础 REST 修正
 - Android：会话列表 + 聊天页 + 乐观发送 + 本地缓存 + 已读
 - 无 WS 时可用前台短轮询兜底
 
@@ -330,13 +381,16 @@ POST /api/messages
 ## [S9] Testing strategy
 
 1. 后端单测：发送幂等、已读计数、权限（关闭私信）
-2. DO 本地：`wrangler dev` 下双连接互推
+2. Cloudflare Vitest pool：真实 D1 + DO，覆盖并发幂等、hibernation attachment、双连接互推
 3. Android 仪器/手工：
    - 双账号互发
    - 杀进程后草稿恢复
    - 断网发送失败 → 重试成功
    - 进入会话未读清零
-   - 后台收 JPush 点进聊天
+    - 后台收 JPush 点进聊天
+    - 两个本地账号相同 peer id 不串缓存/草稿/推送
+    - REST 成功 + WS 回显只保留一条消息
+    - socket 断线/`sync.required` 后通过边界 sync 完整补齐
 4. 体验对照清单：对照 Telegram 截图/真机，逐项勾 UI 差异
 
 ## [S10] Risks
@@ -347,6 +401,10 @@ POST /api/messages
 | DO 成本/复杂度 | 仅用户级 presence；Hibernation；无连接不常驻 |
 | 与现有 Fragment 栈冲突 | 继续 appkit Fragment 栈，不引入 TG BaseFragment |
 | 消息乱序/重复 | `client_msg_id` 幂等 + 本地 temp 映射 |
+| REST/WS/JPush 三路重复 | `client_msg_id → message_id → event_id` 分层去重 |
+| 多账号串数据 | 所有本地表、Controller、WS、推送深链显式携带 `account_id` |
+| 写消息成功但推送失败 | D1 message_events/outbox + REST sync，推送不是可靠性来源 |
+| 凭据泄露/公开推送滥用 | 轮换 JPush secret；仅 Wrangler Secret；移除公开 send 接口 |
 | GPL 合规 | 不复制 TG 源文件，只参考行为与结构 |
 
 ## [S11] Decision log
@@ -354,5 +412,7 @@ POST /api/messages
 - 不做 Telegram 整包复制，采用逻辑镜像重写
 - 实时：Cloudflare Durable Objects WebSocket Hibernation
 - 架构：REST 落库 + 每用户 DO 推送（方案 A）
+- 可靠性：D1 持久化事件游标 + outbox；WS/JPush 只负责低延迟与离线提醒
+- 多账号：所有客户端聊天状态以 `AccountSession.getID()` 隔离
 - 第一版：1v1 文字 + 列表/气泡/状态/草稿/已读/实时/推送
 - 明确延后：语音/贴纸/反应/群聊/E2EE
