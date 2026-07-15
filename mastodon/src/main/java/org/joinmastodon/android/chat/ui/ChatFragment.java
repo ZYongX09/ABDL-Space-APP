@@ -2,6 +2,7 @@ package org.joinmastodon.android.chat.ui;
 
 import android.app.Fragment;
 import android.graphics.Rect;
+import android.graphics.drawable.Drawable;
 import android.content.res.ColorStateList;
 import android.os.Bundle;
 import android.os.Handler;
@@ -101,7 +102,17 @@ public class ChatFragment extends Fragment {
 		peerNameView.setText(peerName == null || peerName.isEmpty() ? "私信" : peerName);
 		ImageView peerAvatarView = view.findViewById(R.id.peer_avatar);
 		if (peerAvatar != null && !peerAvatar.isEmpty()) {
-			ViewImageLoader.loadWithoutAnimation(peerAvatarView, peerAvatarView.getDrawable(), new UrlImageLoaderRequest(peerAvatar, V.dp(40), V.dp(40)));
+			ViewImageLoader.load(new ViewImageLoader.Target() {
+				@Override
+				public void setImageDrawable(Drawable drawable) {
+					peerAvatarView.setImageDrawable(ConversationCell.makeCircular(drawable, V.dp(20)));
+				}
+
+				@Override
+				public View getView() {
+					return peerAvatarView;
+				}
+			}, peerAvatarView.getDrawable(), new UrlImageLoaderRequest(peerAvatar, V.dp(40), V.dp(40)), false);
 		}
 
 		// Keyboard inset

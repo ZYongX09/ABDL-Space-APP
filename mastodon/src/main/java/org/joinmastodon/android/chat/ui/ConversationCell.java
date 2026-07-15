@@ -1,6 +1,8 @@
 package org.joinmastodon.android.chat.ui;
 
 import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.Typeface;
 import android.view.LayoutInflater;
@@ -17,6 +19,7 @@ import org.joinmastodon.android.ui.utils.UiUtils;
 import me.grishka.appkit.imageloader.ViewImageLoader;
 import me.grishka.appkit.imageloader.requests.UrlImageLoaderRequest;
 import me.grishka.appkit.utils.V;
+import me.grishka.appkit.views.RoundedDrawable;
 
 public class ConversationCell extends android.widget.FrameLayout {
 	private final TextView nameView;
@@ -46,12 +49,12 @@ public class ConversationCell extends android.widget.FrameLayout {
 		nameView.setTypeface(Typeface.DEFAULT, unread ? Typeface.BOLD : Typeface.NORMAL);
 		previewView.setTypeface(Typeface.DEFAULT, unread ? Typeface.BOLD : Typeface.NORMAL);
 		timeView.setTextColor(UiUtils.getThemeColor(getContext(), unread ? R.attr.colorM3Primary : R.attr.colorM3OnSurfaceVariant));
-		avatarView.setImageResource(R.drawable.image_placeholder);
+		avatarView.setImageDrawable(getContext().getDrawable(R.drawable.image_placeholder));
 		if (c.avatar != null && !c.avatar.isEmpty()) {
 			ViewImageLoader.load(new ViewImageLoader.Target() {
 				@Override
 				public void setImageDrawable(Drawable drawable) {
-					if (conversation == c) avatarView.setImageDrawable(drawable);
+					if (conversation == c) avatarView.setImageDrawable(makeCircular(drawable, V.dp(26)));
 				}
 
 				@Override
@@ -66,6 +69,12 @@ public class ConversationCell extends android.widget.FrameLayout {
 		} else {
 			badgeView.setVisibility(View.GONE);
 		}
+	}
+
+	public static Drawable makeCircular(Drawable drawable, int radius) {
+		if (!(drawable instanceof BitmapDrawable)) return drawable;
+		Bitmap bitmap = ((BitmapDrawable) drawable).getBitmap();
+		return bitmap == null ? drawable : new RoundedDrawable(bitmap).setRadius(radius);
 	}
 
 	private String getPreviewText() {
