@@ -4,6 +4,7 @@ import android.app.Fragment;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.content.res.ColorStateList;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -84,9 +85,22 @@ public class ChatFragment extends Fragment {
 
 		View toolbar = view.findViewById(R.id.toolbar);
 		View inputBar = view.findViewById(R.id.input_bar);
+
+		// Make the window dispatch raw insets instead of consuming them at the activity level
+		android.view.Window window = getActivity().getWindow();
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+			window.setDecorFitsSystemWindows(false);
+		} else {
+			window.getDecorView().setSystemUiVisibility(
+				android.view.View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+				| android.view.View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+				| android.view.View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
+		}
+
 		ViewGroup.LayoutParams baseToolbarParams = toolbar.getLayoutParams();
 		int baseToolbarHeight = baseToolbarParams != null ? baseToolbarParams.height : V.dp(64);
 		int baseInputBottom = inputBar.getPaddingBottom();
+		view.setFitsSystemWindows(true);
 		view.setOnApplyWindowInsetsListener((v, insets) -> {
 			int top = insets.getSystemWindowInsetTop();
 			int bottom = insets.getStableInsetBottom();
@@ -95,7 +109,7 @@ public class ChatFragment extends Fragment {
 			toolbarParams.height = baseToolbarHeight + top;
 			toolbar.setLayoutParams(toolbarParams);
 			inputBar.setPadding(inputBar.getPaddingLeft(), inputBar.getPaddingTop(), inputBar.getPaddingRight(), baseInputBottom + bottom);
-			return v.onApplyWindowInsets(insets);
+			return insets;
 		});
 		view.requestApplyInsets();
 
