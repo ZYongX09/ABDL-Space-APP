@@ -155,8 +155,10 @@
     <string name="sk_edit_list_title">Edit list</string>
     <string name="sk_your_lists">Your lists</string>
     <string name="sk_timeline_home">Home</string>
+    <string name="sk_timeline_nbw">宝宝新天地</string>
     <string name="sk_timeline_local">Local</string>
     <string name="sk_timeline_federated">Federation</string>
+    <string name="sk_timeline_nbw">NBW</string>
     <string name="sk_timeline_bubble">Bubble</string>
     <string name="sk_recent_searches_placeholder">Type to start searching</string>
     <string name="sk_remove_follower">Remove as follower</string>
