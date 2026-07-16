@@ -84,16 +84,20 @@ public class ChatFragment extends Fragment {
 
 		View toolbar = view.findViewById(R.id.toolbar);
 		View inputBar = view.findViewById(R.id.input_bar);
+		ViewGroup.LayoutParams baseToolbarParams = toolbar.getLayoutParams();
+		int baseToolbarHeight = baseToolbarParams != null ? baseToolbarParams.height : V.dp(64);
+		int baseInputBottom = inputBar.getPaddingBottom();
 		view.setOnApplyWindowInsetsListener((v, insets) -> {
 			int top = insets.getSystemWindowInsetTop();
 			int bottom = insets.getStableInsetBottom();
-			toolbar.setPadding(toolbar.getPaddingLeft(), top, toolbar.getPaddingRight(), toolbar.getPaddingBottom());
+			toolbar.setPadding(toolbar.getPaddingLeft(), top, toolbar.getPaddingRight(), 0);
 			ViewGroup.LayoutParams toolbarParams = toolbar.getLayoutParams();
-			toolbarParams.height = V.dp(64) + top;
+			toolbarParams.height = baseToolbarHeight + top;
 			toolbar.setLayoutParams(toolbarParams);
-			inputBar.setPadding(inputBar.getPaddingLeft(), inputBar.getPaddingTop(), inputBar.getPaddingRight(), V.dp(8) + bottom);
-			return insets;
+			inputBar.setPadding(inputBar.getPaddingLeft(), inputBar.getPaddingTop(), inputBar.getPaddingRight(), baseInputBottom + bottom);
+			return v.onApplyWindowInsets(insets);
 		});
+		view.requestApplyInsets();
 
 		ImageButton backBtn = view.findViewById(R.id.back_btn);
 		backBtn.setImageTintList(ColorStateList.valueOf(UiUtils.getThemeColor(getActivity(), R.attr.colorM3OnSurface)));
