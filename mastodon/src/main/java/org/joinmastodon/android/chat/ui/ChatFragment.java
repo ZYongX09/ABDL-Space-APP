@@ -4,7 +4,6 @@ import android.app.Fragment;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.content.res.ColorStateList;
-import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -13,6 +12,7 @@ import android.text.TextWatcher;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowInsets;
 import android.view.ViewTreeObserver;
 import android.widget.EditText;
 import android.widget.ImageButton;
@@ -39,11 +39,12 @@ import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
 
+import me.grishka.appkit.fragments.WindowInsetsAwareFragment;
 import me.grishka.appkit.imageloader.ViewImageLoader;
 import me.grishka.appkit.imageloader.requests.UrlImageLoaderRequest;
 import me.grishka.appkit.utils.V;
 
-public class ChatFragment extends Fragment {
+public class ChatFragment extends Fragment implements WindowInsetsAwareFragment {
 	private long peerId;
 	private String peerName;
 	private String peerAvatar;
@@ -54,6 +55,10 @@ public class ChatFragment extends Fragment {
 	private EditText inputField;
 	private ImageButton sendBtn;
 	private LinearLayoutManager layoutManager;
+	private View toolbar;
+	private View inputBar;
+	private int baseToolbarHeight;
+	private int baseInputBottom;
 
 	private boolean autoScroll = true;
 	private boolean loadingMore = false;
@@ -83,35 +88,11 @@ public class ChatFragment extends Fragment {
 	public void onViewCreated(View view, Bundle savedInstanceState) {
 		super.onViewCreated(view, savedInstanceState);
 
-		View toolbar = view.findViewById(R.id.toolbar);
-		View inputBar = view.findViewById(R.id.input_bar);
-
-		// Make the window dispatch raw insets instead of consuming them at the activity level
-		android.view.Window window = getActivity().getWindow();
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-			window.setDecorFitsSystemWindows(false);
-		} else {
-			window.getDecorView().setSystemUiVisibility(
-				android.view.View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-				| android.view.View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-				| android.view.View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
-		}
-
+		toolbar = view.findViewById(R.id.toolbar);
+		inputBar = view.findViewById(R.id.input_bar);
 		ViewGroup.LayoutParams baseToolbarParams = toolbar.getLayoutParams();
-		int baseToolbarHeight = baseToolbarParams != null ? baseToolbarParams.height : V.dp(64);
-		int baseInputBottom = inputBar.getPaddingBottom();
-		view.setFitsSystemWindows(true);
-		view.setOnApplyWindowInsetsListener((v, insets) -> {
-			int top = insets.getSystemWindowInsetTop();
-			int bottom = insets.getStableInsetBottom();
-			toolbar.setPadding(toolbar.getPaddingLeft(), top, toolbar.getPaddingRight(), 0);
-			ViewGroup.LayoutParams toolbarParams = toolbar.getLayoutParams();
-			toolbarParams.height = baseToolbarHeight + top;
-			toolbar.setLayoutParams(toolbarParams);
-			inputBar.setPadding(inputBar.getPaddingLeft(), inputBar.getPaddingTop(), inputBar.getPaddingRight(), baseInputBottom + bottom);
-			return insets;
-		});
-		view.requestApplyInsets();
+		baseToolbarHeight = baseToolbarParams != null ? baseToolbarParams.height : V.dp(64);
+		baseInputBottom = inputBar.getPaddingBottom();
 
 		ImageButton backBtn = view.findViewById(R.id.back_btn);
 		backBtn.setImageTintList(ColorStateList.valueOf(UiUtils.getThemeColor(getActivity(), R.attr.colorM3OnSurface)));
@@ -300,5 +281,27 @@ public class ChatFragment extends Fragment {
 	@Subscribe
 	public void onTyping(ChatEvents.TypingEvent evt) {
 		// TODO: 显示 typing 指示器
+	}
+
+	@Override
+	public void onApplyWindowInsets(WindowInsets insets) {
+		if (toolbar == null || inputBar == null) return;
+		int top = insets.getSystemWindowInsetTop();
+		int bottom = insets.getStableInsetBottom();
+		toolbar.setPadding(toolbar.getPaddingLeft(), top, toolbar.getPaddingRight(), 0);
+		ViewGroup.LayoutParams toolbarParams = toolbar.getLayoutParams();
+		toolbarParams.height = baseToolbarHeight + top;
+		toolbar.setLayoutParams(toolbarParams);
+		inputBar.setPadding(inputBar.getPaddingLeft(), inputBar.getPaddingTop(), inputBar.getPaddingRight(), baseInputBottom + bottom);
+	}
+
+	@Override
+	public boolean wantsLightStatusBar() {
+		return !UiUtils.isDarkTheme();
+	}
+
+	@Override
+	public boolean wantsLightNavigationBar() {
+		return !UiUtils.isDarkTheme();
 	}
 }
