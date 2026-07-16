@@ -210,11 +210,19 @@ public class ChatFragment extends Fragment implements WindowInsetsAwareFragment 
 
 	private void loadMessages() {
 		if (accountId == null) return;
-		ChatController.getInstance(accountId).loadMessages(peerId, 0, 50,
+		ChatController controller = ChatController.getInstance(accountId);
+		List<ChatMessage> cached = controller.getCachedMessages(peerId, 50);
+		if (!cached.isEmpty()) {
+			adapter.setMessages(cached);
+			oldestMessageId = cached.get(0).id;
+			scrollToBottom();
+		}
+		controller.loadMessages(peerId, 0, 50,
 				new me.grishka.appkit.api.Callback<List<ChatMessage>>() {
 					@Override public void onSuccess(List<ChatMessage> result) {
-						adapter.setMessages(result);
-						if (!result.isEmpty()) oldestMessageId = result.get(0).id;
+						List<ChatMessage> updated = controller.getCachedMessages(peerId, 50);
+						adapter.setMessages(updated);
+						if (!updated.isEmpty()) oldestMessageId = updated.get(0).id;
 						scrollToBottom();
 					}
 					@Override public void onError(me.grishka.appkit.api.ErrorResponse error) {}

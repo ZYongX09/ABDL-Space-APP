@@ -58,6 +58,10 @@ public class ChatController {
 
 	public ChatStorage getStorage() { return storage; }
 
+	public List<ChatMessage> getCachedMessages(long peerId, int limit) {
+		return storage.getMessages(accountId, peerId, limit);
+	}
+
 	public void loadConversations(boolean forceNetwork, Callback<List<Conversation>> callback) {
 		List<Conversation> cached = storage.listConversations(accountId);
 		if (!cached.isEmpty() && !forceNetwork) {

@@ -18,6 +18,8 @@ import org.joinmastodon.android.api.requests.search.GetSearchResults;
 import org.joinmastodon.android.api.requests.accounts.GetAccountByID;
 import org.joinmastodon.android.api.session.AccountSession;
 import org.joinmastodon.android.api.session.AccountSessionManager;
+import org.joinmastodon.android.chat.ChatController;
+import org.joinmastodon.android.chat.ChatEvents;
 import org.joinmastodon.android.chat.ChatRealtimeClient;
 import org.joinmastodon.android.chat.ui.ConversationsFragment;
 import org.joinmastodon.android.chat.ui.ChatFragment;
@@ -36,6 +38,7 @@ import org.joinmastodon.android.updater.GithubSelfUpdater;
 import org.parceler.Parcels;
 
 import java.lang.reflect.InvocationTargetException;
+import java.util.List;
 
 import androidx.annotation.Nullable;
 import me.grishka.appkit.FragmentStackActivity;
@@ -56,6 +59,7 @@ public class MainActivity extends FragmentStackActivity{
 		if(savedInstanceState==null){
 			restartHomeFragment();
 			connectChatWebSocket();
+			refreshChatConversations();
 		}
 
 		if(BuildConfig.BUILD_TYPE.startsWith("appcenter")){
@@ -325,6 +329,20 @@ public class MainActivity extends FragmentStackActivity{
 		if(session==null || !session.activated) return;
 		chatWsClient=new ChatRealtimeClient(session.getID());
 		chatWsClient.connect();
+	}
+
+	private void refreshChatConversations(){
+		AccountSession session=AccountSessionManager.getInstance().getLastActiveAccount();
+		if(session==null || !session.activated) return;
+		ChatController.getInstance(session.getID()).loadConversations(true, new Callback<List<org.joinmastodon.android.chat.model.Conversation>>(){
+			@Override public void onSuccess(List<org.joinmastodon.android.chat.model.Conversation> result){
+				E.post(new ChatEvents.ConversationsUpdatedEvent());
+			}
+
+			@Override public void onError(ErrorResponse error){
+				Log.w(TAG, "Conversation refresh failed: "+error);
+			}
+		});
 	}
 
 	private void showChatConversations(){
