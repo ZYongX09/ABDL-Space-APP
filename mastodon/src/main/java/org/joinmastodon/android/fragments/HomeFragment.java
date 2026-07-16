@@ -83,6 +83,7 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 	private TextView notificationsBadge;
 	private TextView diaperNewFeatureBadge;
 	private AlertDialog featureDialog;
+	private AlertDialog autoStartGuideDialog;
 
 	private String accountID;
 
@@ -133,6 +134,10 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 		if(featureDialog!=null){
 			featureDialog.dismiss();
 			featureDialog=null;
+		}
+		if(autoStartGuideDialog!=null){
+			autoStartGuideDialog.dismiss();
+			autoStartGuideDialog=null;
 		}
 		super.onDestroyView();
 	}
@@ -408,7 +413,7 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 	}
 
 	private void showAutoStartGuideIfNeeded(){
-		if(getActivity()==null)
+		if(autoStartGuideDialog!=null || getActivity()==null)
 			return;
 		org.joinmastodon.android.ui.utils.OemUtils.Vendor vendor=org.joinmastodon.android.ui.utils.OemUtils.detectVendor();
 		if(vendor==org.joinmastodon.android.ui.utils.OemUtils.Vendor.OTHER)
@@ -417,7 +422,7 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 			return;
 		if(GlobalUserPreferences.getPrefs().getBoolean("autoStartGuideShown_"+BuildConfig.VERSION_NAME, false))
 			return;
-		new M3AlertDialogBuilder(getActivity())
+		autoStartGuideDialog=new M3AlertDialogBuilder(getActivity())
 				.setTitle("开启实时通知")
 				.setMessage("您当前使用的是"+vendor.displayName+"手机，需要允许后台运行才能尽可能保证您能实时收到通知")
 				.setPositiveButton("去设置", (dialog, which)->{
@@ -427,7 +432,9 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 				.setNegativeButton("以后再说", (dialog, which)->
 						GlobalUserPreferences.getPrefs().edit().putBoolean("autoStartGuideShown_"+BuildConfig.VERSION_NAME, true).apply())
 				.setCancelable(false)
-				.show();
+				.create();
+		autoStartGuideDialog.setOnDismissListener(dialog->autoStartGuideDialog=null);
+		autoStartGuideDialog.show();
 	}
 
 	private void reloadNotificationsForUnreadCount(){
