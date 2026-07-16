@@ -54,7 +54,7 @@ public class ChatMessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHo
 	private void rebuildItems() {
 		items.clear();
 		String lastDate = null;
-		for (int i = messages.size() - 1; i >= 0; i--) {
+		for (int i = 0; i < messages.size(); i++) {
 			ChatMessage msg = messages.get(i);
 			String date = formatDate(msg.createdAt);
 			if (!date.equals(lastDate)) {

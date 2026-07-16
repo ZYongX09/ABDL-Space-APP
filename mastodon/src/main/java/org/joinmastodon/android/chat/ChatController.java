@@ -242,7 +242,7 @@ public class ChatController {
 		if (o == null) return System.currentTimeMillis();
 		String s = String.valueOf(o);
 		try {
-			if (s.contains("-")) return java.text.SimpleDateFormat.getDateTimeInstance().parse(s).getTime();
+			if (s.contains("-")) return new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US).parse(s).getTime();
 			return Long.parseLong(s) * 1000;
 		} catch (Exception e) { return System.currentTimeMillis(); }
 	}
