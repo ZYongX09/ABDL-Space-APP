@@ -3,7 +3,7 @@ package org.joinmastodon.android.fragments.discover;
 import android.net.Uri;
 import android.os.Bundle;
 
-import org.joinmastodon.android.api.requests.timelines.GetPublicTimeline;
+import org.joinmastodon.android.api.requests.timelines.GetAllTimeline;
 import org.joinmastodon.android.api.session.AccountSessionManager;
 import org.joinmastodon.android.fragments.StatusListFragment;
 import org.joinmastodon.android.model.FilterContext;
@@ -19,7 +19,6 @@ import me.grishka.appkit.utils.MergeRecyclerAdapter;
 
 public class FederatedTimelineFragment extends StatusListFragment implements ProvidesAssistContent.ProvidesWebUri{
 	private DiscoverInfoBannerHelper bannerHelper;
-
 	private String maxID;
 
 	@Override
@@ -30,18 +29,25 @@ public class FederatedTimelineFragment extends StatusListFragment implements Pro
 
 	@Override
 	protected void doLoadData(int offset, int count){
-		currentRequest=new GetPublicTimeline(false, false, getMaxID(), null, count, null, getLocalPrefs().timelineReplyVisibility)
+		if(offset==0) maxID=null;
+		GetAllTimeline request=new GetAllTimeline(maxID, count);
+		currentRequest=request
 				.setCallback(new SimpleCallback<>(this){
 					@Override
 					public void onSuccess(List<Status> result){
 						if(getActivity()==null) return;
-						boolean more=applyMaxID(result);
+						maxID=request.getNextMaxID();
 						AccountSessionManager.get(accountID).filterStatuses(result, getFilterContext());
-						onDataLoaded(result, more);
+						onDataLoaded(result, maxID!=null);
 						bannerHelper.onBannerBecameVisible();
 					}
 				})
 				.exec(accountID);
+	}
+
+	@Override
+	protected String getMaxID(){
+		return maxID;
 	}
 
 	@Override
@@ -53,12 +59,12 @@ public class FederatedTimelineFragment extends StatusListFragment implements Pro
 	}
 
 	@Override
-	protected FilterContext getFilterContext() {
+	protected FilterContext getFilterContext(){
 		return FilterContext.PUBLIC;
 	}
 
 	@Override
-	public Uri getWebUri(Uri.Builder base) {
-		return base.path(isInstanceAkkoma() ? "/main/all" : "/public").build();
+	public Uri getWebUri(Uri.Builder base){
+		return base.path("/api/v1/timelines/all").build();
 	}
 }
