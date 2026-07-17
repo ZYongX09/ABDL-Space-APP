@@ -66,13 +66,20 @@ public class ChatController {
 	 * 收到新消息时立即更新会话列表缓存
 	 */
 	public void upsertConversationFromMessage(ChatMessage msg) {
-		Conversation conv = new Conversation();
+		Conversation conv = null;
+		for (Conversation existing : storage.listConversations(accountId)) {
+			if (existing.peerId == msg.peerId) {
+				conv = existing;
+				break;
+			}
+		}
+		if (conv == null) conv = new Conversation();
 		conv.accountId = accountId;
 		conv.peerId = msg.peerId;
 		conv.lastMessage = msg.content;
 		conv.lastMessageAt = msg.createdAt;
 		conv.lastMessageId = msg.id;
-		conv.unreadCount = msg.out ? 0 : 1;
+		if (!msg.out) conv.unreadCount++;
 		storage.upsertConversation(accountId, conv);
 	}
 
@@ -129,7 +136,8 @@ public class ChatController {
 							msg.senderId = toLong(m.get("sender_id"));
 							msg.peerId = peerId;
 							msg.content = str(m.get("content"));
-							msg.clientMsgId = str(m.get("client_msg_id"));
+							Object clientMsgId = m.get("client_msg_id");
+							msg.clientMsgId = clientMsgId != null ? String.valueOf(clientMsgId) : null;
 							msg.createdAt = parseTime(m.get("created_at"));
 							msg.out = msg.senderId == getCurrentUserId();
 							msg.sendState = msg.out && toBool(m.get("read")) ? SendState.READ : (msg.id > 0 ? SendState.SENT : null);
@@ -145,7 +153,7 @@ public class ChatController {
 	}
 
 	public void markRead(long peerId, long readUpToId) {
-		storage.markReadByServerId(accountId, peerId, readUpToId);
+		storage.setConversationUnreadCount(accountId, peerId, 0);
 		new MarkChatRead(peerId, readUpToId).setCallback(new Callback<Map<String, Object>>() {
 			@Override public void onSuccess(Map<String, Object> result) {}
 			@Override public void onError(ErrorResponse error) { Log.w(TAG, "markRead failed: " + error); }
@@ -194,10 +202,13 @@ public class ChatController {
 			case "message.read" -> {
 				final long readPeerId = event.has("peer_id") ? event.get("peer_id").getAsLong() : 0;
 				final long readUpToId = event.has("read_up_to_id") ? event.get("read_up_to_id").getAsLong() : 0;
+				final long readerId = event.has("reader_id") ? event.get("reader_id").getAsLong() : 0;
 				if (readUpToId > 0) {
-					storage.markReadByServerId(accountId, readPeerId, readUpToId);
+					if (readerId != getCurrentUserId()) {
+						storage.markReadByServerId(accountId, readPeerId, readUpToId);
+						handler.post(() -> E.post(new ChatEvents.MessageReadEvent(readPeerId, readUpToId)));
+					}
 					if (eventId > 0) storage.setLastEventId(accountId, eventId);
-					handler.post(() -> E.post(new ChatEvents.MessageReadEvent(readPeerId, readUpToId)));
 				}
 			}
 			case "typing" -> {

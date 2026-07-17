@@ -117,6 +117,13 @@ public class ChatStorage extends SQLiteOpenHelper {
 		getWritableDatabase().insertWithOnConflict("chat_drafts", null, cv, SQLiteDatabase.CONFLICT_REPLACE);
 	}
 
+	public void setConversationUnreadCount(String accountId, long peerId, int unreadCount) {
+		ContentValues cv = new ContentValues();
+		cv.put("unread_count", unreadCount);
+		getWritableDatabase().update("chat_conversations", cv,
+				"account_id = ? AND peer_id = ?", new String[]{accountId, String.valueOf(peerId)});
+	}
+
 	public String getDraft(String accountId, long peerId) {
 		Cursor cursor = getReadableDatabase().query("chat_drafts", new String[]{"content"},
 				"account_id = ? AND peer_id = ?", new String[]{accountId, String.valueOf(peerId)}, null, null, null);

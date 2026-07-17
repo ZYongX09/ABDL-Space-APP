@@ -190,14 +190,7 @@ public class ChatFragment extends Fragment implements WindowInsetsAwareFragment 
 		E.register(this);
 		if (accountId != null) {
 			ChatController controller = ChatController.getInstance(accountId);
-			ChatStorage storage = ChatStorage.getInstance(getActivity());
-			List<ChatMessage> msgs = storage.getMessages(accountId, peerId, 1);
-			if (!msgs.isEmpty()) {
-				ChatMessage last = msgs.get(msgs.size() - 1);
-				if (!last.out && last.id > 0) {
-					controller.markRead(peerId, last.id);
-				}
-			}
+			markLatestIncomingRead(controller.getCachedMessages(peerId, 50));
 		}
 	}
 
@@ -224,9 +217,23 @@ public class ChatFragment extends Fragment implements WindowInsetsAwareFragment 
 						adapter.setMessages(updated);
 						if (!updated.isEmpty()) oldestMessageId = updated.get(0).id;
 						scrollToBottom();
+						markLatestIncomingRead(updated);
 					}
-					@Override public void onError(me.grishka.appkit.api.ErrorResponse error) {}
+					@Override public void onError(me.grishka.appkit.api.ErrorResponse error) {
+						markLatestIncomingRead(cached);
+					}
 				});
+	}
+
+	private void markLatestIncomingRead(List<ChatMessage> messages) {
+		if (accountId == null) return;
+		for (int i = messages.size() - 1; i >= 0; i--) {
+			ChatMessage message = messages.get(i);
+			if (!message.out && message.id > 0) {
+				ChatController.getInstance(accountId).markRead(peerId, message.id);
+				return;
+			}
+		}
 	}
 
 	private void loadMore() {
