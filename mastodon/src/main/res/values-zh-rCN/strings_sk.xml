@@ -148,7 +148,6 @@
     <string name="sk_remove_follower_success">已成功删除粉丝</string>
     <string name="sk_changelog">更新日志</string>
     <string name="sk_timeline_home">主页</string>
-    <string name="sk_timeline_nbw">宝宝新天地</string>
     <string name="sk_timeline_local">本站</string>
     <string name="sk_alt_text_missing">至少有一个附件不包含描述。</string>
     <string name="sk_publish_anyway">仍然发布</string>
