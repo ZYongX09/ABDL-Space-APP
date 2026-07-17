@@ -407,6 +407,31 @@
 							android:indeterminate="true"
 							android:outlineProvider="none"
 							android:visibility="gone" />
+
+						<LinearLayout
+							android:id="@+id/nbw_source_notice"
+							android:layout_width="match_parent"
+							android:layout_height="40dp"
+							android:background="@drawable/bg_handle_help"
+							android:gravity="center"
+							android:orientation="horizontal"
+							android:paddingHorizontal="12dp"
+							android:visibility="gone">
+
+							<ImageView
+								android:layout_width="24dp"
+								android:layout_height="24dp"
+								android:contentDescription="@string/nbw_third_party_nbw"
+								android:src="@drawable/ic_nbw_logo" />
+
+							<TextView
+								android:layout_width="wrap_content"
+								android:layout_height="wrap_content"
+								android:layout_marginStart="8dp"
+								android:text="@string/nbw_profile_source"
+								android:textColor="?colorM3OnSurface"
+								android:textSize="14sp" />
+						</LinearLayout>
 					</FrameLayout>
 					
 					<ImageButton

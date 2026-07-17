@@ -149,6 +149,7 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 	private View nameEditWrap, bioEditWrap;
 	private View tabsDivider;
 	private View actionButtonWrap;
+	private View nbwSourceNotice;
 	private CustomDrawingOrderLinearLayout scrollableContent;
 	private ImageButton qrCodeButton;
 	private ProgressBar innerProgress;
@@ -253,6 +254,7 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 		countersLayout=content.findViewById(R.id.profile_counters);
 		tabsDivider=content.findViewById(R.id.tabs_divider);
 		actionButtonWrap=content.findViewById(R.id.profile_action_btn_wrap);
+		nbwSourceNotice=content.findViewById(R.id.nbw_source_notice);
 		scrollableContent=content.findViewById(R.id.scrollable_content);
 		qrCodeButton=content.findViewById(R.id.qr_code);
 		innerProgress=content.findViewById(R.id.profile_progress);
@@ -729,6 +731,7 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 		UiUtils.loadCustomEmojiInTextView(bio);
 
 		if(AccountSessionManager.getInstance().isSelf(accountID, account)){
+			nbwSourceNotice.setVisibility(View.GONE);
 			actionButton.setText(R.string.edit_profile);
 			TypedArray ta=actionButton.getContext().obtainStyledAttributes(R.style.Widget_Mastodon_M3_Button_Tonal, new int[]{android.R.attr.background});
 			actionButton.setBackground(ta.getDrawable(0));
@@ -738,6 +741,8 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 			ta.recycle();
 		}else{
 			actionButton.setVisibility(View.GONE);
+			actionProgress.setVisibility(View.GONE);
+			nbwSourceNotice.setVisibility(isNBWAccount() ? View.VISIBLE : View.GONE);
 		}
 
 		fields.clear();
@@ -986,14 +991,26 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 
 	private void updateRelationship(){
 		invalidateOptionsMenu();
-		actionButton.setVisibility(View.VISIBLE);
-		UiUtils.setRelationshipToActionButtonM3(relationship, actionButton);
-		actionProgress.setIndeterminateTintList(actionButton.getTextColors());
-		followsYouView.setVisibility(relationship.followedBy ? View.VISIBLE : View.GONE);
+		if(isNBWAccount()){
+			actionButton.setVisibility(View.GONE);
+			actionProgress.setVisibility(View.GONE);
+			nbwSourceNotice.setVisibility(View.VISIBLE);
+			followsYouView.setVisibility(View.GONE);
+		}else{
+			nbwSourceNotice.setVisibility(View.GONE);
+			actionButton.setVisibility(View.VISIBLE);
+			UiUtils.setRelationshipToActionButtonM3(relationship, actionButton);
+			actionProgress.setIndeterminateTintList(actionButton.getTextColors());
+			followsYouView.setVisibility(relationship.followedBy ? View.VISIBLE : View.GONE);
+		}
 
 		// MOSHIDON: private note stuff!
 		showPrivateNote();
 		UiUtils.beginLayoutTransition(scrollableContent);
+	}
+
+	private boolean isNBWAccount(){
+		return account!=null && account.id!=null && account.id.startsWith("nbw_");
 	}
 
 	private void updateFamiliarFollowers(){
