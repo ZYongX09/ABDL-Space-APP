@@ -81,7 +81,7 @@ public class ConversationsFragment extends Fragment {
 	private void loadData() {
 		if (accountId == null) return;
 		ChatController controller = ChatController.getInstance(accountId);
-		controller.loadConversations(false, new me.grishka.appkit.api.Callback<List<Conversation>>() {
+		controller.loadConversations(true, new me.grishka.appkit.api.Callback<List<Conversation>>() {
 			@Override public void onSuccess(List<Conversation> result) {
 				data.clear();
 				data.addAll(result);

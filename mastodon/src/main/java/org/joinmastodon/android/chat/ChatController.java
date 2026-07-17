@@ -62,6 +62,20 @@ public class ChatController {
 		return storage.getMessages(accountId, peerId, limit);
 	}
 
+	/**
+	 * 收到新消息时立即更新会话列表缓存
+	 */
+	public void upsertConversationFromMessage(ChatMessage msg) {
+		Conversation conv = new Conversation();
+		conv.accountId = accountId;
+		conv.peerId = msg.peerId;
+		conv.lastMessage = msg.content;
+		conv.lastMessageAt = msg.createdAt;
+		conv.lastMessageId = msg.id;
+		conv.unreadCount = msg.out ? 0 : 1;
+		storage.upsertConversation(accountId, conv);
+	}
+
 	public void loadConversations(boolean forceNetwork, Callback<List<Conversation>> callback) {
 		List<Conversation> cached = storage.listConversations(accountId);
 		if (!cached.isEmpty() && !forceNetwork) {
