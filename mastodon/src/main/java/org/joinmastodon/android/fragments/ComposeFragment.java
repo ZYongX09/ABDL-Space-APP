@@ -59,6 +59,7 @@ import org.joinmastodon.android.E;
 import org.joinmastodon.android.GlobalUserPreferences;
 import org.joinmastodon.android.R;
 import org.joinmastodon.android.api.MastodonErrorResponse;
+import org.joinmastodon.android.api.requests.nbw.RecommendNBWForum;
 import org.joinmastodon.android.api.requests.statuses.CreateStatus;
 import org.joinmastodon.android.api.requests.statuses.EditStatus;
 import org.joinmastodon.android.api.session.AccountSession;
@@ -86,7 +87,6 @@ import org.joinmastodon.android.ui.PopupKeyboard;
 import org.joinmastodon.android.ui.displayitems.InlineStatusStatusDisplayItem;
 import org.joinmastodon.android.ui.displayitems.StatusDisplayItem;
 import org.joinmastodon.android.ui.drawables.SpoilerStripesDrawable;
-import org.joinmastodon.android.ui.sheets.ComposerVisibilitySheet;
 import org.joinmastodon.android.ui.sheets.ListItemsSheet;
 import org.joinmastodon.android.ui.text.ComposeAutocompleteSpan;
 import org.joinmastodon.android.ui.text.ComposeHashtagOrMentionSpan;
@@ -181,6 +181,8 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	private WindowManager wm;
 	private StatusPrivacy statusVisibility=StatusPrivacy.PUBLIC;
 	private StatusQuotePolicy statusQuotePolicy=StatusQuotePolicy.PUBLIC;
+	private int selectedNBWForumId;
+	private int resolvedNBWForumId=27;
 	private ComposeAutocompleteSpan currentAutocompleteSpan;
 	private FrameLayout mainEditTextWrap;
 	private ComposeLanguageAlertViewController.SelectedOption postLang;
@@ -246,6 +248,8 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 
 		if(getArguments().containsKey("quote"))
 			quotedStatus=Parcels.unwrap(getArguments().getParcelable("quote"));
+		if(getArguments().containsKey("replyTo"))
+			replyTo=Parcels.unwrap(getArguments().getParcelable("replyTo"));
 	}
 
 	@Override
@@ -385,13 +389,8 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 			spoilerBtn.setSelected(true);
 		}
 
-		if(editingStatus!=null && editingStatus.visibility!=null){
-			statusVisibility=editingStatus.visibility;
-			if(editingStatus.quoteApproval!=null){
-				statusQuotePolicy=editingStatus.quoteApproval.toQuotePolicy();
-			}
-		}
-		updateVisibilityButton(false);
+		statusVisibility=StatusPrivacy.PUBLIC;
+		updateNBWForumButton(false);
 
 		autocompleteViewController=new ComposeAutocompleteViewController(getActivity(), accountID);
 		autocompleteViewController.setCompletionSelectedListener(new ComposeAutocompleteViewController.AutocompleteListener(){
@@ -449,7 +448,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		pollViewController.onSaveInstanceState(outState);
 		mediaViewController.onSaveInstanceState(outState);
 		outState.putBoolean("hasSpoiler", hasSpoiler);
-		outState.putSerializable("visibility", statusVisibility);
+		outState.putInt("nbwForumId", selectedNBWForumId);
 		outState.putParcelable("postLang", Parcels.wrap(postLang));
 		if(currentAutocompleteSpan!=null){
 			Editable e=mainEditText.getText();
@@ -481,8 +480,10 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	@Override
 	public void onViewCreated(View view, Bundle savedInstanceState){
 		super.onViewCreated(view, savedInstanceState);
-		if(editingStatus==null)
-			loadDefaultStatusVisibility(savedInstanceState);
+		statusVisibility=StatusPrivacy.PUBLIC;
+		if(savedInstanceState!=null)
+			selectedNBWForumId=savedInstanceState.getInt("nbwForumId", 0);
+		updateNBWForumButton(false);
 		contentView.setSizeListener(emojiKeyboard::onContentViewSizeChanged);
 		InputMethodManager imm=getActivity().getSystemService(InputMethodManager.class);
 		mainEditText.requestFocus();
@@ -805,6 +806,32 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	}
 
 	private void publish(){
+		if(selectedNBWForumId!=0){
+			resolvedNBWForumId=selectedNBWForumId;
+			publishResolved();
+			return;
+		}
+		String content=mainEditText.getText().toString().trim();
+		new RecommendNBWForum(content).setCallback(new Callback<>(){
+			@Override
+			public void onSuccess(RecommendNBWForum.Response result){
+				resolvedNBWForumId=isValidNBWForumId(result.fid) ? result.fid : 27;
+				publishResolved();
+			}
+
+			@Override
+			public void onError(ErrorResponse error){
+				resolvedNBWForumId=27;
+				publishResolved();
+			}
+		}).exec(accountID);
+	}
+
+	private boolean isValidNBWForumId(int fid){
+		return fid==28 || fid==27 || fid==26 || fid==3;
+	}
+
+	private void publishResolved(){
 		Runnable publishAction=()->{
 			sendingOverlay=new View(getActivity());
 			WindowManager.LayoutParams overlayParams=new WindowManager.LayoutParams();
@@ -844,7 +871,8 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		String text=mainEditText.getText().toString();
 		CreateStatus.Request req=new CreateStatus.Request();
 		req.status=text;
-		req.visibility=statusVisibility;
+		req.visibility=StatusPrivacy.PUBLIC;
+		req.nbwFid=resolvedNBWForumId;
 		if(!mediaViewController.isEmpty()){
 			req.mediaIds=mediaViewController.getAttachmentIDs();
 			req.mediaAttributes=mediaViewController.getAttachmentAttributes();
@@ -1151,86 +1179,24 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	}
 
 	private void onVisibilityClick(View v){
-		if(instance.supportsQuotePostAuthoring()){
-			ComposerVisibilitySheet sheet=new ComposerVisibilitySheet(getActivity(), statusVisibility, statusQuotePolicy,
-					true, quotedStatus!=null, quotedStatus==null ? StatusPrivacy.PUBLIC : quotedStatus.visibility, accountID, (s, visibility, policy)->{
-				if(statusVisibility!=visibility || statusQuotePolicy!=policy){
-					statusVisibility=visibility;
-					statusQuotePolicy=policy;
-					updateVisibilityButton(true);
-					if(quotedStatus!=null && visibility==StatusPrivacy.DIRECT){
-						mainEditText.append("\n\n"+quotedStatus.url);
-						removeQuote();
-					}
-				}
-				return true;
-			});
-			sheet.show();
-		}else{
-			ArrayList<ListItem<StatusPrivacy>> items=new ArrayList<>();
-			ExtendedPopupMenu menu=new ExtendedPopupMenu(getActivity(), items);
-			Consumer<ListItem<StatusPrivacy>> onClick=i->{
-				if(statusVisibility!=i.parentObject){
-					statusVisibility=i.parentObject;
-					updateVisibilityButton(true);
-				}
-				menu.dismiss();
-			};
-			items.add(new ListItem<>(R.string.visibility_public, R.string.visibility_subtitle_public, R.drawable.ic_public_24px, StatusPrivacy.PUBLIC, onClick));
-			items.add(new ListItem<>(R.string.visibility_unlisted, R.string.visibility_subtitle_unlisted, R.drawable.ic_clear_night_24px, StatusPrivacy.UNLISTED, onClick));
-			items.add(new ListItem<>(R.string.visibility_followers_only, R.string.visibility_subtitle_followers, R.drawable.ic_lock_24px, StatusPrivacy.PRIVATE, onClick));
-			items.add(new ListItem<>(R.string.visibility_private, R.string.visibility_subtitle_private, R.drawable.ic_alternate_email_24px, StatusPrivacy.DIRECT, onClick));
-			menu.showAsDropDown(v);
-		}
+		ArrayList<ListItem<Integer>> items=new ArrayList<>();
+		ExtendedPopupMenu menu=new ExtendedPopupMenu(getActivity(), items);
+		Consumer<ListItem<Integer>> onClick=item->{
+			selectedNBWForumId=item.parentObject;
+			updateNBWForumButton(true);
+			menu.dismiss();
+		};
+		items.add(new ListItem<>(R.string.nbw_forum_ai, R.string.nbw_forum_ai_subtitle, R.drawable.ic_fluent_wand_24_regular, 0, onClick));
+		items.add(new ListItem<>(R.string.nbw_forum_selfie, 0, R.drawable.ic_fluent_camera_24_regular, 28, onClick));
+		items.add(new ListItem<>(R.string.nbw_forum_share, 0, R.drawable.ic_fluent_share_24_regular, 27, onClick));
+		items.add(new ListItem<>(R.string.nbw_forum_novel, 0, R.drawable.ic_fluent_book_24_regular, 26, onClick));
+		items.add(new ListItem<>(R.string.nbw_forum_friends, 0, R.drawable.ic_fluent_group_24_regular, 3, onClick));
+		menu.showAsDropDown(v);
 	}
 
-	private void loadDefaultStatusVisibility(Bundle savedInstanceState){
-		if(getArguments().containsKey("replyTo")){
-			replyTo=Parcels.unwrap(getArguments().getParcelable("replyTo"));
-			statusVisibility=replyTo.visibility;
-		}
-
-		// A saved privacy setting from a previous compose session wins over the reply visibility
-		if(savedInstanceState!=null){
-			statusVisibility=(StatusPrivacy) savedInstanceState.getSerializable("visibility");
-		}
-
-		Preferences prevPrefs=AccountSessionManager.getInstance().getAccount(accountID).preferences;
-		if(prevPrefs!=null){
-			applyPreferencesForPostVisibility(prevPrefs, savedInstanceState);
-		}
-		AccountSessionManager.getInstance().getAccount(accountID).reloadPreferences(prefs->{
-			applyPreferencesForPostVisibility(prefs, savedInstanceState);
-		});
-	}
-
-	private void applyPreferencesForPostVisibility(Preferences prefs, Bundle savedInstanceState){
-		if(quotedStatus!=null && quotedStatus.visibility==StatusPrivacy.UNLISTED){
-			statusVisibility=StatusPrivacy.UNLISTED;
-		}
-
-		// Only override the reply visibility if our preference is more private
-		if(prefs.postingDefaultVisibility.isLessVisibleThan(statusVisibility)){
-			statusVisibility=prefs.postingDefaultVisibility;
-		}
-
-		// A saved privacy setting from a previous compose session wins over all
-		if(savedInstanceState!=null){
-			statusVisibility=(StatusPrivacy) savedInstanceState.getSerializable("visibility");
-		}
-
-		if(prefs.postingDefaultQuotePolicy!=null)
-			statusQuotePolicy=prefs.postingDefaultQuotePolicy;
-
-		updateVisibilityButton(false);
-	}
-
-	private void updateVisibilityButton(boolean animated){
+	private void updateNBWForumButton(boolean animated){
 		if(getActivity()==null)
 			return;
-		if(statusVisibility==null){ // TODO find out why this happens
-			statusVisibility=StatusPrivacy.PUBLIC;
-		}
 		TextView visibilityText;
 		if(!animated){
 			visibilityText=visibilityCurrentText;
@@ -1246,40 +1212,19 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 			visibilityCurrentText.setVisibility(View.GONE);
 			visibilityCurrentText=visibilityText;
 		}
-		if(instance.supportsQuotePostAuthoring()){
-			visibilityText.setText(switch(statusVisibility){
-				case PUBLIC -> switch(statusQuotePolicy){
-					case PUBLIC -> R.string.compose_visibility_public_anyone;
-					case FOLLOWERS -> R.string.compose_visibility_public_limited;
-					case NOBODY -> R.string.compose_visibility_public_disabled;
-				};
-				case UNLISTED -> switch(statusQuotePolicy){
-					case PUBLIC -> R.string.compose_visibility_unlisted_anyone;
-					case FOLLOWERS -> R.string.compose_visibility_unlisted_limited;
-					case NOBODY -> R.string.compose_visibility_unlisted_disabled;
-				};
-				case PRIVATE -> R.string.visibility_followers_only;
-				case DIRECT -> R.string.visibility_private;
-				// MOSHIDON:
-				case LOCAL -> R.string.sk_local_only;
-			});
-		}else{
-			visibilityText.setText(switch(statusVisibility){
-				case PUBLIC -> R.string.visibility_public;
-				case UNLISTED -> R.string.visibility_unlisted;
-				case PRIVATE -> R.string.visibility_followers_only;
-				case DIRECT -> R.string.visibility_private;
-				// MOSHIDON:
-				case LOCAL -> R.string.sk_local_only;
-			});
-		}
-		Drawable icon=getResources().getDrawable(switch(statusVisibility){
-			case PUBLIC -> R.drawable.ic_public_20px;
-			case UNLISTED -> R.drawable.ic_clear_night_20px;
-			case PRIVATE -> R.drawable.ic_group_20px;
-			case DIRECT -> R.drawable.ic_alternate_email_20px;
-			// MOSHIDON:
-			case LOCAL -> R.drawable.ic_fluent_eye_16_regular;
+		visibilityText.setText(switch(selectedNBWForumId){
+			case 28 -> R.string.nbw_forum_selfie;
+			case 27 -> R.string.nbw_forum_share;
+			case 26 -> R.string.nbw_forum_novel;
+			case 3 -> R.string.nbw_forum_friends;
+			default -> R.string.nbw_forum_ai;
+		});
+		Drawable icon=getResources().getDrawable(switch(selectedNBWForumId){
+			case 28 -> R.drawable.ic_fluent_camera_24_regular;
+			case 27 -> R.drawable.ic_fluent_share_24_regular;
+			case 26 -> R.drawable.ic_fluent_book_24_regular;
+			case 3 -> R.drawable.ic_fluent_group_24_regular;
+			default -> R.drawable.ic_fluent_wand_24_regular;
 		}, getActivity().getTheme()).mutate();
 		icon.setBounds(0, 0, V.dp(18), V.dp(18));
 		icon.setTint(UiUtils.getThemeColor(getActivity(), R.attr.colorM3OnSurfaceVariant));

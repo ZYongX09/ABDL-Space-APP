@@ -576,6 +576,12 @@
 	<string name="nbw_third_party_account">第三方账户</string>
 	<string name="nbw_third_party_nbw">宝宝新天地</string>
 	<string name="nbw_profile_source">此用户来自宝宝新天地</string>
+	<string name="nbw_forum_ai">AI recommendation</string>
+	<string name="nbw_forum_ai_subtitle">Automatically select the best NewBabyWorld forum</string>
+	<string name="nbw_forum_selfie">Selfies</string>
+	<string name="nbw_forum_share">Sharing</string>
+	<string name="nbw_forum_novel">Novels / Comics</string>
+	<string name="nbw_forum_friends">Friends</string>
 	<string name="nbw_unbind_title">解绑宝宝新天地</string>
 	<string name="nbw_unbind_message">确定解绑 %s？</string>
 	<string name="nbw_unbind">解绑</string>

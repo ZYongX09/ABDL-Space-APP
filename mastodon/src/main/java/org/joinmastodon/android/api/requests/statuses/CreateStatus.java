@@ -1,5 +1,7 @@
 package org.joinmastodon.android.api.requests.statuses;
 
+import com.google.gson.annotations.SerializedName;
+
 import org.joinmastodon.android.api.MastodonAPIRequest;
 import org.joinmastodon.android.model.Status;
 import org.joinmastodon.android.model.StatusPrivacy;
@@ -29,6 +31,8 @@ public class CreateStatus extends MastodonAPIRequest<Status>{
 		public String language;
 		public StatusQuotePolicy quoteApprovalPolicy;
 		public String quotedStatusId;
+		@SerializedName("nbw_fid")
+		public Integer nbwFid;
 
 		public static class Poll{
 			public ArrayList<String> options=new ArrayList<>();

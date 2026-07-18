@@ -153,6 +153,12 @@
 	<string name="visibility_public">公开</string>
 	<string name="visibility_followers_only">仅关注者</string>
 	<string name="visibility_private">私下提及</string>
+	<string name="nbw_forum_ai">AI 推荐</string>
+	<string name="nbw_forum_ai_subtitle">自动选择最合适的宝宝新天地版块</string>
+	<string name="nbw_forum_selfie">自拍</string>
+	<string name="nbw_forum_share">分享</string>
+	<string name="nbw_forum_novel">小说/漫画</string>
+	<string name="nbw_forum_friends">交友</string>
 	<string name="recent_searches">最近</string>
 	<string name="notification_type_follow">新关注者</string>
 	<string name="notification_type_favorite">喜欢</string>
