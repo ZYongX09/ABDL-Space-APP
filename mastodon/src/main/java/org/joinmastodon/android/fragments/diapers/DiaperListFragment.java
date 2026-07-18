@@ -1,6 +1,7 @@
 package org.joinmastodon.android.fragments.diapers;
 
 import android.app.Activity;
+import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -22,7 +23,6 @@ import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
-
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
@@ -40,14 +40,19 @@ import me.grishka.appkit.Nav;
 import me.grishka.appkit.api.Callback;
 import me.grishka.appkit.api.ErrorResponse;
 import me.grishka.appkit.fragments.LoaderFragment;
-import me.grishka.appkit.imageloader.ViewImageLoader;
+import me.grishka.appkit.imageloader.ImageLoaderRecyclerAdapter;
+import me.grishka.appkit.imageloader.ImageLoaderViewHolder;
+import me.grishka.appkit.imageloader.ListImageLoaderWrapper;
+import me.grishka.appkit.imageloader.requests.ImageLoaderRequest;
 import me.grishka.appkit.imageloader.requests.UrlImageLoaderRequest;
 import me.grishka.appkit.utils.V;
+import me.grishka.appkit.views.UsableRecyclerView;
 
 public class DiaperListFragment extends LoaderFragment {
-	private RecyclerView recyclerView;
+	private UsableRecyclerView recyclerView;
 	private SwipeRefreshLayout swipeRefreshLayout;
 	private DiaperAdapter adapter;
+	private ListImageLoaderWrapper imgLoader;
 	private List<Diaper> data = new ArrayList<>();
 	private String currentSearch = "";
 	private String currentBrand = "";
@@ -175,13 +180,15 @@ public class DiaperListFragment extends LoaderFragment {
 		emptyState.setVisibility(View.GONE);
 
 		// RecyclerView
-		recyclerView = new RecyclerView(getContext());
+		recyclerView = new UsableRecyclerView(getContext());
 		recyclerView.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 		recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
 		recyclerView.setClipToPadding(false);
 		recyclerView.setPadding(0, V.dp(4), 0, V.dp(16));
 		adapter = new DiaperAdapter();
 		recyclerView.setAdapter(adapter);
+		imgLoader = new ListImageLoaderWrapper(getActivity(), (UsableRecyclerView) recyclerView, (UsableRecyclerView) recyclerView, null);
+		imgLoader.setPrefetchAmount(2);
 
 		// 滚动加载更多
 		recyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
@@ -395,7 +402,7 @@ public class DiaperListFragment extends LoaderFragment {
 	private static final int VIEW_TYPE_LOADING = 1;
 	private static final int VIEW_TYPE_END = 2;
 
-	private class DiaperAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
+	private class DiaperAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> implements ImageLoaderRecyclerAdapter {
 
 		@NonNull
 		@Override
@@ -423,15 +430,13 @@ public class DiaperListFragment extends LoaderFragment {
 				ItemViewHolder itemHolder = (ItemViewHolder) holder;
 				Diaper diaper = data.get(position);
 
-				// 纸尿裤图片（优先使用图片数组第一张）
-				if (diaper.images != null && !diaper.images.isEmpty()) {
-					int imgSize = V.dp(56);
-					ViewImageLoader.loadWithoutAnimation(itemHolder.diaperImage, null,
-						new UrlImageLoaderRequest(diaper.images.get(0), imgSize, imgSize));
-					itemHolder.diaperImage.setVisibility(View.VISIBLE);
-				} else {
-					itemHolder.diaperImage.setVisibility(View.GONE);
-				}
+				// 纸尿裤图片（由 imgLoader 统一管理预取/取消/绑定）
+				itemHolder.imageRequest = (diaper.images != null && !diaper.images.isEmpty())
+					? new UrlImageLoaderRequest(diaper.images.get(0), V.dp(56), V.dp(56))
+					: null;
+				itemHolder.diaperImage.setVisibility(itemHolder.imageRequest != null ? View.VISIBLE : View.GONE);
+				if (itemHolder.imageRequest == null)
+					itemHolder.diaperImage.setImageDrawable(null);
 
 				// 品牌 + 型号
 				itemHolder.brandName.setText(diaper.brand + " " + diaper.model);
@@ -492,13 +497,29 @@ public class DiaperListFragment extends LoaderFragment {
 			return VIEW_TYPE_ITEM;
 		}
 
-		class ItemViewHolder extends RecyclerView.ViewHolder {
+		@Override
+		public int getImageCountForItem(int position) {
+			return (position >= 0 && position < data.size() && data.get(position).images != null && !data.get(position).images.isEmpty()) ? 1 : 0;
+		}
+
+		@Override
+		public ImageLoaderRequest getImageRequest(int position, int image) {
+			if (position >= 0 && position < data.size()) {
+				Diaper diaper = data.get(position);
+				if (diaper.images != null && !diaper.images.isEmpty())
+					return new UrlImageLoaderRequest(diaper.images.get(0), V.dp(56), V.dp(56));
+			}
+			return null;
+		}
+
+		class ItemViewHolder extends RecyclerView.ViewHolder implements ImageLoaderViewHolder {
 			ImageView diaperImage;
 			TextView brandName;
 			TextView babyBadge;
 			TextView avgScore;
 			TextView ratingCount;
 			TextView absorbency;
+			ImageLoaderRequest imageRequest;
 
 			ItemViewHolder(View itemView) {
 				super(itemView);
@@ -508,6 +529,16 @@ public class DiaperListFragment extends LoaderFragment {
 				avgScore = itemView.findViewById(R.id.avg_score);
 				ratingCount = itemView.findViewById(R.id.rating_count);
 				absorbency = itemView.findViewById(R.id.absorbency);
+			}
+
+			@Override
+			public void setImage(int image, Drawable drawable) {
+				diaperImage.setImageDrawable(drawable);
+			}
+
+			@Override
+			public void clearImage(int image) {
+				diaperImage.setImageDrawable(null);
 			}
 		}
 
