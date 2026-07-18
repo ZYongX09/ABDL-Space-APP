@@ -59,6 +59,7 @@ import org.joinmastodon.android.E;
 import org.joinmastodon.android.GlobalUserPreferences;
 import org.joinmastodon.android.R;
 import org.joinmastodon.android.api.MastodonErrorResponse;
+import org.joinmastodon.android.api.requests.accounts.GetOwnAccount;
 import org.joinmastodon.android.api.requests.nbw.RecommendNBWForum;
 import org.joinmastodon.android.api.requests.statuses.CreateStatus;
 import org.joinmastodon.android.api.requests.statuses.EditStatus;
@@ -68,6 +69,7 @@ import org.joinmastodon.android.events.StatusCountersUpdatedEvent;
 import org.joinmastodon.android.events.StatusCreatedEvent;
 import org.joinmastodon.android.events.StatusUpdatedEvent;
 import org.joinmastodon.android.fragments.account_list.AccountSearchFragment;
+import org.joinmastodon.android.fragments.settings.NBWPostRegisterActivity;
 import org.joinmastodon.android.model.Account;
 import org.joinmastodon.android.model.Emoji;
 import org.joinmastodon.android.model.EmojiCategory;
@@ -111,7 +113,9 @@ import org.joinmastodon.android.utils.ViewImageLoaderHolderTarget;
 import org.parceler.Parcels;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Consumer;
@@ -183,6 +187,18 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	private StatusQuotePolicy statusQuotePolicy=StatusQuotePolicy.PUBLIC;
 	private int selectedNBWForumId;
 	private int resolvedNBWForumId=27;
+	private String aiRecommendedForumName;
+	private TextView newBabyWorldCardText, newBabyWorldCardAction;
+	private View newBabyWorldCard;
+	private int newBabyWorldBindingState;
+	private int newBabyWorldBindingRequestGeneration;
+	private int aiRecommendationRequestGeneration;
+	private boolean aiRecommendationInFlight;
+	private static final Set<String> dismissedNewBabyWorldCards=new HashSet<>();
+	private static final int BINDING_CHECKING=0;
+	private static final int BINDING_BOUND=1;
+	private static final int BINDING_UNBOUND=-1;
+	private static final int BINDING_CHECK_FAILED=-2;
 	private ComposeAutocompleteSpan currentAutocompleteSpan;
 	private FrameLayout mainEditTextWrap;
 	private ComposeLanguageAlertViewController.SelectedOption postLang;
@@ -254,6 +270,8 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 
 	@Override
 	public void onDestroy(){
+		newBabyWorldBindingRequestGeneration++;
+		aiRecommendationRequestGeneration++;
 		super.onDestroy();
 		mediaViewController.cancelAllUploads();
 		removeBackCallback(emojiKeyboardHider);
@@ -297,6 +315,10 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 
 		View view=inflater.inflate(R.layout.fragment_compose, container, false);
 		mainLayout=view.findViewById(R.id.compose_main_ll);
+		newBabyWorldCard=view.findViewById(R.id.newbabyworld_card);
+		newBabyWorldCardText=view.findViewById(R.id.newbabyworld_card_text);
+		newBabyWorldCardAction=view.findViewById(R.id.newbabyworld_card_action);
+		newBabyWorldCardAction.setOnClickListener(v->onNewBabyWorldCardAction());
 		mainEditText=view.findViewById(R.id.toot_text);
 		mainEditTextWrap=view.findViewById(R.id.toot_text_wrap);
 		charCounter=view.findViewById(R.id.char_counter);
@@ -391,6 +413,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 
 		statusVisibility=StatusPrivacy.PUBLIC;
 		updateNBWForumButton(false);
+		refreshNewBabyWorldBinding();
 
 		autocompleteViewController=new ComposeAutocompleteViewController(getActivity(), accountID);
 		autocompleteViewController.setCompletionSelectedListener(new ComposeAutocompleteViewController.AutocompleteListener(){
@@ -460,6 +483,76 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	@Override
 	public void onResume(){
 		super.onResume();
+		if(!creatingView)
+			refreshNewBabyWorldBinding();
+	}
+
+	private void refreshNewBabyWorldBinding(){
+		final int requestGeneration=++newBabyWorldBindingRequestGeneration;
+		newBabyWorldBindingState=BINDING_CHECKING;
+		updateNewBabyWorldCard();
+		updatePublishButtonState();
+		new GetOwnAccount().setCallback(new Callback<>(){
+			@Override
+			public void onSuccess(Account account){
+				if(getActivity()==null || requestGeneration!=newBabyWorldBindingRequestGeneration)
+					return;
+				AccountSessionManager.getInstance().updateAccountInfo(accountID, account);
+				self=account;
+				newBabyWorldBindingState=TextUtils.isEmpty(account.nbwUsername) ? BINDING_UNBOUND : BINDING_BOUND;
+				getActivity().runOnUiThread(()->{
+					updateNewBabyWorldCard();
+					updatePublishButtonState();
+				});
+			}
+
+			@Override
+			public void onError(ErrorResponse error){
+				if(getActivity()==null || requestGeneration!=newBabyWorldBindingRequestGeneration)
+					return;
+				newBabyWorldBindingState=BINDING_CHECK_FAILED;
+				getActivity().runOnUiThread(()->{
+					updateNewBabyWorldCard();
+					updatePublishButtonState();
+				});
+			}
+		}).exec(accountID);
+	}
+
+	private void updateNewBabyWorldCard(){
+		if(newBabyWorldCard==null)
+			return;
+		if(newBabyWorldBindingState==BINDING_BOUND && dismissedNewBabyWorldCards.contains(accountID)){
+			newBabyWorldCard.setVisibility(View.GONE);
+			return;
+		}
+		newBabyWorldCard.setVisibility(View.VISIBLE);
+		if(newBabyWorldBindingState==BINDING_BOUND){
+			newBabyWorldCardText.setText(getString(R.string.compose_newbabyworld_bound, self.nbwUsername));
+			newBabyWorldCardAction.setText(R.string.compose_newbabyworld_close);
+		}else if(newBabyWorldBindingState==BINDING_UNBOUND){
+			newBabyWorldCardText.setText(R.string.compose_newbabyworld_unbound);
+			newBabyWorldCardAction.setText(R.string.compose_newbabyworld_bind);
+		}else if(newBabyWorldBindingState==BINDING_CHECK_FAILED){
+			newBabyWorldCardText.setText(R.string.compose_newbabyworld_check_failed);
+			newBabyWorldCardAction.setText(R.string.compose_newbabyworld_retry);
+		}else{
+			newBabyWorldCardText.setText(R.string.compose_newbabyworld_checking);
+			newBabyWorldCardAction.setText(R.string.compose_newbabyworld_retry);
+		}
+	}
+
+	private void onNewBabyWorldCardAction(){
+		if(newBabyWorldBindingState==BINDING_BOUND){
+			dismissedNewBabyWorldCards.add(accountID);
+			updateNewBabyWorldCard();
+		}else if(newBabyWorldBindingState==BINDING_UNBOUND){
+			Intent intent=new Intent(getActivity(), NBWPostRegisterActivity.class);
+			intent.putExtra("show_back", true);
+			startActivity(intent);
+		}else{
+			refreshNewBabyWorldBinding();
+		}
 	}
 
 	@Override
@@ -684,6 +777,10 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	@Override
 	public boolean onOptionsItemSelected(MenuItem item){
 		if(item.getItemId()==R.id.publish){
+			if(newBabyWorldBindingState!=BINDING_BOUND){
+				refreshNewBabyWorldBinding();
+				return true;
+			}
 			if(GlobalUserPreferences.altTextReminders && editingStatus==null)
 				checkAltTextsAndPublish();
 			else
@@ -738,7 +835,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		uuid=null;
 		if(publishButton==null)
 			return;
-		publishButton.setEnabled((trimmedCharCount>0 || !mediaViewController.isEmpty()) && charCount<=charLimit && mediaViewController.getNonDoneAttachmentCount()==0 && (pollViewController.isEmpty() || pollViewController.getNonEmptyOptionsCount()>1));
+		publishButton.setEnabled(newBabyWorldBindingState==BINDING_BOUND && !aiRecommendationInFlight && (trimmedCharCount>0 || !mediaViewController.isEmpty()) && charCount<=charLimit && mediaViewController.getNonDoneAttachmentCount()==0 && (pollViewController.isEmpty() || pollViewController.getNonEmptyOptionsCount()>1));
 		updateDraftState();
 	}
 
@@ -806,25 +903,63 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	}
 
 	private void publish(){
+		if(newBabyWorldBindingState!=BINDING_BOUND){
+			refreshNewBabyWorldBinding();
+			return;
+		}
 		if(selectedNBWForumId!=0){
 			resolvedNBWForumId=selectedNBWForumId;
 			publishResolved();
 			return;
 		}
+		if(aiRecommendationInFlight)
+			return;
+		aiRecommendationInFlight=true;
+		updatePublishButtonState();
+		final int requestGeneration=++aiRecommendationRequestGeneration;
 		String content=mainEditText.getText().toString().trim();
 		new RecommendNBWForum(content).setCallback(new Callback<>(){
 			@Override
 			public void onSuccess(RecommendNBWForum.Response result){
-				resolvedNBWForumId=isValidNBWForumId(result.fid) ? result.fid : 27;
+				if(getActivity()==null || requestGeneration!=aiRecommendationRequestGeneration)
+					return;
+				aiRecommendationInFlight=false;
+				updatePublishButtonState();
+				if(result.fallback || !isValidNBWForumId(result.fid)){
+					confirmDefaultNBWForumPublish();
+					return;
+				}
+				resolvedNBWForumId=result.fid;
+				aiRecommendedForumName=result.forumName;
+				selectedNBWForumId=0;
+				updateNBWForumButton(true);
 				publishResolved();
 			}
 
 			@Override
 			public void onError(ErrorResponse error){
-				resolvedNBWForumId=27;
-				publishResolved();
+				if(getActivity()==null || requestGeneration!=aiRecommendationRequestGeneration)
+					return;
+				aiRecommendationInFlight=false;
+				updatePublishButtonState();
+				confirmDefaultNBWForumPublish();
 			}
 		}).exec(accountID);
+	}
+
+	private void confirmDefaultNBWForumPublish(){
+		new M3AlertDialogBuilder(getActivity())
+				.setTitle(R.string.compose_ai_recommend_failed_title)
+				.setMessage(R.string.compose_ai_recommend_failed_message)
+				.setPositiveButton(R.string.compose_ai_recommend_publish_default, (dialog, which)->{
+					selectedNBWForumId=27;
+					resolvedNBWForumId=27;
+					aiRecommendedForumName=null;
+					updateNBWForumButton(true);
+					publishResolved();
+				})
+				.setNegativeButton(R.string.cancel, null)
+				.show();
 	}
 
 	private boolean isValidNBWForumId(int fid){
@@ -832,6 +967,12 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	}
 
 	private void publishResolved(){
+		if(getActivity()==null)
+			return;
+		if(newBabyWorldBindingState!=BINDING_BOUND){
+			refreshNewBabyWorldBinding();
+			return;
+		}
 		Runnable publishAction=()->{
 			sendingOverlay=new View(getActivity());
 			WindowManager.LayoutParams overlayParams=new WindowManager.LayoutParams();
@@ -1183,6 +1324,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		ExtendedPopupMenu menu=new ExtendedPopupMenu(getActivity(), items);
 		Consumer<ListItem<Integer>> onClick=item->{
 			selectedNBWForumId=item.parentObject;
+			aiRecommendedForumName=null;
 			updateNBWForumButton(true);
 			menu.dismiss();
 		};
@@ -1212,13 +1354,16 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 			visibilityCurrentText.setVisibility(View.GONE);
 			visibilityCurrentText=visibilityText;
 		}
-		visibilityText.setText(switch(selectedNBWForumId){
-			case 28 -> R.string.nbw_forum_selfie;
-			case 27 -> R.string.nbw_forum_share;
-			case 26 -> R.string.nbw_forum_novel;
-			case 3 -> R.string.nbw_forum_friends;
-			default -> R.string.nbw_forum_ai;
-		});
+		if(selectedNBWForumId==0 && !TextUtils.isEmpty(aiRecommendedForumName))
+			visibilityText.setText(getString(R.string.compose_ai_recommend_result, aiRecommendedForumName));
+		else
+			visibilityText.setText(switch(selectedNBWForumId){
+				case 28 -> R.string.nbw_forum_selfie;
+				case 27 -> R.string.nbw_forum_share;
+				case 26 -> R.string.nbw_forum_novel;
+				case 3 -> R.string.nbw_forum_friends;
+				default -> R.string.nbw_forum_ai;
+			});
 		Drawable icon=getResources().getDrawable(switch(selectedNBWForumId){
 			case 28 -> R.drawable.ic_fluent_camera_24_regular;
 			case 27 -> R.drawable.ic_fluent_share_24_regular;

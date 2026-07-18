@@ -28,5 +28,6 @@ public class RecommendNBWForum extends MastodonAPIRequest<RecommendNBWForum.Resp
 		@SerializedName("forum_name")
 		public String forumName;
 		public double confidence;
+		public boolean fallback;
 	}
 }
