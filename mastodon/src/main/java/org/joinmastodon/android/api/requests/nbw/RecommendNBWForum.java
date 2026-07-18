@@ -1,5 +1,7 @@
 package org.joinmastodon.android.api.requests.nbw;
 
+import android.net.Uri;
+
 import com.google.gson.annotations.SerializedName;
 
 import org.joinmastodon.android.api.MastodonAPIRequest;
@@ -13,6 +15,15 @@ public class RecommendNBWForum extends MastodonAPIRequest<RecommendNBWForum.Resp
 	@Override
 	protected String getPathPrefix(){
 		return "/api";
+	}
+
+	@Override
+	public Uri getURL(){
+		return new Uri.Builder()
+				.scheme("https")
+				.authority("api.abdl-space.top")
+				.path("/api/auth/nbw/recommend-fid")
+				.build();
 	}
 
 	private static class Request{
