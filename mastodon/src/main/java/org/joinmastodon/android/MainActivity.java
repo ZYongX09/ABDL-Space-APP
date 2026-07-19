@@ -13,6 +13,10 @@ import android.os.Bundle;
 import android.util.Log;
 import android.widget.Toast;
 
+import android.view.GestureDetector;
+import android.view.MotionEvent;
+import android.view.ViewConfiguration;
+
 import org.joinmastodon.android.api.ObjectValidationException;
 import org.joinmastodon.android.api.requests.search.GetSearchResults;
 import org.joinmastodon.android.api.requests.accounts.GetAccountByID;
@@ -45,16 +49,37 @@ import me.grishka.appkit.FragmentStackActivity;
 import me.grishka.appkit.Nav;
 import me.grishka.appkit.api.Callback;
 import me.grishka.appkit.api.ErrorResponse;
+import me.grishka.appkit.utils.V;
 
 public class MainActivity extends FragmentStackActivity{
 	private static final String TAG="MainActivity";
 	private ChatRealtimeClient chatWsClient;
+	private GestureDetector backGestureDetector;
 
 	@Override
 	protected void onCreate(@Nullable Bundle savedInstanceState){
 		AccountSession session=getCurrentSession();
 		UiUtils.setUserPreferredTheme(this, /* MOSHIDON: this is for per account user themes */ session);
 		super.onCreate(savedInstanceState);
+
+		final float minVelocity=ViewConfiguration.get(this).getScaledMinimumFlingVelocity()*2f;
+		final float maxFlingPathLength=V.dp(80);
+		backGestureDetector=new GestureDetector(this, new GestureDetector.SimpleOnGestureListener(){
+			@Override
+			public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY){
+				if(e1==null || e2==null)
+					return false;
+				float dx=e2.getX()-e1.getX();
+				float dy=e2.getY()-e1.getY();
+				if(dx>0 && Math.abs(dx)<=maxFlingPathLength && velocityX>minVelocity && Math.abs(velocityX)>Math.abs(velocityY)*1.5f){
+					if(fragmentContainers!=null && fragmentContainers.size()>1){
+						onBackPressed();
+						return true;
+					}
+				}
+				return false;
+			}
+		});
 
 		if(savedInstanceState==null){
 			restartHomeFragment();
@@ -94,6 +119,13 @@ public class MainActivity extends FragmentStackActivity{
 		}catch(Exception e){
 			Log.w("MainActivity", "Failed to start LAN discovery service", e);
 		}
+	}
+
+	@Override
+	public boolean dispatchTouchEvent(MotionEvent ev){
+		if(backGestureDetector!=null)
+			backGestureDetector.onTouchEvent(ev);
+		return super.dispatchTouchEvent(ev);
 	}
 
 	@Override
