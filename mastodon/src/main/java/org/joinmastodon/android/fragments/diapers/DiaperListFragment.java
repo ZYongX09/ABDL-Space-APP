@@ -188,7 +188,7 @@ public class DiaperListFragment extends LoaderFragment {
 		adapter = new DiaperAdapter();
 		recyclerView.setAdapter(adapter);
 		imgLoader = new ListImageLoaderWrapper(getActivity(), (UsableRecyclerView) recyclerView, (UsableRecyclerView) recyclerView, null);
-		imgLoader.setPrefetchAmount(2);
+		imgLoader.setPrefetchAmount(1);
 
 		// 滚动加载更多
 		recyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
