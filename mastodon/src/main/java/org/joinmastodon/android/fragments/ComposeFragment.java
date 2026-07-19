@@ -193,7 +193,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	private View newBabyWorldCard;
 	private View crisisCard;
 	private boolean crisisWarningDismissed;
-	private static final String[] CRISIS_KEYWORDS={"自杀", "自残", "死亡", "抑郁", "双向", "双相", "ADHD", "PTSD", "童年创伤", "不想活", "活不下去", "轻生", "绝望", "伤害自己"};
+	private static final String[] CRISIS_KEYWORDS={"自杀", "自残", "死亡", "抑郁", "双向", "双相", "ADHD", "PTSD", "童年创伤", "不想活", "不想活了", "不想再活", "活不下去", "活着没意思", "活着没有意义", "想死", "去死", "求死", "寻死", "轻生", "结束生命", "结束自己的生命", "了结自己", "离开这个世界", "永远消失", "绝望", "割腕", "割脉", "跳楼", "跳河", "吞药", "自我伤害", "伤害自己", "伤害我自己"};
 	private int newBabyWorldBindingState;
 	private int newBabyWorldBindingRequestGeneration;
 	private int aiRecommendationRequestGeneration;
