@@ -593,6 +593,10 @@
 	<string name="compose_newbabyworld_bound">宝宝新天地 is an ABDL Space federation partner. After posting, we will try to sync it to 宝宝新天地 as @%s.</string>
 	<string name="compose_newbabyworld_checking">Checking your 宝宝新天地 binding…</string>
 	<string name="compose_newbabyworld_check_failed">Your binding could not be verified. Posting is disabled until verification succeeds.</string>
+	<string name="compose_crisis_title">You are not alone, we are here</string>
+	<string name="compose_crisis_message">The world may not be perfect, but there are people who care about you.\nYou can tap a button below to get help.</string>
+	<string name="compose_crisis_close">Close</string>
+	<string name="compose_crisis_help">I need help</string>
 	<string name="compose_newbabyworld_bind">Bind account</string>
 	<string name="compose_newbabyworld_close">Close</string>
 	<string name="compose_newbabyworld_retry">Check again</string>

@@ -115,6 +115,7 @@ import org.parceler.Parcels;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.Map;
 import java.util.UUID;
@@ -190,6 +191,9 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	private String aiRecommendedForumName;
 	private TextView newBabyWorldCardText, newBabyWorldCardAction;
 	private View newBabyWorldCard;
+	private View crisisCard;
+	private boolean crisisWarningDismissed;
+	private static final String[] CRISIS_KEYWORDS={"自杀", "自残", "死亡", "抑郁", "双向", "双相", "ADHD", "PTSD", "童年创伤", "不想活", "活不下去", "轻生", "绝望", "伤害自己"};
 	private int newBabyWorldBindingState;
 	private int newBabyWorldBindingRequestGeneration;
 	private int aiRecommendationRequestGeneration;
@@ -316,9 +320,12 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		View view=inflater.inflate(R.layout.fragment_compose, container, false);
 		mainLayout=view.findViewById(R.id.compose_main_ll);
 		newBabyWorldCard=view.findViewById(R.id.newbabyworld_card);
+		crisisCard=view.findViewById(R.id.compose_crisis_card);
 		newBabyWorldCardText=view.findViewById(R.id.newbabyworld_card_text);
 		newBabyWorldCardAction=view.findViewById(R.id.newbabyworld_card_action);
 		newBabyWorldCardAction.setOnClickListener(v->onNewBabyWorldCardAction());
+		view.findViewById(R.id.compose_crisis_close).setOnClickListener(v->dismissCrisisWarning());
+		view.findViewById(R.id.compose_crisis_help).setOnClickListener(v->dismissCrisisWarning());
 		mainEditText=view.findViewById(R.id.toot_text);
 		mainEditTextWrap=view.findViewById(R.id.toot_text_wrap);
 		charCounter=view.findViewById(R.id.char_counter);
@@ -522,6 +529,10 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	private void updateNewBabyWorldCard(){
 		if(newBabyWorldCard==null)
 			return;
+		if(crisisCard!=null && crisisCard.getVisibility()==View.VISIBLE){
+			newBabyWorldCard.setVisibility(View.GONE);
+			return;
+		}
 		if(newBabyWorldBindingState==BINDING_BOUND && dismissedNewBabyWorldCards.contains(accountID)){
 			newBabyWorldCard.setVisibility(View.GONE);
 			return;
@@ -540,6 +551,34 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 			newBabyWorldCardText.setText(R.string.compose_newbabyworld_checking);
 			newBabyWorldCardAction.setText(R.string.compose_newbabyworld_retry);
 		}
+	}
+
+	private boolean containsCrisisKeyword(String text){
+		if(TextUtils.isEmpty(text))
+			return false;
+		String normalized=text.toLowerCase(Locale.ROOT);
+		for(String keyword:CRISIS_KEYWORDS){
+			if(normalized.contains(keyword.toLowerCase(Locale.ROOT)))
+				return true;
+		}
+		return false;
+	}
+
+	private void updateCrisisWarning(CharSequence text){
+		if(crisisCard==null || crisisWarningDismissed)
+			return;
+		boolean show=containsCrisisKeyword(text==null ? "" : text.toString());
+		crisisCard.setVisibility(show ? View.VISIBLE : View.GONE);
+		if(show)
+			newBabyWorldCard.setVisibility(View.GONE);
+		else
+			updateNewBabyWorldCard();
+	}
+
+	private void dismissCrisisWarning(){
+		crisisWarningDismissed=true;
+		crisisCard.setVisibility(View.GONE);
+		updateNewBabyWorldCard();
 	}
 
 	private void onNewBabyWorldCardAction(){
@@ -605,6 +644,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 
 			@Override
 			public void afterTextChanged(Editable s){
+				updateCrisisWarning(s);
 				if(s.length()==0){
 					updateCharCounter();
 					return;
@@ -660,6 +700,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 				updateDraftState();
 			}
 		});
+		updateCrisisWarning(mainEditText.getText());
 		spoilerEdit.addTextChangedListener(new SimpleTextWatcher(e->updateCharCounter()));
 		if(replyTo!=null){
 			InlineStatusStatusDisplayItem item=new InlineStatusStatusDisplayItem("reply", new StatusDisplayItem.NoOpCallbacks(getActivity()), getActivity(), replyTo, accountID, R.drawable.ic_reply_wght700_20px, getString(R.string.in_reply_to, replyTo.account.displayName));

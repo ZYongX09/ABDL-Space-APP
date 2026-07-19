@@ -165,6 +165,10 @@
 	<string name="compose_newbabyworld_checking">正在检查宝宝新天地绑定状态…</string>
 	<string name="compose_newbabyworld_check_failed">暂时无法确认绑定状态，确认前不能发帖。</string>
 	<string name="compose_newbabyworld_bind">前往绑定</string>
+	<string name="compose_crisis_title">你不孤单，我们都在</string>
+	<string name="compose_crisis_message">这个世界虽然不完美，但总有人守护着你。\n你可以点击以下按钮获得帮助</string>
+	<string name="compose_crisis_close">关闭</string>
+	<string name="compose_crisis_help">我需要帮助</string>
 	<string name="compose_newbabyworld_close">关闭</string>
 	<string name="compose_newbabyworld_retry">重新检查</string>
 	<string name="compose_ai_recommend_result">AI 推荐 · %s</string>

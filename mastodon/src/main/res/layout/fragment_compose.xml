@@ -40,6 +40,8 @@
 						android:layout_height="wrap_content"
 						android:orientation="vertical">
 
+						<include layout="@layout/include_compose_crisis_card" />
+
 						<include layout="@layout/include_compose_newbabyworld_card" />
 
 						<LinearLayout
