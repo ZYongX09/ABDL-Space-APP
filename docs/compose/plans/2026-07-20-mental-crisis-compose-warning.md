@@ -1,5 +1,10 @@
 # 发帖心理危机提示实现计划
 
+> [!NOTE]
+> This document may not reflect the current implementation.
+> See the final report for up-to-date state:
+> [Final Report](../reports/mental-crisis-compose-warning.md)
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use compose:subagent (recommended) or compose:execute to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 在发帖页检测心理危机相关词汇，并以红色顶部提示卡优先于宝宝新天地绑定卡显示。
