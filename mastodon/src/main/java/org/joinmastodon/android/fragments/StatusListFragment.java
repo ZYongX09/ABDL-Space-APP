@@ -35,7 +35,7 @@ public abstract class StatusListFragment extends BaseStatusListFragment<Status>{
 
 	@Override
 	protected float getImagePrefetchScreens(){
-		return 0;
+		return 1;
 	}
 
 	@Override
