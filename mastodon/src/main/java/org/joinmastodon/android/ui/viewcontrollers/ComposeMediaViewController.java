@@ -616,7 +616,7 @@ public class ComposeMediaViewController{
 	public List<CreateStatus.Request.MediaAttribute> getAttachmentAttributes(){
 		List<CreateStatus.Request.MediaAttribute> mediaAttributes = new ArrayList<>();
 		for (DraftMediaAttachment att:attachments){
-			 mediaAttributes.add(new CreateStatus.Request.MediaAttribute(att.serverAttachment.id, att.description, null));
+			mediaAttributes.add(new CreateStatus.Request.MediaAttribute(att.serverAttachment.id, att.description, null, att.serverAttachment.blurhash));
 		}
 		return mediaAttributes;
 	}

@@ -47,11 +47,13 @@ public class CreateStatus extends MastodonAPIRequest<Status>{
 			public String id;
 			public String description;
 			public String focus;
+			public String blurhash;
 
-			public MediaAttribute(String id, String description, String focus){
+			public MediaAttribute(String id, String description, String focus, String blurhash){
 				this.id=id;
 				this.description=description;
 				this.focus=focus;
+				this.blurhash=blurhash;
 			}
 		}
 	}
