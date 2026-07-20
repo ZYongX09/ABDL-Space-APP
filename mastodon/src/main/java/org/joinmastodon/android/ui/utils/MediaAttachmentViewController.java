@@ -98,8 +98,11 @@ public class MediaAttachmentViewController{
 		this.status=status;
 		this.attachment=attachment;
 		crossfadeDrawable.setSize(attachment.getWidth(), attachment.getHeight());
-		crossfadeDrawable.setBlurhashDrawable(attachment.blurhashPlaceholder);
-		crossfadeDrawable.setCrossfadeAlpha(0f);
+		Drawable placeholder=attachment.blurhashPlaceholder;
+		if(placeholder==null)
+			placeholder=context.getDrawable(R.drawable.image_placeholder);
+		crossfadeDrawable.setBlurhashDrawable(placeholder);
+		crossfadeDrawable.setCrossfadeAlpha(1f);
 		photo.setImageDrawable(null);
 		photo.setImageDrawable(crossfadeDrawable);
 		photo.setContentDescription(TextUtils.isEmpty(attachment.description) ? context.getString(R.string.media_no_description) : attachment.description);

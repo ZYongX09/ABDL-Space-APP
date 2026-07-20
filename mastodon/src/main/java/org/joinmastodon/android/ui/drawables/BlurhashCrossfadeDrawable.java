@@ -66,10 +66,6 @@ public class BlurhashCrossfadeDrawable extends Drawable{
 
 	public void setImageDrawable(Drawable imageDrawable){
 		this.imageDrawable=imageDrawable;
-		if(imageDrawable!=null){
-			width=imageDrawable.getIntrinsicWidth();
-			height=imageDrawable.getIntrinsicHeight();
-		}
 		invalidateSelf();
 	}
 
