@@ -25,6 +25,8 @@ public class CreateStatus extends MastodonAPIRequest<Status>{
 		public Poll poll;
 		public String inReplyToId;
 		public boolean sensitive;
+		@SerializedName("mental_crisis")
+		public boolean mentalCrisis;
 		public String spoilerText;
 		public StatusPrivacy visibility;
 		public Instant scheduledAt;

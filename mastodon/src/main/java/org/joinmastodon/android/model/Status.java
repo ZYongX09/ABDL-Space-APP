@@ -26,6 +26,7 @@ import com.google.gson.JsonDeserializer;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
+import com.google.gson.annotations.SerializedName;
 
 @Parcel
 public class Status extends BaseModel implements DisplayItemsParent, Searchable {
@@ -42,6 +43,8 @@ public class Status extends BaseModel implements DisplayItemsParent, Searchable 
 	@RequiredField
 	public StatusPrivacy visibility;
 	public boolean sensitive;
+	@SerializedName("mental_crisis")
+	public boolean mentalCrisis;
 //	@RequiredField
 	public String spoilerText="";
 //	@RequiredField

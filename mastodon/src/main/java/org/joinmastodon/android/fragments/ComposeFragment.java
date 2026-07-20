@@ -94,6 +94,7 @@ import org.joinmastodon.android.ui.text.ComposeAutocompleteSpan;
 import org.joinmastodon.android.ui.text.ComposeHashtagOrMentionSpan;
 import org.joinmastodon.android.ui.text.HtmlParser;
 import org.joinmastodon.android.ui.utils.SimpleTextWatcher;
+import org.joinmastodon.android.ui.views.CrisisWarningViewController;
 import org.joinmastodon.android.ui.utils.UiUtils;
 import org.joinmastodon.android.ui.viewcontrollers.ComposeAutocompleteViewController;
 import org.joinmastodon.android.ui.viewcontrollers.ComposeLanguageAlertViewController;
@@ -192,6 +193,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	private TextView newBabyWorldCardText, newBabyWorldCardAction;
 	private View newBabyWorldCard;
 	private View crisisCard;
+	private CrisisWarningViewController crisisWarningController;
 	private boolean crisisWarningDismissed;
 	private static final String[] CRISIS_KEYWORDS={"自杀", "自残", "死亡", "抑郁", "双向", "双相", "ADHD", "PTSD", "童年创伤", "不想活", "不想活了", "不想再活", "活不下去", "活着没意思", "活着没有意义", "想死", "去死", "求死", "寻死", "轻生", "结束生命", "结束自己的生命", "了结自己", "离开这个世界", "永远消失", "绝望", "割腕", "割脉", "跳楼", "跳河", "吞药", "自我伤害", "伤害自己", "伤害我自己"};
 	private int newBabyWorldBindingState;
@@ -321,11 +323,10 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		mainLayout=view.findViewById(R.id.compose_main_ll);
 		newBabyWorldCard=view.findViewById(R.id.newbabyworld_card);
 		crisisCard=view.findViewById(R.id.compose_crisis_card);
+		crisisWarningController=new CrisisWarningViewController(view);
 		newBabyWorldCardText=view.findViewById(R.id.newbabyworld_card_text);
 		newBabyWorldCardAction=view.findViewById(R.id.newbabyworld_card_action);
 		newBabyWorldCardAction.setOnClickListener(v->onNewBabyWorldCardAction());
-		view.findViewById(R.id.compose_crisis_close).setOnClickListener(v->dismissCrisisWarning());
-		view.findViewById(R.id.compose_crisis_help).setOnClickListener(v->dismissCrisisWarning());
 		mainEditText=view.findViewById(R.id.toot_text);
 		mainEditTextWrap=view.findViewById(R.id.toot_text_wrap);
 		charCounter=view.findViewById(R.id.char_counter);
@@ -529,7 +530,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	private void updateNewBabyWorldCard(){
 		if(newBabyWorldCard==null)
 			return;
-		if(crisisCard!=null && crisisCard.getVisibility()==View.VISIBLE){
+		if(crisisWarningController!=null && crisisWarningController.isVisible()){
 			newBabyWorldCard.setVisibility(View.GONE);
 			return;
 		}
@@ -568,7 +569,10 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		if(crisisCard==null || crisisWarningDismissed)
 			return;
 		boolean show=containsCrisisKeyword(text==null ? "" : text.toString());
-		crisisCard.setVisibility(show ? View.VISIBLE : View.GONE);
+		if(show)
+			crisisWarningController.show();
+		else
+			crisisWarningController.hide();
 		if(show)
 			newBabyWorldCard.setVisibility(View.GONE);
 		else
@@ -577,7 +581,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 
 	private void dismissCrisisWarning(){
 		crisisWarningDismissed=true;
-		crisisCard.setVisibility(View.GONE);
+		crisisWarningController.hide();
 		updateNewBabyWorldCard();
 	}
 
@@ -1053,6 +1057,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		String text=mainEditText.getText().toString();
 		CreateStatus.Request req=new CreateStatus.Request();
 		req.status=text;
+		req.mentalCrisis=containsCrisisKeyword(text);
 		req.visibility=StatusPrivacy.PUBLIC;
 		req.nbwFid=resolvedNBWForumId;
 		if(!mediaViewController.isEmpty()){
