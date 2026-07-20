@@ -33,6 +33,10 @@ public abstract class StatusListFragment extends BaseStatusListFragment<Status>{
 
 	protected abstract FilterContext getFilterContext();
 
+	@Override
+	protected float getImagePrefetchScreens(){
+		return 0;
+	}
 
 	@Override
 	protected void addAccountToKnown(Status s){
