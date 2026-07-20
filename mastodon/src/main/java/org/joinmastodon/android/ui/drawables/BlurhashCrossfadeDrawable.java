@@ -132,6 +132,10 @@ public class BlurhashCrossfadeDrawable extends Drawable{
 	}
 
 	public void setCrossfadeAlpha(float alpha){
+		if(currentAnim!=null){
+			currentAnim.cancel();
+			currentAnim=null;
+		}
 		blurhashAlpha=alpha;
 		invalidateSelf();
 	}

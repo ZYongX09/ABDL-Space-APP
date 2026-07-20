@@ -33,7 +33,6 @@ public class MediaAttachmentViewController{
 	public final View failedText;
 	private BlurhashCrossfadeDrawable crossfadeDrawable=new BlurhashCrossfadeDrawable();
 	private final Context context;
-	private boolean didClear;
 	private Status status;
 	private Attachment attachment;
 	private ViewOutlineProvider outlineProvider=new ViewOutlineProvider(){
@@ -112,7 +111,6 @@ public class MediaAttachmentViewController{
 		if(type==MediaGridStatusDisplayItem.GridItemType.VIDEO){
 			duration.setText(UiUtils.formatMediaDuration((int)attachment.getDuration()));
 		}
-		didClear=false;
 		if(failedOverlay!=null){
 			V.cancelVisibilityAnimation(failedOverlay);
 			failedOverlay.setVisibility(View.GONE);
@@ -122,8 +120,8 @@ public class MediaAttachmentViewController{
 
 	public void setImage(Drawable drawable){
 		crossfadeDrawable.setImageDrawable(drawable);
-		if(didClear)
-			 crossfadeDrawable.animateAlpha(0f);
+		if(drawable!=null)
+			crossfadeDrawable.animateAlpha(0f);
 		// Make sure the image is not stretched if the server returned wrong dimensions
 		if(drawable!=null && (drawable.getIntrinsicWidth()!=attachment.getWidth() || drawable.getIntrinsicHeight()!=attachment.getHeight())){
 			photo.setImageDrawable(null);
@@ -137,7 +135,6 @@ public class MediaAttachmentViewController{
 	public void clearImage(){
 		crossfadeDrawable.setCrossfadeAlpha(1f);
 		crossfadeDrawable.setImageDrawable(null);
-		didClear=true;
 		if(failedOverlay!=null && failedOverlay.getVisibility()!=View.GONE){
 			V.setVisibilityAnimated(failedOverlay, View.GONE);
 		}
