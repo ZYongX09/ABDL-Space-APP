@@ -569,7 +569,7 @@ public abstract class BaseStatusListFragment<T extends DisplayItemsParent> exten
 		list.setItemAnimator(new BetterItemAnimator());
 		((UsableRecyclerView) list).setIncludeMarginsInItemHitbox(true);
 		if(imgLoader!=null)
-			imgLoader.setPrefetchAmount(1);
+			imgLoader.setPrefetchAmount(0);
 		updateToolbar();
 
 		// MOSHIDON: this is also for the fabulous
