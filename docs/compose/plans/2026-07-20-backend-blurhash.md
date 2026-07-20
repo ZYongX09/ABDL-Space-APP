@@ -1,5 +1,10 @@
 # 后端 BlurHash 实现计划
 
+> [!NOTE]
+> This document may not reflect the current implementation.
+> See the final report for up-to-date state:
+> [Final Report](../reports/backend-blurhash.md)
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use compose:subagent (recommended) or compose:execute to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 在 Cloudflare Worker 上传静态图片时生成 BlurHash，并将其随帖子媒体持久化和返回给 Android。
