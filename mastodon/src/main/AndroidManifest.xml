@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-	package="org.joinmastodon.android">
+	xmlns:tools="http://schemas.android.com/tools"
+	package="org.joinmastodon.android"
+	tools:node="merge">
+
+	<uses-sdk tools:overrideLibrary="top.yukonga.miuix.kmp.blur" />
 
 	<uses-permission android:name="android.permission.INTERNET"/>
 	<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
@@ -55,6 +59,10 @@
 		android:icon="@mipmap/ic_launcher"
 		android:theme="@style/Theme.Mastodon.AutoLightDark"
 		android:largeHeap="true">
+
+		<activity
+			android:name=".fragments.settings.ComposeAboutActivity"
+			android:exported="false" />
 
 		<activity android:name=".MainActivity" android:exported="false" android:configChanges="orientation|screenSize" android:windowSoftInputMode="adjustResize" android:launchMode="singleTask">
 			<intent-filter android:autoVerify="true">

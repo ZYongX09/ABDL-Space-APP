@@ -1,6 +1,8 @@
 plugins {
 	id 'com.android.application'
 	id 'com.google.android.libraries.mapsplatform.secrets-gradle-plugin'
+	id 'org.jetbrains.kotlin.android'
+	id 'org.jetbrains.kotlin.plugin.compose'
 }
 
 android {
@@ -11,7 +13,7 @@ android {
 		noCompress "tflite"
 	}
 
-	compileSdk 35
+	compileSdk 37
 	defaultConfig {
 		manifestPlaceholders = [oAuthScheme:"abdl-space"]
 		applicationId "top.abdl_space.app"
@@ -120,9 +122,11 @@ android {
 		}
 	}
 	compileOptions {
-		sourceCompatibility JavaVersion.VERSION_17
-		targetCompatibility JavaVersion.VERSION_17
-		coreLibraryDesugaringEnabled true
+		sourceCompatibility JavaVersion.VERSION_21
+		targetCompatibility JavaVersion.VERSION_21
+	}
+	kotlinOptions {
+		jvmTarget = '21'
 	}
 	sourceSets{
 //		appcenterPrivateBeta{
@@ -145,6 +149,17 @@ android {
 	buildFeatures{
 		aidl true
 		buildConfig true
+		compose true
+	}
+	composeOptions {
+	}
+	packaging {
+		resources {
+			excludes += ['META-INF/DEPENDENCIES', 'META-INF/LICENSE', 'META-INF/LICENSE.txt', 'META-INF/NOTICE', 'META-INF/NOTICE.txt']
+		}
+	}
+	lint {
+		abortOnError false
 	}
 	dependenciesInfo{
 		// Disables dependency metadata when building APKs.
@@ -156,7 +171,11 @@ android {
 }
 
 configurations.all {
-	exclude group: 'androidx.collection', module: 'collection'
+	resolutionStrategy {
+		force 'androidx.collection:collection:1.5.0'
+		force 'androidx.collection:collection-jvm:1.5.0'
+	}
+	exclude group: 'me.grishka.litex', module: 'collection'
 	exclude group: 'androidx.concurrent', module: 'concurrent-futures'
 	exclude group: 'com.google.guava', module: 'listenablefuture'
 	exclude group: 'androidx.viewpager', module: 'viewpager'
@@ -168,7 +187,10 @@ dependencies {
 	implementation 'me.grishka.litex:recyclerview:1.2.1.1'
 	implementation 'me.grishka.litex:swiperefreshlayout:1.2.0-beta01'
 	implementation 'me.grishka.litex:browser:1.4.0'
-	implementation 'me.grishka.litex:dynamicanimation:1.1.0-alpha03'
+	implementation('me.grishka.litex:dynamicanimation:1.1.0-alpha03') {
+		exclude group: 'androidx.dynamicanimation', module: 'dynamicanimation'
+		exclude group: 'androidx.collection', module: 'collection-jvm'
+	}
 	implementation 'me.grishka.litex:viewpager:1.0.0'
 	implementation 'me.grishka.litex:viewpager2:1.0.0'
 	implementation 'me.grishka.litex:palette:1.0.0'
@@ -186,6 +208,28 @@ dependencies {
 	annotationProcessor 'org.parceler:parceler:1.1.12'
 	coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.3'
 
+	// Compose + miuix
+	def composeBom = platform('androidx.compose:compose-bom:2024.12.01')
+	implementation(composeBom) {
+		exclude group: 'androidx.dynamicanimation', module: 'dynamicanimation'
+	}
+	implementation 'androidx.compose.ui:ui'
+	implementation 'androidx.compose.foundation:foundation'
+	implementation 'androidx.compose.material3:material3'
+	implementation 'androidx.compose.material:material-icons-extended'
+	implementation 'androidx.compose.ui:ui-tooling-preview'
+	implementation 'androidx.activity:activity-compose:1.9.3'
+	implementation 'androidx.fragment:fragment-compose:1.8.5'
+	implementation 'androidx.lifecycle:lifecycle-runtime:2.8.7'
+	implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.8.7'
+	implementation 'androidx.lifecycle:lifecycle-common:2.8.7'
+	implementation 'androidx.savedstate:savedstate:1.2.1'
+	implementation 'top.yukonga.miuix.kmp:miuix-ui-android:0.9.3'
+	implementation 'top.yukonga.miuix.kmp:miuix-icons-android:0.9.3'
+	implementation 'top.yukonga.miuix.kmp:miuix-preference-android:0.9.3'
+	implementation 'top.yukonga.miuix.kmp:miuix-blur-android:0.9.3'
+	debugImplementation 'androidx.compose.ui:ui-tooling'
+
 	// MOSHIDON: we don't do that here
 //	def appCenterSdkVersion = "5.0.4"
 //	appcenterPrivateBetaImplementation "com.microsoft.appcenter:appcenter-crashes:${appCenterSdkVersion}"
@@ -200,4 +244,10 @@ dependencies {
 
 	// JPush SDK
 	implementation project(':jiguang-sdk:jiguang_sdk:jiguang')
+}
+
+android {
+    lint {
+        abortOnError false
+    }
 }

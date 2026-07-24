@@ -35,6 +35,8 @@ import org.joinmastodon.android.fragments.SplashFragment;
 import org.joinmastodon.android.fragments.ThreadFragment;
 import org.joinmastodon.android.fragments.onboarding.AccountActivationFragment;
 import org.joinmastodon.android.fragments.onboarding.CustomWelcomeFragment;
+import org.joinmastodon.android.fragments.settings.ComposeAboutActivity;
+import org.joinmastodon.android.fragments.settings.OpenSourceLicensesFragment;
 import org.joinmastodon.android.model.Notification;
 import org.joinmastodon.android.model.SearchResults;
 import org.joinmastodon.android.ui.utils.UiUtils;
@@ -45,22 +47,45 @@ import java.lang.reflect.InvocationTargetException;
 import java.util.List;
 
 import androidx.annotation.Nullable;
+import androidx.lifecycle.Lifecycle;
+import androidx.lifecycle.LifecycleOwner;
+import androidx.lifecycle.LifecycleRegistry;
+import androidx.lifecycle.ViewModelStore;
+import androidx.lifecycle.ViewModelStoreOwner;
+import androidx.savedstate.SavedStateRegistry;
+import androidx.savedstate.SavedStateRegistryController;
+import androidx.savedstate.SavedStateRegistryOwner;
 import me.grishka.appkit.FragmentStackActivity;
 import me.grishka.appkit.Nav;
 import me.grishka.appkit.api.Callback;
 import me.grishka.appkit.api.ErrorResponse;
 import me.grishka.appkit.utils.V;
+import org.joinmastodon.android.ui.compose.ComposeLifecycleHelperKt;
 
-public class MainActivity extends FragmentStackActivity{
+public class MainActivity extends FragmentStackActivity implements LifecycleOwner, ViewModelStoreOwner, SavedStateRegistryOwner {
 	private static final String TAG="MainActivity";
+	public static final String EXTRA_OPEN_SOURCE_LICENSES="open_source_licenses";
+	private final LifecycleRegistry lifecycleRegistry=new LifecycleRegistry(this);
+	private final ViewModelStore viewModelStore=new ViewModelStore();
+	private final SavedStateRegistryController savedStateController=SavedStateRegistryController.create(this);
+
+	@Override public Lifecycle getLifecycle(){ return lifecycleRegistry; }
+	@Override public ViewModelStore getViewModelStore(){ return viewModelStore; }
+	@Override public SavedStateRegistry getSavedStateRegistry(){ return savedStateController.getSavedStateRegistry(); }
+
 	private ChatRealtimeClient chatWsClient;
 	private GestureDetector backGestureDetector;
 
 	@Override
 	protected void onCreate(@Nullable Bundle savedInstanceState){
+		savedStateController.performRestore(savedInstanceState);
+		lifecycleRegistry.setCurrentState(Lifecycle.State.CREATED);
+
 		AccountSession session=getCurrentSession();
 		UiUtils.setUserPreferredTheme(this, /* MOSHIDON: this is for per account user themes */ session);
 		super.onCreate(savedInstanceState);
+
+		ComposeLifecycleHelperKt.installComposeLifecycle(this);
 
 		final float minVelocity=ViewConfiguration.get(this).getScaledMinimumFlingVelocity()*2f;
 		final float maxFlingPathLength=V.dp(80);
@@ -85,6 +110,9 @@ public class MainActivity extends FragmentStackActivity{
 			restartHomeFragment();
 			connectChatWebSocket();
 			refreshChatConversations();
+		}
+		if(getIntent().getBooleanExtra(EXTRA_OPEN_SOURCE_LICENSES, false)){
+			getWindow().getDecorView().post(()->openSourceLicenses(getIntent()));
 		}
 
 		if(BuildConfig.BUILD_TYPE.startsWith("appcenter")){
@@ -132,7 +160,9 @@ public class MainActivity extends FragmentStackActivity{
 	protected void onNewIntent(Intent intent){
 		super.onNewIntent(intent);
 		setIntent(intent);
-		if(intent.getBooleanExtra("fromNotification", false)){
+		if(intent.getBooleanExtra(EXTRA_OPEN_SOURCE_LICENSES, false)){
+			openSourceLicenses(intent);
+		}else if(intent.getBooleanExtra("fromNotification", false)){
 			String accountID=intent.getStringExtra("accountID");
 			AccountSession accountSession;
 			try{
@@ -174,6 +204,15 @@ public class MainActivity extends FragmentStackActivity{
 		}/*else if(intent.hasExtra(PackageInstaller.EXTRA_STATUS) && GithubSelfUpdater.needSelfUpdating()){
 			GithubSelfUpdater.getInstance().handleIntentFromInstaller(intent, this);
 		}*/
+	}
+
+	private void openSourceLicenses(Intent intent){
+		intent.removeExtra(EXTRA_OPEN_SOURCE_LICENSES);
+		Bundle args=new Bundle();
+		String accountID=intent.getStringExtra(ComposeAboutActivity.EXTRA_ACCOUNT_ID);
+		if(accountID!=null)
+			args.putString("account", accountID);
+		Nav.go(this, OpenSourceLicensesFragment.class, args);
 	}
 
 	public void handleURL(Uri uri, String accountID){
@@ -338,18 +377,21 @@ public class MainActivity extends FragmentStackActivity{
 	@Override
 	protected void onResume(){
 		super.onResume();
+		lifecycleRegistry.setCurrentState(Lifecycle.State.RESUMED);
 		if(chatWsClient!=null) chatWsClient.connect();
 	}
 
 	@Override
 	protected void onPause(){
 		super.onPause();
+		lifecycleRegistry.setCurrentState(Lifecycle.State.STARTED);
 		if(chatWsClient!=null) chatWsClient.disconnect();
 	}
 
 	@Override
 	protected void onDestroy(){
 		super.onDestroy();
+		lifecycleRegistry.setCurrentState(Lifecycle.State.DESTROYED);
 		if(chatWsClient!=null){
 			chatWsClient.disconnect();
 			chatWsClient=null;
