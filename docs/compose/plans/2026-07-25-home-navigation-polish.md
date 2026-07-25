@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use compose:subagent (recommended) or compose:execute to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Move private messages to a permanent Home toolbar action, reduce the bottom Liquid Glass bar to five tabs, prevent drag/long-press conflicts, and synchronize the real-content backdrop with scrolling frames.
+**Goal:** Move private messages to the own-profile toolbar, reduce the bottom Liquid Glass bar to five tabs, prevent drag/long-press conflicts, and synchronize the real-content backdrop with scrolling frames.
 
-**Architecture:** Keep the existing AppKit child fragments and tab selection state machine. Conversations become a normal pushed destination from `HomeTabFragment`; the bottom bar owns only five persistent primary destinations. `BackdropCaptureFrameLayout` observes descendant invalidations and schedules at most one capture per display frame while content is changing, stopping automatically when invalidations stop.
+**Architecture:** Keep the existing AppKit child fragments and tab selection state machine. Conversations become a normal pushed destination from the user's own `ProfileFragment`; the bottom bar owns only five persistent primary destinations. `BackdropCaptureFrameLayout` observes descendant invalidations and schedules at most one capture per display frame while content is changing, stopping automatically when invalidations stop.
 
 **Tech Stack:** Java 17 Android Views/AppKit, Kotlin Compose, miuix blur, JUnit 4, Android Choreographer/View invalidation.
 
@@ -14,7 +14,7 @@
 
 ### [S1] Private message entry
 
-The Home timeline toolbar always shows a private-message action. It opens `ConversationsFragment` with the active account and displays the unread conversation count badge.
+The user's own Profile toolbar shows a private-message action beside Notifications. It opens `ConversationsFragment` with the active account and displays the unread conversation count badge. The Home timeline toolbar has no private-message action.
 
 ### [S2] Five primary tabs
 
@@ -86,19 +86,19 @@ Run the Step 2 command.
 
 Expected: PASS.
 
-### Task 2: Permanent toolbar private-message action and unread badge
+### Task 2: Profile toolbar private-message action and unread badge
 
 **Covers:** [S1]
 
 **Files:**
-- Modify: `mastodon/src/main/res/menu/home_custom.xml`
-- Modify: `mastodon/src/main/java/org/joinmastodon/android/fragments/HomeTabFragment.java`
+- Modify: `mastodon/src/main/res/menu/profile_own.xml`
+- Modify: `mastodon/src/main/java/org/joinmastodon/android/fragments/ProfileFragment.java`
 - Inspect/reuse: `mastodon/src/main/java/org/joinmastodon/android/chat/ui/ConversationsFragment.java`
 - Inspect/reuse: `mastodon/src/main/java/org/joinmastodon/android/chat/ChatController.java`
 
-- [ ] **Step 1: Add an always-visible message action**
+- [ ] **Step 1: Add an always-visible message action to own profile**
 
-Add before the overflow action:
+Add beside `profile_notifications`:
 
 ```xml
 <item
@@ -110,7 +110,7 @@ Add before the overflow action:
 
 - [ ] **Step 2: Wire the action to conversations**
 
-In `HomeTabFragment.onOptionsItemSelected`, handle `R.id.messages_action` with:
+In `ProfileFragment.onOptionsItemSelected`, handle `R.id.messages_action` with:
 
 ```java
 Bundle args=new Bundle();
@@ -120,7 +120,7 @@ Nav.go(getActivity(), ConversationsFragment.class, args);
 
 - [ ] **Step 3: Reuse the existing action-view badge pattern**
 
-Create an action view for `messages_action` using the same toolbar action sizing/tint conventions already used by other badged actions. The click listener must call `onOptionsItemSelected(messagesAction)`. Load the account-scoped conversation summary through the existing `ChatController` and set the badge text to the total unread count, hiding it at zero. Refresh when the fragment is shown and on existing chat update events; do not add a second chat database or polling loop.
+Create an action view for `messages_action` beside `profile_notifications`, using the same toolbar action sizing and badge conventions. Load the account-scoped conversation summary through the existing `ChatController` and set the badge text to the total unread count, hiding it at zero. Refresh when the own-profile fragment is shown and on existing chat update events; do not add a second chat database or polling loop.
 
 - [ ] **Step 4: Compile Java**
 

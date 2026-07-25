@@ -25,6 +25,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import kotlin.math.roundToInt
 import java.util.function.IntConsumer
 import java.util.function.IntPredicate
 import me.grishka.appkit.imageloader.ViewImageLoader
@@ -56,6 +57,9 @@ object HomeNavigationTabs {
 	@JvmStatic
 	fun indexOf(tabId: Int): Int = ids.indexOf(tabId).takeIf { it >= 0 } ?: 0
 }
+
+internal fun snapNavigationDragTarget(value: Float, tabsCount: Int): Int =
+	value.roundToInt().coerceIn(0, tabsCount - 1)
 
 class HomeLiquidNavigationController(
 	context: Context,

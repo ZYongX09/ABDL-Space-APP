@@ -56,7 +56,10 @@ import org.joinmastodon.android.R;
 import org.joinmastodon.android.api.MastodonAPIRequest;
 import org.joinmastodon.android.api.requests.accounts.GetAccountByID;
 import org.joinmastodon.android.api.requests.accounts.GetAccountFamiliarFollowers;
+import com.squareup.otto.Subscribe;
+
 import org.joinmastodon.android.api.requests.accounts.GetAccountRelationships;
+import org.joinmastodon.android.E;
 import org.joinmastodon.android.api.requests.accounts.GetOwnAccount;
 import org.joinmastodon.android.api.requests.accounts.SetAccountFollowed;
 import org.joinmastodon.android.api.requests.accounts.SetPrivateNote;
@@ -69,6 +72,9 @@ import org.joinmastodon.android.fragments.report.ReportReasonChoiceFragment;
 import org.joinmastodon.android.model.Account;
 import org.joinmastodon.android.model.AccountField;
 import org.joinmastodon.android.model.Attachment;
+import org.joinmastodon.android.chat.ChatController;
+import org.joinmastodon.android.chat.ChatEvents;
+import org.joinmastodon.android.chat.model.Conversation;
 import org.joinmastodon.android.model.FamiliarFollowers;
 import org.joinmastodon.android.model.Relationship;
 import org.joinmastodon.android.model.viewmodel.AccountViewModel;
@@ -189,6 +195,7 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 	private EditText noteEdit;
 
 	@Override
+	private TextView profileMessagesBadge;
 	public void onCreate(Bundle savedInstanceState){
 		super.onCreate(savedInstanceState);
 		if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.N)
@@ -201,6 +208,7 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 			isOwnProfile=AccountSessionManager.getInstance().isSelf(accountID, account);
 			// Always fetch fresh data instead of using cached account
 			profileAccountID=getArguments().getString("profileAccountID", account.id);
+		E.register(this);
 		}else{
 			profileAccountID=getArguments().getString("profileAccountID");
 		}
@@ -227,6 +235,7 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 		View content=inflater.inflate(R.layout.fragment_profile, container, false);
 
 		avatar=content.findViewById(R.id.avatar);
+		E.unregister(this);
 		cover=content.findViewById(R.id.cover);
 		avatarBorder=content.findViewById(R.id.avatar_border);
 		name=content.findViewById(R.id.name);
@@ -894,6 +903,12 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 		}else if(id==R.id.notifications){
 			new SetAccountFollowed(account.id, true, relationship.showingReblogs, !relationship.notifying)
 					.setCallback(new Callback<>(){
+			MenuItem messagesItem=menu.findItem(R.id.messages_action);
+			View messagesActionView=LayoutInflater.from(getActivity()).inflate(R.layout.action_home_messages, getToolbar(), false);
+			messagesItem.setActionView(messagesActionView);
+			profileMessagesBadge=messagesActionView.findViewById(R.id.messages_badge);
+			messagesActionView.setOnClickListener(v->openConversations());
+			updateProfileMessagesBadge();
 						@Override
 						public void onSuccess(Relationship result){
 							updateRelationship(result);
@@ -927,6 +942,8 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 		boolean visible=!TextUtils.isEmpty(unreadNotificationsBadgeText);
 		profileNotificationsBadge.setVisibility(visible ? View.VISIBLE : View.GONE);
 		profileNotificationsBadge.setText(visible ? unreadNotificationsBadgeText : "");
+		}else if(id==R.id.messages_action){
+			openConversations();
 	}
 
 	private void openNotifications(){
@@ -1011,6 +1028,38 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 
 	private boolean isNBWAccount(){
 		return account!=null && account.id!=null && account.id.startsWith("nbw_");
+	}
+
+	private void openConversations(){
+		Intent intent=new Intent(getActivity(), MainActivity.class);
+		intent.putExtra("navigate_to", "conversations");
+		intent.putExtra("account", accountID);
+		startActivity(intent);
+	}
+
+	private void updateProfileMessagesBadge(){
+		if(profileMessagesBadge==null || accountID==null)
+			return;
+		int unread=0;
+		for(Conversation conversation:ChatController.getInstance(accountID).getStorage().listConversations(accountID))
+			unread+=Math.max(0, conversation.unreadCount);
+		profileMessagesBadge.setVisibility(unread>0 ? View.VISIBLE : View.GONE);
+		profileMessagesBadge.setText(unread>99 ? "99+" : String.valueOf(unread));
+	}
+
+	@Subscribe
+	public void onConversationsUpdated(ChatEvents.ConversationsUpdatedEvent event){
+		updateProfileMessagesBadge();
+	}
+
+	@Subscribe
+	public void onNewChatMessage(ChatEvents.NewChatMessageEvent event){
+		updateProfileMessagesBadge();
+	}
+
+	@Subscribe
+	public void onChatMessageRead(ChatEvents.MessageReadEvent event){
+		updateProfileMessagesBadge();
 	}
 
 	private void updateFamiliarFollowers(){

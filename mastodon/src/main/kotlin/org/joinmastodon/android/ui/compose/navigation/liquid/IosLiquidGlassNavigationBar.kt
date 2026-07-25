@@ -73,6 +73,7 @@ import kotlinx.coroutines.launch
 import org.joinmastodon.android.ui.compose.ui.isInDarkTheme
 import org.joinmastodon.android.ui.compose.navigation.animation.DampedDragAnimation
 import org.joinmastodon.android.ui.compose.navigation.animation.InteractiveHighlight
+import org.joinmastodon.android.ui.compose.navigation.snapNavigationDragTarget
 import top.yukonga.miuix.kmp.basic.BadgedBox
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.NavigationItem
@@ -263,12 +264,11 @@ internal fun IosLiquidGlassNavigationBar(
             onClick = { onItemClickUpdated(currentIndex) },
             onLongClick = { onItemLongClick(currentIndex) },
             onDragStopped = {
-                val targetIndex = targetValue.roundToInt().coerceIn(0, tabsCount - 1)
+                val targetIndex = snapNavigationDragTarget(targetValue, tabsCount)
+                animateToValue(targetIndex.toFloat())
                 if (currentIndex != targetIndex) {
                     currentIndex = targetIndex
                     onItemClickUpdated(targetIndex)
-                } else {
-                    animateToValue(targetIndex.toFloat())
                 }
                 animationScope.launch {
                     offsetAnimation.animateTo(0f, spring(1f, 300f, 0.5f))

@@ -32,4 +32,12 @@ class HomeNavigationTabsTest {
 		)
 		assertEquals(0, HomeNavigationTabs.indexOf(R.id.tab_messages))
 	}
+
+	@Test
+	fun dragReleaseAlwaysSnapsToAValidTab() {
+		assertEquals(1, snapNavigationDragTarget(1.47f, 5))
+		assertEquals(2, snapNavigationDragTarget(1.5f, 5))
+		assertEquals(0, snapNavigationDragTarget(-0.4f, 5))
+		assertEquals(4, snapNavigationDragTarget(4.8f, 5))
+	}
 }

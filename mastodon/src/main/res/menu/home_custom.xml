@@ -16,11 +16,6 @@
 		android:visible="false"
 		android:showAsAction="always" />
 	<item
-		android:id="@+id/messages_action"
-		android:icon="@drawable/ic_mail_24px"
-		android:title="私信"
-		android:showAsAction="always" />
-	<item
 		android:id="@+id/overflow"
 		android:title="@string/more_options"
 		android:icon="@drawable/ic_fluent_more_vertical_24_regular"
