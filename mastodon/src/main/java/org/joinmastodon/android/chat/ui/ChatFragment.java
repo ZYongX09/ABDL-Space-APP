@@ -75,8 +75,10 @@ public class ChatFragment extends Fragment implements WindowInsetsAwareFragment 
 			peerId = args.getLong("peer_id");
 			peerName = args.getString("peer_name", "");
 			peerAvatar = args.getString("peer_avatar", "");
+			accountId = args.getString("account");
 		}
-		accountId = AccountSessionManager.getInstance().getLastActiveAccountID();
+		if(accountId==null)
+			accountId = AccountSessionManager.getInstance().getLastActiveAccountID();
 	}
 
 	@Override

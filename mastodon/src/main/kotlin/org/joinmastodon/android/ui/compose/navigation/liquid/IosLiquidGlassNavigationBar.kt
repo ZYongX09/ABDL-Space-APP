@@ -383,7 +383,11 @@ internal fun IosLiquidGlassNavigationBar(
         }
     }
 
-    Column(modifier = modifier.fillMaxWidth()) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(top = 12.dp),
+    ) {
         Box(
             modifier = Modifier
                 .padding(bottom = bottomPaddingValue, start = 24.dp, end = 24.dp)

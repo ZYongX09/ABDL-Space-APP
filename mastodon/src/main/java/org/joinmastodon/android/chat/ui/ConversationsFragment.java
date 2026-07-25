@@ -2,10 +2,12 @@ package org.joinmastodon.android.chat.ui;
 
 import android.app.Fragment;
 import android.os.Bundle;
+import android.content.res.ColorStateList;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowInsets;
+import android.widget.ImageButton;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -20,20 +22,23 @@ import org.joinmastodon.android.chat.ChatController;
 import org.joinmastodon.android.chat.ChatEvents;
 import org.joinmastodon.android.chat.model.Conversation;
 import org.joinmastodon.android.api.session.AccountSessionManager;
+import org.joinmastodon.android.ui.utils.UiUtils;
 
 import java.util.ArrayList;
 import java.util.List;
 
-import me.grishka.appkit.utils.V;
+import me.grishka.appkit.fragments.WindowInsetsAwareFragment;
 
-public class ConversationsFragment extends Fragment {
+public class ConversationsFragment extends Fragment implements WindowInsetsAwareFragment {
 	private RecyclerView recyclerView;
 	private SwipeRefreshLayout swipeRefreshLayout;
 	private ConversationsAdapter adapter;
 	private List<Conversation> data = new ArrayList<>();
 	private String accountId;
 	private View emptyState;
-	private View pageTitle;
+	private View toolbar;
+	private int baseToolbarHeight;
+	private int baseRecyclerBottomPadding;
 
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
@@ -49,7 +54,12 @@ public class ConversationsFragment extends Fragment {
 		swipeRefreshLayout = root.findViewById(R.id.swipe_refresh);
 		recyclerView = root.findViewById(R.id.recycler);
 		emptyState = root.findViewById(R.id.empty_state);
-		pageTitle = root.findViewById(R.id.page_title);
+		toolbar = root.findViewById(R.id.toolbar);
+		baseToolbarHeight=toolbar.getLayoutParams().height;
+		baseRecyclerBottomPadding=recyclerView.getPaddingBottom();
+		ImageButton backBtn=root.findViewById(R.id.back_btn);
+		backBtn.setImageTintList(ColorStateList.valueOf(UiUtils.getThemeColor(getActivity(), R.attr.colorM3OnSurface)));
+		backBtn.setOnClickListener(v->getActivity().onBackPressed());
 		recyclerView.setLayoutManager(new LinearLayoutManager(getActivity()));
 		adapter = new ConversationsAdapter();
 		recyclerView.setAdapter(adapter);
@@ -61,11 +71,25 @@ public class ConversationsFragment extends Fragment {
 	}
 
 	public void onApplyWindowInsets(WindowInsets insets) {
-		if (pageTitle == null) return;
-		pageTitle.setPadding(pageTitle.getPaddingLeft(), insets.getSystemWindowInsetTop(), pageTitle.getPaddingRight(), 0);
-		ViewGroup.LayoutParams lp = pageTitle.getLayoutParams();
-		lp.height = V.dp(64) + insets.getSystemWindowInsetTop();
-		pageTitle.setLayoutParams(lp);
+		if(toolbar==null || recyclerView==null)
+			return;
+		int top=insets.getSystemWindowInsetTop();
+		int bottom=insets.getStableInsetBottom();
+		toolbar.setPadding(toolbar.getPaddingLeft(), top, toolbar.getPaddingRight(), 0);
+		ViewGroup.LayoutParams lp=toolbar.getLayoutParams();
+		lp.height=baseToolbarHeight+top;
+		toolbar.setLayoutParams(lp);
+		recyclerView.setPadding(recyclerView.getPaddingLeft(), recyclerView.getPaddingTop(), recyclerView.getPaddingRight(), baseRecyclerBottomPadding+bottom);
+	}
+
+	@Override
+	public boolean wantsLightStatusBar(){
+		return !UiUtils.isDarkTheme();
+	}
+
+	@Override
+	public boolean wantsLightNavigationBar(){
+		return !UiUtils.isDarkTheme();
 	}
 
 	@Override

@@ -32,6 +32,14 @@ When descendants invalidate during RecyclerView scrolling, image crossfades, or 
 
 Match the demo's five-item density and click/drag behavior while preserving ABDL-specific icons, badges, AppKit fragments, and real View backdrop bridge. Do not migrate the whole Home pager or FAB architecture to Compose.
 
+### [S6] Glass overflow space
+
+The selected prism must remain fully visible at its maximum pressed scale. Add transparent top layout space without moving the visible navigation pill or changing bottom insets.
+
+### [S7] Conversation page system bars
+
+The conversation list has a standard back button, applies the status-bar inset to its toolbar, and applies the navigation-bar inset to list bottom padding. Chat list and detail use the explicitly supplied account scope.
+
 ### Task 1: Five-tab navigation mapping
 
 **Covers:** [S2, S5]
@@ -240,3 +248,35 @@ Stage only files listed in Tasks 1-4 and commit with:
 ```bash
 git commit -m "fix(ui): 完善首页液态导航交互与私信入口"
 ```
+
+### Task 6: Prism overflow and conversation safe areas
+
+**Covers:** [S6, S7]
+
+**Files:**
+- Modify: `mastodon/src/main/kotlin/org/joinmastodon/android/ui/compose/navigation/liquid/IosLiquidGlassNavigationBar.kt`
+- Modify: `mastodon/src/main/res/layout/fragment_conversations.xml`
+- Modify: `mastodon/src/main/java/org/joinmastodon/android/chat/ui/ConversationsFragment.java`
+- Modify: `mastodon/src/main/java/org/joinmastodon/android/chat/ui/ChatFragment.java`
+
+- [ ] **Step 1: Add transparent prism overflow space**
+
+Add `12.dp` top padding outside the positioned glass `Box`, and compensate inside with the same negative visual displacement or reduced outer top position so the visible 64dp pill stays at its current screen Y coordinate. The Compose root height grows by 12dp while the bar itself does not move down.
+
+- [ ] **Step 2: Replace the conversation title with a toolbar**
+
+Use a horizontal `LinearLayout` with id `toolbar`, a 48dp `ImageButton` id `back_btn` using `ic_arrow_back_24`, and a title `TextView`. Preserve the existing surface colors and 64dp base height.
+
+- [ ] **Step 3: Apply WindowInsets in the conversation list**
+
+Implement `WindowInsetsAwareFragment`, store base toolbar height and RecyclerView bottom padding, wire the back button to `getActivity().onBackPressed()`, increase toolbar height/padding by the top inset, and increase RecyclerView bottom padding by the stable bottom inset.
+
+- [ ] **Step 4: Use the supplied account in chat detail**
+
+In `ChatFragment.onCreate`, read `args.getString("account")` before falling back to the last active account.
+
+- [ ] **Step 5: Build and install**
+
+Run: `JAVA_HOME=/usr/lib/jvm/java-17-openjdk ./gradlew :mastodon:assembleDebug -x checkDebugAarMetadata -x checkDebugDuplicateClasses --no-daemon`
+
+Expected: `BUILD SUCCESSFUL`. Install when ADB reconnects and verify the prism top edge, conversation back button, status-bar clearance, and bottom list clearance.
