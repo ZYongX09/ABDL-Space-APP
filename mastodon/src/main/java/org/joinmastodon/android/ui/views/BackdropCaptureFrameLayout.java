@@ -24,6 +24,7 @@ public class BackdropCaptureFrameLayout extends FrameLayout{
 	private Bitmap captureBitmap;
 	private Consumer<Bitmap> captureListener;
 	private boolean capturing;
+	private boolean captureFrameScheduled;
 	private final WeakHashMap<Bitmap, Bitmap> softwareBitmapCache=new WeakHashMap<>();
 	private final ArrayList<Runnable> restoreDrawables=new ArrayList<>();
 
@@ -46,10 +47,27 @@ public class BackdropCaptureFrameLayout extends FrameLayout{
 
 	public void setCaptureListener(Consumer<Bitmap> captureListener){
 		this.captureListener=captureListener;
+		captureFrameScheduled=false;
+		if(captureListener!=null)
+			scheduleCaptureFrame();
+	}
+
+	@Override
+	public void onDescendantInvalidated(View child, View target){
+		super.onDescendantInvalidated(child, target);
+		scheduleCaptureFrame();
+	}
+
+	private void scheduleCaptureFrame(){
+		if(capturing || captureFrameScheduled || captureListener==null || !isAttachedToWindow())
+			return;
+		captureFrameScheduled=true;
+		postInvalidateOnAnimation();
 	}
 
 	@Override
 	protected void dispatchDraw(Canvas canvas){
+		captureFrameScheduled=false;
 		super.dispatchDraw(canvas);
 		if(capturing || captureListener==null || captureHeight<=0 || getWidth()<=0 || getHeight()<=0)
 			return;
@@ -72,6 +90,12 @@ public class BackdropCaptureFrameLayout extends FrameLayout{
 			capturing=false;
 		}
 		captureListener.accept(captureBitmap);
+	}
+
+	@Override
+	protected void onDetachedFromWindow(){
+		captureFrameScheduled=false;
+		super.onDetachedFromWindow();
 	}
 
 	private void replaceHardwareBitmaps(View view){

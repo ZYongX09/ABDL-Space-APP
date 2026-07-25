@@ -12,6 +12,7 @@ import android.app.Fragment;
 import android.app.FragmentTransaction;
 import android.app.assist.AssistContent;
 import android.content.Context;
+import android.content.Intent;
 import android.content.res.Configuration;
 import android.os.Build;
 import android.os.Bundle;
@@ -40,11 +41,15 @@ import com.squareup.otto.Subscribe;
 
 import org.joinmastodon.android.E;
 import org.joinmastodon.android.GlobalUserPreferences;
+import org.joinmastodon.android.MainActivity;
 import org.joinmastodon.android.R;
 import org.joinmastodon.android.api.requests.announcements.GetAnnouncements;
 import org.joinmastodon.android.api.requests.lists.GetLists;
 import org.joinmastodon.android.api.requests.tags.GetFollowedTags;
 import org.joinmastodon.android.api.session.AccountSessionManager;
+import org.joinmastodon.android.chat.ChatController;
+import org.joinmastodon.android.chat.ChatEvents;
+import org.joinmastodon.android.chat.model.Conversation;
 import org.joinmastodon.android.events.HashtagUpdatedEvent;
 import org.joinmastodon.android.events.ListCreatedEvent;
 import org.joinmastodon.android.events.ListDeletedEvent;
@@ -88,7 +93,7 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 	private static final int ANNOUNCEMENTS_RESULT = 654;
 
 	private String accountID;
-	private MenuItem announcements, announcementsAction, settings, settingsAction;
+	private MenuItem announcements, announcementsAction, settings, settingsAction, messagesAction;
 	//	private ImageView toolbarLogo;
 	private Button toolbarShowNewPostsBtn;
 	private boolean newPostsBtnShown;
@@ -112,6 +117,7 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 	private PopupMenu overflowPopup;
 	private View overflowActionView = null;
 	private boolean announcementsBadged, settingsBadged;
+	private TextView messagesBadge;
 	private ImageButton fab;
 	private ElevationOnScrollListener elevationOnScrollListener;
 
@@ -438,6 +444,12 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		menu.findItem(R.id.overflow).setActionView(overflowActionView);
 		announcementsAction = menu.findItem(R.id.announcements_action);
 		settingsAction = menu.findItem(R.id.settings_action);
+		messagesAction = menu.findItem(R.id.messages_action);
+		View messagesActionView=LayoutInflater.from(getActivity()).inflate(R.layout.action_home_messages, getToolbar(), false);
+		messagesAction.setActionView(messagesActionView);
+		messagesBadge=messagesActionView.findViewById(R.id.messages_badge);
+		messagesActionView.setOnClickListener(v->openConversations());
+		updateMessagesBadge();
 
 		updateOverflowMenu();
 	}
@@ -541,6 +553,8 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 			return true;
 		} else if (id == R.id.settings || id == R.id.settings_action) {
 			Nav.go(getActivity(), SettingsMainFragment.class, args);
+		} else if(id==R.id.messages_action){
+			openConversations();
 		} else if (id == R.id.announcements || id == R.id.announcements_action) {
 			Nav.goForResult(getActivity(), AnnouncementsFragment.class, args, ANNOUNCEMENTS_RESULT, this);
 		} else if (id == R.id.edit_timelines) {
@@ -693,8 +707,41 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 	@Override
 	protected void onShown() {
 		super.onShown();
+		updateMessagesBadge();
 		Object timelines = AccountSessionManager.get(accountID).getLocalPreferences().timelines;
 		if (timelines != null && timelinesList!= timelines) UiUtils.restartApp();
+	}
+
+	private void openConversations(){
+		Intent intent=new Intent(getActivity(), MainActivity.class);
+		intent.putExtra("navigate_to", "conversations");
+		intent.putExtra("account", accountID);
+		startActivity(intent);
+	}
+
+	private void updateMessagesBadge(){
+		if(messagesBadge==null || accountID==null)
+			return;
+		int unread=0;
+		for(Conversation conversation:ChatController.getInstance(accountID).getStorage().listConversations(accountID))
+			unread+=Math.max(0, conversation.unreadCount);
+		messagesBadge.setVisibility(unread>0 ? View.VISIBLE : View.GONE);
+		messagesBadge.setText(unread>99 ? "99+" : String.valueOf(unread));
+	}
+
+	@Subscribe
+	public void onConversationsUpdated(ChatEvents.ConversationsUpdatedEvent event){
+		updateMessagesBadge();
+	}
+
+	@Subscribe
+	public void onNewChatMessage(ChatEvents.NewChatMessageEvent event){
+		updateMessagesBadge();
+	}
+
+	@Subscribe
+	public void onChatMessageRead(ChatEvents.MessageReadEvent event){
+		updateMessagesBadge();
 	}
 
 	@Override

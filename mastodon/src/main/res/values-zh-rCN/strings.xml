@@ -432,6 +432,8 @@
 	<string name="blocked_user">已屏蔽 %s</string>
 	<string name="mark_all_notifications_read">全部标记为已读</string>
 	<string name="settings_display">显示</string>
+	<string name="settings_ios_liquid_navigation">iOS 风格底部导航栏</string>
+	<string name="settings_ios_liquid_navigation_summary">在主界面使用悬浮液态玻璃导航栏</string>
 	<string name="settings_filters">过滤器</string>
 	<string name="settings_server_explanation">概览、规则与管理员</string>
 	<!-- %s is the app name (ABDL Space, key app_name). I made it a placeholder so everything Just Works™ with forks -->

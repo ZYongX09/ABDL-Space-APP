@@ -38,7 +38,7 @@ public class SettingsDisplayFragment extends BaseSettingsFragment<Void>{
 
 	// MOSHIDON:
 	private ListItem<Void> colorItem;
-	private CheckableListItem<Void> trueBlackModeItem;
+	private CheckableListItem<Void> trueBlackModeItem, iosLiquidNavigationItem;
 	private AccountLocalPreferences lp;
 
 	@Override
@@ -65,6 +65,12 @@ public class SettingsDisplayFragment extends BaseSettingsFragment<Void>{
 		// MOSHIDON:
 		items.add(colorItem=new ListItem<>(getString(R.string.sk_settings_color_palette), getColorPaletteValue(), R.drawable.ic_fluent_color_24_regular, this::onColorClick));
 		items.add(trueBlackModeItem=new CheckableListItem<>(R.string.sk_settings_true_black, R.string.mo_setting_true_black_summary, CheckableListItem.Style.SWITCH, GlobalUserPreferences.trueBlackTheme, R.drawable.ic_fluent_dark_theme_24_regular, i->onTrueBlackModeClick(), true));
+		items.add(iosLiquidNavigationItem=new CheckableListItem<>(R.string.settings_ios_liquid_navigation, R.string.settings_ios_liquid_navigation_summary, CheckableListItem.Style.SWITCH, GlobalUserPreferences.useIosLiquidNavigation, R.drawable.ic_fluent_navigation_24_regular, item->{
+			toggleCheckableItem(item);
+			GlobalUserPreferences.useIosLiquidNavigation=item.checked;
+			GlobalUserPreferences.save();
+			E.post(new StatusDisplaySettingsChangedEvent(accountID));
+		}));
 
 		items.add(showCWsItem=new CheckableListItem<>(R.string.settings_show_cws, 0, CheckableListItem.Style.SWITCH, GlobalUserPreferences.showCWs, R.drawable.ic_warning_24px, this::toggleCheckableItem));
 		items.add(hideSensitiveMediaItem=new CheckableListItem<>(R.string.settings_hide_sensitive_media, 0, CheckableListItem.Style.SWITCH, GlobalUserPreferences.hideSensitiveMedia, R.drawable.ic_no_adult_content_24px, this::toggleCheckableItem));
@@ -93,6 +99,7 @@ public class SettingsDisplayFragment extends BaseSettingsFragment<Void>{
 		GlobalUserPreferences.hideSensitiveMedia=hideSensitiveMediaItem.checked;
 		GlobalUserPreferences.showInteractionCounts=interactionCountsItem.checked;
 		GlobalUserPreferences.customEmojiInNames=emojiInNamesItem.checked;
+		GlobalUserPreferences.useIosLiquidNavigation=iosLiquidNavigationItem.checked;
 		GlobalUserPreferences.save();
 		E.post(new StatusDisplaySettingsChangedEvent(accountID));
 	}

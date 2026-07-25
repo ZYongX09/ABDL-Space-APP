@@ -440,6 +440,8 @@
 	<string name="blocked_user">Blocked %s</string>
 	<string name="mark_all_notifications_read">Mark all as read</string>
 	<string name="settings_display">Display</string>
+	<string name="settings_ios_liquid_navigation">iOS-style bottom navigation</string>
+	<string name="settings_ios_liquid_navigation_summary">Use the floating liquid glass navigation bar on the home screen</string>
 	<string name="settings_filters">Filters</string>
 	<string name="settings_server_explanation">Overview, rules, moderators</string>
 	<!-- %s is the app name (ABDL Space, key app_name). I made it a placeholder so everything Just Works™ with forks -->

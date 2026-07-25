@@ -66,6 +66,7 @@ public class GlobalUserPreferences{
 	public static boolean showPostsWithoutAlt;
 	public static boolean showMediaPreview;
 	public static boolean removeTrackingParams;
+	public static boolean useIosLiquidNavigation;
 
 	// MOSHIDON: we changed this to public, because otherwise we can't export the settings
 	public static SharedPreferences getPrefs(){
@@ -134,6 +135,7 @@ public class GlobalUserPreferences{
 		showPostsWithoutAlt=prefs.getBoolean("showPostsWithoutAlt", true);
 		showMediaPreview=prefs.getBoolean("showMediaPreview", true);
 		removeTrackingParams=prefs.getBoolean("removeTrackingParams", true);
+		useIosLiquidNavigation=prefs.getBoolean("useIosLiquidNavigation", true);
 //		enhanceTextSize=prefs.getBoolean("enhanceTextSize", false);
 
 
@@ -210,6 +212,7 @@ public class GlobalUserPreferences{
 				.putBoolean("showPostsWithoutAlt", showPostsWithoutAlt)
 				.putBoolean("showMediaPreview", showMediaPreview)
 				.putBoolean("removeTrackingParams", removeTrackingParams)
+				.putBoolean("useIosLiquidNavigation", useIosLiquidNavigation)
 //				.putBoolean("enhanceTextSize", enhanceTextSize)
 
 				.apply();

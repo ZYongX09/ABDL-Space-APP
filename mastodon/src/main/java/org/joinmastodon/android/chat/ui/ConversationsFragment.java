@@ -38,7 +38,9 @@ public class ConversationsFragment extends Fragment {
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
-		accountId = AccountSessionManager.getInstance().getLastActiveAccountID();
+		accountId = getArguments()!=null ? getArguments().getString("account") : null;
+		if(accountId==null)
+			accountId = AccountSessionManager.getInstance().getLastActiveAccountID();
 	}
 
 	@Override
