@@ -154,12 +154,18 @@ internal class DampedDragAnimation(
     private fun updateVelocity() {
         velocityTracker.addPosition(nowMillis(), Offset(value, 0f))
         val span = (valueRange.endInclusive - valueRange.start).coerceAtLeast(1e-6f)
-        val targetVelocity = velocityTracker.calculateVelocity().x / span
+        val targetVelocity = stabilizeDragVelocity(
+            previousVelocity = velocityAnimation.value,
+            measuredVelocity = velocityTracker.calculateVelocity().x / span,
+        )
         animationScope.launch(start = CoroutineStart.UNDISPATCHED) {
             velocityAnimation.snapTo(targetVelocity)
         }
     }
 }
+
+internal fun stabilizeDragVelocity(previousVelocity: Float, measuredVelocity: Float): Float =
+    previousVelocity * 0.75f + measuredVelocity * 0.25f
 
 internal suspend fun PointerInputScope.inspectDragGestures(
     onDragStart: (down: PointerInputChange) -> Unit = {},
