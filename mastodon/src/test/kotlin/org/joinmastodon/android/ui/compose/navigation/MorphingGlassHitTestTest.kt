@@ -11,4 +11,18 @@ class MorphingGlassHitTestTest {
 		assertEquals(1, hitTestMenuRow(70f, rows))
 		assertNull(hitTestMenuRow(170f, rows))
 	}
+
+	@Test
+	fun trailingPillSplitsComposeAndMoreAtVisualMidpoint() {
+		assertEquals(TrailingToolbarAction.COMPOSE, trailingToolbarAction(26f, 108f))
+		assertEquals(TrailingToolbarAction.MORE, trailingToolbarAction(82f, 108f))
+		assertEquals(TrailingToolbarAction.MORE, trailingToolbarAction(54f, 108f))
+	}
+
+	@Test
+	fun menuHeightMatchesRenderedRows() {
+		assertEquals(60, toolbarMenuHeightDp(itemCount = 1, hasBackRow = false))
+		assertEquals(204, toolbarMenuHeightDp(itemCount = 4, hasBackRow = false))
+		assertEquals(252, toolbarMenuHeightDp(itemCount = 4, hasBackRow = true))
+	}
 }

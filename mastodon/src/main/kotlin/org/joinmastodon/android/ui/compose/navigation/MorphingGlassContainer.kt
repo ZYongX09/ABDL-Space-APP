@@ -26,6 +26,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -142,7 +143,7 @@ internal fun MorphingGlassContainer(
 			.clip(shape)
 			.pointerInput(Unit) {
 				awaitEachGesture {
-					val down = awaitPointerEvent().changes.firstOrNull { it.pressed } ?: return@awaitEachGesture
+					val down = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.pressed } ?: return@awaitEachGesture
 					val startedExpanded = expandedState.value
 					val requestedExpansion = !startedExpanded && shouldExpandFromClosed(down.position, size)
 					if(requestedExpansion) onExpansionRequested()
@@ -152,7 +153,7 @@ internal fun MorphingGlassContainer(
 					var totalDy = 0f
 					try {
 						while(true) {
-							val event = awaitPointerEvent()
+							val event = awaitPointerEvent(PointerEventPass.Initial)
 							val change = event.changes.firstOrNull { it.id==down.id } ?: break
 							val delta = change.positionChange()
 							totalDx += delta.x
