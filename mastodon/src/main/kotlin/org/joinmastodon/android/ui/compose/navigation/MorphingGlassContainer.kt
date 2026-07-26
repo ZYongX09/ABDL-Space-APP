@@ -29,6 +29,7 @@ import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -69,6 +70,7 @@ internal fun MorphingGlassContainer(
 	onClick: () -> Unit,
 	onSelectionChanged: (Int?) -> Unit = {},
 	onSelectionConfirmed: (Int) -> Unit = {},
+	onUpwardFling: () -> Unit = {},
 	onBoundsChanged: (Offset, IntSize) -> Unit = { _, _ -> },
 	closedContent: @Composable BoxScope.() -> Unit,
 	expandedContent: @Composable BoxScope.(progress: Float) -> Unit,
@@ -157,11 +159,14 @@ internal fun MorphingGlassContainer(
 					var dragged = false
 					var totalDx = 0f
 					var totalDy = 0f
+					val velocityTracker = VelocityTracker()
+					velocityTracker.addPosition(down.uptimeMillis, down.position)
 					try {
 						while(true) {
 							val event = awaitPointerEvent(PointerEventPass.Initial)
 							val change = event.changes.firstOrNull { it.id==down.id } ?: break
 							val delta = change.positionChange()
+							velocityTracker.addPosition(change.uptimeMillis, change.position)
 							totalDx += delta.x
 							totalDy += delta.y
 							if(!dragged && hypot(totalDx, totalDy)>viewConfiguration.touchSlop) dragged = true
@@ -175,7 +180,9 @@ internal fun MorphingGlassContainer(
 							}
 							if(dragged) change.consume()
 							if(change.changedToUpIgnoreConsumed()) {
-								if(dragged) index?.let(onSelectionConfirmed)
+								val velocityY = velocityTracker.calculateVelocity().y
+								if(shouldCollapseTrailingMenu(velocityY, viewConfiguration.minimumFlingVelocity)) onUpwardFling()
+								else if(dragged) index?.let(onSelectionConfirmed)
 								else if(!requestedExpansion && !startedExpanded) onClosedTap(change.position, size)
 								break
 							}

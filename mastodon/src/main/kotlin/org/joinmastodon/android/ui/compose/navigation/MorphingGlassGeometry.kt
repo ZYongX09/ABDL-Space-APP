@@ -66,6 +66,9 @@ internal fun leadingGlassOpenTrigger(longPressReached: Boolean): LeadingGlassOpe
 internal fun isUpwardToolbarFling(velocityY: Float, minimumFlingVelocity: Float): Boolean =
 	velocityY < -minimumFlingVelocity
 
+internal fun shouldCollapseTrailingMenu(velocityY: Float, minimumFlingVelocity: Float): Boolean =
+	isUpwardToolbarFling(velocityY, minimumFlingVelocity)
+
 internal fun leadingGlassReleaseAction(longPressOpened: Boolean, moved: Boolean, upwardFling: Boolean): LeadingGlassReleaseAction = when {
 	longPressOpened && upwardFling -> LeadingGlassReleaseAction.COLLAPSE
 	longPressOpened && !moved -> LeadingGlassReleaseAction.COLLAPSE

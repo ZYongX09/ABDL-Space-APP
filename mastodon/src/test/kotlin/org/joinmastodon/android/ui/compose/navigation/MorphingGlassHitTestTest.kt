@@ -67,4 +67,11 @@ class MorphingGlassHitTestTest {
 		assertFalse(isUpwardToolbarFling(velocityY = -1199f, minimumFlingVelocity = 1200f))
 		assertFalse(isUpwardToolbarFling(velocityY = 1800f, minimumFlingVelocity = 1200f))
 	}
+
+	@Test
+	fun trailingMenuUsesTheSameUpwardFlingRule() {
+		assertTrue(shouldCollapseTrailingMenu(velocityY = -1400f, minimumFlingVelocity = 1200f))
+		assertFalse(shouldCollapseTrailingMenu(velocityY = -900f, minimumFlingVelocity = 1200f))
+		assertFalse(shouldCollapseTrailingMenu(velocityY = 1400f, minimumFlingVelocity = 1200f))
+	}
 }

@@ -384,6 +384,7 @@ class HomeLiquidToolbarController(
 				onClick = { if(showNewPostsState) onNewPosts.run() else requestMenu(HomeToolbarMenuPage.TIMELINES) },
 				onSelectionChanged = { highlightedMenuIndexState = it },
 				onSelectionConfirmed = { index -> menuItems.getOrNull(index)?.let { activateMenuItem(HomeToolbarMenuPage.TIMELINES, it) } },
+				onUpwardFling = { closeMenu() },
 				onBoundsChanged = { position, size -> leadingGlassBounds.set(position.x, position.y, position.x + size.width, position.y + size.height) },
 				closedContent = {
 					Row(Modifier.height(48.dp).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -432,6 +433,7 @@ class HomeLiquidToolbarController(
 					if(hasBack && rawIndex==0) menuPageState = HomeToolbarMenuPage.ROOT
 					else menuItems.getOrNull(rawIndex - if(hasBack) 1 else 0)?.let { activateMenuItem(menuPageState, it) }
 				},
+				onUpwardFling = { closeMenu() },
 				onBoundsChanged = { _, _ -> },
 				closedContent = {
 					Row(Modifier.height(48.dp), verticalAlignment = Alignment.CenterVertically) {

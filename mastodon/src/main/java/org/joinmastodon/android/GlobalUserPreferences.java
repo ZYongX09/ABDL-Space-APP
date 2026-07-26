@@ -119,7 +119,7 @@ public class GlobalUserPreferences{
 		overlayMedia=prefs.getBoolean("overlayMedia", false);
 		showSuicideHelp=prefs.getBoolean("showSuicideHelp", true);
 		underlinedLinks=prefs.getBoolean("underlinedLinks", true);
-		color=AccountLocalPreferences.ColorPreference.valueOf(prefs.getString("color", AccountLocalPreferences.ColorPreference.BLUE.name()));
+		color=AccountLocalPreferences.ColorPreference.valueOf(prefs.getString("color", AccountLocalPreferences.ColorPreference.NORD.name()));
 		likeIcon=prefs.getBoolean("likeIcon", false);
 		uniformNotificationIcon=prefs.getBoolean("uniformNotificationIcon", false);
 		showDividers =prefs.getBoolean("showDividers", false);

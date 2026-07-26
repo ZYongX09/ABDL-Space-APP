@@ -419,7 +419,7 @@
 	<color name="nord_gray_100">#E2E7EE</color>
 	<color name="nord_gray_50t">#EAEDF2</color>
 	<color name="nord_gray_50">#EAEDF2</color>
-	<color name="nord_gray_25">#f7f8fa</color>
+	<color name="nord_gray_25">#F6F8FC</color>
 
 	<color name="white_primary_25">#F5F5F5</color>
 	<color name="white_primary_50">#EAEAEA</color>
