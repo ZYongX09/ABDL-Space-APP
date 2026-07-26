@@ -42,6 +42,7 @@ import org.joinmastodon.android.model.NotificationType;
 import org.joinmastodon.android.ui.M3AlertDialogBuilder;
 import org.joinmastodon.android.ui.OutlineProviders;
 import org.joinmastodon.android.ui.compose.navigation.HomeLiquidNavigationController;
+import org.joinmastodon.android.ui.compose.navigation.HomeLiquidToolbarController;
 import org.joinmastodon.android.ui.sheets.AccountSwitcherSheet;
 import org.joinmastodon.android.ui.utils.UiUtils;
 import org.joinmastodon.android.ui.views.BackdropCaptureFrameLayout;
@@ -78,11 +79,14 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 	private DiaperListFragment diaperListFragment;
 	private BackdropCaptureFrameLayout fragmentContainer;
 	private FrameLayout navigationHost;
+	private FrameLayout toolbarHost;
 	private TabBar tabBar;
 	private View tabBarWrap;
 	private ImageView tabBarAvatar;
 	private HomeLiquidNavigationController liquidNavigationController;
+	private HomeLiquidToolbarController liquidToolbarController;
 	private int bottomSystemInset;
+	private int topSystemInset;
 	@IdRes
 	private int currentTab=R.id.tab_home;
 	private TextView notificationsBadge;
@@ -139,6 +143,12 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 			liquidNavigationController.dispose();
 			liquidNavigationController=null;
 		}
+		if(liquidToolbarController!=null){
+			liquidToolbarController.dispose();
+			liquidToolbarController=null;
+		}
+		if(homeTabFragment!=null)
+			homeTabFragment.setLiquidToolbarController(null);
 		if(featureDialog!=null){
 			featureDialog.dismiss();
 			featureDialog=null;
@@ -149,6 +159,7 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 		}
 		content=null;
 		navigationHost=null;
+		toolbarHost=null;
 		fragmentContainer=null;
 		tabBar=null;
 		tabBarWrap=null;
@@ -176,14 +187,19 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 		fragmentContainer.setLayoutTransition(layoutTransition);
 		homeLayout.addView(fragmentContainer, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
+		toolbarHost=new FrameLayout(getActivity());
+		FrameLayout.LayoutParams toolbarLayoutParams=new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.TOP);
+		homeLayout.addView(toolbarHost, toolbarLayoutParams);
+
 		navigationHost=new FrameLayout(getActivity());
 		FrameLayout.LayoutParams navigationLayoutParams=new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM);
 		homeLayout.addView(navigationHost, navigationLayoutParams);
 		navigationHost.addOnLayoutChangeListener((v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom)->{
 			if(fragmentContainer!=null)
-				fragmentContainer.setCaptureHeights(0, bottom-top);
+				updateCaptureHeights();
 		});
 		createNavigationBar(inflater);
+		createLiquidToolbar();
 
 		if(savedInstanceState==null){
 			getChildFragmentManager().beginTransaction()
@@ -227,6 +243,7 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 		profileFragment=(ProfileFragment) getChildFragmentManager().getFragment(savedInstanceState, "profileFragment");
 		currentTab=savedInstanceState.getInt("selectedTab");
 		selectTabInNavigation(currentTab);
+		updateLiquidToolbarVisibility();
 		Fragment current=fragmentForTab(currentTab);
 		getChildFragmentManager().beginTransaction()
 				.hide(homeTabFragment)
@@ -258,7 +275,9 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 	@Override
 	public void onApplyWindowInsets(WindowInsets insets){
 		bottomSystemInset=insets.getSystemWindowInsetBottom();
+		topSystemInset=insets.getSystemWindowInsetTop();
 		applyNavigationBottomInset();
+		applyLiquidToolbarInsets();
 		super.onApplyWindowInsets(insets.replaceSystemWindowInsets(insets.getSystemWindowInsetLeft(), 0, insets.getSystemWindowInsetRight(), 0));
 		WindowInsets topOnlyInsets=insets.replaceSystemWindowInsets(0, insets.getSystemWindowInsetTop(), 0, 0);
 		homeTabFragment.onApplyWindowInsets(topOnlyInsets);
@@ -313,6 +332,7 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 			.commit();
 		maybeTriggerLoading(newFragment);
 		currentTab=tab;
+		updateLiquidToolbarVisibility();
 		((FragmentStackActivity)getActivity()).invalidateSystemBarColors(this);
 	}
 
@@ -528,8 +548,10 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 	public void onStatusDisplaySettingsChanged(StatusDisplaySettingsChangedEvent ev){
 		if(!ev.accountID.equals(accountID))
 			return;
-		if(navigationHost!=null && GlobalUserPreferences.useIosLiquidNavigation!=(liquidNavigationController!=null))
+		if(navigationHost!=null && GlobalUserPreferences.useIosLiquidNavigation!=(liquidNavigationController!=null)){
 			createNavigationBar(LayoutInflater.from(getActivity()));
+			createLiquidToolbar();
+		}
 
 		// FIXME: figure this out
 //		if(homeTabFragment.loaded)
@@ -552,6 +574,8 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 		if(GlobalUserPreferences.useIosLiquidNavigation){
 			liquidNavigationController=new HomeLiquidNavigationController(getActivity(), currentTab, self.avatar, this::onTabSelected, this::onTabLongClick);
 			fragmentContainer.setCaptureListener((top, bottom)->{
+				if(liquidToolbarController!=null && top!=null)
+					liquidToolbarController.setBackdropBitmap(top);
 				if(liquidNavigationController!=null && bottom!=null)
 					liquidNavigationController.setBackdropBitmap(bottom);
 			});
@@ -578,6 +602,54 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 		}
 		updateDiaperNewFeatureBadge();
 		applyNavigationBottomInset();
+		updateCaptureHeights();
+	}
+
+	private void createLiquidToolbar(){
+		if(liquidToolbarController!=null){
+			liquidToolbarController.dispose();
+			liquidToolbarController=null;
+		}
+		toolbarHost.removeAllViews();
+		if(!GlobalUserPreferences.useIosLiquidNavigation){
+			homeTabFragment.setLiquidToolbarController(null);
+			updateCaptureHeights();
+			return;
+		}
+		liquidToolbarController=new HomeLiquidToolbarController(
+				getActivity(),
+				homeTabFragment::onLiquidTimelineSelected,
+				homeTabFragment::onLiquidNewPosts,
+				homeTabFragment::onLiquidCompose,
+				homeTabFragment::onLiquidMenuItem
+		);
+		toolbarHost.addView(liquidToolbarController.getView(), new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+		homeTabFragment.setLiquidToolbarController(liquidToolbarController);
+		applyLiquidToolbarInsets();
+		updateLiquidToolbarVisibility();
+		updateCaptureHeights();
+	}
+
+	private void applyLiquidToolbarInsets(){
+		if(liquidToolbarController!=null)
+			liquidToolbarController.setStatusBarInset(topSystemInset);
+		updateCaptureHeights();
+	}
+
+	private void updateLiquidToolbarVisibility(){
+		if(toolbarHost!=null)
+			toolbarHost.setVisibility(GlobalUserPreferences.useIosLiquidNavigation && currentTab==R.id.tab_home ? View.VISIBLE : View.GONE);
+		if(currentTab!=R.id.tab_home && liquidToolbarController!=null)
+			liquidToolbarController.closeMenu();
+		updateCaptureHeights();
+	}
+
+	private void updateCaptureHeights(){
+		if(fragmentContainer==null)
+			return;
+		int topHeight=liquidToolbarController!=null && toolbarHost!=null && toolbarHost.getVisibility()==View.VISIBLE ? topSystemInset+V.dp(72) : 0;
+		int bottomHeight=navigationHost==null ? 0 : navigationHost.getHeight();
+		fragmentContainer.setCaptureHeights(topHeight, bottomHeight);
 	}
 
 	private void selectTabInNavigation(@IdRes int tab){

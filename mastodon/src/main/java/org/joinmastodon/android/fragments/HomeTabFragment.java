@@ -60,6 +60,9 @@ import org.joinmastodon.android.model.TimelineDefinition;
 import org.joinmastodon.android.model.viewmodel.ListItem;
 import org.joinmastodon.android.ui.ExtendedPopupMenu;
 import org.joinmastodon.android.ui.SimpleViewHolder;
+import org.joinmastodon.android.ui.compose.navigation.HomeLiquidToolbarController;
+import org.joinmastodon.android.ui.compose.navigation.HomeToolbarMenuItem;
+import org.joinmastodon.android.ui.compose.navigation.HomeToolbarTimeline;
 import org.joinmastodon.android.ui.utils.UiUtils;
 import org.joinmastodon.android.updater.GithubSelfUpdater;
 import org.joinmastodon.android.utils.ElevationOnScrollListener;
@@ -114,6 +117,7 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 	private boolean announcementsBadged, settingsBadged;
 	private ImageButton fab;
 	private ElevationOnScrollListener elevationOnScrollListener;
+	private HomeLiquidToolbarController liquidToolbarController;
 
 	// TODO: rename this
 	private Runnable returnToBeginningOfPager=this::returnToBeginningOfPager;
@@ -255,6 +259,8 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		}
 
 		updateToolbarLogo();
+		updateLiquidToolbarMode();
+		updateLiquidToolbarState();
 
 		ViewTreeObserver vto = getToolbar().getViewTreeObserver();
 		if (vto.isAlive()) {
@@ -319,8 +325,11 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 				if(getActivity()==null) return;
 				if (result.stream().anyMatch(a -> !a.read)) {
 					announcementsBadged = true;
-					announcements.setVisible(false);
-					announcementsAction.setVisible(true);
+					if(announcements!=null)
+						announcements.setVisible(GlobalUserPreferences.useIosLiquidNavigation);
+					if(announcementsAction!=null)
+						announcementsAction.setVisible(!GlobalUserPreferences.useIosLiquidNavigation);
+					updateLiquidToolbarState();
 				}
 			}
 
@@ -419,19 +428,84 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		hashtagsMenu = m.findItem(R.id.hashtags).getSubMenu();
 		listsMenu = m.findItem(R.id.lists).getSubMenu();
 
-		announcements.setVisible(!announcementsBadged);
-		announcementsAction.setVisible(announcementsBadged);
+		boolean liquid=GlobalUserPreferences.useIosLiquidNavigation && liquidToolbarController!=null;
+		announcements.setVisible(liquid || !announcementsBadged);
+		announcementsAction.setVisible(!liquid && announcementsBadged);
 
-		settings.setVisible(!settingsBadged);
-		settingsAction.setVisible(settingsBadged);
+		settings.setVisible(liquid || !settingsBadged);
+		settingsAction.setVisible(!liquid && settingsBadged);
 
 		UiUtils.enablePopupMenuIcons(getContext(), overflowPopup);
 
 		addListsToOverflowMenu();
 		addHashtagsToOverflowMenu();
+		updateLiquidToolbarState();
 
 		if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.P && !UiUtils.isEMUI() && !UiUtils.isMagic())
 			m.setGroupDividerEnabled(true);
+	}
+
+	public void setLiquidToolbarController(HomeLiquidToolbarController controller){
+		liquidToolbarController=controller;
+		updateLiquidToolbarMode();
+		updateLiquidToolbarState();
+	}
+
+	private void updateLiquidToolbarMode(){
+		boolean liquid=GlobalUserPreferences.useIosLiquidNavigation && liquidToolbarController!=null;
+		Toolbar toolbar=getToolbar();
+		if(toolbar!=null)
+			toolbar.setVisibility(liquid ? View.GONE : View.VISIBLE);
+		if(fab!=null)
+			fab.setVisibility(liquid ? View.GONE : View.VISIBLE);
+	}
+
+	private void updateLiquidToolbarState(){
+		if(liquidToolbarController==null || timelines==null)
+			return;
+		ArrayList<HomeToolbarTimeline> toolbarTimelines=new ArrayList<>();
+		for(int i=0;i<timelines.length;i++){
+			TimelineDefinition timeline=timelines[i];
+			if(timeline!=null)
+				toolbarTimelines.add(new HomeToolbarTimeline(i, timeline.getTitle(getContext()), timeline.getIcon().iconRes));
+		}
+		liquidToolbarController.setTimelines(toolbarTimelines, pager==null ? 0 : pager.getCurrentItem());
+		liquidToolbarController.setShowNewPosts(newPostsBtnShown);
+		liquidToolbarController.setReminderState(announcementsBadged, settingsBadged);
+		ArrayList<HomeToolbarMenuItem> root=new ArrayList<>();
+		root.add(new HomeToolbarMenuItem(R.id.settings, getString(R.string.settings), R.drawable.ic_fluent_settings_24_regular));
+		root.add(new HomeToolbarMenuItem(R.id.announcements, getString(R.string.sk_announcements), R.drawable.ic_fluent_megaphone_24_regular));
+		root.add(new HomeToolbarMenuItem(R.id.edit_timelines, getString(R.string.sk_edit_timelines), R.drawable.ic_fluent_edit_24_regular));
+		if(!listItems.isEmpty())
+			root.add(new HomeToolbarMenuItem(R.id.lists, getString(R.string.sk_your_lists), R.drawable.ic_fluent_people_24_regular));
+		if(!hashtagsItems.isEmpty())
+			root.add(new HomeToolbarMenuItem(R.id.hashtags, getString(R.string.sk_hashtags_you_follow), R.drawable.ic_fluent_number_symbol_24_regular));
+		ArrayList<HomeToolbarMenuItem> lists=new ArrayList<>();
+		listItems.forEach((id, list)->lists.add(new HomeToolbarMenuItem(id, list.title, R.drawable.ic_fluent_people_24_regular)));
+		ArrayList<HomeToolbarMenuItem> hashtags=new ArrayList<>();
+		hashtagsItems.entrySet().stream().sorted(Comparator.comparing(x->x.getValue().name, String.CASE_INSENSITIVE_ORDER))
+				.forEach(entry->hashtags.add(new HomeToolbarMenuItem(entry.getKey(), entry.getValue().name, R.drawable.ic_fluent_number_symbol_24_regular)));
+		liquidToolbarController.setMenus(root, lists, hashtags);
+	}
+
+	public void onLiquidTimelineSelected(int index){
+		if(index>=0 && index<count)
+			navigateTo(index);
+	}
+
+	public void onLiquidNewPosts(){
+		if(toolbarShowNewPostsBtn!=null)
+			onNewPostsBtnClick(toolbarShowNewPostsBtn);
+	}
+
+	public void onLiquidCompose(){
+		onFabClick(fab);
+	}
+
+	public void onLiquidMenuItem(int id){
+		MenuItem item=overflowPopup==null ? null : overflowPopup.getMenu().findItem(id);
+		if(item!=null)
+			onOptionsItemSelected(item);
 	}
 
 	@Override
@@ -448,6 +522,7 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		if (addItems.size() == 0 || getActivity() == null) return;
 		for (int i = 0; i < addItems.size(); i++) items.put(View.generateViewId(), addItems.get(i));
 		updateOverflowMenu();
+		updateLiquidToolbarState();
 	}
 
 	private void updateSwitcherMenu() {
@@ -501,11 +576,13 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 	@Override
 	public void showFab() {
 		if (fragments[pager.getCurrentItem()] instanceof BaseStatusListFragment<?> l) l.showFab();
+		updateLiquidToolbarMode();
 	}
 
 	@Override
 	public void hideFab() {
 		if (fragments[pager.getCurrentItem()] instanceof BaseStatusListFragment<?> l) l.hideFab();
+		updateLiquidToolbarMode();
 	}
 
 	@Override
@@ -524,6 +601,7 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		timelineIcon.setImageResource(timelines[i].getIcon().iconRes);
 		timelineTitle.setText(timelines[i].getTitle(getContext()));
 		showFab();
+		updateLiquidToolbarState();
 		if (elevationOnScrollListener != null && getCurrentFragment() instanceof IsOnTop f) {
 			// FIXME: make this work again
 //			elevationOnScrollListener.handleScroll(getContext(), f.isOnTop());
@@ -574,6 +652,7 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		if(!newPostsBtnShown)
 			return;
 		newPostsBtnShown=false;
+		updateLiquidToolbarState();
 		if(currentNewPostsAnim!=null){
 			currentNewPostsAnim.cancel();
 		}
@@ -606,6 +685,7 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		if(newPostsBtnShown || pager == null || !timelines[pager.getCurrentItem()].equals(TimelineDefinition.HOME_TIMELINE))
 			return;
 		newPostsBtnShown=true;
+		updateLiquidToolbarState();
 		if(currentNewPostsAnim!=null){
 			currentNewPostsAnim.cancel();
 		}
@@ -649,16 +729,22 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 	public void onFragmentResult(int reqCode, boolean success, Bundle result){
 		if (reqCode == ANNOUNCEMENTS_RESULT && success) {
 			announcementsBadged = false;
-			announcements.setVisible(true);
-			announcementsAction.setVisible(false);
+			if(announcements!=null)
+				announcements.setVisible(true);
+			if(announcementsAction!=null)
+				announcementsAction.setVisible(false);
+			updateLiquidToolbarState();
 		}
 	}
 
 	private void updateUpdateState(GithubSelfUpdater.UpdateState state){
 		if(state!=GithubSelfUpdater.UpdateState.NO_UPDATE && state!=GithubSelfUpdater.UpdateState.CHECKING) {
 			settingsBadged = true;
-			settingsAction.setVisible(true);
-			settings.setVisible(false);
+			if(settingsAction!=null)
+				settingsAction.setVisible(!GlobalUserPreferences.useIosLiquidNavigation);
+			if(settings!=null)
+				settings.setVisible(GlobalUserPreferences.useIosLiquidNavigation);
+			updateLiquidToolbarState();
 		}
 	}
 
@@ -678,7 +764,7 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 
 	@Override
 	public void onDestroyView(){
-		super.onDestroyView();
+		liquidToolbarController=null;
 		if (overflowPopup != null) {
 			overflowPopup.dismiss();
 			overflowPopup = null;
@@ -690,6 +776,7 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		if(GithubSelfUpdater.needSelfUpdating()){
 			E.unregister(this);
 		}
+		super.onDestroyView();
 	}
 
 	@Override
