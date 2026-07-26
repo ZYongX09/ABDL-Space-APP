@@ -1,5 +1,10 @@
 # Media Preview Hot Update Implementation Plan
 
+> [!NOTE]
+> This document may not reflect the current implementation.
+> See the final report for up-to-date state:
+> [Final Report](../reports/media-preview-hot-update.md)
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use compose:subagent (recommended) or compose:execute to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 通过 Worker 懒生成并缓存 720px WebP 缩略图，让旧帖和新帖无需网页前端更新即可获得真实 `preview_url`，并让 Android 列表优先加载该预览图。
