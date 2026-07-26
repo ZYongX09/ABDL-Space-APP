@@ -173,9 +173,17 @@ class HomeLiquidToolbarController(
 	private fun isInsideActiveGlass(x: Float, y: Float): Boolean {
 		val density = view.resources.displayMetrics.density
 		val top = statusBarInsetState + 8f * density
-		val bottom = top + 420f * density
+		val activePage = menuPageState.takeIf { it!=HomeToolbarMenuPage.NONE } ?: pendingMenuPageState
+		val rowCount = when(activePage) {
+			HomeToolbarMenuPage.TIMELINES -> timelinesState.size
+			HomeToolbarMenuPage.ROOT -> rootMenuState.size
+			HomeToolbarMenuPage.LISTS -> listsState.size + 1
+			HomeToolbarMenuPage.HASHTAGS -> hashtagsState.size + 1
+			HomeToolbarMenuPage.NONE -> 1
+		}
+		val bottom = top + toolbarMenuHeightDp(rowCount, false) * density
 		if(y !in top..bottom) return false
-		return when(menuPageState.takeIf { it!=HomeToolbarMenuPage.NONE } ?: pendingMenuPageState) {
+		return when(activePage) {
 			HomeToolbarMenuPage.TIMELINES -> x in 12f*density..260f*density
 			HomeToolbarMenuPage.ROOT, HomeToolbarMenuPage.LISTS, HomeToolbarMenuPage.HASHTAGS -> x in view.width-260f*density..view.width-12f*density
 			HomeToolbarMenuPage.NONE -> false
@@ -266,7 +274,7 @@ class HomeLiquidToolbarController(
 			val trailingRows = menuItems.size + if(menuPageState==HomeToolbarMenuPage.LISTS || menuPageState==HomeToolbarMenuPage.HASHTAGS) 1 else 0
 			MorphingGlassContainer(
 				expanded = trailingExpanded,
-				closedWidth = 108.dp,
+				closedWidth = 96.dp,
 				closedHeight = 48.dp,
 				expandedWidth = 248.dp,
 				expandedHeight = toolbarMenuHeightDp(menuItems.size, menuPageState==HomeToolbarMenuPage.LISTS || menuPageState==HomeToolbarMenuPage.HASHTAGS).dp,
@@ -287,7 +295,7 @@ class HomeLiquidToolbarController(
 					else menuItems.getOrNull(rawIndex - if(hasBack) 1 else 0)?.let { activateMenuItem(menuPageState, it) }
 				},
 				closedContent = {
-					Row(Modifier.height(48.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+					Row(Modifier.height(48.dp), verticalAlignment = Alignment.CenterVertically) {
 					ToolbarIcon(R.drawable.ic_fluent_edit_24_regular)
 					Box {
 						ToolbarIcon(R.drawable.ic_fluent_more_vertical_24_regular)
@@ -400,7 +408,7 @@ class HomeLiquidToolbarController(
 
 	@Composable
 	private fun ToolbarIcon(@DrawableRes icon: Int) {
-		Box(Modifier.size(40.dp).padding(8.dp)) {
+		Box(Modifier.size(48.dp).padding(12.dp)) {
 			ResourceIcon(icon, 24, MiuixTheme.colorScheme.onSurface)
 		}
 	}
@@ -409,7 +417,12 @@ class HomeLiquidToolbarController(
 	private fun ResourceIcon(@DrawableRes icon: Int, sizeDp: Int, tint: Color) {
 		AndroidView(
 			modifier = Modifier.size(sizeDp.dp),
-			factory = { context -> ImageView(context).apply { scaleType = ImageView.ScaleType.CENTER_INSIDE } },
+			factory = { context -> ImageView(context).apply {
+				scaleType = ImageView.ScaleType.CENTER_INSIDE
+				isClickable = false
+				isFocusable = false
+				isEnabled = false
+			} },
 			update = { imageView ->
 				imageView.setImageResource(icon)
 				imageView.imageTintList = ColorStateList.valueOf(tint.toArgb())
