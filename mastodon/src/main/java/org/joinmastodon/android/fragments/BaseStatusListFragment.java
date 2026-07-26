@@ -135,6 +135,8 @@ public abstract class BaseStatusListFragment<T extends DisplayItemsParent> exten
 	// MOSHIDON:
 	@Override
 	public void showFab() {
+		if(GlobalUserPreferences.useIosLiquidNavigation && getParentFragment() instanceof HomeTabFragment)
+			return;
 		View fab = getFab();
 		if (fab == null || fab.getVisibility() == View.VISIBLE) return;
 		fab.setVisibility(View.VISIBLE);

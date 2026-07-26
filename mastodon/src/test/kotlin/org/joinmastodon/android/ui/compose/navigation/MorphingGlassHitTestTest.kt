@@ -1,7 +1,9 @@
 package org.joinmastodon.android.ui.compose.navigation
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MorphingGlassHitTestTest {
@@ -36,5 +38,12 @@ class MorphingGlassHitTestTest {
 	@Test
 	fun menuRequestCommitsOnNextFrameWithoutWaitingForBackdrop() {
 		assertEquals(1, toolbarMenuCommitDelayFrames())
+	}
+
+	@Test
+	fun leadingGlassHitRegionCoversFullVisualHeight() {
+		assertTrue(isInsideLeadingGlass(x = 20f, y = 40f, top = 32f, width = 180f, height = 48f))
+		assertTrue(isInsideLeadingGlass(x = 20f, y = 79.9f, top = 32f, width = 180f, height = 48f))
+		assertFalse(isInsideLeadingGlass(x = 20f, y = 80.1f, top = 32f, width = 180f, height = 48f))
 	}
 }

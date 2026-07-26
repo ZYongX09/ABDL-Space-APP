@@ -99,4 +99,10 @@ class HomeLiquidToolbarModelTest {
 		assertFalse(shouldInstallToolbarDragRecognizer(isLeading = true))
 		assertTrue(shouldInstallToolbarDragRecognizer(isLeading = false))
 	}
+
+	@Test
+	fun expandedGlassAlwaysRendersAboveTheCollapsedPeer() {
+		assertEquals(2f, toolbarGlassZIndex(isExpanded = true), 0f)
+		assertEquals(1f, toolbarGlassZIndex(isExpanded = false), 0f)
+	}
 }

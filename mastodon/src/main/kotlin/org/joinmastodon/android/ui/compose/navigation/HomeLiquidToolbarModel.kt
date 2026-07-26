@@ -74,6 +74,8 @@ internal fun shouldConsumeToolbarBack(menuVisible: Boolean, menuPending: Boolean
 
 internal fun shouldInstallToolbarDragRecognizer(isLeading: Boolean): Boolean = !isLeading
 
+internal fun toolbarGlassZIndex(isExpanded: Boolean): Float = if(isExpanded) 2f else 1f
+
 internal data class HomeLiquidToolbarOutlineSpec(
 	val widthDp: Float,
 	val innerBlurRadiusDp: Float,

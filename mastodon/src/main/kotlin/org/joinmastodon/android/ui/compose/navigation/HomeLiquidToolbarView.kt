@@ -3,6 +3,7 @@ package org.joinmastodon.android.ui.compose.navigation
 import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.Bitmap
+import android.graphics.RectF
 import android.widget.ImageView
 import android.widget.FrameLayout
 import android.view.MotionEvent
@@ -60,6 +61,7 @@ import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
@@ -121,6 +123,8 @@ class HomeLiquidToolbarController(
 	private var outsideGestureDown: MotionEvent? = null
 	private var forwardingOutsideGesture = false
 	private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop.toFloat()
+	private val leadingGlassBounds = RectF()
+	private var leadingGlassTouch = false
 
 	private val composeView = ComposeView(context).apply {
 		setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
@@ -132,6 +136,25 @@ class HomeLiquidToolbarController(
 	}
 	val view = object : FrameLayout(context) {
 		override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+			if(!isMenuVisible()) {
+				when(event.actionMasked) {
+					MotionEvent.ACTION_DOWN -> if(leadingGlassBounds.contains(event.x, event.y)) {
+						leadingGlassTouch = true
+						return true
+					}
+					MotionEvent.ACTION_UP -> if(leadingGlassTouch) {
+						leadingGlassTouch = false
+						if(leadingGlassBounds.contains(event.x, event.y)) {
+							if(showNewPostsState) onNewPosts.run() else requestMenu(HomeToolbarMenuPage.TIMELINES)
+						}
+						return true
+					}
+					MotionEvent.ACTION_CANCEL -> if(leadingGlassTouch) {
+						leadingGlassTouch = false
+						return true
+					}
+				}
+			}
 			if(event.actionMasked==MotionEvent.ACTION_DOWN && isMenuVisible() && !isInsideActiveGlass(event.x, event.y)) {
 				outsideGestureDown?.recycle()
 				outsideGestureDown = MotionEvent.obtain(event)
@@ -306,12 +329,13 @@ class HomeLiquidToolbarController(
 				shouldExpandFromClosed = { _, _ -> false },
 				onExpansionRequested = { requestMenu(HomeToolbarMenuPage.TIMELINES) },
 				onClosedTap = { _, _ -> },
-				modifier = Modifier.align(Alignment.TopStart).padding(top = topInset + 8.dp, start = 12.dp),
+				modifier = Modifier.zIndex(toolbarGlassZIndex(leadingExpanded)).align(Alignment.TopStart).padding(top = topInset + 8.dp, start = 12.dp),
 				onExpansionStarted = {},
 				onExpansionFinished = { open -> if(!open && menuPageState==HomeToolbarMenuPage.NONE) menuOpenListener?.accept(false) },
 				onClick = { if(showNewPostsState) onNewPosts.run() else requestMenu(HomeToolbarMenuPage.TIMELINES) },
 				onSelectionChanged = { highlightedMenuIndexState = it },
 				onSelectionConfirmed = { index -> menuItems.getOrNull(index)?.let { activateMenuItem(HomeToolbarMenuPage.TIMELINES, it) } },
+				onBoundsChanged = { position, size -> leadingGlassBounds.set(position.x, position.y, position.x + size.width, position.y + size.height) },
 				closedContent = {
 					Row(Modifier.height(48.dp).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
 					ResourceIcon(if(showNewPostsState) R.drawable.ic_fluent_arrow_up_16_filled else currentTimeline?.iconRes ?: R.drawable.ic_fluent_home_24_regular, 24, contentColor)
@@ -349,7 +373,7 @@ class HomeLiquidToolbarController(
 				shouldExpandFromClosed = { position, size -> trailingToolbarAction(position.x, size.width.toFloat())==TrailingToolbarAction.MORE },
 				onExpansionRequested = { requestMenu(HomeToolbarMenuPage.ROOT) },
 				onClosedTap = { position, size -> if(trailingToolbarAction(position.x, size.width.toFloat())==TrailingToolbarAction.COMPOSE) onCompose.run() },
-				modifier = Modifier.align(Alignment.TopEnd).padding(top = topInset + 8.dp, end = 12.dp),
+				modifier = Modifier.zIndex(toolbarGlassZIndex(trailingExpanded)).align(Alignment.TopEnd).padding(top = topInset + 8.dp, end = 12.dp),
 				onExpansionStarted = {},
 				onExpansionFinished = { open -> if(!open && menuPageState==HomeToolbarMenuPage.NONE) menuOpenListener?.accept(false) },
 				onClick = {},
@@ -359,6 +383,7 @@ class HomeLiquidToolbarController(
 					if(hasBack && rawIndex==0) menuPageState = HomeToolbarMenuPage.ROOT
 					else menuItems.getOrNull(rawIndex - if(hasBack) 1 else 0)?.let { activateMenuItem(menuPageState, it) }
 				},
+				onBoundsChanged = { _, _ -> },
 				closedContent = {
 					Row(Modifier.height(48.dp), verticalAlignment = Alignment.CenterVertically) {
 					ToolbarIcon(R.drawable.ic_fluent_edit_24_regular)

@@ -29,6 +29,8 @@ import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.unit.Dp
@@ -67,6 +69,7 @@ internal fun MorphingGlassContainer(
 	onClick: () -> Unit,
 	onSelectionChanged: (Int?) -> Unit = {},
 	onSelectionConfirmed: (Int) -> Unit = {},
+	onBoundsChanged: (Offset, IntSize) -> Unit = { _, _ -> },
 	closedContent: @Composable BoxScope.() -> Unit,
 	expandedContent: @Composable BoxScope.(progress: Float) -> Unit,
 ) {
@@ -117,6 +120,7 @@ internal fun MorphingGlassContainer(
 		modifier = modifier
 			.width(width)
 			.height(height)
+			.onGloballyPositioned { onBoundsChanged(it.positionInRoot(), it.size) }
 			.graphicsLayer {
 				scaleX = pressScale.value
 				scaleY = pressScale.value

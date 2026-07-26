@@ -52,3 +52,6 @@ internal fun outsideGlassGesture(distance: Float, touchSlop: Float): OutsideGlas
 	if(distance > touchSlop) OutsideGlassGesture.FORWARD_TO_CONTENT else OutsideGlassGesture.CLOSE_ONLY
 
 internal fun toolbarMenuCommitDelayFrames(): Int = 1
+
+internal fun isInsideLeadingGlass(x: Float, y: Float, top: Float, width: Float, height: Float): Boolean =
+	x in 0f..width && y>=top && y<top+height
