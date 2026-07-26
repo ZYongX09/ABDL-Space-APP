@@ -87,6 +87,8 @@ import me.grishka.appkit.utils.CubicBezierInterpolator;
 import me.grishka.appkit.utils.V;
 import me.grishka.appkit.views.FragmentRootLinearLayout;
 
+import static org.joinmastodon.android.ui.compose.navigation.HomeLiquidToolbarModelKt.homeTimelineTopPaddingDp;
+
 public class HomeTabFragment extends MastodonToolbarFragment implements ScrollableToTop, HasFab, ProvidesAssistContent, HasElevationOnScrollListener {
 	private static final int ANNOUNCEMENTS_RESULT = 654;
 
@@ -457,9 +459,16 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		boolean liquid=GlobalUserPreferences.useIosLiquidNavigation && liquidToolbarController!=null;
 		Toolbar toolbar=getToolbar();
 		if(toolbar!=null)
-			toolbar.setVisibility(liquid ? View.INVISIBLE : View.VISIBLE);
+			toolbar.setVisibility(liquid ? View.GONE : View.VISIBLE);
 		if(fab!=null)
 			fab.setVisibility(liquid ? View.GONE : View.VISIBLE);
+		int topPadding=V.dp(homeTimelineTopPaddingDp(liquid));
+		if(fragments!=null){
+			for(Fragment fragment:fragments){
+				if(fragment instanceof BaseStatusListFragment<?> statusListFragment)
+					statusListFragment.setLiquidToolbarTopPadding(topPadding);
+			}
+		}
 	}
 
 	private void updateLiquidToolbarState(){

@@ -65,6 +65,8 @@ internal fun homeLiquidToolbarMotionSpec(): HomeLiquidToolbarMotionSpec = HomeLi
 
 internal fun homeToolbarCaptureHeightDp(menuOpen: Boolean): Int = if(menuOpen) 520 else 72
 
+internal fun homeTimelineTopPaddingDp(liquidMode: Boolean): Int = if(liquidMode) 72 else 0
+
 internal fun liquidToolbarActions(): List<HomeToolbarAction> = listOf(
 	HomeToolbarAction.COMPOSE,
 	HomeToolbarAction.OVERFLOW,

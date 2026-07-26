@@ -921,10 +921,17 @@ public abstract class BaseStatusListFragment<T extends DisplayItemsParent> exten
 		return displayItems;
 	}
 
+	public void setLiquidToolbarTopPadding(int padding){
+		if(list==null)
+			return;
+		list.setClipToPadding(false);
+		list.setPadding(list.getPaddingLeft(), Math.max(0, padding), list.getPaddingRight(), list.getPaddingBottom());
+	}
+
 	@Override
 	public void onApplyWindowInsets(WindowInsets insets){
 		if(Build.VERSION.SDK_INT>=29 && insets.getTappableElementInsets().bottom==0 && wantsOverlaySystemNavigation()){
-			list.setPadding(0, 0, 0, insets.getSystemWindowInsetBottom());
+			list.setPadding(list.getPaddingLeft(), list.getPaddingTop(), list.getPaddingRight(), insets.getSystemWindowInsetBottom());
 			onSetFabBottomInset(insets.getSystemWindowInsetBottom());
 			insets=insets.inset(0, 0, 0, insets.getSystemWindowInsetBottom());
 		}else{

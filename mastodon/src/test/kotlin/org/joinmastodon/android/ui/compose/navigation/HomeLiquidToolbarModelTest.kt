@@ -65,4 +65,10 @@ class HomeLiquidToolbarModelTest {
 		assertTrue(motion.dampingRatio >= 0.7f)
 		assertTrue(motion.stiffness >= 350f)
 	}
+
+	@Test
+	fun liquidTimelineUsesScrollableTopPaddingInsteadOfFixedToolbarSpace() {
+		assertEquals(72, homeTimelineTopPaddingDp(liquidMode = true))
+		assertEquals(0, homeTimelineTopPaddingDp(liquidMode = false))
+	}
 }
