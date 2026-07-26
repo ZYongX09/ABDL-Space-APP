@@ -46,4 +46,11 @@ class MorphingGlassHitTestTest {
 		assertTrue(isInsideLeadingGlass(x = 20f, y = 79.9f, top = 32f, width = 180f, height = 48f))
 		assertFalse(isInsideLeadingGlass(x = 20f, y = 80.1f, top = 32f, width = 180f, height = 48f))
 	}
+
+	@Test
+	fun longPressReleaseBehaviorDependsOnMovement() {
+		assertEquals(LeadingGlassReleaseAction.COLLAPSE, leadingGlassReleaseAction(longPressOpened = true, moved = false))
+		assertEquals(LeadingGlassReleaseAction.KEEP_OPEN, leadingGlassReleaseAction(longPressOpened = true, moved = true))
+		assertEquals(LeadingGlassReleaseAction.OPEN, leadingGlassReleaseAction(longPressOpened = false, moved = false))
+	}
 }

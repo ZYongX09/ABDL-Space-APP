@@ -125,6 +125,14 @@ class HomeLiquidToolbarController(
 	private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop.toFloat()
 	private val leadingGlassBounds = RectF()
 	private var leadingGlassTouch = false
+	private var leadingGlassLongPress = false
+	private var leadingGlassMoved = false
+	private var leadingGlassDownX = 0f
+	private var leadingGlassDownY = 0f
+	private val markLeadingLongPress = Runnable {
+		if(leadingGlassTouch)
+			leadingGlassLongPress = true
+	}
 
 	private val composeView = ComposeView(context).apply {
 		setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
@@ -136,21 +144,43 @@ class HomeLiquidToolbarController(
 	}
 	val view = object : FrameLayout(context) {
 		override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+			if(leadingGlassTouch && event.actionMasked!=MotionEvent.ACTION_DOWN) {
+				when(event.actionMasked) {
+					MotionEvent.ACTION_MOVE -> {
+						if(hypot(event.x-leadingGlassDownX, event.y-leadingGlassDownY)>touchSlop)
+							leadingGlassMoved = true
+						return true
+					}
+					MotionEvent.ACTION_UP -> {
+						leadingGlassTouch = false
+						removeCallbacks(markLeadingLongPress)
+						if(showNewPostsState && leadingGlassBounds.contains(event.x, event.y))
+							onNewPosts.run()
+						else if(leadingGlassReleaseAction(leadingGlassLongPress, leadingGlassMoved)==LeadingGlassReleaseAction.COLLAPSE)
+							closeMenu()
+						return true
+					}
+					MotionEvent.ACTION_CANCEL -> {
+						leadingGlassTouch = false
+						removeCallbacks(markLeadingLongPress)
+						if(leadingGlassLongPress && !leadingGlassMoved)
+							closeMenu()
+						return true
+					}
+				}
+			}
 			if(!isMenuVisible()) {
 				when(event.actionMasked) {
 					MotionEvent.ACTION_DOWN -> if(leadingGlassBounds.contains(event.x, event.y)) {
 						leadingGlassTouch = true
-						return true
-					}
-					MotionEvent.ACTION_UP -> if(leadingGlassTouch) {
-						leadingGlassTouch = false
-						if(leadingGlassBounds.contains(event.x, event.y)) {
-							if(showNewPostsState) onNewPosts.run() else requestMenu(HomeToolbarMenuPage.TIMELINES)
-						}
-						return true
-					}
-					MotionEvent.ACTION_CANCEL -> if(leadingGlassTouch) {
-						leadingGlassTouch = false
+						leadingGlassLongPress = false
+						leadingGlassMoved = false
+						leadingGlassDownX = event.x
+						leadingGlassDownY = event.y
+						if(!showNewPostsState)
+							requestMenu(HomeToolbarMenuPage.TIMELINES)
+						removeCallbacks(markLeadingLongPress)
+						postDelayed(markLeadingLongPress, ViewConfiguration.getLongPressTimeout().toLong())
 						return true
 					}
 				}
@@ -269,6 +299,7 @@ class HomeLiquidToolbarController(
 		return true
 	}
 	fun dispose() {
+		view.removeCallbacks(markLeadingLongPress)
 		outsideGestureDown?.recycle()
 		outsideGestureDown = null
 		contentTouchTarget = null
@@ -293,7 +324,7 @@ class HomeLiquidToolbarController(
 		}
 		val leadingClosedWidth by androidx.compose.animation.core.animateDpAsState(
 			targetValue = homeToolbarCollapsedWidthDp(measuredLeadingWidth).dp,
-			animationSpec = spring(dampingRatio = 0.78f, stiffness = 500f),
+			animationSpec = spring(dampingRatio = motionSpec.dampingRatio, stiffness = motionSpec.stiffness),
 			label = "leadingToolbarWidth",
 		)
 		val menuItems = when(menuPageState) {

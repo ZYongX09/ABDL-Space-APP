@@ -67,6 +67,13 @@ class HomeLiquidToolbarModelTest {
 	}
 
 	@Test
+	fun toolbarExpansionHasOneVisibleRebound() {
+		val motion = homeLiquidToolbarMotionSpec()
+		assertEquals(0.72f, motion.dampingRatio, 0f)
+		assertEquals(520f, motion.stiffness, 0f)
+	}
+
+	@Test
 	fun liquidTimelineUsesScrollableTopPaddingInsteadOfFixedToolbarSpace() {
 		assertEquals(72, homeTimelineTopPaddingDp(liquidMode = true))
 		assertEquals(0, homeTimelineTopPaddingDp(liquidMode = false))

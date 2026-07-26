@@ -55,3 +55,11 @@ internal fun toolbarMenuCommitDelayFrames(): Int = 1
 
 internal fun isInsideLeadingGlass(x: Float, y: Float, top: Float, width: Float, height: Float): Boolean =
 	x in 0f..width && y>=top && y<top+height
+
+internal enum class LeadingGlassReleaseAction { OPEN, KEEP_OPEN, COLLAPSE }
+
+internal fun leadingGlassReleaseAction(longPressOpened: Boolean, moved: Boolean): LeadingGlassReleaseAction = when {
+	longPressOpened && !moved -> LeadingGlassReleaseAction.COLLAPSE
+	longPressOpened -> LeadingGlassReleaseAction.KEEP_OPEN
+	else -> LeadingGlassReleaseAction.OPEN
+}

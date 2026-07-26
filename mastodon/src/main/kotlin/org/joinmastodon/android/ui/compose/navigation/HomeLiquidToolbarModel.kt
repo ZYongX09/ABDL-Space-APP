@@ -59,8 +59,8 @@ internal data class HomeLiquidToolbarMotionSpec(
 )
 
 internal fun homeLiquidToolbarMotionSpec(): HomeLiquidToolbarMotionSpec = HomeLiquidToolbarMotionSpec(
-	dampingRatio = 0.78f,
-	stiffness = 500f,
+	dampingRatio = 0.72f,
+	stiffness = 520f,
 )
 
 internal fun homeToolbarCaptureHeightDp(menuOpen: Boolean): Int = if(menuOpen) 520 else 72

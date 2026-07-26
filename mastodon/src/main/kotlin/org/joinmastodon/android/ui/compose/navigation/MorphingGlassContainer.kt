@@ -104,8 +104,8 @@ internal fun MorphingGlassContainer(
 		progress.animateTo(
 			targetValue = if(expanded) 1f else 0f,
 			animationSpec = spring(
-				dampingRatio = if(expanded) 0.82f else 0.9f,
-				stiffness = if(expanded) 520f else 620f,
+				dampingRatio = if(expanded) motion.dampingRatio else 0.9f,
+				stiffness = if(expanded) motion.stiffness else 620f,
 			),
 		)
 		onExpansionFinished(expanded)
