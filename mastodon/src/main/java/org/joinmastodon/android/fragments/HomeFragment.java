@@ -199,7 +199,8 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 				updateCaptureHeights();
 		});
 		createNavigationBar(inflater);
-		createLiquidToolbar();
+		if(savedInstanceState==null)
+			createLiquidToolbar();
 
 		if(savedInstanceState==null){
 			getChildFragmentManager().beginTransaction()
@@ -241,6 +242,7 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 		friendRequestFragment=(FriendRequestListFragment) getChildFragmentManager().getFragment(savedInstanceState, "friendRequestFragment");
 		diaperListFragment=(DiaperListFragment) getChildFragmentManager().getFragment(savedInstanceState, "diaperListFragment");
 		profileFragment=(ProfileFragment) getChildFragmentManager().getFragment(savedInstanceState, "profileFragment");
+		createLiquidToolbar();
 		currentTab=savedInstanceState.getInt("selectedTab");
 		selectTabInNavigation(currentTab);
 		updateLiquidToolbarVisibility();

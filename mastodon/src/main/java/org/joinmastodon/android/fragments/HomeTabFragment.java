@@ -448,6 +448,8 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 	public void setLiquidToolbarController(HomeLiquidToolbarController controller){
 		liquidToolbarController=controller;
 		updateLiquidToolbarMode();
+		if(overflowPopup!=null)
+			updateOverflowMenu();
 		updateLiquidToolbarState();
 	}
 

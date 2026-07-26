@@ -13,9 +13,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -186,7 +189,12 @@ class HomeLiquidToolbarController(
 	@Composable
 	private fun GlassMenu(modifier: Modifier, page: HomeToolbarMenuPage, items: List<HomeToolbarMenuItem>) {
 		GlassSurface(modifier = modifier.width(248.dp), onClick = {}) {
-			Column(Modifier.padding(vertical = 6.dp)) {
+			Column(
+				Modifier
+					.heightIn(max = 420.dp)
+					.verticalScroll(rememberScrollState())
+					.padding(vertical = 6.dp),
+			) {
 				if(page==HomeToolbarMenuPage.LISTS || page==HomeToolbarMenuPage.HASHTAGS) {
 					MenuRow(R.drawable.ic_fluent_chevron_left_24_regular, view.context.getString(R.string.back), false) { menuPageState = HomeToolbarMenuPage.ROOT }
 				}

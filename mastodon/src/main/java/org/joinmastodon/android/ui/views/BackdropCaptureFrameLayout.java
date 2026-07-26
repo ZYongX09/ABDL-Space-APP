@@ -86,8 +86,9 @@ public class BackdropCaptureFrameLayout extends FrameLayout{
 		int actualTopHeight=Math.min(topCaptureHeight, getHeight());
 		int actualBottomHeight=Math.min(bottomCaptureHeight, getHeight());
 		int sharedHeight=actualTopHeight>0 ? getHeight() : actualBottomHeight;
-		if(captureBitmap==null || captureBitmap.getWidth()!=getWidth() || captureBitmap.getHeight()!=sharedHeight)
-			captureBitmap=Bitmap.createBitmap(getWidth(), sharedHeight, Bitmap.Config.ARGB_8888);
+		Bitmap.Config sharedConfig=actualTopHeight>0 ? Bitmap.Config.RGB_565 : Bitmap.Config.ARGB_8888;
+		if(captureBitmap==null || captureBitmap.getWidth()!=getWidth() || captureBitmap.getHeight()!=sharedHeight || captureBitmap.getConfig()!=sharedConfig)
+			captureBitmap=Bitmap.createBitmap(getWidth(), sharedHeight, sharedConfig);
 		if(actualTopHeight>0 && (topCaptureBitmap==null || topCaptureBitmap.getWidth()!=getWidth() || topCaptureBitmap.getHeight()!=actualTopHeight))
 			topCaptureBitmap=Bitmap.createBitmap(getWidth(), actualTopHeight, Bitmap.Config.ARGB_8888);
 		if(actualBottomHeight>0 && (bottomCaptureBitmap==null || bottomCaptureBitmap.getWidth()!=getWidth() || bottomCaptureBitmap.getHeight()!=actualBottomHeight))
