@@ -93,4 +93,10 @@ class HomeLiquidToolbarModelTest {
 		assertTrue(shouldConsumeToolbarBack(menuVisible = false, menuPending = true))
 		assertFalse(shouldConsumeToolbarBack(menuVisible = false, menuPending = false))
 	}
+
+	@Test
+	fun collapsedLeadingGlassUsesClickWithoutDragRecognizer() {
+		assertFalse(shouldInstallToolbarDragRecognizer(isLeading = true))
+		assertTrue(shouldInstallToolbarDragRecognizer(isLeading = false))
+	}
 }

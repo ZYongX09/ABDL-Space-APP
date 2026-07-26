@@ -72,6 +72,8 @@ internal fun homeToolbarCollapsedWidthDp(titleWidthDp: Float): Float =
 
 internal fun shouldConsumeToolbarBack(menuVisible: Boolean, menuPending: Boolean): Boolean = menuVisible || menuPending
 
+internal fun shouldInstallToolbarDragRecognizer(isLeading: Boolean): Boolean = !isLeading
+
 internal data class HomeLiquidToolbarOutlineSpec(
 	val widthDp: Float,
 	val innerBlurRadiusDp: Float,

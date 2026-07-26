@@ -57,6 +57,7 @@ internal fun MorphingGlassContainer(
 	backdrop: Backdrop,
 	anchorFractionX: Float,
 	selectionItemCount: Int,
+	enableDragSelection: Boolean,
 	modifier: Modifier = Modifier,
 	shouldExpandFromClosed: (Offset, IntSize) -> Boolean,
 	onExpansionRequested: () -> Unit,
@@ -142,7 +143,7 @@ internal fun MorphingGlassContainer(
 				) else Modifier.background(surface, shape),
 			)
 			.clip(shape)
-			.pointerInput(Unit) {
+			.then(if(enableDragSelection) Modifier.pointerInput(Unit) {
 				awaitEachGesture {
 					val down = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.pressed } ?: return@awaitEachGesture
 					val startedExpanded = expandedState.value
@@ -179,7 +180,7 @@ internal fun MorphingGlassContainer(
 						onSelectionChanged(null)
 					}
 				}
-			}
+			} else Modifier)
 			.clickable(interactionSource = interactionSource, indication = null, onClick = onClick),
 		contentAlignment = Alignment.TopStart,
 	) {

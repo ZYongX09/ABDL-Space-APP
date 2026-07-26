@@ -465,8 +465,10 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		int topPadding=V.dp(homeTimelineTopPaddingDp(liquid));
 		if(fragments!=null){
 			for(Fragment fragment:fragments){
-				if(fragment instanceof BaseStatusListFragment<?> statusListFragment)
+				if(fragment instanceof BaseStatusListFragment<?> statusListFragment){
 					statusListFragment.setLiquidToolbarTopPadding(topPadding);
+					statusListFragment.setLiquidToolbarFabHidden(liquid);
+				}
 				if(fragment instanceof HomeTimelineFragment homeTimelineFragment)
 					homeTimelineFragment.setLiquidToolbarMode(liquid);
 			}

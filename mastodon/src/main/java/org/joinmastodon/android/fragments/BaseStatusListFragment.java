@@ -928,6 +928,11 @@ public abstract class BaseStatusListFragment<T extends DisplayItemsParent> exten
 		list.setPadding(list.getPaddingLeft(), Math.max(0, padding), list.getPaddingRight(), list.getPaddingBottom());
 	}
 
+	public void setLiquidToolbarFabHidden(boolean hidden){
+		if(fab!=null && hidden)
+			fab.setVisibility(View.GONE);
+	}
+
 	@Override
 	public void onApplyWindowInsets(WindowInsets insets){
 		if(Build.VERSION.SDK_INT>=29 && insets.getTappableElementInsets().bottom==0 && wantsOverlaySystemNavigation()){

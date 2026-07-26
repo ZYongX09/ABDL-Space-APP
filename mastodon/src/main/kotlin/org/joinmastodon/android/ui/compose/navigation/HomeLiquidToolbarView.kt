@@ -302,6 +302,7 @@ class HomeLiquidToolbarController(
 				backdrop = backdrop,
 				anchorFractionX = 0f,
 				selectionItemCount = menuItems.size,
+				enableDragSelection = shouldInstallToolbarDragRecognizer(isLeading = true),
 				shouldExpandFromClosed = { _, _ -> false },
 				onExpansionRequested = { requestMenu(HomeToolbarMenuPage.TIMELINES) },
 				onClosedTap = { _, _ -> },
@@ -344,6 +345,7 @@ class HomeLiquidToolbarController(
 				backdrop = backdrop,
 				anchorFractionX = 1f,
 				selectionItemCount = menuItems.size + if(menuPageState==HomeToolbarMenuPage.LISTS || menuPageState==HomeToolbarMenuPage.HASHTAGS) 1 else 0,
+				enableDragSelection = shouldInstallToolbarDragRecognizer(isLeading = false),
 				shouldExpandFromClosed = { position, size -> trailingToolbarAction(position.x, size.width.toFloat())==TrailingToolbarAction.MORE },
 				onExpansionRequested = { requestMenu(HomeToolbarMenuPage.ROOT) },
 				onClosedTap = { position, size -> if(trailingToolbarAction(position.x, size.width.toFloat())==TrailingToolbarAction.COMPOSE) onCompose.run() },
@@ -408,7 +410,7 @@ class HomeLiquidToolbarController(
 				Modifier
 					.heightIn(max = 420.dp)
 					.verticalScroll(rememberScrollState())
-					.padding(vertical = 6.dp)
+					.padding(top = 14.dp, bottom = 6.dp)
 					.graphicsLayer { alpha = progress },
 			) {
 				if(animatedPage==HomeToolbarMenuPage.LISTS || animatedPage==HomeToolbarMenuPage.HASHTAGS) {

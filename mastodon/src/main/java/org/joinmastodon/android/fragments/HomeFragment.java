@@ -578,12 +578,13 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 		Account self=AccountSessionManager.getInstance().getAccount(accountID).self;
 		if(GlobalUserPreferences.useIosLiquidNavigation){
 			liquidNavigationController=new HomeLiquidNavigationController(getActivity(), currentTab, self.avatar, this::onTabSelected, this::onTabLongClick);
-			fragmentContainer.setCaptureListener((top, bottom)->{
-				if(liquidToolbarController!=null && top!=null)
-					liquidToolbarController.setBackdropBitmap(top);
-				if(liquidNavigationController!=null && bottom!=null)
-					liquidNavigationController.setBackdropBitmap(bottom);
-			});
+			fragmentContainer.postOnAnimation(()->fragmentContainer.postOnAnimation(()->
+					fragmentContainer.setCaptureListener((top, bottom)->{
+						if(liquidToolbarController!=null && top!=null)
+							liquidToolbarController.setBackdropBitmap(top);
+						if(liquidNavigationController!=null && bottom!=null)
+							liquidNavigationController.setBackdropBitmap(bottom);
+					})));
 			navigationHost.addView(liquidNavigationController.getView(), new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 		}else{
 			fragmentContainer.setCaptureListener(null);
