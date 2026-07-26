@@ -160,32 +160,35 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		pager = new ViewPager2(getContext());
 		toolbarFrame = (FrameLayout) LayoutInflater.from(getContext()).inflate(R.layout.home_toolbar, getToolbar(), false);
 
-		if (fragments[0] == null) {
-			Bundle args = new Bundle();
-			args.putString("account", accountID);
-			args.putBoolean("__is_tab", true);
-			args.putBoolean("__disable_fab", true);
-			args.putBoolean("onlyPosts", true);
-
-			for (int i=0; i < timelinesList.size(); i++) {
-				TimelineDefinition tl = timelinesList.get(i);
-				fragments[i] = tl.getFragment();
-				timelines[i] = tl;
-			}
-
-			FragmentTransaction transaction = getChildFragmentManager().beginTransaction();
-			for (int i = 0; i < count; i++) {
+		Bundle args = new Bundle();
+		args.putString("account", accountID);
+		args.putBoolean("__is_tab", true);
+		args.putBoolean("__disable_fab", true);
+		args.putBoolean("onlyPosts", true);
+		FragmentTransaction transaction = null;
+		for (int i = 0; i < count; i++) {
+			int containerId=i + 1;
+			timelines[i]=timelinesList.get(i);
+			Fragment restoredFragment=getChildFragmentManager().findFragmentById(containerId);
+			if(restoredFragment!=null){
+				fragments[i]=restoredFragment;
+			}else if(fragments[i]==null){
+				fragments[i]=timelines[i].getFragment();
 				fragments[i].setArguments(timelines[i].populateArguments(new Bundle(args)));
-				FrameLayout tabView = new FrameLayout(getActivity());
-				tabView.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-				tabView.setVisibility(View.GONE);
-				tabView.setId(i + 1);
-				transaction.add(i + 1, fragments[i]);
-				view.addView(tabView);
-				tabViews[i] = tabView;
+				if(transaction==null)
+					transaction=getChildFragmentManager().beginTransaction();
+				transaction.add(containerId, fragments[i]);
 			}
-			transaction.commit();
+
+			FrameLayout tabView = new FrameLayout(getActivity());
+			tabView.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+			tabView.setVisibility(View.GONE);
+			tabView.setId(containerId);
+			view.addView(tabView);
+			tabViews[i] = tabView;
 		}
+		if(transaction!=null)
+			transaction.commit();
 
 		view.addView(pager, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
