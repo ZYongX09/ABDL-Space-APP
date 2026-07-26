@@ -6,6 +6,8 @@ import android.graphics.Bitmap
 import android.widget.ImageView
 import android.widget.FrameLayout
 import android.view.MotionEvent
+import android.view.View
+import android.view.ViewConfiguration
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedContent
@@ -80,6 +82,7 @@ import top.yukonga.miuix.kmp.theme.LocalContentColor
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import java.util.function.IntConsumer
 import java.util.function.Consumer
+import kotlin.math.hypot
 
 data class HomeToolbarTimeline(
 	val id: Int,
@@ -113,6 +116,10 @@ class HomeLiquidToolbarController(
 	private var pendingMenuPageState by mutableStateOf(HomeToolbarMenuPage.NONE)
 	private var highlightedMenuIndexState by mutableStateOf<Int?>(null)
 	private var menuOpenListener: Consumer<Boolean>? = null
+	private var contentTouchTarget: View? = null
+	private var outsideGestureDown: MotionEvent? = null
+	private var forwardingOutsideGesture = false
+	private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop.toFloat()
 
 	private val composeView = ComposeView(context).apply {
 		setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
@@ -125,8 +132,26 @@ class HomeLiquidToolbarController(
 	val view = object : FrameLayout(context) {
 		override fun dispatchTouchEvent(event: MotionEvent): Boolean {
 			if(event.actionMasked==MotionEvent.ACTION_DOWN && isMenuVisible() && !isInsideActiveGlass(event.x, event.y)) {
+				outsideGestureDown?.recycle()
+				outsideGestureDown = MotionEvent.obtain(event)
+				forwardingOutsideGesture = false
 				closeMenu()
-				return false
+				return true
+			}
+			val down = outsideGestureDown
+			if(down!=null) {
+				if(!forwardingOutsideGesture && event.actionMasked==MotionEvent.ACTION_MOVE && hypot(event.x-down.x, event.y-down.y)>touchSlop) {
+					forwardingOutsideGesture = true
+					forwardToContent(down)
+				}
+				if(forwardingOutsideGesture)
+					forwardToContent(event)
+				if(event.actionMasked==MotionEvent.ACTION_UP || event.actionMasked==MotionEvent.ACTION_CANCEL) {
+					down.recycle()
+					outsideGestureDown = null
+					forwardingOutsideGesture = false
+				}
+				return true
 			}
 			return super.dispatchTouchEvent(event)
 		}
@@ -136,11 +161,8 @@ class HomeLiquidToolbarController(
 
 	fun setBackdropBitmap(bitmap: Bitmap) {
 		backdrop.update(bitmap)
-		if(pendingMenuPageState!=HomeToolbarMenuPage.NONE) {
-			menuPageState = pendingMenuPageState
-			pendingMenuPageState = HomeToolbarMenuPage.NONE
-		}
 	}
+	fun setContentTouchTarget(target: View?) { contentTouchTarget = target }
 	fun setStatusBarInset(insetPx: Int) { statusBarInsetState = insetPx.coerceAtLeast(0) }
 	fun setTimelines(items: List<HomeToolbarTimeline>, selectedIndex: Int) {
 		timelinesState = items
@@ -168,6 +190,23 @@ class HomeLiquidToolbarController(
 		}
 		pendingMenuPageState = page
 		menuOpenListener?.accept(true)
+		view.postOnAnimation {
+			if(pendingMenuPageState==page) {
+				menuPageState = page
+				pendingMenuPageState = HomeToolbarMenuPage.NONE
+			}
+		}
+	}
+	private fun forwardToContent(source: MotionEvent) {
+		val target = contentTouchTarget ?: return
+		val event = MotionEvent.obtain(source)
+		val hostLocation = IntArray(2)
+		val targetLocation = IntArray(2)
+		view.getLocationOnScreen(hostLocation)
+		target.getLocationOnScreen(targetLocation)
+		event.offsetLocation((hostLocation[0]-targetLocation[0]).toFloat(), (hostLocation[1]-targetLocation[1]).toFloat())
+		target.dispatchTouchEvent(event)
+		event.recycle()
 	}
 	private fun isMenuVisible(): Boolean = menuPageState!=HomeToolbarMenuPage.NONE || pendingMenuPageState!=HomeToolbarMenuPage.NONE
 	private fun isInsideActiveGlass(x: Float, y: Float): Boolean {
@@ -200,7 +239,12 @@ class HomeLiquidToolbarController(
 		}
 	}
 	fun setMenuOpenListener(listener: Consumer<Boolean>?) { menuOpenListener = listener }
-	fun dispose() = composeView.disposeComposition()
+	fun dispose() {
+		outsideGestureDown?.recycle()
+		outsideGestureDown = null
+		contentTouchTarget = null
+		composeView.disposeComposition()
+	}
 
 	@Composable
 	private fun ToolbarContent() {

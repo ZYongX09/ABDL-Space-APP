@@ -45,3 +45,10 @@ internal fun trailingToolbarAction(x: Float, width: Float): TrailingToolbarActio
 
 internal fun toolbarMenuHeightDp(itemCount: Int, hasBackRow: Boolean): Int =
 	((itemCount + if(hasBackRow) 1 else 0) * 48 + 12).coerceIn(60, 420)
+
+internal enum class OutsideGlassGesture { CLOSE_ONLY, FORWARD_TO_CONTENT }
+
+internal fun outsideGlassGesture(distance: Float, touchSlop: Float): OutsideGlassGesture =
+	if(distance > touchSlop) OutsideGlassGesture.FORWARD_TO_CONTENT else OutsideGlassGesture.CLOSE_ONLY
+
+internal fun toolbarMenuCommitDelayFrames(): Int = 1

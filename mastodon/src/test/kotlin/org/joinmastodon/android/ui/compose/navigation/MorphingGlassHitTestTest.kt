@@ -25,4 +25,16 @@ class MorphingGlassHitTestTest {
 		assertEquals(204, toolbarMenuHeightDp(itemCount = 4, hasBackRow = false))
 		assertEquals(252, toolbarMenuHeightDp(itemCount = 4, hasBackRow = true))
 	}
+
+	@Test
+	fun outsideGestureOnlyForwardsAfterTouchSlop() {
+		assertEquals(OutsideGlassGesture.CLOSE_ONLY, outsideGlassGesture(0f, 8f))
+		assertEquals(OutsideGlassGesture.CLOSE_ONLY, outsideGlassGesture(7.9f, 8f))
+		assertEquals(OutsideGlassGesture.FORWARD_TO_CONTENT, outsideGlassGesture(8.1f, 8f))
+	}
+
+	@Test
+	fun menuRequestCommitsOnNextFrameWithoutWaitingForBackdrop() {
+		assertEquals(1, toolbarMenuCommitDelayFrames())
+	}
 }

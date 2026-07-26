@@ -632,6 +632,7 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 			liquidToolbarMenuOpen=open;
 			updateCaptureHeights();
 		});
+		liquidToolbarController.setContentTouchTarget(fragmentContainer);
 		toolbarHost.addView(liquidToolbarController.getView(), new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 		homeTabFragment.setLiquidToolbarController(liquidToolbarController);
 		applyLiquidToolbarInsets();
