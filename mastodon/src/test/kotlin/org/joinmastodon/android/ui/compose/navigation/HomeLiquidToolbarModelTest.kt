@@ -42,4 +42,13 @@ class HomeLiquidToolbarModelTest {
 		assertEquals(HomeToolbarMenuPage.HASHTAGS, HomeToolbarMenuPage.ROOT.openHashtags())
 		assertEquals(HomeToolbarMenuPage.ROOT, HomeToolbarMenuPage.LISTS.back())
 	}
+
+	@Test
+	fun toolbarVisualsStayReadableAndTransparentWithoutFrostedBlur() {
+		val spec = homeLiquidToolbarVisualSpec()
+		assertEquals(18, spec.titleTextSp)
+		assertEquals(17, spec.menuTextSp)
+		assertEquals(0, spec.blurRadiusDp)
+		assertTrue(spec.surfaceAlpha <= 0.25f)
+	}
 }

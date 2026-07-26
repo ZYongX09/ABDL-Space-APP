@@ -39,6 +39,20 @@ internal data class HomeLiquidToolbarState(
 		get() = if(showNewPosts) HomeToolbarLeadingMode.NEW_POSTS else HomeToolbarLeadingMode.TIMELINE
 }
 
+internal data class HomeLiquidToolbarVisualSpec(
+	val titleTextSp: Int,
+	val menuTextSp: Int,
+	val blurRadiusDp: Int,
+	val surfaceAlpha: Float,
+)
+
+internal fun homeLiquidToolbarVisualSpec(): HomeLiquidToolbarVisualSpec = HomeLiquidToolbarVisualSpec(
+	titleTextSp = 18,
+	menuTextSp = 17,
+	blurRadiusDp = 0,
+	surfaceAlpha = 0.22f,
+)
+
 internal fun liquidToolbarActions(): List<HomeToolbarAction> = listOf(
 	HomeToolbarAction.COMPOSE,
 	HomeToolbarAction.OVERFLOW,

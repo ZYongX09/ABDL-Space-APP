@@ -51,7 +51,6 @@ import org.joinmastodon.android.ui.compose.ui.isInDarkTheme
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.blur.drawBackdrop
-import top.yukonga.miuix.kmp.blur.blur
 import top.yukonga.miuix.kmp.blur.isRuntimeShaderSupported
 import top.yukonga.miuix.kmp.theme.LocalContentColor
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -116,6 +115,8 @@ class HomeLiquidToolbarController(
 
 	@Composable
 	private fun ToolbarContent() {
+		val visualSpec = homeLiquidToolbarVisualSpec()
+		val contentColor = MiuixTheme.colorScheme.onSurface
 		val density = LocalDensity.current
 		val topInset = with(density) { statusBarInsetState.toDp() }
 		val currentTimeline = timelinesState.getOrNull(selectedTimelineState)
@@ -149,18 +150,19 @@ class HomeLiquidToolbarController(
 						modifier = Modifier.size(22.dp),
 						painter = painterResource(if(showNewPostsState) R.drawable.ic_fluent_arrow_up_16_filled else currentTimeline?.iconRes ?: R.drawable.ic_fluent_home_24_regular),
 						contentDescription = null,
+						tint = contentColor,
 					)
 					Spacer(Modifier.width(8.dp))
 					Text(
 						text = if(showNewPostsState) view.context.getString(R.string.see_new_posts) else currentTimeline?.title.orEmpty(),
-						fontSize = 15.sp,
+						fontSize = visualSpec.titleTextSp.sp,
 						fontWeight = FontWeight.Medium,
 						maxLines = 1,
 						overflow = TextOverflow.Ellipsis,
 					)
 					if(!showNewPostsState) {
 						Spacer(Modifier.width(6.dp))
-						Icon(painter = painterResource(R.drawable.ic_fluent_chevron_down_16_filled), contentDescription = null, modifier = Modifier.size(16.dp))
+						Icon(painter = painterResource(R.drawable.ic_fluent_chevron_down_16_filled), contentDescription = null, modifier = Modifier.size(18.dp), tint = contentColor)
 					}
 				}
 				Spacer(Modifier.width(10.dp))
@@ -221,9 +223,9 @@ class HomeLiquidToolbarController(
 			modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 10.dp),
 			verticalAlignment = Alignment.CenterVertically,
 		) {
-			Icon(painter = painterResource(icon), contentDescription = null, modifier = Modifier.size(22.dp))
+			Icon(painter = painterResource(icon), contentDescription = null, modifier = Modifier.size(24.dp), tint = MiuixTheme.colorScheme.onSurface)
 			Spacer(Modifier.width(12.dp))
-			Text(title, modifier = Modifier.weight(1f), fontSize = 15.sp)
+			Text(title, modifier = Modifier.weight(1f), fontSize = homeLiquidToolbarVisualSpec().menuTextSp.sp)
 			if(badged) Box(Modifier.size(7.dp).background(Color.Red, CircleShape))
 		}
 	}
@@ -231,14 +233,15 @@ class HomeLiquidToolbarController(
 	@Composable
 	private fun GlassSurface(modifier: Modifier, onClick: () -> Unit, content: @Composable () -> Unit) {
 		val isDark = isInDarkTheme()
-		val surface = if(isDark) Color(0xB828282D) else Color(0xB8FFFFFF)
+		val surfaceAlpha = homeLiquidToolbarVisualSpec().surfaceAlpha
+		val surface = if(isDark) Color.Black.copy(alpha = surfaceAlpha) else Color.White.copy(alpha = surfaceAlpha)
 		Row(
 			modifier = modifier
 				.then(
 					if(isRuntimeShaderSupported()) Modifier.drawBackdrop(
 						backdrop = backdrop,
 						shape = { RoundedCornerShape(24.dp) },
-						effects = { vibrancy(); blur(6.dp.toPx(), 6.dp.toPx()); lens(12.dp.toPx(), 16.dp.toPx()) },
+						effects = { vibrancy(); lens(12.dp.toPx(), 16.dp.toPx()) },
 						onDrawSurface = { drawRect(surface) },
 					) else Modifier.background(surface, RoundedCornerShape(24.dp)),
 				)
@@ -256,6 +259,7 @@ class HomeLiquidToolbarController(
 			modifier = Modifier.size(40.dp).clip(CircleShape).clickable(onClick = onClick).padding(8.dp),
 			painter = painterResource(icon),
 			contentDescription = description,
+			tint = MiuixTheme.colorScheme.onSurface,
 		)
 	}
 }
