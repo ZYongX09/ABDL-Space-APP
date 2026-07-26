@@ -58,7 +58,16 @@ internal fun isInsideLeadingGlass(x: Float, y: Float, top: Float, width: Float, 
 
 internal enum class LeadingGlassReleaseAction { OPEN, KEEP_OPEN, COLLAPSE }
 
-internal fun leadingGlassReleaseAction(longPressOpened: Boolean, moved: Boolean): LeadingGlassReleaseAction = when {
+internal enum class LeadingGlassOpenTrigger { ON_RELEASE, ON_LONG_PRESS }
+
+internal fun leadingGlassOpenTrigger(longPressReached: Boolean): LeadingGlassOpenTrigger =
+	if(longPressReached) LeadingGlassOpenTrigger.ON_LONG_PRESS else LeadingGlassOpenTrigger.ON_RELEASE
+
+internal fun isUpwardToolbarFling(velocityY: Float, minimumFlingVelocity: Float): Boolean =
+	velocityY < -minimumFlingVelocity
+
+internal fun leadingGlassReleaseAction(longPressOpened: Boolean, moved: Boolean, upwardFling: Boolean): LeadingGlassReleaseAction = when {
+	longPressOpened && upwardFling -> LeadingGlassReleaseAction.COLLAPSE
 	longPressOpened && !moved -> LeadingGlassReleaseAction.COLLAPSE
 	longPressOpened -> LeadingGlassReleaseAction.KEEP_OPEN
 	else -> LeadingGlassReleaseAction.OPEN

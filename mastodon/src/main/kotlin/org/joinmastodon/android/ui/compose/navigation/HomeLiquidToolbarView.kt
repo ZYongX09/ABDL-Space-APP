@@ -9,6 +9,7 @@ import android.widget.FrameLayout
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
+import android.view.VelocityTracker
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedContent
@@ -129,9 +130,14 @@ class HomeLiquidToolbarController(
 	private var leadingGlassMoved = false
 	private var leadingGlassDownX = 0f
 	private var leadingGlassDownY = 0f
+	private var leadingGlassVelocityTracker: VelocityTracker? = null
+	private val minimumFlingVelocity = ViewConfiguration.get(context).scaledMinimumFlingVelocity.toFloat()
 	private val markLeadingLongPress = Runnable {
-		if(leadingGlassTouch)
+		if(leadingGlassTouch) {
 			leadingGlassLongPress = true
+			if(!showNewPostsState)
+				requestMenu(HomeToolbarMenuPage.TIMELINES)
+		}
 	}
 
 	private val composeView = ComposeView(context).apply {
@@ -145,6 +151,7 @@ class HomeLiquidToolbarController(
 	val view = object : FrameLayout(context) {
 		override fun dispatchTouchEvent(event: MotionEvent): Boolean {
 			if(leadingGlassTouch && event.actionMasked!=MotionEvent.ACTION_DOWN) {
+				leadingGlassVelocityTracker?.addMovement(event)
 				when(event.actionMasked) {
 					MotionEvent.ACTION_MOVE -> {
 						if(hypot(event.x-leadingGlassDownX, event.y-leadingGlassDownY)>touchSlop)
@@ -154,15 +161,24 @@ class HomeLiquidToolbarController(
 					MotionEvent.ACTION_UP -> {
 						leadingGlassTouch = false
 						removeCallbacks(markLeadingLongPress)
+						leadingGlassVelocityTracker?.computeCurrentVelocity(1000)
+						val upwardFling = isUpwardToolbarFling(leadingGlassVelocityTracker?.yVelocity ?: 0f, minimumFlingVelocity)
+						leadingGlassVelocityTracker?.recycle()
+						leadingGlassVelocityTracker = null
 						if(showNewPostsState && leadingGlassBounds.contains(event.x, event.y))
 							onNewPosts.run()
-						else if(leadingGlassReleaseAction(leadingGlassLongPress, leadingGlassMoved)==LeadingGlassReleaseAction.COLLAPSE)
-							closeMenu()
+						else when(leadingGlassReleaseAction(leadingGlassLongPress, leadingGlassMoved, upwardFling)) {
+							LeadingGlassReleaseAction.OPEN -> requestMenu(HomeToolbarMenuPage.TIMELINES)
+							LeadingGlassReleaseAction.COLLAPSE -> closeMenu()
+							LeadingGlassReleaseAction.KEEP_OPEN -> Unit
+						}
 						return true
 					}
 					MotionEvent.ACTION_CANCEL -> {
 						leadingGlassTouch = false
 						removeCallbacks(markLeadingLongPress)
+						leadingGlassVelocityTracker?.recycle()
+						leadingGlassVelocityTracker = null
 						if(leadingGlassLongPress && !leadingGlassMoved)
 							closeMenu()
 						return true
@@ -177,8 +193,8 @@ class HomeLiquidToolbarController(
 						leadingGlassMoved = false
 						leadingGlassDownX = event.x
 						leadingGlassDownY = event.y
-						if(!showNewPostsState)
-							requestMenu(HomeToolbarMenuPage.TIMELINES)
+						leadingGlassVelocityTracker?.recycle()
+						leadingGlassVelocityTracker = VelocityTracker.obtain().also { it.addMovement(event) }
 						removeCallbacks(markLeadingLongPress)
 						postDelayed(markLeadingLongPress, ViewConfiguration.getLongPressTimeout().toLong())
 						return true
@@ -300,6 +316,8 @@ class HomeLiquidToolbarController(
 	}
 	fun dispose() {
 		view.removeCallbacks(markLeadingLongPress)
+		leadingGlassVelocityTracker?.recycle()
+		leadingGlassVelocityTracker = null
 		outsideGestureDown?.recycle()
 		outsideGestureDown = null
 		contentTouchTarget = null

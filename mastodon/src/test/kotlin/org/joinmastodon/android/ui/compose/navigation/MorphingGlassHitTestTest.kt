@@ -49,8 +49,22 @@ class MorphingGlassHitTestTest {
 
 	@Test
 	fun longPressReleaseBehaviorDependsOnMovement() {
-		assertEquals(LeadingGlassReleaseAction.COLLAPSE, leadingGlassReleaseAction(longPressOpened = true, moved = false))
-		assertEquals(LeadingGlassReleaseAction.KEEP_OPEN, leadingGlassReleaseAction(longPressOpened = true, moved = true))
-		assertEquals(LeadingGlassReleaseAction.OPEN, leadingGlassReleaseAction(longPressOpened = false, moved = false))
+		assertEquals(LeadingGlassReleaseAction.COLLAPSE, leadingGlassReleaseAction(longPressOpened = true, moved = false, upwardFling = false))
+		assertEquals(LeadingGlassReleaseAction.KEEP_OPEN, leadingGlassReleaseAction(longPressOpened = true, moved = true, upwardFling = false))
+		assertEquals(LeadingGlassReleaseAction.COLLAPSE, leadingGlassReleaseAction(longPressOpened = true, moved = true, upwardFling = true))
+		assertEquals(LeadingGlassReleaseAction.OPEN, leadingGlassReleaseAction(longPressOpened = false, moved = false, upwardFling = false))
+	}
+
+	@Test
+	fun tapAndLongPressOpenAtDifferentGesturePhases() {
+		assertEquals(LeadingGlassOpenTrigger.ON_RELEASE, leadingGlassOpenTrigger(longPressReached = false))
+		assertEquals(LeadingGlassOpenTrigger.ON_LONG_PRESS, leadingGlassOpenTrigger(longPressReached = true))
+	}
+
+	@Test
+	fun upwardFlingUsesNegativeSystemVelocityThreshold() {
+		assertTrue(isUpwardToolbarFling(velocityY = -1201f, minimumFlingVelocity = 1200f))
+		assertFalse(isUpwardToolbarFling(velocityY = -1199f, minimumFlingVelocity = 1200f))
+		assertFalse(isUpwardToolbarFling(velocityY = 1800f, minimumFlingVelocity = 1200f))
 	}
 }
