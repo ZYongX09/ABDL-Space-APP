@@ -49,6 +49,7 @@ import org.joinmastodon.android.api.requests.timelines.GetHomeTimeline;
 import org.joinmastodon.android.api.requests.timelines.GetListTimeline;
 import org.joinmastodon.android.api.requests.timelines.GetPublicTimeline;
 import org.joinmastodon.android.api.session.AccountSessionManager;
+import org.joinmastodon.android.GlobalUserPreferences;
 import org.joinmastodon.android.events.DismissDonationCampaignBannerEvent;
 import org.joinmastodon.android.events.SelfUpdateStateChangedEvent;
 import org.joinmastodon.android.fragments.settings.SettingsMainFragment;
@@ -716,6 +717,10 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 		if(newPostsBtnShown)
 			return;
 		newPostsBtnShown=true;
+		if(GlobalUserPreferences.useIosLiquidNavigation){
+			newPostsBtnWrap.setVisibility(View.GONE);
+			return;
+		}
 		if(currentNewPostsAnim!=null){
 			currentNewPostsAnim.cancel();
 		}
@@ -737,6 +742,11 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 		});
 		currentNewPostsAnim=set;
 		set.start();
+	}
+
+	public void setLiquidToolbarMode(boolean liquid){
+		if(newPostsBtnWrap!=null)
+			newPostsBtnWrap.setVisibility(liquid ? View.GONE : (newPostsBtnShown ? View.VISIBLE : View.GONE));
 	}
 
 	private void hideNewPostsButton(){

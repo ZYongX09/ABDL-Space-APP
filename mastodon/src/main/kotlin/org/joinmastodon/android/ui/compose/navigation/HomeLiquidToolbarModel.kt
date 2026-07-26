@@ -49,7 +49,7 @@ internal data class HomeLiquidToolbarVisualSpec(
 internal fun homeLiquidToolbarVisualSpec(): HomeLiquidToolbarVisualSpec = HomeLiquidToolbarVisualSpec(
 	titleTextSp = 18,
 	menuTextSp = 17,
-	blurRadiusDp = 4,
+	blurRadiusDp = 8,
 	surfaceAlpha = 0.22f,
 )
 
@@ -66,6 +66,11 @@ internal fun homeLiquidToolbarMotionSpec(): HomeLiquidToolbarMotionSpec = HomeLi
 internal fun homeToolbarCaptureHeightDp(menuOpen: Boolean): Int = if(menuOpen) 520 else 72
 
 internal fun homeTimelineTopPaddingDp(liquidMode: Boolean): Int = if(liquidMode) 72 else 0
+
+internal fun homeToolbarCollapsedWidthDp(titleWidthDp: Float): Float =
+	(titleWidthDp + 72f).coerceIn(96f, 260f)
+
+internal fun shouldConsumeToolbarBack(menuVisible: Boolean, menuPending: Boolean): Boolean = menuVisible || menuPending
 
 internal data class HomeLiquidToolbarOutlineSpec(
 	val widthDp: Float,

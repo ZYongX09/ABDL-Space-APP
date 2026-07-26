@@ -77,6 +77,14 @@ public class MainActivity extends FragmentStackActivity implements LifecycleOwne
 	private GestureDetector backGestureDetector;
 
 	@Override
+	public void onBackPressed(){
+		Fragment top=getTopmostFragment();
+		if(top instanceof HomeFragment homeFragment && homeFragment.onBackPressed())
+			return;
+		super.onBackPressed();
+	}
+
+	@Override
 	protected void onCreate(@Nullable Bundle savedInstanceState){
 		savedStateController.performRestore(savedInstanceState);
 		lifecycleRegistry.setCurrentState(Lifecycle.State.CREATED);

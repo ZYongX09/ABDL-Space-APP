@@ -61,6 +61,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -239,6 +240,11 @@ class HomeLiquidToolbarController(
 		}
 	}
 	fun setMenuOpenListener(listener: Consumer<Boolean>?) { menuOpenListener = listener }
+	fun onBackPressed(): Boolean {
+		if(!shouldConsumeToolbarBack(menuPageState!=HomeToolbarMenuPage.NONE, pendingMenuPageState!=HomeToolbarMenuPage.NONE)) return false
+		closeMenu()
+		return true
+	}
 	fun dispose() {
 		outsideGestureDown?.recycle()
 		outsideGestureDown = null
@@ -252,8 +258,21 @@ class HomeLiquidToolbarController(
 		val motionSpec = homeLiquidToolbarMotionSpec()
 		val contentColor = MiuixTheme.colorScheme.onSurface
 		val density = LocalDensity.current
+		val textMeasurer = rememberTextMeasurer()
 		val topInset = with(density) { statusBarInsetState.toDp() }
 		val currentTimeline = timelinesState.getOrNull(selectedTimelineState)
+		val leadingTitle = if(showNewPostsState) view.context.getString(R.string.see_new_posts) else currentTimeline?.title.orEmpty()
+		val measuredLeadingWidth = with(density) {
+			textMeasurer.measure(
+				text = leadingTitle,
+				style = androidx.compose.ui.text.TextStyle(fontSize = visualSpec.titleTextSp.sp, fontWeight = FontWeight.Medium),
+			).size.width.toDp().value
+		}
+		val leadingClosedWidth by androidx.compose.animation.core.animateDpAsState(
+			targetValue = homeToolbarCollapsedWidthDp(measuredLeadingWidth).dp,
+			animationSpec = spring(dampingRatio = 0.78f, stiffness = 500f),
+			label = "leadingToolbarWidth",
+		)
 		val menuItems = when(menuPageState) {
 			HomeToolbarMenuPage.TIMELINES -> timelinesState.map { HomeToolbarMenuItem(it.id, it.title, it.iconRes) }
 			HomeToolbarMenuPage.LISTS -> listsState
@@ -276,20 +295,20 @@ class HomeLiquidToolbarController(
 			val leadingExpanded = menuPageState==HomeToolbarMenuPage.TIMELINES
 			MorphingGlassContainer(
 				expanded = leadingExpanded,
-				closedWidth = 220.dp,
+				closedWidth = leadingClosedWidth,
 				closedHeight = 48.dp,
 				expandedWidth = 248.dp,
 				expandedHeight = toolbarMenuHeightDp(timelinesState.size, false).dp,
 				backdrop = backdrop,
 				anchorFractionX = 0f,
 				selectionItemCount = menuItems.size,
-				shouldExpandFromClosed = { _, _ -> !showNewPostsState },
+				shouldExpandFromClosed = { _, _ -> false },
 				onExpansionRequested = { requestMenu(HomeToolbarMenuPage.TIMELINES) },
-				onClosedTap = { _, _ -> if(showNewPostsState) onNewPosts.run() },
+				onClosedTap = { _, _ -> },
 				modifier = Modifier.align(Alignment.TopStart).padding(top = topInset + 8.dp, start = 12.dp),
 				onExpansionStarted = {},
 				onExpansionFinished = { open -> if(!open && menuPageState==HomeToolbarMenuPage.NONE) menuOpenListener?.accept(false) },
-				onClick = {},
+				onClick = { if(showNewPostsState) onNewPosts.run() else requestMenu(HomeToolbarMenuPage.TIMELINES) },
 				onSelectionChanged = { highlightedMenuIndexState = it },
 				onSelectionConfirmed = { index -> menuItems.getOrNull(index)?.let { activateMenuItem(HomeToolbarMenuPage.TIMELINES, it) } },
 				closedContent = {
@@ -297,7 +316,7 @@ class HomeLiquidToolbarController(
 					ResourceIcon(if(showNewPostsState) R.drawable.ic_fluent_arrow_up_16_filled else currentTimeline?.iconRes ?: R.drawable.ic_fluent_home_24_regular, 24, contentColor)
 					Spacer(Modifier.width(8.dp))
 					Text(
-						text = if(showNewPostsState) view.context.getString(R.string.see_new_posts) else currentTimeline?.title.orEmpty(),
+						text = leadingTitle,
 						fontSize = visualSpec.titleTextSp.sp,
 						fontWeight = FontWeight.Medium,
 						maxLines = 1,

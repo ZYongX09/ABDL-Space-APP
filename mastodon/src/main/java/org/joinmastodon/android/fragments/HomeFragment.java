@@ -663,6 +663,10 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 		fragmentContainer.setCaptureHeights(topHeight, bottomHeight);
 	}
 
+	public boolean onBackPressed(){
+		return liquidToolbarController!=null && liquidToolbarController.onBackPressed();
+	}
+
 	private void selectTabInNavigation(@IdRes int tab){
 		if(liquidNavigationController!=null)
 			liquidNavigationController.setSelectedTab(tab);

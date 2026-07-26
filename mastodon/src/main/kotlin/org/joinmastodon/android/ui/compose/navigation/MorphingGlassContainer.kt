@@ -130,7 +130,8 @@ internal fun MorphingGlassContainer(
 					shape = { shape },
 					effects = {
 						vibrancy()
-						blur(4.dp.toPx(), 4.dp.toPx())
+						val blurRadius = homeLiquidToolbarVisualSpec().blurRadiusDp.dp.toPx()
+						blur(blurRadius, blurRadius)
 						lens(
 							refractionHeight = lerp(18.dp.toPx(), 10.dp.toPx(), p),
 							refractionAmount = lerp(20.dp.toPx(), 12.dp.toPx(), p),

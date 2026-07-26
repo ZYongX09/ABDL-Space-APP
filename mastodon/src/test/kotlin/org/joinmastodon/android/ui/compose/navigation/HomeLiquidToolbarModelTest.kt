@@ -48,7 +48,7 @@ class HomeLiquidToolbarModelTest {
 		val spec = homeLiquidToolbarVisualSpec()
 		assertEquals(18, spec.titleTextSp)
 		assertEquals(17, spec.menuTextSp)
-		assertEquals(4, spec.blurRadiusDp)
+		assertEquals(8, spec.blurRadiusDp)
 		assertTrue(spec.surfaceAlpha <= 0.25f)
 	}
 
@@ -78,5 +78,19 @@ class HomeLiquidToolbarModelTest {
 		assertEquals(1f, outline.widthDp, 0f)
 		assertEquals(2f, outline.innerBlurRadiusDp, 0f)
 		assertTrue(outline.dualPeak)
+	}
+
+	@Test
+	fun collapsedLeadingWidthTracksMeasuredTitleWithinBounds() {
+		assertEquals(96f, homeToolbarCollapsedWidthDp(20f), 0f)
+		assertEquals(172f, homeToolbarCollapsedWidthDp(100f), 0f)
+		assertEquals(260f, homeToolbarCollapsedWidthDp(300f), 0f)
+	}
+
+	@Test
+	fun backClosesVisibleOrPendingMenuBeforeNavigation() {
+		assertTrue(shouldConsumeToolbarBack(menuVisible = true, menuPending = false))
+		assertTrue(shouldConsumeToolbarBack(menuVisible = false, menuPending = true))
+		assertFalse(shouldConsumeToolbarBack(menuVisible = false, menuPending = false))
 	}
 }
