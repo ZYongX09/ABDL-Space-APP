@@ -60,6 +60,8 @@ import org.joinmastodon.android.ui.compose.AppState
 import org.joinmastodon.android.ui.compose.LocalAppState
 import org.joinmastodon.android.ui.compose.MiuixAppTheme
 import org.joinmastodon.android.ui.compose.navigation.liquid.lens
+import org.joinmastodon.android.ui.compose.navigation.liquid.iosIndicatorSpecular
+import org.joinmastodon.android.ui.compose.navigation.liquid.rememberGravityRotatedHighlight
 import org.joinmastodon.android.ui.compose.navigation.liquid.vibrancy
 import org.joinmastodon.android.ui.compose.ui.isInDarkTheme
 import top.yukonga.miuix.kmp.basic.Icon
@@ -261,6 +263,7 @@ class HomeLiquidToolbarController(
 		val interactionSource = remember { MutableInteractionSource() }
 		val pressed by interactionSource.collectIsPressedAsState()
 		val motionSpec = homeLiquidToolbarMotionSpec()
+		val outlineHighlight = rememberGravityRotatedHighlight(iosIndicatorSpecular, extraDegrees = -45f)
 		val scale by animateFloatAsState(
 			targetValue = if(pressed) 0.96f else 1f,
 			animationSpec = spring(motionSpec.dampingRatio, motionSpec.stiffness),
@@ -276,6 +279,7 @@ class HomeLiquidToolbarController(
 						backdrop = backdrop,
 						shape = { RoundedCornerShape(24.dp) },
 						effects = { vibrancy(); blur(homeLiquidToolbarVisualSpec().blurRadiusDp.dp.toPx(), homeLiquidToolbarVisualSpec().blurRadiusDp.dp.toPx()); lens(12.dp.toPx(), 16.dp.toPx()) },
+						highlight = { outlineHighlight.value.copy(alpha = 0.75f) },
 						onDrawSurface = { drawRect(surface) },
 					) else Modifier.background(surface, RoundedCornerShape(24.dp)),
 				)

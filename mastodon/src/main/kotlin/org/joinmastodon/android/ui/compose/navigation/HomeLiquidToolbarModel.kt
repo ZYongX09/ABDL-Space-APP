@@ -67,6 +67,18 @@ internal fun homeToolbarCaptureHeightDp(menuOpen: Boolean): Int = if(menuOpen) 5
 
 internal fun homeTimelineTopPaddingDp(liquidMode: Boolean): Int = if(liquidMode) 72 else 0
 
+internal data class HomeLiquidToolbarOutlineSpec(
+	val widthDp: Float,
+	val innerBlurRadiusDp: Float,
+	val dualPeak: Boolean,
+)
+
+internal fun homeLiquidToolbarOutlineSpec(): HomeLiquidToolbarOutlineSpec = HomeLiquidToolbarOutlineSpec(
+	widthDp = 1f,
+	innerBlurRadiusDp = 2f,
+	dualPeak = true,
+)
+
 internal fun liquidToolbarActions(): List<HomeToolbarAction> = listOf(
 	HomeToolbarAction.COMPOSE,
 	HomeToolbarAction.OVERFLOW,

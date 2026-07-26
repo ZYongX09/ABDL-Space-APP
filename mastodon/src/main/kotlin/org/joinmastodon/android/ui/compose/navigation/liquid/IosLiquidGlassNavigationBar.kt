@@ -102,7 +102,7 @@ import kotlin.math.sin
 
 private val LocalIosTabScale = staticCompositionLocalOf { { 1f } }
 
-private val iosIndicatorSpecular: Highlight = Highlight(
+internal val iosIndicatorSpecular: Highlight = Highlight(
     width = 1.dp,
     alpha = 1f,
     style = BloomStroke(
@@ -163,7 +163,7 @@ private fun rememberQuantizedGravityAngle(): State<Float> {
  * cached, re-allocating only when the angle crosses a quantization step.
  */
 @Composable
-private fun rememberGravityRotatedHighlight(
+internal fun rememberGravityRotatedHighlight(
     base: Highlight,
     extraDegrees: Float,
 ): State<Highlight> {
