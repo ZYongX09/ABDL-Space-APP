@@ -50,6 +50,8 @@ import org.joinmastodon.android.ui.views.TabBar;
 import org.joinmastodon.android.utils.ObjectIdComparator;
 import org.parceler.Parcels;
 
+import static org.joinmastodon.android.ui.compose.navigation.HomeLiquidToolbarModelKt.homeToolbarCaptureHeightDp;
+
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
@@ -87,6 +89,7 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 	private HomeLiquidToolbarController liquidToolbarController;
 	private int bottomSystemInset;
 	private int topSystemInset;
+	private boolean liquidToolbarMenuOpen;
 	@IdRes
 	private int currentTab=R.id.tab_home;
 	private TextView notificationsBadge;
@@ -625,6 +628,10 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 				homeTabFragment::onLiquidCompose,
 				homeTabFragment::onLiquidMenuItem
 		);
+		liquidToolbarController.setMenuOpenListener(open->{
+			liquidToolbarMenuOpen=open;
+			updateCaptureHeights();
+		});
 		toolbarHost.addView(liquidToolbarController.getView(), new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 		homeTabFragment.setLiquidToolbarController(liquidToolbarController);
 		applyLiquidToolbarInsets();
@@ -649,7 +656,8 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 	private void updateCaptureHeights(){
 		if(fragmentContainer==null)
 			return;
-		int topHeight=liquidToolbarController!=null && toolbarHost!=null && toolbarHost.getVisibility()==View.VISIBLE ? topSystemInset+V.dp(72) : 0;
+		int topHeight=liquidToolbarController!=null && toolbarHost!=null && toolbarHost.getVisibility()==View.VISIBLE
+				? topSystemInset+V.dp(homeToolbarCaptureHeightDp(liquidToolbarMenuOpen)) : 0;
 		int bottomHeight=navigationHost==null ? 0 : navigationHost.getHeight();
 		fragmentContainer.setCaptureHeights(topHeight, bottomHeight);
 	}

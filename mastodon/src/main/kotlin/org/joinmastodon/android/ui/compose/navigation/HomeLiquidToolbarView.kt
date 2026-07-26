@@ -1,10 +1,21 @@
 package org.joinmastodon.android.ui.compose.navigation
 
 import android.content.Context
+import android.content.res.ColorStateList
 import android.graphics.Bitmap
+import android.widget.ImageView
 import androidx.annotation.DrawableRes
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,17 +37,20 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.ViewCompositionStrategy
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -51,10 +65,12 @@ import org.joinmastodon.android.ui.compose.ui.isInDarkTheme
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.blur.drawBackdrop
+import top.yukonga.miuix.kmp.blur.blur
 import top.yukonga.miuix.kmp.blur.isRuntimeShaderSupported
 import top.yukonga.miuix.kmp.theme.LocalContentColor
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import java.util.function.IntConsumer
+import java.util.function.Consumer
 
 data class HomeToolbarTimeline(
 	val id: Int,
@@ -85,6 +101,7 @@ class HomeLiquidToolbarController(
 	private var listsState by mutableStateOf(emptyList<HomeToolbarMenuItem>())
 	private var hashtagsState by mutableStateOf(emptyList<HomeToolbarMenuItem>())
 	private var menuPageState by mutableStateOf(HomeToolbarMenuPage.NONE)
+	private var menuOpenListener: Consumer<Boolean>? = null
 
 	val view = ComposeView(context).apply {
 		setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
@@ -110,12 +127,17 @@ class HomeLiquidToolbarController(
 		listsState = lists
 		hashtagsState = hashtags
 	}
-	fun closeMenu() { menuPageState = HomeToolbarMenuPage.NONE }
+	fun closeMenu() {
+		menuPageState = HomeToolbarMenuPage.NONE
+		menuOpenListener?.accept(false)
+	}
+	fun setMenuOpenListener(listener: Consumer<Boolean>?) { menuOpenListener = listener }
 	fun dispose() = view.disposeComposition()
 
 	@Composable
 	private fun ToolbarContent() {
 		val visualSpec = homeLiquidToolbarVisualSpec()
+		val motionSpec = homeLiquidToolbarMotionSpec()
 		val contentColor = MiuixTheme.colorScheme.onSurface
 		val density = LocalDensity.current
 		val topInset = with(density) { statusBarInsetState.toDp() }
@@ -143,15 +165,13 @@ class HomeLiquidToolbarController(
 				GlassSurface(
 					modifier = Modifier.height(48.dp).weight(1f, fill = false),
 					onClick = {
-						if(showNewPostsState) onNewPosts.run() else menuPageState = HomeToolbarMenuPage.TIMELINES
+						if(showNewPostsState) onNewPosts.run() else {
+							menuPageState = HomeToolbarMenuPage.TIMELINES
+							menuOpenListener?.accept(true)
+						}
 					},
 				) {
-					Icon(
-						modifier = Modifier.size(22.dp),
-						painter = painterResource(if(showNewPostsState) R.drawable.ic_fluent_arrow_up_16_filled else currentTimeline?.iconRes ?: R.drawable.ic_fluent_home_24_regular),
-						contentDescription = null,
-						tint = contentColor,
-					)
+					ResourceIcon(if(showNewPostsState) R.drawable.ic_fluent_arrow_up_16_filled else currentTimeline?.iconRes ?: R.drawable.ic_fluent_home_24_regular, 24, contentColor)
 					Spacer(Modifier.width(8.dp))
 					Text(
 						text = if(showNewPostsState) view.context.getString(R.string.see_new_posts) else currentTimeline?.title.orEmpty(),
@@ -162,7 +182,7 @@ class HomeLiquidToolbarController(
 					)
 					if(!showNewPostsState) {
 						Spacer(Modifier.width(6.dp))
-						Icon(painter = painterResource(R.drawable.ic_fluent_chevron_down_16_filled), contentDescription = null, modifier = Modifier.size(18.dp), tint = contentColor)
+						ResourceIcon(R.drawable.ic_fluent_chevron_down_16_filled, 18, contentColor)
 					}
 				}
 				Spacer(Modifier.width(10.dp))
@@ -171,12 +191,17 @@ class HomeLiquidToolbarController(
 					Box {
 						ToolbarIcon(R.drawable.ic_fluent_more_vertical_24_regular, view.context.getString(R.string.more_options)) {
 							menuPageState = if(menuPageState==HomeToolbarMenuPage.ROOT) HomeToolbarMenuPage.NONE else HomeToolbarMenuPage.ROOT
+							menuOpenListener?.accept(menuPageState!=HomeToolbarMenuPage.NONE)
 						}
 						if(remindersState.overflowBadged) Box(Modifier.align(Alignment.TopEnd).size(7.dp).background(Color.Red, CircleShape))
 					}
 				}
 			}
-			if(menuPageState!=HomeToolbarMenuPage.NONE) {
+			AnimatedVisibility(
+				visible = menuPageState!=HomeToolbarMenuPage.NONE,
+				enter = fadeIn(spring(motionSpec.dampingRatio, motionSpec.stiffness)) + scaleIn(initialScale = 0.88f, animationSpec = spring(motionSpec.dampingRatio, motionSpec.stiffness)),
+				exit = fadeOut() + scaleOut(targetScale = 0.92f),
+			) {
 				GlassMenu(
 					modifier = Modifier
 						.align(if(menuPageState==HomeToolbarMenuPage.TIMELINES) Alignment.TopStart else Alignment.TopEnd)
@@ -223,7 +248,7 @@ class HomeLiquidToolbarController(
 			modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 10.dp),
 			verticalAlignment = Alignment.CenterVertically,
 		) {
-			Icon(painter = painterResource(icon), contentDescription = null, modifier = Modifier.size(24.dp), tint = MiuixTheme.colorScheme.onSurface)
+			ResourceIcon(icon, 24, MiuixTheme.colorScheme.onSurface)
 			Spacer(Modifier.width(12.dp))
 			Text(title, modifier = Modifier.weight(1f), fontSize = homeLiquidToolbarVisualSpec().menuTextSp.sp)
 			if(badged) Box(Modifier.size(7.dp).background(Color.Red, CircleShape))
@@ -233,20 +258,29 @@ class HomeLiquidToolbarController(
 	@Composable
 	private fun GlassSurface(modifier: Modifier, onClick: () -> Unit, content: @Composable () -> Unit) {
 		val isDark = isInDarkTheme()
+		val interactionSource = remember { MutableInteractionSource() }
+		val pressed by interactionSource.collectIsPressedAsState()
+		val motionSpec = homeLiquidToolbarMotionSpec()
+		val scale by animateFloatAsState(
+			targetValue = if(pressed) 0.96f else 1f,
+			animationSpec = spring(motionSpec.dampingRatio, motionSpec.stiffness),
+			label = "glassPressScale",
+		)
 		val surfaceAlpha = homeLiquidToolbarVisualSpec().surfaceAlpha
 		val surface = if(isDark) Color.Black.copy(alpha = surfaceAlpha) else Color.White.copy(alpha = surfaceAlpha)
 		Row(
 			modifier = modifier
+				.graphicsLayer { scaleX = scale; scaleY = scale }
 				.then(
 					if(isRuntimeShaderSupported()) Modifier.drawBackdrop(
 						backdrop = backdrop,
 						shape = { RoundedCornerShape(24.dp) },
-						effects = { vibrancy(); lens(12.dp.toPx(), 16.dp.toPx()) },
+						effects = { vibrancy(); blur(homeLiquidToolbarVisualSpec().blurRadiusDp.dp.toPx(), homeLiquidToolbarVisualSpec().blurRadiusDp.dp.toPx()); lens(12.dp.toPx(), 16.dp.toPx()) },
 						onDrawSurface = { drawRect(surface) },
 					) else Modifier.background(surface, RoundedCornerShape(24.dp)),
 				)
 				.clip(RoundedCornerShape(24.dp))
-				.clickable(onClick = onClick)
+				.clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
 				.padding(horizontal = 12.dp),
 			verticalAlignment = Alignment.CenterVertically,
 			content = { content() },
@@ -255,11 +289,20 @@ class HomeLiquidToolbarController(
 
 	@Composable
 	private fun ToolbarIcon(@DrawableRes icon: Int, description: String, onClick: () -> Unit) {
-		Icon(
-			modifier = Modifier.size(40.dp).clip(CircleShape).clickable(onClick = onClick).padding(8.dp),
-			painter = painterResource(icon),
-			contentDescription = description,
-			tint = MiuixTheme.colorScheme.onSurface,
+		Box(Modifier.size(40.dp).clip(CircleShape).clickable(onClick = onClick).padding(8.dp)) {
+			ResourceIcon(icon, 24, MiuixTheme.colorScheme.onSurface)
+		}
+	}
+
+	@Composable
+	private fun ResourceIcon(@DrawableRes icon: Int, sizeDp: Int, tint: Color) {
+		AndroidView(
+			modifier = Modifier.size(sizeDp.dp),
+			factory = { context -> ImageView(context).apply { scaleType = ImageView.ScaleType.CENTER_INSIDE } },
+			update = { imageView ->
+				imageView.setImageResource(icon)
+				imageView.imageTintList = ColorStateList.valueOf(tint.toArgb())
+			},
 		)
 	}
 }

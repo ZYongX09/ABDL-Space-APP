@@ -457,7 +457,7 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		boolean liquid=GlobalUserPreferences.useIosLiquidNavigation && liquidToolbarController!=null;
 		Toolbar toolbar=getToolbar();
 		if(toolbar!=null)
-			toolbar.setVisibility(liquid ? View.GONE : View.VISIBLE);
+			toolbar.setVisibility(liquid ? View.INVISIBLE : View.VISIBLE);
 		if(fab!=null)
 			fab.setVisibility(liquid ? View.GONE : View.VISIBLE);
 	}

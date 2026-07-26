@@ -48,7 +48,21 @@ class HomeLiquidToolbarModelTest {
 		val spec = homeLiquidToolbarVisualSpec()
 		assertEquals(18, spec.titleTextSp)
 		assertEquals(17, spec.menuTextSp)
-		assertEquals(0, spec.blurRadiusDp)
+		assertEquals(4, spec.blurRadiusDp)
 		assertTrue(spec.surfaceAlpha <= 0.25f)
+	}
+
+	@Test
+	fun openMenuExpandsCaptureBelowTheToolbar() {
+		assertEquals(72, homeToolbarCaptureHeightDp(menuOpen = false))
+		assertEquals(520, homeToolbarCaptureHeightDp(menuOpen = true))
+	}
+
+	@Test
+	fun toolbarMotionUsesAResponsiveUnderdampedSpring() {
+		val motion = homeLiquidToolbarMotionSpec()
+		assertTrue(motion.dampingRatio < 1f)
+		assertTrue(motion.dampingRatio >= 0.7f)
+		assertTrue(motion.stiffness >= 350f)
 	}
 }

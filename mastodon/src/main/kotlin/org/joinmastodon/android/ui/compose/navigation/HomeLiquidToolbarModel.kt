@@ -49,9 +49,21 @@ internal data class HomeLiquidToolbarVisualSpec(
 internal fun homeLiquidToolbarVisualSpec(): HomeLiquidToolbarVisualSpec = HomeLiquidToolbarVisualSpec(
 	titleTextSp = 18,
 	menuTextSp = 17,
-	blurRadiusDp = 0,
+	blurRadiusDp = 4,
 	surfaceAlpha = 0.22f,
 )
+
+internal data class HomeLiquidToolbarMotionSpec(
+	val dampingRatio: Float,
+	val stiffness: Float,
+)
+
+internal fun homeLiquidToolbarMotionSpec(): HomeLiquidToolbarMotionSpec = HomeLiquidToolbarMotionSpec(
+	dampingRatio = 0.78f,
+	stiffness = 500f,
+)
+
+internal fun homeToolbarCaptureHeightDp(menuOpen: Boolean): Int = if(menuOpen) 520 else 72
 
 internal fun liquidToolbarActions(): List<HomeToolbarAction> = listOf(
 	HomeToolbarAction.COMPOSE,
