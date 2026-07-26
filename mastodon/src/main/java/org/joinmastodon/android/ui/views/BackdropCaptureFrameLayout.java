@@ -3,6 +3,7 @@ package org.joinmastodon.android.ui.views;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
+import android.graphics.Path;
 import android.graphics.PorterDuff;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
@@ -17,12 +18,18 @@ import org.joinmastodon.android.ui.drawables.BlurhashCrossfadeDrawable;
 
 import java.util.ArrayList;
 import java.util.WeakHashMap;
-import java.util.function.Consumer;
 
 public class BackdropCaptureFrameLayout extends FrameLayout{
-	private int captureHeight;
+	public interface CaptureListener{
+		void onCaptured(Bitmap top, Bitmap bottom);
+	}
+
+	private int topCaptureHeight;
+	private int bottomCaptureHeight;
 	private Bitmap captureBitmap;
-	private Consumer<Bitmap> captureListener;
+	private Bitmap topCaptureBitmap;
+	private Bitmap bottomCaptureBitmap;
+	private CaptureListener captureListener;
 	private boolean capturing;
 	private boolean captureFrameScheduled;
 	private final WeakHashMap<Bitmap, Bitmap> softwareBitmapCache=new WeakHashMap<>();
@@ -36,16 +43,20 @@ public class BackdropCaptureFrameLayout extends FrameLayout{
 		super(context, attrs);
 	}
 
-	public void setCaptureHeight(int captureHeight){
-		int newHeight=Math.max(0, captureHeight);
-		if(this.captureHeight==newHeight)
+	public void setCaptureHeights(int topCaptureHeight, int bottomCaptureHeight){
+		int newTopHeight=Math.max(0, topCaptureHeight);
+		int newBottomHeight=Math.max(0, bottomCaptureHeight);
+		if(this.topCaptureHeight==newTopHeight && this.bottomCaptureHeight==newBottomHeight)
 			return;
-		this.captureHeight=newHeight;
+		this.topCaptureHeight=newTopHeight;
+		this.bottomCaptureHeight=newBottomHeight;
 		captureBitmap=null;
+		topCaptureBitmap=null;
+		bottomCaptureBitmap=null;
 		invalidate();
 	}
 
-	public void setCaptureListener(Consumer<Bitmap> captureListener){
+	public void setCaptureListener(CaptureListener captureListener){
 		this.captureListener=captureListener;
 		captureFrameScheduled=false;
 		if(captureListener!=null)
@@ -69,12 +80,18 @@ public class BackdropCaptureFrameLayout extends FrameLayout{
 	protected void dispatchDraw(Canvas canvas){
 		captureFrameScheduled=false;
 		super.dispatchDraw(canvas);
-		if(capturing || captureListener==null || captureHeight<=0 || getWidth()<=0 || getHeight()<=0)
+		if(capturing || captureListener==null || (topCaptureHeight<=0 && bottomCaptureHeight<=0) || getWidth()<=0 || getHeight()<=0)
 			return;
 
-		int actualHeight=Math.min(captureHeight, getHeight());
-		if(captureBitmap==null || captureBitmap.getWidth()!=getWidth() || captureBitmap.getHeight()!=actualHeight)
-			captureBitmap=Bitmap.createBitmap(getWidth(), actualHeight, Bitmap.Config.ARGB_8888);
+		int actualTopHeight=Math.min(topCaptureHeight, getHeight());
+		int actualBottomHeight=Math.min(bottomCaptureHeight, getHeight());
+		int sharedHeight=actualTopHeight>0 ? getHeight() : actualBottomHeight;
+		if(captureBitmap==null || captureBitmap.getWidth()!=getWidth() || captureBitmap.getHeight()!=sharedHeight)
+			captureBitmap=Bitmap.createBitmap(getWidth(), sharedHeight, Bitmap.Config.ARGB_8888);
+		if(actualTopHeight>0 && (topCaptureBitmap==null || topCaptureBitmap.getWidth()!=getWidth() || topCaptureBitmap.getHeight()!=actualTopHeight))
+			topCaptureBitmap=Bitmap.createBitmap(getWidth(), actualTopHeight, Bitmap.Config.ARGB_8888);
+		if(actualBottomHeight>0 && (bottomCaptureBitmap==null || bottomCaptureBitmap.getWidth()!=getWidth() || bottomCaptureBitmap.getHeight()!=actualBottomHeight))
+			bottomCaptureBitmap=Bitmap.createBitmap(getWidth(), actualBottomHeight, Bitmap.Config.ARGB_8888);
 
 		capturing=true;
 		replaceHardwareBitmaps(this);
@@ -82,14 +99,32 @@ public class BackdropCaptureFrameLayout extends FrameLayout{
 			Canvas captureCanvas=new Canvas(captureBitmap);
 			captureCanvas.drawColor(0, PorterDuff.Mode.CLEAR);
 			captureCanvas.save();
-			captureCanvas.translate(0, -(getHeight()-actualHeight));
+			if(actualTopHeight>0){
+				Path capturePath=new Path();
+				capturePath.addRect(0, 0, getWidth(), actualTopHeight, Path.Direction.CW);
+				if(actualBottomHeight>0)
+					capturePath.addRect(0, getHeight()-actualBottomHeight, getWidth(), getHeight(), Path.Direction.CW);
+				captureCanvas.clipPath(capturePath);
+			}else{
+				captureCanvas.translate(0, -(getHeight()-actualBottomHeight));
+			}
 			super.dispatchDraw(captureCanvas);
 			captureCanvas.restore();
+			if(actualTopHeight>0){
+				Canvas topCanvas=new Canvas(topCaptureBitmap);
+				topCanvas.drawColor(0, PorterDuff.Mode.CLEAR);
+				topCanvas.drawBitmap(captureBitmap, 0, 0, null);
+			}
+			if(actualBottomHeight>0){
+				Canvas bottomCanvas=new Canvas(bottomCaptureBitmap);
+				bottomCanvas.drawColor(0, PorterDuff.Mode.CLEAR);
+				bottomCanvas.drawBitmap(captureBitmap, 0, actualTopHeight>0 ? -(getHeight()-actualBottomHeight) : 0, null);
+			}
 		}finally{
 			restoreHardwareBitmaps();
 			capturing=false;
 		}
-		captureListener.accept(captureBitmap);
+		captureListener.onCaptured(actualTopHeight>0 ? topCaptureBitmap : null, actualBottomHeight>0 ? bottomCaptureBitmap : null);
 	}
 
 	@Override

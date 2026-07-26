@@ -16,6 +16,16 @@ import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.unit.Density
 import top.yukonga.miuix.kmp.blur.Backdrop
 
+internal fun topCaptureRange(viewHeight: Int, requestedHeight: Int): IntRange {
+	val height = requestedHeight.coerceIn(0, viewHeight.coerceAtLeast(0))
+	return if(height==0) IntRange.EMPTY else 0 until height
+}
+
+internal fun bottomCaptureRange(viewHeight: Int, requestedHeight: Int): IntRange {
+	val height = requestedHeight.coerceIn(0, viewHeight.coerceAtLeast(0))
+	return if(height==0) IntRange.EMPTY else (viewHeight-height) until viewHeight
+}
+
 internal class ViewBitmapBackdrop : Backdrop {
 	private var image by mutableStateOf<ImageBitmap?>(null)
 	private var generation by mutableIntStateOf(0)

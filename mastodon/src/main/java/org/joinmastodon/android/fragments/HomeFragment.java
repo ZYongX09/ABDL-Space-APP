@@ -181,7 +181,7 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 		homeLayout.addView(navigationHost, navigationLayoutParams);
 		navigationHost.addOnLayoutChangeListener((v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom)->{
 			if(fragmentContainer!=null)
-				fragmentContainer.setCaptureHeight(bottom-top);
+				fragmentContainer.setCaptureHeights(0, bottom-top);
 		});
 		createNavigationBar(inflater);
 
@@ -551,7 +551,10 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 		Account self=AccountSessionManager.getInstance().getAccount(accountID).self;
 		if(GlobalUserPreferences.useIosLiquidNavigation){
 			liquidNavigationController=new HomeLiquidNavigationController(getActivity(), currentTab, self.avatar, this::onTabSelected, this::onTabLongClick);
-			fragmentContainer.setCaptureListener(liquidNavigationController::setBackdropBitmap);
+			fragmentContainer.setCaptureListener((top, bottom)->{
+				if(liquidNavigationController!=null && bottom!=null)
+					liquidNavigationController.setBackdropBitmap(bottom);
+			});
 			navigationHost.addView(liquidNavigationController.getView(), new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 		}else{
 			fragmentContainer.setCaptureListener(null);
