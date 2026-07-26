@@ -6,12 +6,17 @@ import android.graphics.Bitmap
 import android.widget.ImageView
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -103,6 +108,8 @@ class HomeLiquidToolbarController(
 	private var listsState by mutableStateOf(emptyList<HomeToolbarMenuItem>())
 	private var hashtagsState by mutableStateOf(emptyList<HomeToolbarMenuItem>())
 	private var menuPageState by mutableStateOf(HomeToolbarMenuPage.NONE)
+	private var pendingMenuPageState by mutableStateOf(HomeToolbarMenuPage.NONE)
+	private var highlightedMenuIndexState by mutableStateOf<Int?>(null)
 	private var menuOpenListener: Consumer<Boolean>? = null
 
 	val view = ComposeView(context).apply {
@@ -114,7 +121,13 @@ class HomeLiquidToolbarController(
 		}
 	}
 
-	fun setBackdropBitmap(bitmap: Bitmap) = backdrop.update(bitmap)
+	fun setBackdropBitmap(bitmap: Bitmap) {
+		backdrop.update(bitmap)
+		if(pendingMenuPageState!=HomeToolbarMenuPage.NONE) {
+			menuPageState = pendingMenuPageState
+			pendingMenuPageState = HomeToolbarMenuPage.NONE
+		}
+	}
 	fun setStatusBarInset(insetPx: Int) { statusBarInsetState = insetPx.coerceAtLeast(0) }
 	fun setTimelines(items: List<HomeToolbarTimeline>, selectedIndex: Int) {
 		timelinesState = items
@@ -130,8 +143,28 @@ class HomeLiquidToolbarController(
 		hashtagsState = hashtags
 	}
 	fun closeMenu() {
+		val wasPending = pendingMenuPageState!=HomeToolbarMenuPage.NONE
+		pendingMenuPageState = HomeToolbarMenuPage.NONE
 		menuPageState = HomeToolbarMenuPage.NONE
-		menuOpenListener?.accept(false)
+		if(wasPending) menuOpenListener?.accept(false)
+	}
+	private fun requestMenu(page: HomeToolbarMenuPage) {
+		if(menuPageState!=HomeToolbarMenuPage.NONE) {
+			menuPageState = page
+			return
+		}
+		pendingMenuPageState = page
+		menuOpenListener?.accept(true)
+	}
+	private fun activateMenuItem(page: HomeToolbarMenuPage, item: HomeToolbarMenuItem) {
+		when(item.id) {
+			R.id.lists -> menuPageState = HomeToolbarMenuPage.LISTS
+			R.id.hashtags -> menuPageState = HomeToolbarMenuPage.HASHTAGS
+			else -> {
+				closeMenu()
+				if(page==HomeToolbarMenuPage.TIMELINES) onTimelineSelected.accept(item.id) else onMenuItem.accept(item.id)
+			}
+		}
 	}
 	fun setMenuOpenListener(listener: Consumer<Boolean>?) { menuOpenListener = listener }
 	fun dispose() = view.disposeComposition()
@@ -159,20 +192,27 @@ class HomeLiquidToolbarController(
 			if(menuPageState!=HomeToolbarMenuPage.NONE) {
 				Box(Modifier.fillMaxSize().clickable { closeMenu() })
 			}
-			Row(
-				modifier = Modifier.fillMaxWidth().padding(top = topInset + 8.dp, start = 12.dp, end = 12.dp),
-				horizontalArrangement = Arrangement.SpaceBetween,
-				verticalAlignment = Alignment.Top,
-			) {
-				GlassSurface(
-					modifier = Modifier.height(48.dp).weight(1f, fill = false),
-					onClick = {
-						if(showNewPostsState) onNewPosts.run() else {
-							menuPageState = HomeToolbarMenuPage.TIMELINES
-							menuOpenListener?.accept(true)
-						}
-					},
-				) {
+			val leadingExpanded = menuPageState==HomeToolbarMenuPage.TIMELINES
+			MorphingGlassContainer(
+				expanded = leadingExpanded,
+				closedWidth = 220.dp,
+				closedHeight = 48.dp,
+				expandedWidth = 248.dp,
+				expandedHeight = (timelinesState.size * 48 + 12).coerceAtLeast(60).dp,
+				backdrop = backdrop,
+				anchorFractionX = 0f,
+				selectionItemCount = menuItems.size,
+				shouldExpandFromClosed = { _, _ -> !showNewPostsState },
+				onExpansionRequested = { requestMenu(HomeToolbarMenuPage.TIMELINES) },
+				onClosedTap = { _, _ -> if(showNewPostsState) onNewPosts.run() },
+				modifier = Modifier.align(Alignment.TopStart).padding(top = topInset + 8.dp, start = 12.dp),
+				onExpansionStarted = {},
+				onExpansionFinished = { open -> if(!open && menuPageState==HomeToolbarMenuPage.NONE) menuOpenListener?.accept(false) },
+				onClick = {},
+				onSelectionChanged = { highlightedMenuIndexState = it },
+				onSelectionConfirmed = { index -> menuItems.getOrNull(index)?.let { activateMenuItem(HomeToolbarMenuPage.TIMELINES, it) } },
+				closedContent = {
+					Row(Modifier.height(48.dp).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
 					ResourceIcon(if(showNewPostsState) R.drawable.ic_fluent_arrow_up_16_filled else currentTimeline?.iconRes ?: R.drawable.ic_fluent_home_24_regular, 24, contentColor)
 					Spacer(Modifier.width(8.dp))
 					Text(
@@ -186,68 +226,99 @@ class HomeLiquidToolbarController(
 						Spacer(Modifier.width(6.dp))
 						ResourceIcon(R.drawable.ic_fluent_chevron_down_16_filled, 18, contentColor)
 					}
-				}
-				Spacer(Modifier.width(10.dp))
-				GlassSurface(modifier = Modifier.height(48.dp), onClick = {}) {
-					ToolbarIcon(R.drawable.ic_fluent_edit_24_regular, view.context.getString(R.string.new_post), onCompose::run)
+					}
+				},
+				expandedContent = { progress ->
+					MenuContent(page = HomeToolbarMenuPage.TIMELINES, progress = progress, highlightedIndex = highlightedMenuIndexState)
+				},
+			)
+
+			val trailingExpanded = menuPageState==HomeToolbarMenuPage.ROOT || menuPageState==HomeToolbarMenuPage.LISTS || menuPageState==HomeToolbarMenuPage.HASHTAGS
+			val trailingRows = menuItems.size + if(menuPageState==HomeToolbarMenuPage.LISTS || menuPageState==HomeToolbarMenuPage.HASHTAGS) 1 else 0
+			MorphingGlassContainer(
+				expanded = trailingExpanded,
+				closedWidth = 108.dp,
+				closedHeight = 48.dp,
+				expandedWidth = 248.dp,
+				expandedHeight = (trailingRows * 48 + 12).coerceIn(60, 420).dp,
+				backdrop = backdrop,
+				anchorFractionX = 1f,
+				selectionItemCount = menuItems.size + if(menuPageState==HomeToolbarMenuPage.LISTS || menuPageState==HomeToolbarMenuPage.HASHTAGS) 1 else 0,
+				shouldExpandFromClosed = { position, size -> position.x >= size.width - 54f },
+				onExpansionRequested = { requestMenu(HomeToolbarMenuPage.ROOT) },
+				onClosedTap = { position, size -> if(position.x < size.width / 2f) onCompose.run() },
+				modifier = Modifier.align(Alignment.TopEnd).padding(top = topInset + 8.dp, end = 12.dp),
+				onExpansionStarted = {},
+				onExpansionFinished = { open -> if(!open && menuPageState==HomeToolbarMenuPage.NONE) menuOpenListener?.accept(false) },
+				onClick = {},
+				onSelectionChanged = { highlightedMenuIndexState = it },
+				onSelectionConfirmed = { rawIndex ->
+					val hasBack = menuPageState==HomeToolbarMenuPage.LISTS || menuPageState==HomeToolbarMenuPage.HASHTAGS
+					if(hasBack && rawIndex==0) menuPageState = HomeToolbarMenuPage.ROOT
+					else menuItems.getOrNull(rawIndex - if(hasBack) 1 else 0)?.let { activateMenuItem(menuPageState, it) }
+				},
+				closedContent = {
+					Row(Modifier.height(48.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+					ToolbarIcon(R.drawable.ic_fluent_edit_24_regular)
 					Box {
-						ToolbarIcon(R.drawable.ic_fluent_more_vertical_24_regular, view.context.getString(R.string.more_options)) {
-							menuPageState = if(menuPageState==HomeToolbarMenuPage.ROOT) HomeToolbarMenuPage.NONE else HomeToolbarMenuPage.ROOT
-							menuOpenListener?.accept(menuPageState!=HomeToolbarMenuPage.NONE)
-						}
+						ToolbarIcon(R.drawable.ic_fluent_more_vertical_24_regular)
 						if(remindersState.overflowBadged) Box(Modifier.align(Alignment.TopEnd).size(7.dp).background(Color.Red, CircleShape))
 					}
-				}
-			}
-			AnimatedVisibility(
-				visible = menuPageState!=HomeToolbarMenuPage.NONE,
-				enter = fadeIn(spring(motionSpec.dampingRatio, motionSpec.stiffness)) + scaleIn(initialScale = 0.88f, animationSpec = spring(motionSpec.dampingRatio, motionSpec.stiffness)),
-				exit = fadeOut() + scaleOut(targetScale = 0.92f),
-			) {
-				GlassMenu(
-					modifier = Modifier
-						.align(if(menuPageState==HomeToolbarMenuPage.TIMELINES) Alignment.TopStart else Alignment.TopEnd)
-						.padding(top = topInset + 64.dp, start = 12.dp, end = 12.dp),
-					page = menuPageState,
-					items = menuItems,
-				)
-			}
+					}
+				},
+				expandedContent = { progress -> MenuContent(menuPageState, progress, highlightedMenuIndexState) },
+			)
 		}
 	}
 
 	@Composable
-	private fun GlassMenu(modifier: Modifier, page: HomeToolbarMenuPage, items: List<HomeToolbarMenuItem>) {
-		GlassSurface(modifier = modifier.width(248.dp), onClick = {}) {
+	private fun MenuContent(page: HomeToolbarMenuPage, progress: Float, highlightedIndex: Int?) {
+		AnimatedContent(
+			targetState = page,
+			transitionSpec = {
+				val forward = targetState==HomeToolbarMenuPage.LISTS || targetState==HomeToolbarMenuPage.HASHTAGS
+				(slideInHorizontally(
+					animationSpec = spring(dampingRatio = 0.86f, stiffness = 560f),
+					initialOffsetX = { if(forward) 18 else -18 },
+				) + fadeIn()).togetherWith(
+					slideOutHorizontally(
+						animationSpec = spring(dampingRatio = 0.9f, stiffness = 620f),
+						targetOffsetX = { if(forward) -18 else 18 },
+					) + fadeOut(),
+				).using(SizeTransform(clip = false))
+			},
+			label = "toolbarMenuPage",
+		) { animatedPage ->
+			val animatedItems = when(animatedPage) {
+				HomeToolbarMenuPage.TIMELINES -> timelinesState.map { HomeToolbarMenuItem(it.id, it.title, it.iconRes) }
+				HomeToolbarMenuPage.LISTS -> listsState
+				HomeToolbarMenuPage.HASHTAGS -> hashtagsState
+				HomeToolbarMenuPage.ROOT -> rootMenuState
+				HomeToolbarMenuPage.NONE -> emptyList()
+			}
 			Column(
 				Modifier
 					.heightIn(max = 420.dp)
 					.verticalScroll(rememberScrollState())
-					.padding(vertical = 6.dp),
+					.padding(vertical = 6.dp)
+					.graphicsLayer { alpha = progress },
 			) {
-				if(page==HomeToolbarMenuPage.LISTS || page==HomeToolbarMenuPage.HASHTAGS) {
-					MenuRow(R.drawable.ic_fluent_chevron_left_24_regular, view.context.getString(R.string.back), false) { menuPageState = HomeToolbarMenuPage.ROOT }
+				if(animatedPage==HomeToolbarMenuPage.LISTS || animatedPage==HomeToolbarMenuPage.HASHTAGS) {
+					MenuRow(R.drawable.ic_fluent_chevron_left_24_regular, view.context.getString(R.string.back), false, highlightedIndex==0) { menuPageState = HomeToolbarMenuPage.ROOT }
 				}
-				items.forEach { item ->
+				animatedItems.forEachIndexed { index, item ->
 					val badged = (item.id==R.id.announcements && remindersState.announcementsBadged) || (item.id==R.id.settings && remindersState.settingsBadged)
-					MenuRow(item.iconRes, item.title, badged) {
-						when(item.id) {
-							R.id.lists -> menuPageState = HomeToolbarMenuPage.LISTS
-							R.id.hashtags -> menuPageState = HomeToolbarMenuPage.HASHTAGS
-							else -> {
-								closeMenu()
-								if(page==HomeToolbarMenuPage.TIMELINES) onTimelineSelected.accept(item.id) else onMenuItem.accept(item.id)
-							}
-						}
-					}
+					val offset = if(animatedPage==HomeToolbarMenuPage.LISTS || animatedPage==HomeToolbarMenuPage.HASHTAGS) 1 else 0
+					MenuRow(item.iconRes, item.title, badged, highlightedIndex==index+offset) { activateMenuItem(animatedPage, item) }
 				}
 			}
 		}
 	}
 
 	@Composable
-	private fun MenuRow(@DrawableRes icon: Int, title: String, badged: Boolean, onClick: () -> Unit) {
+	private fun MenuRow(@DrawableRes icon: Int, title: String, badged: Boolean, highlighted: Boolean, onClick: () -> Unit) {
 		Row(
-			modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 10.dp),
+			modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(if(highlighted) MiuixTheme.colorScheme.onSurface.copy(alpha = 0.10f) else Color.Transparent).clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 10.dp),
 			verticalAlignment = Alignment.CenterVertically,
 		) {
 			ResourceIcon(icon, 24, MiuixTheme.colorScheme.onSurface)
@@ -292,8 +363,8 @@ class HomeLiquidToolbarController(
 	}
 
 	@Composable
-	private fun ToolbarIcon(@DrawableRes icon: Int, description: String, onClick: () -> Unit) {
-		Box(Modifier.size(40.dp).clip(CircleShape).clickable(onClick = onClick).padding(8.dp)) {
+	private fun ToolbarIcon(@DrawableRes icon: Int) {
+		Box(Modifier.size(40.dp).padding(8.dp)) {
 			ResourceIcon(icon, 24, MiuixTheme.colorScheme.onSurface)
 		}
 	}
