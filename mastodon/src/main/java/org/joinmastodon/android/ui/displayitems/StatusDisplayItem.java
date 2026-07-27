@@ -359,6 +359,7 @@ public abstract class StatusDisplayItem{
 		boolean isItemEnabled(StatusDisplayItem item);
 		TypedObjectPool<MediaGridStatusDisplayItem.GridItemType, MediaAttachmentViewController> getAttachmentViewsPool();
 		void retryFailedImages();
+		void scheduleRetryFailedImages();
 		void onPollOptionClick(PollOptionStatusDisplayItem.Holder holder);
 		void onPollToggleResultsClick(PollFooterStatusDisplayItem.Holder holder);
 		void onPollVoteButtonClick(PollFooterStatusDisplayItem.Holder holder);
@@ -400,6 +401,11 @@ public abstract class StatusDisplayItem{
 
 		@Override
 		public void retryFailedImages(){
+
+		}
+
+		@Override
+		public void scheduleRetryFailedImages(){
 
 		}
 

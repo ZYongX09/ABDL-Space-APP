@@ -99,6 +99,7 @@ public class MediaGridStatusDisplayItem extends StatusDisplayItem{
 		private final TextView hideSensitiveButton;
 		private final TextView sensitiveText;
 		private boolean thereAreFailedImages;
+		private boolean automaticRetryRequested;
 
 		public Holder(Activity activity, ViewGroup parent){
 			super(new FrameLayoutThatOnlyMeasuresFirstChild(activity));
@@ -135,6 +136,7 @@ public class MediaGridStatusDisplayItem extends StatusDisplayItem{
 		@Override
 		public void onBind(MediaGridStatusDisplayItem item){
 			thereAreFailedImages=false;
+			automaticRetryRequested=false;
 			wrapper.setPaddingRelative(V.dp(item.fullWidth ? 16 : 64), 0, V.dp(16), V.dp(8));
 
 			layout.setTiledLayout(item.tiledLayout);
@@ -219,6 +221,10 @@ public class MediaGridStatusDisplayItem extends StatusDisplayItem{
 			if(index<controllers.size()){
 				controllers.get(index).showFailedOverlay();
 				thereAreFailedImages=true;
+				if(!automaticRetryRequested){
+					automaticRetryRequested=true;
+					item.callbacks.scheduleRetryFailedImages();
+				}
 			}
 		}
 

@@ -99,6 +99,10 @@ public abstract class BaseStatusListFragment<T extends DisplayItemsParent> exten
 	protected HashMap<String, Status> knownStatuses=new HashMap<>();
 	protected HashSet<APIRequest<?>> requestsToCancelWhenListClears=new HashSet<>();
 	private SpringAnimation listShakeAnimation;
+	private final Runnable retryFailedImagesRunnable=()->{
+		if(imgLoader!=null)
+			imgLoader.retryFailedRequests();
+	};
 
 	// MOSHIDON: truly fabulous
 	protected ImageButton fab;
@@ -1080,6 +1084,21 @@ public abstract class BaseStatusListFragment<T extends DisplayItemsParent> exten
 
 	public void retryFailedImages(){
 		imgLoader.retryFailedRequests();
+	}
+
+	@Override
+	public void scheduleRetryFailedImages(){
+		if(list==null)
+			return;
+		list.removeCallbacks(retryFailedImagesRunnable);
+		list.postDelayed(retryFailedImagesRunnable, 1500);
+	}
+
+	@Override
+	public void onDestroyView(){
+		if(list!=null)
+			list.removeCallbacks(retryFailedImagesRunnable);
+		super.onDestroyView();
 	}
 
 	public void removeDisplayItem(StatusDisplayItem item){
