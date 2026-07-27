@@ -63,12 +63,6 @@ public class MastodonApp extends Application{
 			// 快捷方式发布失败不影响正常功能（SplashActivity 改变了 LAUNCHER 入口）
 		}
 		GlobalUserPreferences.load();
-		// 初始化 NSFW 本地检测模型
-		try{
-			org.joinmastodon.android.nsfw.NsfwDetector.init(this);
-		}catch(Throwable t){
-			// 模型加载失败不影响正常功能
-		}
 	}
 
 	private String getCurrentProcessName(){
