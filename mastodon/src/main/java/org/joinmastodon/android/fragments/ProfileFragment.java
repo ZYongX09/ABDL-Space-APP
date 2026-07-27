@@ -1163,7 +1163,11 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 	}
 
 	private RecyclerView getScrollableRecyclerView(){
-		return getFragmentForPage(pager.getCurrentItem()).getView().findViewById(R.id.list);
+		if(pager==null)
+			return null;
+		Fragment fragment=getFragmentForPage(pager.getCurrentItem());
+		View view=fragment==null ? null : fragment.getView();
+		return view==null ? null : view.findViewById(R.id.list);
 	}
 
 	private void onActionButtonClick(View v){
@@ -1511,8 +1515,11 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 
 	@Override
 	public void scrollToTop(){
-		getScrollableRecyclerView().scrollToPosition(0);
-		scrollView.smoothScrollTo(0, 0);
+		RecyclerView list=getScrollableRecyclerView();
+		if(list!=null)
+			list.scrollToPosition(0);
+		if(scrollView!=null)
+			scrollView.smoothScrollTo(0, 0);
 	}
 
 	private void onFollowersOrFollowingClick(View v){
