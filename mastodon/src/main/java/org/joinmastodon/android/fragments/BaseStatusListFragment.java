@@ -585,7 +585,7 @@ public abstract class BaseStatusListFragment<T extends DisplayItemsParent> exten
 	}
 
 	protected float getImagePrefetchScreens(){
-		return 0;
+		return 1;
 	}
 
 	@Override
