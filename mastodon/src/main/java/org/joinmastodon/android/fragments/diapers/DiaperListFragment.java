@@ -13,6 +13,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
 import android.widget.FrameLayout;
+import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
@@ -29,7 +30,6 @@ import org.joinmastodon.android.R;
 import org.joinmastodon.android.api.requests.diapers.GetDiaperBrands;
 import org.joinmastodon.android.api.requests.diapers.GetDiaperList;
 import org.joinmastodon.android.model.Diaper;
-import org.joinmastodon.android.ui.compose.diapers.DiaperBrandTabRowView;
 import org.joinmastodon.android.ui.utils.UiUtils;
 
 import java.util.ArrayList;
@@ -61,7 +61,7 @@ public class DiaperListFragment extends LoaderFragment {
 	private boolean loadingMore = false;
 	private boolean hasMore = true;
 	private List<String> brands = new ArrayList<>();
-	private DiaperBrandTabRowView brandTabRow;
+	private LinearLayout chipsContainer;
 	private View emptyState;
 	private String accountID;
 	private EditText searchInput;
@@ -153,21 +153,18 @@ public class DiaperListFragment extends LoaderFragment {
 		}
 		root.addView(searchView);
 
-		brandTabRow=new DiaperBrandTabRowView(getContext());
-		brandTabRow.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-		brandTabRow.setOnTabSelectedListener(index->{
-			if(index<0 || index>=brands.size())
-				return;
-			String brand=brands.get(index);
-			if(brand.equals(currentBrand))
-				return;
-			currentBrand=brand;
-			currentPage=1;
-			hasMore=true;
-			updateBrandTabs();
-			loadData();
-		});
-		root.addView(brandTabRow);
+		// 品牌筛选 chips (HorizontalScrollView)
+		HorizontalScrollView chipsScroll = new HorizontalScrollView(getContext());
+		chipsScroll.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+		chipsScroll.setHorizontalScrollBarEnabled(false);
+		chipsScroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
+
+		chipsContainer = new LinearLayout(getContext());
+		chipsContainer.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+		chipsContainer.setOrientation(LinearLayout.HORIZONTAL);
+		chipsContainer.setPadding(V.dp(16), V.dp(8), V.dp(16), V.dp(8));
+		chipsScroll.addView(chipsContainer);
+		root.addView(chipsScroll);
 
 		// 下拉刷新
 		swipeRefreshLayout = new SwipeRefreshLayout(getContext());
@@ -263,7 +260,7 @@ public class DiaperListFragment extends LoaderFragment {
 							brands.clear();
 							brands.add("");
 							brands.addAll(brandList);
-							updateBrandTabs();
+							buildChips();
 						}
 					}
 
@@ -362,14 +359,33 @@ public class DiaperListFragment extends LoaderFragment {
 			.exec(accountID);
 	}
 
-	private void updateBrandTabs() {
-		if(brandTabRow==null || brands.isEmpty())
-			return;
-		List<String> labels=new ArrayList<>(brands.size());
-		for(String brand:brands)
-			labels.add(brand.isEmpty() ? getString(R.string.diaper_all_brands) : brand);
-		int selectedIndex=Math.max(0, brands.indexOf(currentBrand));
-		brandTabRow.setTabs(labels, selectedIndex);
+	private void buildChips() {
+		if (chipsContainer == null) return;
+		chipsContainer.removeAllViews();
+		for (int i = 0; i < brands.size(); i++) {
+			String brand = brands.get(i);
+			View chipView = LayoutInflater.from(getContext()).inflate(R.layout.item_diaper_chip, chipsContainer, false);
+			TextView chipText = chipView.findViewById(R.id.chip_text);
+			chipText.setText(brand.isEmpty() ? getString(R.string.diaper_all_brands) : brand);
+
+			boolean isSelected = brand.equals(currentBrand);
+			chipText.setBackgroundResource(isSelected ? R.drawable.bg_diaper_chip_selected : R.drawable.bg_diaper_chip);
+			if (isSelected) {
+				chipText.setTextColor(0xFF163247);
+			} else {
+				chipText.setTextColor(UiUtils.getThemeColor(getActivity(), R.attr.colorM3OnSurface));
+			}
+
+			chipText.setOnClickListener(v -> {
+				currentBrand = brand;
+				currentPage = 1;
+				hasMore = true;
+				buildChips();
+				loadData();
+			});
+
+			chipsContainer.addView(chipView);
+		}
 	}
 
 	private void updateEmptyState() {
