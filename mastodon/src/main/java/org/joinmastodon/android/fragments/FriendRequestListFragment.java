@@ -199,6 +199,7 @@ public class FriendRequestListFragment extends LoaderFragment {
 	@Override
 	protected void onShown() {
 		super.onShown();
+		updateLiquidMode();
 		if (!loaded && !dataLoading) {
 			loadData();
 		}

@@ -172,7 +172,9 @@ class FriendUniverseLiquidToolbarController(
 				SearchGlass(focusRequester, availableSearchWidth)
 				Spacer(Modifier.width(8.dp))
 				GlassSurface(Modifier.size(48.dp), onPublish) {
-					ResourceIcon(R.drawable.ic_fluent_add_24_regular, 24, MiuixTheme.colorScheme.onSurface)
+					Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+						ResourceIcon(R.drawable.ic_fluent_add_24_regular, 24, MiuixTheme.colorScheme.onSurface)
+					}
 				}
 			}
 		}

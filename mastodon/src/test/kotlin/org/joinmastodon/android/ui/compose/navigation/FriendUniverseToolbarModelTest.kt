@@ -17,10 +17,10 @@ class FriendUniverseToolbarModelTest {
 	fun toolbarMetricsInterpolateFromMiuixLargeTitle() {
 		assertEquals(32f, friendUniverseTitleSizeSp(0f), 0.001f)
 		assertEquals(18f, friendUniverseTitleSizeSp(1f), 0.001f)
-		assertEquals(128, friendUniverseTopPaddingDp(liquidMode = true))
+		assertEquals(96, friendUniverseTopPaddingDp(liquidMode = true))
 		assertEquals(8, friendUniverseTopPaddingDp(liquidMode = false))
-		assertEquals(128, friendUniverseCaptureHeightDp(searchExpanded = false))
-		assertEquals(144, friendUniverseCaptureHeightDp(searchExpanded = true))
+		assertEquals(104, friendUniverseCaptureHeightDp(searchExpanded = false))
+		assertEquals(112, friendUniverseCaptureHeightDp(searchExpanded = true))
 	}
 
 	@Test

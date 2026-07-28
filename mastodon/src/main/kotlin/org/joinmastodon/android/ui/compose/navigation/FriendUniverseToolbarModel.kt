@@ -8,9 +8,9 @@ fun friendUniverseCollapseProgress(scrollY: Int, density: Float): Float =
 fun friendUniverseTitleSizeSp(progress: Float): Float =
 	32f + (18f - 32f) * progress.coerceIn(0f, 1f)
 
-fun friendUniverseTopPaddingDp(liquidMode: Boolean): Int = if(liquidMode) 128 else 8
+fun friendUniverseTopPaddingDp(liquidMode: Boolean): Int = if(liquidMode) 96 else 8
 
-fun friendUniverseCaptureHeightDp(searchExpanded: Boolean): Int = if(searchExpanded) 144 else 128
+fun friendUniverseCaptureHeightDp(searchExpanded: Boolean): Int = if(searchExpanded) 112 else 104
 
 fun friendUniverseMayApplySearch(requestGeneration: Int, currentGeneration: Int): Boolean =
 	requestGeneration == currentGeneration
