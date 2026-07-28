@@ -36,6 +36,7 @@ import org.joinmastodon.android.api.requests.friendrequests.GetFriendRequestList
 import org.joinmastodon.android.api.session.AccountSessionManager;
 import org.joinmastodon.android.model.FriendRequest;
 import org.joinmastodon.android.model.FriendRequestField;
+import org.joinmastodon.android.ui.compose.navigation.FriendUniverseLiquidToolbarController;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -53,6 +54,10 @@ import org.joinmastodon.android.ui.OutlineProviders;
 import org.joinmastodon.android.ui.views.FlowLayout;
 import org.joinmastodon.android.ui.utils.UiUtils;
 
+import static org.joinmastodon.android.ui.compose.navigation.FriendUniverseToolbarModelKt.friendUniverseMayApplySearch;
+import static org.joinmastodon.android.ui.compose.navigation.FriendUniverseToolbarModelKt.friendUniverseTopPaddingDp;
+import static org.joinmastodon.android.ui.compose.navigation.FriendUniverseToolbarModelKt.friendUniverseCanLoadMore;
+
 public class FriendRequestListFragment extends LoaderFragment {
 	private RecyclerView recyclerView;
 	private SwipeRefreshLayout swipeRefreshLayout;
@@ -64,10 +69,13 @@ public class FriendRequestListFragment extends LoaderFragment {
 	private boolean loadingMore = false;
 	private boolean hasMore = true;
 	private String accountID;
-	private View emptyState;
 	private ImageButton fab;
 	private float totalDy = 0;
 	private boolean fabHidden = false;
+	private FriendUniverseLiquidToolbarController liquidToolbarController;
+	private SharedPreferences prefs;
+	private boolean bannerVisible;
+	private int searchGeneration;
 
 	// Metadata icon 映射
 	private static final String[][] METADATA_ICONS = {
@@ -120,30 +128,15 @@ public class FriendRequestListFragment extends LoaderFragment {
 		root.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 		root.setOrientation(LinearLayout.VERTICAL);
 
-		// 防诈骗 Banner
-		SharedPreferences prefs = getContext().getSharedPreferences("friend_request", 0);
-		if (!prefs.getBoolean("banner_dismissed", false)) {
-			View banner = inflater.inflate(R.layout.friend_request_fraud_banner, root, false);
-			banner.setOnClickListener(v -> {
-				prefs.edit().putBoolean("banner_dismissed", true).apply();
-				((ViewGroup) banner.getParent()).removeView(banner);
-			});
-			root.addView(banner);
-		}
+		prefs = getContext().getSharedPreferences("friend_request", 0);
+		bannerVisible = !prefs.getBoolean("banner_dismissed", false);
 
 		// 下拉刷新
 		swipeRefreshLayout = new SwipeRefreshLayout(getContext());
 		swipeRefreshLayout.setColorSchemeColors(0xFFA1D9F7);
-		swipeRefreshLayout.setOnRefreshListener(() -> {
-			currentPage = 1;
-			data.clear();
-			hasMore = true;
-			loadData();
+			swipeRefreshLayout.setOnRefreshListener(() -> {
+			startFullReload(false);
 		});
-
-		// 空状态
-		emptyState = inflater.inflate(R.layout.friend_request_empty_state, swipeRefreshLayout, false);
-		emptyState.setVisibility(View.GONE);
 
 		// RecyclerView
 		recyclerView = new RecyclerView(getContext());
@@ -159,12 +152,13 @@ public class FriendRequestListFragment extends LoaderFragment {
 			@Override
 			public void onScrolled(@NonNull RecyclerView rv, int dx, int dy) {
 				totalDy += dy;
+				if(liquidToolbarController!=null)
+					liquidToolbarController.setScrollY(Math.max(0, rv.computeVerticalScrollOffset()));
 				// 加载更多
 				LinearLayoutManager lm = (LinearLayoutManager) rv.getLayoutManager();
-				if (lm != null && !loadingMore && hasMore && lm.findLastVisibleItemPosition() >= data.size() - 3) {
+				if (lm != null && friendUniverseCanLoadMore(dataLoading, loadingMore, hasMore, data.size(), lm.findLastVisibleItemPosition()-(bannerVisible ? 1 : 0))) {
 					loadingMore = true;
-					currentPage++;
-					loadMore();
+					loadMore(currentPage+1);
 				}
 			}
 
@@ -179,7 +173,6 @@ public class FriendRequestListFragment extends LoaderFragment {
 		FrameLayout content=new FrameLayout(getContext());
 		content.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 		content.addView(recyclerView);
-		content.addView(emptyState);
 		swipeRefreshLayout.addView(content);
 		root.addView(swipeRefreshLayout, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
 
@@ -196,12 +189,9 @@ public class FriendRequestListFragment extends LoaderFragment {
 		fab.setScaleType(ImageView.ScaleType.CENTER);
 		fab.setElevation(V.dp(6));
 		fab.setContentDescription("发布交友请求");
-		fab.setOnClickListener(v -> {
-			Bundle args = new Bundle();
-			args.putString("account", accountID);
-			Nav.go(getActivity(), FriendRequestCreateFragment.class, args);
-		});
+		fab.setOnClickListener(v -> openCreateRequest());
 		wrapper.addView(fab);
+		updateLiquidMode();
 
 		return wrapper;
 	}
@@ -215,28 +205,49 @@ public class FriendRequestListFragment extends LoaderFragment {
 	}
 
 	@Override
+	public void onDestroyView() {
+		liquidToolbarController=null;
+		recyclerView=null;
+		swipeRefreshLayout=null;
+		adapter=null;
+		fab=null;
+		prefs=null;
+		dataLoading=false;
+		loadingMore=false;
+		super.onDestroyView();
+	}
+
+	@Override
 	protected void doLoadData() {
 		loadData();
 	}
 
 	@Override
 	public void onRefresh() {
-		currentPage = 1;
-		data.clear();
-		hasMore = true;
-		loadData();
+		startFullReload(false);
 	}
 
 	public void loadData() {
+		loadData(searchGeneration);
+	}
+
+	private void loadData(int requestGeneration) {
+		final int requestPage=1;
+		final String requestSearch=currentSearch;
 		dataLoading = true;
 		showProgress();
 
-		new GetFriendRequestList(currentPage, 20, currentSearch, null)
+		new GetFriendRequestList(requestPage, 20, requestSearch, null)
 			.setCallback(new Callback<Map<String, Object>>() {
 				@Override
 				@SuppressWarnings("unchecked")
 				public void onSuccess(Map<String, Object> result) {
-					if (getActivity() == null) return;
+					if (getActivity() == null) {
+						dataLoading=false;
+						loadingMore=false;
+						return;
+					}
+					if(!friendUniverseMayApplySearch(requestGeneration, searchGeneration)) return;
 					List<Map<String, Object>> requests = (List<Map<String, Object>>) result.get("requests");
 					Gson gson = new Gson();
 					List<FriendRequest> newItems = gson.fromJson(
@@ -244,10 +255,9 @@ public class FriendRequestListFragment extends LoaderFragment {
 						new TypeToken<List<FriendRequest>>(){}.getType()
 					);
 
-					if (currentPage == 1) {
-						data.clear();
-					}
+					data.clear();
 					data.addAll(newItems);
+					currentPage=requestPage;
 
 					Map<String, Object> pagination = (Map<String, Object>) result.get("pagination");
 					if (pagination != null) {
@@ -266,7 +276,12 @@ public class FriendRequestListFragment extends LoaderFragment {
 
 				@Override
 				public void onError(ErrorResponse error) {
-					if (getActivity() == null) return;
+					if (getActivity() == null) {
+						dataLoading=false;
+						loadingMore=false;
+						return;
+					}
+					if(!friendUniverseMayApplySearch(requestGeneration, searchGeneration)) return;
 					swipeRefreshLayout.setRefreshing(false);
 					loadingMore = false;
 					dataLoaded();
@@ -276,13 +291,19 @@ public class FriendRequestListFragment extends LoaderFragment {
 			.exec(accountID);
 	}
 
-	private void loadMore() {
-		new GetFriendRequestList(currentPage, 20, currentSearch, null)
+	private void loadMore(int requestPage) {
+		final int requestGeneration=searchGeneration;
+		final String requestSearch=currentSearch;
+		new GetFriendRequestList(requestPage, 20, requestSearch, null)
 			.setCallback(new Callback<Map<String, Object>>() {
 				@Override
 				@SuppressWarnings("unchecked")
 				public void onSuccess(Map<String, Object> result) {
-					if (getActivity() == null) return;
+					if (getActivity() == null) {
+						loadingMore=false;
+						return;
+					}
+					if(!friendUniverseMayApplySearch(requestGeneration, searchGeneration)) return;
 					List<Map<String, Object>> requests = (List<Map<String, Object>>) result.get("requests");
 					Gson gson = new Gson();
 					List<FriendRequest> newItems = gson.fromJson(
@@ -291,7 +312,8 @@ public class FriendRequestListFragment extends LoaderFragment {
 					);
 
 					data.addAll(newItems);
-					adapter.notifyItemRangeInserted(data.size() - newItems.size(), newItems.size());
+					currentPage=requestPage;
+					adapter.notifyItemRangeInserted(data.size() - newItems.size() + (bannerVisible ? 1 : 0), newItems.size());
 
 					Map<String, Object> pagination = (Map<String, Object>) result.get("pagination");
 					if (pagination != null) {
@@ -306,6 +328,7 @@ public class FriendRequestListFragment extends LoaderFragment {
 
 				@Override
 				public void onError(ErrorResponse error) {
+					if(!friendUniverseMayApplySearch(requestGeneration, searchGeneration)) return;
 					loadingMore = false;
 				}
 			})
@@ -313,10 +336,55 @@ public class FriendRequestListFragment extends LoaderFragment {
 	}
 
 	private void updateEmptyState() {
-		if (emptyState != null) {
-			emptyState.setVisibility(data.isEmpty() ? View.VISIBLE : View.GONE);
-			recyclerView.setVisibility(data.isEmpty() ? View.GONE : View.VISIBLE);
+		if(recyclerView!=null) recyclerView.setVisibility(View.VISIBLE);
+	}
+
+	public void setLiquidToolbarController(FriendUniverseLiquidToolbarController controller) {
+		liquidToolbarController=controller;
+		updateLiquidMode();
+		if(controller!=null && recyclerView!=null)
+			controller.setScrollY(Math.max(0, recyclerView.computeVerticalScrollOffset()));
+		if(controller!=null)
+			controller.setSearchQuery(currentSearch);
+	}
+
+	public void onLiquidSearchChanged(String query) {
+		String normalized=query==null ? "" : query.trim();
+		if(normalized.equals(currentSearch)) return;
+		currentSearch=normalized;
+		startFullReload(true);
+	}
+
+	private void startFullReload(boolean clearVisibleData) {
+		searchGeneration++;
+		currentPage=1;
+		hasMore=true;
+		loadingMore=false;
+		if(clearVisibleData){
+			data.clear();
+			if(adapter!=null) adapter.notifyDataSetChanged();
+			updateEmptyState();
 		}
+		loadData(searchGeneration);
+	}
+
+	public void onLiquidPublish() {
+		openCreateRequest();
+	}
+
+	private void openCreateRequest() {
+		Bundle args = new Bundle();
+		args.putString("account", accountID);
+		Nav.go(getActivity(), FriendRequestCreateFragment.class, args);
+	}
+
+	private void updateLiquidMode() {
+		boolean liquid=liquidToolbarController!=null;
+		View toolbar=getToolbar();
+		if(toolbar!=null) toolbar.setVisibility(liquid ? View.GONE : View.VISIBLE);
+		if(fab!=null) fab.setVisibility(liquid ? View.GONE : View.VISIBLE);
+		if(recyclerView!=null)
+			recyclerView.setPadding(0, V.dp(friendUniverseTopPaddingDp(liquid)), 0, V.dp(72));
 	}
 
 	private String formatTime(String createdAt) {
@@ -353,10 +421,23 @@ public class FriendRequestListFragment extends LoaderFragment {
 	private class FriendRequestAdapter extends RecyclerView.Adapter<FriendRequestAdapter.VH> {
 		private static final int TYPE_ITEM = 0;
 		private static final int TYPE_FOOTER = 1;
+		private static final int TYPE_BANNER = 2;
+		private static final int TYPE_EMPTY = 3;
 
 		@NonNull
 		@Override
 		public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+			if(viewType == TYPE_EMPTY)
+				return new VH(LayoutInflater.from(parent.getContext()).inflate(R.layout.friend_request_empty_state, parent, false));
+			if(viewType == TYPE_BANNER) {
+				View banner=LayoutInflater.from(parent.getContext()).inflate(R.layout.friend_request_fraud_banner, parent, false);
+				banner.setOnClickListener(v -> {
+					prefs.edit().putBoolean("banner_dismissed", true).apply();
+					bannerVisible=false;
+					notifyItemRemoved(0);
+				});
+				return new VH(banner);
+			}
 			if (viewType == TYPE_FOOTER) {
 				View v = new View(getContext());
 				v.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, V.dp(48)));
@@ -368,19 +449,22 @@ public class FriendRequestListFragment extends LoaderFragment {
 
 		@Override
 		public void onBindViewHolder(@NonNull VH holder, int position) {
-			if (getItemViewType(position) == TYPE_FOOTER) return;
-			FriendRequest item = data.get(position);
+			if (getItemViewType(position) != TYPE_ITEM) return;
+			FriendRequest item = data.get(position-(bannerVisible ? 1 : 0));
 			holder.bind(item);
 		}
 
 		@Override
 		public int getItemCount() {
-			return data.size() + 1;
+			return data.size() + 1 + (bannerVisible ? 1 : 0) + (data.isEmpty() ? 1 : 0);
 		}
 
 		@Override
 		public int getItemViewType(int position) {
-			return position >= data.size() ? TYPE_FOOTER : TYPE_ITEM;
+			if(bannerVisible && position==0) return TYPE_BANNER;
+			int contentPosition=position-(bannerVisible ? 1 : 0);
+			if(data.isEmpty() && contentPosition==0) return TYPE_EMPTY;
+			return contentPosition >= data.size()+(data.isEmpty() ? 1 : 0) ? TYPE_FOOTER : TYPE_ITEM;
 		}
 
 		class VH extends RecyclerView.ViewHolder {

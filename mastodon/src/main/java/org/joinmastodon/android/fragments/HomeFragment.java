@@ -43,6 +43,7 @@ import org.joinmastodon.android.ui.M3AlertDialogBuilder;
 import org.joinmastodon.android.ui.OutlineProviders;
 import org.joinmastodon.android.ui.compose.navigation.HomeLiquidNavigationController;
 import org.joinmastodon.android.ui.compose.navigation.HomeLiquidToolbarController;
+import org.joinmastodon.android.ui.compose.navigation.FriendUniverseLiquidToolbarController;
 import org.joinmastodon.android.ui.sheets.AccountSwitcherSheet;
 import org.joinmastodon.android.ui.utils.UiUtils;
 import org.joinmastodon.android.ui.views.BackdropCaptureFrameLayout;
@@ -51,6 +52,7 @@ import org.joinmastodon.android.utils.ObjectIdComparator;
 import org.parceler.Parcels;
 
 import static org.joinmastodon.android.ui.compose.navigation.HomeLiquidToolbarModelKt.homeToolbarCaptureHeightDp;
+import static org.joinmastodon.android.ui.compose.navigation.FriendUniverseToolbarModelKt.friendUniverseCaptureHeightDp;
 
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -87,6 +89,7 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 	private ImageView tabBarAvatar;
 	private HomeLiquidNavigationController liquidNavigationController;
 	private HomeLiquidToolbarController liquidToolbarController;
+	private FriendUniverseLiquidToolbarController friendLiquidToolbarController;
 	private int bottomSystemInset;
 	private int topSystemInset;
 	private boolean liquidToolbarMenuOpen;
@@ -150,8 +153,14 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 			liquidToolbarController.dispose();
 			liquidToolbarController=null;
 		}
+		if(friendLiquidToolbarController!=null){
+			friendLiquidToolbarController.dispose();
+			friendLiquidToolbarController=null;
+		}
 		if(homeTabFragment!=null)
 			homeTabFragment.setLiquidToolbarController(null);
+		if(friendRequestFragment!=null)
+			friendRequestFragment.setLiquidToolbarController(null);
 		if(featureDialog!=null){
 			featureDialog.dismiss();
 			featureDialog=null;
@@ -579,9 +588,13 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 		if(GlobalUserPreferences.useIosLiquidNavigation){
 			liquidNavigationController=new HomeLiquidNavigationController(getActivity(), currentTab, self.avatar, this::onTabSelected, this::onTabLongClick);
 			fragmentContainer.postOnAnimation(()->fragmentContainer.postOnAnimation(()->
-					fragmentContainer.setCaptureListener((top, bottom)->{
-						if(liquidToolbarController!=null && top!=null)
-							liquidToolbarController.setBackdropBitmap(top);
+			fragmentContainer.setCaptureListener((top, bottom)->{
+						if(top!=null){
+							if(currentTab==R.id.tab_home && liquidToolbarController!=null)
+								liquidToolbarController.setBackdropBitmap(top);
+							else if(currentTab==R.id.tab_friend_request && friendLiquidToolbarController!=null)
+								friendLiquidToolbarController.setBackdropBitmap(top);
+						}
 						if(liquidNavigationController!=null && bottom!=null)
 							liquidNavigationController.setBackdropBitmap(bottom);
 					})));
@@ -616,9 +629,14 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 			liquidToolbarController.dispose();
 			liquidToolbarController=null;
 		}
+		if(friendLiquidToolbarController!=null){
+			friendLiquidToolbarController.dispose();
+			friendLiquidToolbarController=null;
+		}
 		toolbarHost.removeAllViews();
 		if(!GlobalUserPreferences.useIosLiquidNavigation){
 			homeTabFragment.setLiquidToolbarController(null);
+			friendRequestFragment.setLiquidToolbarController(null);
 			updateCaptureHeights();
 			return;
 		}
@@ -635,7 +653,15 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 		});
 		liquidToolbarController.setContentTouchTarget(fragmentContainer);
 		toolbarHost.addView(liquidToolbarController.getView(), new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+		friendLiquidToolbarController=new FriendUniverseLiquidToolbarController(
+				getActivity(),
+				friendRequestFragment::onLiquidSearchChanged,
+				friendRequestFragment::onLiquidPublish
+		);
+		friendLiquidToolbarController.setSearchOpenListener(open->updateCaptureHeights());
+		toolbarHost.addView(friendLiquidToolbarController.getView(), new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 		homeTabFragment.setLiquidToolbarController(liquidToolbarController);
+		friendRequestFragment.setLiquidToolbarController(friendLiquidToolbarController);
 		applyLiquidToolbarInsets();
 		updateLiquidToolbarVisibility();
 		updateCaptureHeights();
@@ -644,27 +670,45 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 	private void applyLiquidToolbarInsets(){
 		if(liquidToolbarController!=null)
 			liquidToolbarController.setStatusBarInset(topSystemInset);
+		if(friendLiquidToolbarController!=null)
+			friendLiquidToolbarController.setStatusBarInset(topSystemInset);
 		updateCaptureHeights();
 	}
 
 	private void updateLiquidToolbarVisibility(){
+		boolean liquid=GlobalUserPreferences.useIosLiquidNavigation;
+		boolean homeVisible=liquid && currentTab==R.id.tab_home;
+		boolean friendVisible=liquid && currentTab==R.id.tab_friend_request;
 		if(toolbarHost!=null)
-			toolbarHost.setVisibility(GlobalUserPreferences.useIosLiquidNavigation && currentTab==R.id.tab_home ? View.VISIBLE : View.GONE);
+			toolbarHost.setVisibility(homeVisible || friendVisible ? View.VISIBLE : View.GONE);
+		if(liquidToolbarController!=null)
+			liquidToolbarController.getView().setVisibility(homeVisible ? View.VISIBLE : View.GONE);
+		if(friendLiquidToolbarController!=null)
+			friendLiquidToolbarController.getView().setVisibility(friendVisible ? View.VISIBLE : View.GONE);
 		if(currentTab!=R.id.tab_home && liquidToolbarController!=null)
 			liquidToolbarController.closeMenu();
+		if(currentTab!=R.id.tab_friend_request && friendLiquidToolbarController!=null)
+			friendLiquidToolbarController.closeSearch();
 		updateCaptureHeights();
 	}
 
 	private void updateCaptureHeights(){
 		if(fragmentContainer==null)
 			return;
-		int topHeight=liquidToolbarController!=null && toolbarHost!=null && toolbarHost.getVisibility()==View.VISIBLE
-				? topSystemInset+V.dp(homeToolbarCaptureHeightDp(liquidToolbarMenuOpen)) : 0;
+		int topHeight=0;
+		if(toolbarHost!=null && toolbarHost.getVisibility()==View.VISIBLE){
+			if(currentTab==R.id.tab_home && liquidToolbarController!=null)
+				topHeight=topSystemInset+V.dp(homeToolbarCaptureHeightDp(liquidToolbarMenuOpen));
+			else if(currentTab==R.id.tab_friend_request && friendLiquidToolbarController!=null)
+				topHeight=topSystemInset+V.dp(friendUniverseCaptureHeightDp(friendLiquidToolbarController.isSearchExpanded()));
+		}
 		int bottomHeight=navigationHost==null ? 0 : navigationHost.getHeight();
 		fragmentContainer.setCaptureHeights(topHeight, bottomHeight);
 	}
 
 	public boolean onBackPressed(){
+		if(currentTab==R.id.tab_friend_request && friendLiquidToolbarController!=null && friendLiquidToolbarController.closeSearch())
+			return true;
 		return liquidToolbarController!=null && liquidToolbarController.onBackPressed();
 	}
 
