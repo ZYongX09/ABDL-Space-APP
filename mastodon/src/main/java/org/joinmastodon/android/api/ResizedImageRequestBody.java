@@ -119,31 +119,31 @@ public class ResizedImageRequestBody extends CountingRequestBody{
 						orientation=exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL);
 					}
 				}
-				int rotation=switch(orientation){
-					case ExifInterface.ORIENTATION_ROTATE_90 -> 90;
-					case ExifInterface.ORIENTATION_ROTATE_180 -> 180;
-					case ExifInterface.ORIENTATION_ROTATE_270 -> 270;
-					default -> 0;
-				};
-				if(rotation!=0){
-					Matrix matrix=new Matrix();
-					matrix.setRotate(rotation);
+				Matrix matrix=getExifMatrix(orientation);
+				if(!matrix.isIdentity())
 					bitmap=Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), matrix, false);
-				}
 			}
 
 			boolean isPNG="image/png".equals(contentType);
 			width=bitmap.getWidth();
 			height=bitmap.getHeight();
-			tempFile=File.createTempFile("mastodon_tmp_resized", null);
-			try(FileOutputStream out=new FileOutputStream(tempFile)){
+			File outputFile=File.createTempFile("mastodon_tmp_resized", null);
+			boolean encoded=false;
+			try(FileOutputStream out=new FileOutputStream(outputFile)){
 				if(isPNG){
-					bitmap.compress(Bitmap.CompressFormat.PNG, 0, out);
+					encoded=bitmap.compress(Bitmap.CompressFormat.PNG, 0, out);
 				}else{
-					bitmap.compress(Bitmap.CompressFormat.JPEG, 97, out);
+					encoded=bitmap.compress(Bitmap.CompressFormat.JPEG, 97, out);
 					contentType=MediaType.get("image/jpeg");
 				}
+			}finally{
+				bitmap.recycle();
+				if(!encoded)
+					outputFile.delete();
 			}
+			if(!encoded)
+				throw new IOException("Unable to encode resized image");
+			tempFile=outputFile;
 			length=tempFile.length();
 		}else{
 			width=opts.outWidth;
@@ -221,5 +221,19 @@ public class ResizedImageRequestBody extends CountingRequestBody{
 		try(InputStream in=MastodonApp.context.getContentResolver().openInputStream(uri)){
 			return new ExifInterface(in).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL);
 		}
+	}
+
+	private static Matrix getExifMatrix(int orientation){
+		Matrix matrix=new Matrix();
+		switch(orientation){
+			case ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> matrix.setScale(-1, 1);
+			case ExifInterface.ORIENTATION_ROTATE_180 -> matrix.setRotate(180);
+			case ExifInterface.ORIENTATION_FLIP_VERTICAL -> matrix.setScale(1, -1);
+			case ExifInterface.ORIENTATION_TRANSPOSE -> { matrix.setScale(-1, 1); matrix.postRotate(90); }
+			case ExifInterface.ORIENTATION_ROTATE_90 -> matrix.setRotate(90);
+			case ExifInterface.ORIENTATION_TRANSVERSE -> { matrix.setScale(-1, 1); matrix.postRotate(-90); }
+			case ExifInterface.ORIENTATION_ROTATE_270 -> matrix.setRotate(-90);
+		}
+		return matrix;
 	}
 }
