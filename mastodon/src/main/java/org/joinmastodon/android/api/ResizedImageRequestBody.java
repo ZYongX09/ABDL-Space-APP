@@ -33,6 +33,8 @@ public class ResizedImageRequestBody extends CountingRequestBody{
 	private Uri uri;
 	private MediaType contentType;
 	private int maxSize;
+	private int width;
+	private int height;
 
 	public ResizedImageRequestBody(Uri uri, int maxSize, ProgressListener progressListener) throws IOException{
 		super(progressListener);
@@ -131,6 +133,8 @@ public class ResizedImageRequestBody extends CountingRequestBody{
 			}
 
 			boolean isPNG="image/png".equals(contentType);
+			width=bitmap.getWidth();
+			height=bitmap.getHeight();
 			tempFile=File.createTempFile("mastodon_tmp_resized", null);
 			try(FileOutputStream out=new FileOutputStream(tempFile)){
 				if(isPNG){
@@ -142,6 +146,13 @@ public class ResizedImageRequestBody extends CountingRequestBody{
 			}
 			length=tempFile.length();
 		}else{
+			width=opts.outWidth;
+			height=opts.outHeight;
+			int orientation=getOrientation();
+			if(orientation==ExifInterface.ORIENTATION_ROTATE_90 || orientation==ExifInterface.ORIENTATION_ROTATE_270 || orientation==ExifInterface.ORIENTATION_TRANSPOSE || orientation==ExifInterface.ORIENTATION_TRANSVERSE){
+				width=opts.outHeight;
+				height=opts.outWidth;
+			}
 			if("file".equals(uri.getScheme())){
 				length=new File(uri.getPath()).length();
 			}else{
@@ -199,5 +210,16 @@ public class ResizedImageRequestBody extends CountingRequestBody{
 	public void cleanup(){
 		if(tempFile!=null)
 			tempFile.delete();
+	}
+
+	public int getWidth(){ return width; }
+	public int getHeight(){ return height; }
+
+	private int getOrientation() throws IOException{
+		if("file".equals(uri.getScheme()))
+			return new ExifInterface(uri.getPath()).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL);
+		try(InputStream in=MastodonApp.context.getContentResolver().openInputStream(uri)){
+			return new ExifInterface(in).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL);
+		}
 	}
 }

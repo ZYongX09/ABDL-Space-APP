@@ -74,6 +74,9 @@ public class UploadAttachment extends MastodonAPIRequest<Attachment>{
 			addHeader("X-ABDL-Upload-Fallback", "imgbed");
 			return (UploadAttachment)super.exec(accountID);
 		}
+		AccountSession session=AccountSessionManager.getInstance().getAccount(accountID);
+		if(session==null || !"abdl-space.top".equalsIgnoreCase(session.domain))
+			return (UploadAttachment)super.exec(accountID);
 		Thread thread=new Thread(()->uploadToCos(accountID), "CosMediaUpload");
 		thread.setDaemon(true);
 		thread.start();
@@ -101,7 +104,9 @@ public class UploadAttachment extends MastodonAPIRequest<Attachment>{
 			RequestBody previewUploadBody=new CosProgressRequestBody(previewBody, previewProgress);
 			var client=MastodonAPIController.getHttpClient();
 			String token=session.token.accessToken;
-			var originalAuth=CosMediaUpload.authorize(client, session.domain, token, "status_original", originalBody, bounds.outWidth, bounds.outHeight, this::setCurrentCall);
+			int originalWidth=originalDelegate instanceof ResizedImageRequestBody resized ? resized.getWidth() : bounds.outWidth;
+			int originalHeight=originalDelegate instanceof ResizedImageRequestBody resized ? resized.getHeight() : bounds.outHeight;
+			var originalAuth=CosMediaUpload.authorize(client, session.domain, token, "status_original", originalBody, originalWidth, originalHeight, this::setCurrentCall);
 			var previewAuth=CosMediaUpload.authorize(client, session.domain, token, "status_preview", previewUploadBody, previewBody.getWidth(), previewBody.getHeight(), this::setCurrentCall);
 			CosMediaUpload.put(client, originalAuth, originalBody, this::setCurrentCall);
 			CosMediaUpload.put(client, previewAuth, previewUploadBody, this::setCurrentCall);
