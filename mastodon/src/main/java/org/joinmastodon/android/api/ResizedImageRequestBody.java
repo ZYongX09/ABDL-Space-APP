@@ -60,8 +60,9 @@ public class ResizedImageRequestBody extends CountingRequestBody{
 		if(contentType==null)
 			contentType=MediaType.get("image/jpeg");
 		if(needResize(opts.outWidth, opts.outHeight) || needCrop(opts.outWidth, opts.outHeight)){
-			Bitmap bitmap;
-			checkCanceled(canceled);
+			Bitmap bitmap=null;
+			try{
+				checkCanceled(canceled);
 			if(Build.VERSION.SDK_INT>=28){
 				ImageDecoder.Source source;
 				if("file".equals(uri.getScheme())){
@@ -80,7 +81,10 @@ public class ResizedImageRequestBody extends CountingRequestBody{
 				checkCanceled(canceled, bitmap);
 				if(needCrop(bitmap.getWidth(), bitmap.getHeight())){
 					Rect crop=getCropBounds(bitmap.getWidth(), bitmap.getHeight());
-					bitmap=Bitmap.createBitmap(bitmap, crop.left, crop.top, crop.width(), crop.height());
+					Bitmap previous=bitmap;
+					bitmap=Bitmap.createBitmap(previous, crop.left, crop.top, crop.width(), crop.height());
+					if(bitmap!=previous)
+						previous.recycle();
 				}
 				checkCanceled(canceled, bitmap);
 			}else{
@@ -118,6 +122,7 @@ public class ResizedImageRequestBody extends CountingRequestBody{
 					}
 					Bitmap scaled=Bitmap.createBitmap(dstBounds.width(), dstBounds.height(), Bitmap.Config.ARGB_8888);
 					new Canvas(scaled).drawBitmap(bitmap, srcBounds, dstBounds, new Paint(Paint.FILTER_BITMAP_FLAG));
+					bitmap.recycle();
 					bitmap=scaled;
 				}
 				checkCanceled(canceled, bitmap);
@@ -132,8 +137,12 @@ public class ResizedImageRequestBody extends CountingRequestBody{
 					}
 				}
 				Matrix matrix=getExifMatrix(orientation);
-				if(!matrix.isIdentity())
-					bitmap=Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), matrix, false);
+				if(!matrix.isIdentity()){
+					Bitmap previous=bitmap;
+					bitmap=Bitmap.createBitmap(previous, 0, 0, previous.getWidth(), previous.getHeight(), matrix, false);
+					if(bitmap!=previous)
+						previous.recycle();
+				}
 				checkCanceled(canceled, bitmap);
 			}
 
@@ -151,7 +160,6 @@ public class ResizedImageRequestBody extends CountingRequestBody{
 					contentType=MediaType.get("image/jpeg");
 				}
 			}finally{
-				bitmap.recycle();
 				if(!encoded)
 					outputFile.delete();
 			}
@@ -163,6 +171,10 @@ public class ResizedImageRequestBody extends CountingRequestBody{
 			}
 			tempFile=outputFile;
 			length=tempFile.length();
+			}finally{
+				if(bitmap!=null && !bitmap.isRecycled())
+					bitmap.recycle();
+			}
 		}else{
 			width=opts.outWidth;
 			height=opts.outHeight;

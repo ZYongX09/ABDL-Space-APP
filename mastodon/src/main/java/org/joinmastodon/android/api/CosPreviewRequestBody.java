@@ -70,16 +70,24 @@ public class CosPreviewRequestBody extends CountingRequestBody{
 			checkCanceled(canceled);
 			int targetWidth=Math.max(1, Math.round(bounds.outWidth*scale));
 			int targetHeight=Math.max(1, Math.round(bounds.outHeight*scale));
-			if(bitmap.getWidth()!=targetWidth || bitmap.getHeight()!=targetHeight)
-				bitmap=Bitmap.createScaledBitmap(bitmap, targetWidth, targetHeight, true);
+			if(bitmap.getWidth()!=targetWidth || bitmap.getHeight()!=targetHeight){
+				Bitmap previous=bitmap;
+				bitmap=Bitmap.createScaledBitmap(previous, targetWidth, targetHeight, true);
+				if(bitmap!=previous)
+					previous.recycle();
+			}
 			checkCanceled(canceled);
 			int orientation=ExifInterface.ORIENTATION_NORMAL;
 			try(InputStream input=MastodonApp.context.getContentResolver().openInputStream(uri)){
 				orientation=new ExifInterface(input).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL);
 			}
 			Matrix matrix=getExifMatrix(orientation);
-			if(!matrix.isIdentity())
-				bitmap=Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), matrix, true);
+			if(!matrix.isIdentity()){
+				Bitmap previous=bitmap;
+				bitmap=Bitmap.createBitmap(previous, 0, 0, previous.getWidth(), previous.getHeight(), matrix, true);
+				if(bitmap!=previous)
+					previous.recycle();
+			}
 			checkCanceled(canceled);
 		}
 		outputWidth=bitmap.getWidth();
