@@ -193,9 +193,9 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 	// MOSHIDON: profile note
 	private FrameLayout noteWrap;
 	private EditText noteEdit;
+	private TextView profileMessagesBadge;
 
 	@Override
-	private TextView profileMessagesBadge;
 	public void onCreate(Bundle savedInstanceState){
 		super.onCreate(savedInstanceState);
 		if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.N)
@@ -208,7 +208,7 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 			isOwnProfile=AccountSessionManager.getInstance().isSelf(accountID, account);
 			// Always fetch fresh data instead of using cached account
 			profileAccountID=getArguments().getString("profileAccountID", account.id);
-		E.register(this);
+			E.register(this);
 		}else{
 			profileAccountID=getArguments().getString("profileAccountID");
 		}
@@ -225,6 +225,8 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 	@Override
 	public void onDestroy(){
 		super.onDestroy();
+		if(isOwnProfile)
+			E.unregister(this);
 		for(APIRequest<?> req:relationshipRequests)
 			req.cancel();
 		relationshipRequests.clear();
@@ -235,7 +237,6 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 		View content=inflater.inflate(R.layout.fragment_profile, container, false);
 
 		avatar=content.findViewById(R.id.avatar);
-		E.unregister(this);
 		cover=content.findViewById(R.id.cover);
 		avatarBorder=content.findViewById(R.id.avatar_border);
 		name=content.findViewById(R.id.name);
@@ -819,6 +820,12 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 			profileNotificationsBadge=actionView.findViewById(R.id.profile_notifications_badge);
 			actionView.setOnClickListener(v->openNotifications());
 			updateProfileNotificationsBadge();
+			MenuItem messagesItem=menu.findItem(R.id.messages_action);
+			View messagesActionView=LayoutInflater.from(getActivity()).inflate(R.layout.action_home_messages, getToolbar(), false);
+			messagesItem.setActionView(messagesActionView);
+			profileMessagesBadge=messagesActionView.findViewById(R.id.messages_badge);
+			messagesActionView.setOnClickListener(v->openConversations());
+			updateProfileMessagesBadge();
 			return;
 		}
 
@@ -903,12 +910,6 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 		}else if(id==R.id.notifications){
 			new SetAccountFollowed(account.id, true, relationship.showingReblogs, !relationship.notifying)
 					.setCallback(new Callback<>(){
-			MenuItem messagesItem=menu.findItem(R.id.messages_action);
-			View messagesActionView=LayoutInflater.from(getActivity()).inflate(R.layout.action_home_messages, getToolbar(), false);
-			messagesItem.setActionView(messagesActionView);
-			profileMessagesBadge=messagesActionView.findViewById(R.id.messages_badge);
-			messagesActionView.setOnClickListener(v->openConversations());
-			updateProfileMessagesBadge();
 						@Override
 						public void onSuccess(Relationship result){
 							updateRelationship(result);
@@ -927,6 +928,8 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 		}else if(id==R.id.copy_link){
 			getActivity().getSystemService(ClipboardManager.class).setPrimaryClip(ClipData.newPlainText(null, account.url));
 			UiUtils.maybeShowTextCopiedToast(getActivity());
+		}else if(id==R.id.messages_action){
+			openConversations();
 		}
 		return true;
 	}
@@ -942,8 +945,6 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 		boolean visible=!TextUtils.isEmpty(unreadNotificationsBadgeText);
 		profileNotificationsBadge.setVisibility(visible ? View.VISIBLE : View.GONE);
 		profileNotificationsBadge.setText(visible ? unreadNotificationsBadgeText : "");
-		}else if(id==R.id.messages_action){
-			openConversations();
 	}
 
 	private void openNotifications(){
