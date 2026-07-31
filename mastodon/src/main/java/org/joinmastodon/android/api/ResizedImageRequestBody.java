@@ -121,7 +121,14 @@ public class ResizedImageRequestBody extends CountingRequestBody{
 						dstBounds=new Rect(0, 0, targetWidth, targetHeight);
 					}
 					Bitmap scaled=Bitmap.createBitmap(dstBounds.width(), dstBounds.height(), Bitmap.Config.ARGB_8888);
-					new Canvas(scaled).drawBitmap(bitmap, srcBounds, dstBounds, new Paint(Paint.FILTER_BITMAP_FLAG));
+					boolean drawn=false;
+					try{
+						new Canvas(scaled).drawBitmap(bitmap, srcBounds, dstBounds, new Paint(Paint.FILTER_BITMAP_FLAG));
+						drawn=true;
+					}finally{
+						if(!drawn)
+							scaled.recycle();
+					}
 					bitmap.recycle();
 					bitmap=scaled;
 				}
