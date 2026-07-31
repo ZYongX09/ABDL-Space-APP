@@ -35,6 +35,7 @@ public class UploadAttachment extends MastodonAPIRequest<Attachment>{
 	private String description;
 	private boolean isNsfw;
 	private volatile Call currentCall;
+	private volatile Thread uploadThread;
 	private boolean useImgbedFallback;
 
 	public UploadAttachment(Uri uri){
@@ -65,20 +66,19 @@ public class UploadAttachment extends MastodonAPIRequest<Attachment>{
 
 	@Override
 	public UploadAttachment exec(String accountID){
+		AccountSession session=AccountSessionManager.getInstance().getAccount(accountID);
+		if(session==null || !"abdl-space.top".equalsIgnoreCase(session.domain))
+			return (UploadAttachment)super.exec(accountID);
 		String contentType=MastodonApp.context.getContentResolver().getType(uri);
 		if(useImgbedFallback){
 			addHeader("X-ABDL-Upload-Fallback", "imgbed");
 			return (UploadAttachment)super.exec(accountID);
 		}
-		if(contentType==null || !contentType.startsWith("image/")){
-			addHeader("X-ABDL-Upload-Fallback", "imgbed");
-			return (UploadAttachment)super.exec(accountID);
-		}
-		AccountSession session=AccountSessionManager.getInstance().getAccount(accountID);
-		if(session==null || !"abdl-space.top".equalsIgnoreCase(session.domain))
+		if(contentType==null || !contentType.startsWith("image/"))
 			return (UploadAttachment)super.exec(accountID);
 		Thread thread=new Thread(()->uploadToCos(accountID), "CosMediaUpload");
 		thread.setDaemon(true);
+		uploadThread=thread;
 		thread.start();
 		return this;
 	}
@@ -88,6 +88,7 @@ public class UploadAttachment extends MastodonAPIRequest<Attachment>{
 		RequestBody originalDelegate=null;
 		try{
 			AccountSession session=AccountSessionManager.getInstance().getAccount(accountID);
+			throwIfCanceled();
 			BitmapFactory.Options bounds=new BitmapFactory.Options();
 			bounds.inJustDecodeBounds=true;
 			try(var input=MastodonApp.context.getContentResolver().openInputStream(uri)){
@@ -95,8 +96,11 @@ public class UploadAttachment extends MastodonAPIRequest<Attachment>{
 			}
 			if(bounds.outWidth<=0 || bounds.outHeight<=0)
 				throw new IOException("Invalid image");
+			throwIfCanceled();
 			originalDelegate=maxImageSize>0 ? new ResizedImageRequestBody(uri, maxImageSize, null) : new ContentUriRequestBody(uri, null);
+			throwIfCanceled();
 			previewBody=new CosPreviewRequestBody(uri, null);
+			throwIfCanceled();
 			CosMediaUpload.Progress progress=new CosMediaUpload.Progress(originalDelegate.contentLength(), previewBody.contentLength());
 			ProgressListener originalProgress=(transferred, total)->notifyProgress(progress.updateOriginal(transferred));
 			ProgressListener previewProgress=(transferred, total)->notifyProgress(progress.updatePreview(transferred));
@@ -106,6 +110,7 @@ public class UploadAttachment extends MastodonAPIRequest<Attachment>{
 			String token=session.token.accessToken;
 			int originalWidth=originalDelegate instanceof ResizedImageRequestBody resized ? resized.getWidth() : bounds.outWidth;
 			int originalHeight=originalDelegate instanceof ResizedImageRequestBody resized ? resized.getHeight() : bounds.outHeight;
+			throwIfCanceled();
 			var originalAuth=CosMediaUpload.authorize(client, session.domain, token, "status_original", originalBody, originalWidth, originalHeight, this::setCurrentCall);
 			var previewAuth=CosMediaUpload.authorize(client, session.domain, token, "status_preview", previewUploadBody, previewBody.getWidth(), previewBody.getHeight(), this::setCurrentCall);
 			CosMediaUpload.put(client, originalAuth, originalBody, this::setCurrentCall);
@@ -118,11 +123,17 @@ public class UploadAttachment extends MastodonAPIRequest<Attachment>{
 			dispatchError(new MastodonErrorResponse(x.getLocalizedMessage(), -1, x));
 		}finally{
 			currentCall=null;
+			uploadThread=null;
 			if(previewBody!=null)
 				previewBody.close();
 			if(originalDelegate instanceof ResizedImageRequestBody resized)
 				resized.cleanup();
 		}
+	}
+
+	private void throwIfCanceled() throws IOException{
+		if(isCanceled() || Thread.currentThread().isInterrupted())
+			throw new IOException("Upload canceled");
 	}
 
 	private void setCurrentCall(Call call){
@@ -139,6 +150,8 @@ public class UploadAttachment extends MastodonAPIRequest<Attachment>{
 	@Override
 	public synchronized void cancel(){
 		super.cancel();
+		if(uploadThread!=null)
+			uploadThread.interrupt();
 		if(currentCall!=null)
 			currentCall.cancel();
 	}
