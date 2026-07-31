@@ -184,6 +184,7 @@ dependencies {
 	implementation 'org.parceler:parceler-api:1.1.12'
 	annotationProcessor 'org.parceler:parceler:1.1.12'
 	coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.3'
+	testImplementation 'junit:junit:4.13.2'
 
 	// MOSHIDON: we don't do that here
 //	def appCenterSdkVersion = "5.0.4"
