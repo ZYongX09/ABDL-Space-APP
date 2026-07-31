@@ -21,6 +21,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.function.BooleanSupplier;
 
 import androidx.annotation.NonNull;
 import okhttp3.MediaType;
@@ -37,6 +38,10 @@ public class ResizedImageRequestBody extends CountingRequestBody{
 	private int height;
 
 	public ResizedImageRequestBody(Uri uri, int maxSize, ProgressListener progressListener) throws IOException{
+		this(uri, maxSize, progressListener, ()->false);
+	}
+
+	public ResizedImageRequestBody(Uri uri, int maxSize, ProgressListener progressListener, BooleanSupplier canceled) throws IOException{
 		super(progressListener);
 		this.uri=uri;
 		this.maxSize=maxSize;
@@ -56,6 +61,7 @@ public class ResizedImageRequestBody extends CountingRequestBody{
 			contentType=MediaType.get("image/jpeg");
 		if(needResize(opts.outWidth, opts.outHeight) || needCrop(opts.outWidth, opts.outHeight)){
 			Bitmap bitmap;
+			checkCanceled(canceled);
 			if(Build.VERSION.SDK_INT>=28){
 				ImageDecoder.Source source;
 				if("file".equals(uri.getScheme())){
@@ -71,10 +77,12 @@ public class ResizedImageRequestBody extends CountingRequestBody{
 //					if(needCrop(size[0], size[1]))
 //						decoder.setCrop(getCropBounds(size[0], size[1]));
 				});
+				checkCanceled(canceled, bitmap);
 				if(needCrop(bitmap.getWidth(), bitmap.getHeight())){
 					Rect crop=getCropBounds(bitmap.getWidth(), bitmap.getHeight());
 					bitmap=Bitmap.createBitmap(bitmap, crop.left, crop.top, crop.width(), crop.height());
 				}
+				checkCanceled(canceled, bitmap);
 			}else{
 				int[] size=getTargetSize(opts.outWidth, opts.outHeight);
 				int targetWidth=size[0];
@@ -89,6 +97,9 @@ public class ResizedImageRequestBody extends CountingRequestBody{
 						bitmap=BitmapFactory.decodeStream(in, null, opts);
 					}
 				}
+				if(bitmap==null)
+					throw new IOException("Invalid image");
+				checkCanceled(canceled, bitmap);
 				boolean needCrop=needCrop(targetWidth, targetHeight);
 				if(factor%1f!=0f || needCrop){
 					Rect srcBounds=null;
@@ -109,6 +120,7 @@ public class ResizedImageRequestBody extends CountingRequestBody{
 					new Canvas(scaled).drawBitmap(bitmap, srcBounds, dstBounds, new Paint(Paint.FILTER_BITMAP_FLAG));
 					bitmap=scaled;
 				}
+				checkCanceled(canceled, bitmap);
 				int orientation=0;
 				if("file".equals(uri.getScheme())){
 					ExifInterface exif=new ExifInterface(uri.getPath());
@@ -122,6 +134,7 @@ public class ResizedImageRequestBody extends CountingRequestBody{
 				Matrix matrix=getExifMatrix(orientation);
 				if(!matrix.isIdentity())
 					bitmap=Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), matrix, false);
+				checkCanceled(canceled, bitmap);
 			}
 
 			boolean isPNG="image/png".equals(contentType);
@@ -130,6 +143,7 @@ public class ResizedImageRequestBody extends CountingRequestBody{
 			File outputFile=File.createTempFile("mastodon_tmp_resized", null);
 			boolean encoded=false;
 			try(FileOutputStream out=new FileOutputStream(outputFile)){
+				checkCanceled(canceled);
 				if(isPNG){
 					encoded=bitmap.compress(Bitmap.CompressFormat.PNG, 0, out);
 				}else{
@@ -143,6 +157,10 @@ public class ResizedImageRequestBody extends CountingRequestBody{
 			}
 			if(!encoded)
 				throw new IOException("Unable to encode resized image");
+			if(canceled.getAsBoolean() || Thread.currentThread().isInterrupted()){
+				outputFile.delete();
+				throw new IOException("Upload canceled");
+			}
 			tempFile=outputFile;
 			length=tempFile.length();
 		}else{
@@ -229,11 +247,23 @@ public class ResizedImageRequestBody extends CountingRequestBody{
 			case ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> matrix.setScale(-1, 1);
 			case ExifInterface.ORIENTATION_ROTATE_180 -> matrix.setRotate(180);
 			case ExifInterface.ORIENTATION_FLIP_VERTICAL -> matrix.setScale(1, -1);
-			case ExifInterface.ORIENTATION_TRANSPOSE -> { matrix.setScale(-1, 1); matrix.postRotate(90); }
+			case ExifInterface.ORIENTATION_TRANSPOSE -> matrix.setValues(new float[]{0, 1, 0, 1, 0, 0, 0, 0, 1});
 			case ExifInterface.ORIENTATION_ROTATE_90 -> matrix.setRotate(90);
-			case ExifInterface.ORIENTATION_TRANSVERSE -> { matrix.setScale(-1, 1); matrix.postRotate(-90); }
+			case ExifInterface.ORIENTATION_TRANSVERSE -> matrix.setValues(new float[]{0, -1, 0, -1, 0, 0, 0, 0, 1});
 			case ExifInterface.ORIENTATION_ROTATE_270 -> matrix.setRotate(-90);
 		}
 		return matrix;
+	}
+
+	private static void checkCanceled(BooleanSupplier canceled) throws IOException{
+		if(canceled.getAsBoolean() || Thread.currentThread().isInterrupted())
+			throw new IOException("Upload canceled");
+	}
+
+	private static void checkCanceled(BooleanSupplier canceled, Bitmap bitmap) throws IOException{
+		if(canceled.getAsBoolean() || Thread.currentThread().isInterrupted()){
+			bitmap.recycle();
+			throw new IOException("Upload canceled");
+		}
 	}
 }
