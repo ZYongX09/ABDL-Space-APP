@@ -195,4 +195,9 @@ public class ResizedImageRequestBody extends CountingRequestBody{
 	protected Rect getCropBounds(int srcWidth, int srcHeight){
 		return null;
 	}
+
+	public void cleanup(){
+		if(tempFile!=null)
+			tempFile.delete();
+	}
 }
