@@ -268,6 +268,10 @@
 	<string name="edit">编辑</string>
 	<string name="discard_changes">丢弃更改？</string>
 	<string name="upload_failed">上传失败</string>
+	<string name="cos_upload_failed_title">COS 直传失败</string>
+	<string name="cos_upload_fallback_warning">你可以重试 COS 直传，或明确选择备用图床。备用链路上传和访问更慢，依赖第三方服务，时间线缩略图也可能需要实时转换。</string>
+	<string name="cos_upload_retry">重试 COS</string>
+	<string name="cos_upload_use_fallback">使用备用上传</string>
 	<string name="file_size_bytes">%d 字节</string>
 	<string name="file_size_kb">%.2f KB</string>
 	<string name="file_size_mb">%.2f MB</string>

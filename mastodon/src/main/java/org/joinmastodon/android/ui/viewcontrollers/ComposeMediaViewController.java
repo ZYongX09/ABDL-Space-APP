@@ -4,6 +4,7 @@ import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
+import android.app.AlertDialog;
 import android.content.Context;
 import android.database.Cursor;
 import android.graphics.Bitmap;
@@ -384,6 +385,7 @@ public class ComposeMediaViewController{
 		attachment.speedTracker.addSample(0);
 		attachment.uploadRequest=(UploadAttachment) new UploadAttachment(attachment.uri, maxSize, attachment.description)
 				.setNsfw(attachment.nsfwDetected && org.joinmastodon.android.nsfw.NsfwDetector.isNsfw(attachment.nsfwScore))
+				.setUseImgbedFallback(attachment.useImgbedFallback)
 				.setProgressListener(new ProgressListener(){
 					@Override
 					public void onProgress(long transferred, long total){
@@ -472,19 +474,33 @@ public class ComposeMediaViewController{
 	private void onRetryOrCancelMediaUploadClick(View v){
 		DraftMediaAttachment att=(DraftMediaAttachment) v.getTag();
 		if(att.state==AttachmentUploadState.ERROR){
-//			att.retryButton.setImageResource(R.drawable.ic_fluent_dismiss_24_filled);
-//			att.retryButton.setContentDescription(fragment.getString(R.string.cancel));
-			V.setVisibilityAnimated(att.progressBar, View.VISIBLE);
-			V.setVisibilityAnimated(att.editButton, View.GONE);
-			att.titleView.setText(fragment.getString(R.string.attachment_x_percent_uploaded, 0));
-			att.state=AttachmentUploadState.QUEUED;
-			att.setUseErrorColors(false);
-			if(!areThereAnyUploadingAttachments()){
-				uploadNextQueuedAttachment();
-			}
+			showUploadRecoveryDialog(att);
 		}else{
 			onRemoveMediaAttachmentClick(v);
 		}
+	}
+
+	private void showUploadRecoveryDialog(DraftMediaAttachment attachment){
+		if(fragment.getActivity()==null)
+			return;
+		new AlertDialog.Builder(fragment.getActivity())
+				.setTitle(R.string.cos_upload_failed_title)
+				.setMessage(R.string.cos_upload_fallback_warning)
+				.setPositiveButton(R.string.cos_upload_retry, (dialog, which)->retryMediaUpload(attachment, false))
+				.setNegativeButton(R.string.cos_upload_use_fallback, (dialog, which)->retryMediaUpload(attachment, true))
+				.setNeutralButton(R.string.cancel, null)
+				.show();
+	}
+
+	private void retryMediaUpload(DraftMediaAttachment attachment, boolean fallback){
+		V.setVisibilityAnimated(attachment.progressBar, View.VISIBLE);
+		V.setVisibilityAnimated(attachment.editButton, View.GONE);
+		attachment.titleView.setText(fragment.getString(R.string.attachment_x_percent_uploaded, 0));
+		attachment.state=AttachmentUploadState.QUEUED;
+		attachment.useImgbedFallback=fallback;
+		attachment.setUseErrorColors(false);
+		if(!areThereAnyUploadingAttachments())
+			uploadNextQueuedAttachment();
 	}
 
 	private void loadVideoThumbIntoView(ImageView target, Uri uri){
@@ -688,6 +704,7 @@ public class ComposeMediaViewController{
 		public Attachment serverAttachment;
 		public Uri uri;
 		public transient UploadAttachment uploadRequest;
+		public transient boolean useImgbedFallback;
 		public transient GetAttachmentByID processingPollingRequest;
 		public String description;
 		public String mimeType;

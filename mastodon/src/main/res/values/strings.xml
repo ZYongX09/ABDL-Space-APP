@@ -297,6 +297,10 @@
 	<string name="edit">Edit</string>
 	<string name="discard_changes">Discard changes?</string>
 	<string name="upload_failed">Upload failed</string>
+	<string name="cos_upload_failed_title">COS upload failed</string>
+	<string name="cos_upload_fallback_warning">You can retry the direct COS upload or explicitly use the backup image host. The backup is slower, depends on a third-party service, and timeline thumbnails may require realtime conversion.</string>
+	<string name="cos_upload_retry">Retry COS</string>
+	<string name="cos_upload_use_fallback">Use backup upload</string>
 	<string name="file_size_bytes">%d bytes</string>
 	<string name="file_size_kb">%.2f KB</string>
 	<string name="file_size_mb">%.2f MB</string>

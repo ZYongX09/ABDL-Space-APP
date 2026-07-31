@@ -229,6 +229,18 @@ public abstract class MastodonAPIRequest<T> extends APIRequest<T>{
 			invokeSuccessCallback(resp);
 	}
 
+	protected final void dispatchSuccess(T resp){
+		onSuccess(resp);
+	}
+
+	protected final void dispatchError(ErrorResponse error){
+		onError(error);
+	}
+
+	protected final boolean isCanceled(){
+		return canceled;
+	}
+
 	@Override
 	protected void onRequestDone(){
 		if(progressDialog!=null){
