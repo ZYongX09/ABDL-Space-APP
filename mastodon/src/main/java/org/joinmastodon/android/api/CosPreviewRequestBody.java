@@ -14,6 +14,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.function.BooleanSupplier;
 
 import okhttp3.MediaType;
 import okio.Okio;
@@ -26,6 +27,10 @@ public class CosPreviewRequestBody extends CountingRequestBody{
 	private final int height;
 
 	public CosPreviewRequestBody(Uri uri, ProgressListener listener) throws IOException{
+		this(uri, listener, ()->false);
+	}
+
+	public CosPreviewRequestBody(Uri uri, ProgressListener listener, BooleanSupplier canceled) throws IOException{
 		super(listener);
 		Bitmap bitmap=null;
 		File tempFile=null;
@@ -33,6 +38,7 @@ public class CosPreviewRequestBody extends CountingRequestBody{
 		int outputWidth=0;
 		int outputHeight=0;
 		try{
+		checkCanceled(canceled);
 		if(Build.VERSION.SDK_INT>=28){
 			ImageDecoder.Source source="file".equals(uri.getScheme())
 					? ImageDecoder.createSource(new File(uri.getPath()))
@@ -44,6 +50,7 @@ public class CosPreviewRequestBody extends CountingRequestBody{
 				decoder.setAllocator(ImageDecoder.ALLOCATOR_SOFTWARE);
 				decoder.setTargetSize(Math.max(1, Math.round(srcWidth*scale)), Math.max(1, Math.round(srcHeight*scale)));
 			});
+			checkCanceled(canceled);
 		}else{
 			BitmapFactory.Options bounds=new BitmapFactory.Options();
 			bounds.inJustDecodeBounds=true;
@@ -60,10 +67,12 @@ public class CosPreviewRequestBody extends CountingRequestBody{
 			}
 			if(bitmap==null)
 				throw new IOException("Invalid image");
+			checkCanceled(canceled);
 			int targetWidth=Math.max(1, Math.round(bounds.outWidth*scale));
 			int targetHeight=Math.max(1, Math.round(bounds.outHeight*scale));
 			if(bitmap.getWidth()!=targetWidth || bitmap.getHeight()!=targetHeight)
 				bitmap=Bitmap.createScaledBitmap(bitmap, targetWidth, targetHeight, true);
+			checkCanceled(canceled);
 			int orientation=ExifInterface.ORIENTATION_NORMAL;
 			try(InputStream input=MastodonApp.context.getContentResolver().openInputStream(uri)){
 				orientation=new ExifInterface(input).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL);
@@ -71,11 +80,13 @@ public class CosPreviewRequestBody extends CountingRequestBody{
 			Matrix matrix=getExifMatrix(orientation);
 			if(!matrix.isIdentity())
 				bitmap=Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), matrix, true);
+			checkCanceled(canceled);
 		}
 		outputWidth=bitmap.getWidth();
 		outputHeight=bitmap.getHeight();
 		boolean transparent=bitmap.hasAlpha();
 		tempFile=File.createTempFile("cos_preview", transparent ? ".webp" : ".jpg", MastodonApp.context.getCacheDir());
+		checkCanceled(canceled);
 		try(FileOutputStream output=new FileOutputStream(tempFile)){
 			Bitmap.CompressFormat format=transparent
 					? (Build.VERSION.SDK_INT>=30 ? Bitmap.CompressFormat.WEBP_LOSSLESS : Bitmap.CompressFormat.WEBP)
@@ -83,6 +94,7 @@ public class CosPreviewRequestBody extends CountingRequestBody{
 			if(!bitmap.compress(format, transparent ? 100 : 78, output))
 				throw new IOException("Unable to encode COS preview");
 		}
+		checkCanceled(canceled);
 		length=tempFile.length();
 		outputType=MediaType.get(transparent ? "image/webp" : "image/jpeg");
 		}catch(IOException | RuntimeException x){
@@ -105,12 +117,17 @@ public class CosPreviewRequestBody extends CountingRequestBody{
 			case ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> matrix.setScale(-1, 1);
 			case ExifInterface.ORIENTATION_ROTATE_180 -> matrix.setRotate(180);
 			case ExifInterface.ORIENTATION_FLIP_VERTICAL -> matrix.setScale(1, -1);
-			case ExifInterface.ORIENTATION_TRANSPOSE -> { matrix.setScale(-1, 1); matrix.postRotate(90); }
+			case ExifInterface.ORIENTATION_TRANSPOSE -> matrix.setValues(new float[]{0, 1, 0, 1, 0, 0, 0, 0, 1});
 			case ExifInterface.ORIENTATION_ROTATE_90 -> matrix.setRotate(90);
-			case ExifInterface.ORIENTATION_TRANSVERSE -> { matrix.setScale(-1, 1); matrix.postRotate(-90); }
+			case ExifInterface.ORIENTATION_TRANSVERSE -> matrix.setValues(new float[]{0, -1, 0, -1, 0, 0, 0, 0, 1});
 			case ExifInterface.ORIENTATION_ROTATE_270 -> matrix.setRotate(-90);
 		}
 		return matrix;
+	}
+
+	private static void checkCanceled(BooleanSupplier canceled) throws IOException{
+		if(canceled.getAsBoolean() || Thread.currentThread().isInterrupted())
+			throw new IOException("Upload canceled");
 	}
 
 	public int getWidth(){ return width; }

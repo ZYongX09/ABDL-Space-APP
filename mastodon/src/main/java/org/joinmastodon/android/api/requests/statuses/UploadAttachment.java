@@ -97,9 +97,9 @@ public class UploadAttachment extends MastodonAPIRequest<Attachment>{
 			if(bounds.outWidth<=0 || bounds.outHeight<=0)
 				throw new IOException("Invalid image");
 			throwIfCanceled();
-			originalDelegate=maxImageSize>0 ? new ResizedImageRequestBody(uri, maxImageSize, null) : new ContentUriRequestBody(uri, null);
+			originalDelegate=maxImageSize>0 ? new ResizedImageRequestBody(uri, maxImageSize, null, this::isPreprocessingCanceled) : new ContentUriRequestBody(uri, null);
 			throwIfCanceled();
-			previewBody=new CosPreviewRequestBody(uri, null);
+			previewBody=new CosPreviewRequestBody(uri, null, this::isPreprocessingCanceled);
 			throwIfCanceled();
 			CosMediaUpload.Progress progress=new CosMediaUpload.Progress(originalDelegate.contentLength(), previewBody.contentLength());
 			ProgressListener originalProgress=(transferred, total)->notifyProgress(progress.updateOriginal(transferred));
@@ -132,8 +132,12 @@ public class UploadAttachment extends MastodonAPIRequest<Attachment>{
 	}
 
 	private void throwIfCanceled() throws IOException{
-		if(isCanceled() || Thread.currentThread().isInterrupted())
+		if(isPreprocessingCanceled())
 			throw new IOException("Upload canceled");
+	}
+
+	private boolean isPreprocessingCanceled(){
+		return isCanceled() || Thread.currentThread().isInterrupted();
 	}
 
 	private void setCurrentCall(Call call){
