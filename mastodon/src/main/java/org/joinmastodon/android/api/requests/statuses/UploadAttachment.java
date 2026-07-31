@@ -70,10 +70,8 @@ public class UploadAttachment extends MastodonAPIRequest<Attachment>{
 			addHeader("X-ABDL-Upload-Fallback", "imgbed");
 			return (UploadAttachment)super.exec(accountID);
 		}
-		if(contentType==null || !contentType.startsWith("image/")){
-			addHeader("X-ABDL-Upload-Fallback", "imgbed");
+		if(contentType==null || !contentType.startsWith("image/"))
 			return (UploadAttachment)super.exec(accountID);
-		}
 		AccountSession session=AccountSessionManager.getInstance().getAccount(accountID);
 		if(session==null || !"abdl-space.top".equalsIgnoreCase(session.domain))
 			return (UploadAttachment)super.exec(accountID);
