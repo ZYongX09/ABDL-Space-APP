@@ -57,6 +57,7 @@ import org.joinmastodon.android.ui.utils.UiUtils;
 import static org.joinmastodon.android.ui.compose.navigation.FriendUniverseToolbarModelKt.friendUniverseMayApplySearch;
 import static org.joinmastodon.android.ui.compose.navigation.FriendUniverseToolbarModelKt.friendUniverseTopPaddingDp;
 import static org.joinmastodon.android.ui.compose.navigation.FriendUniverseToolbarModelKt.friendUniverseCanLoadMore;
+import static org.joinmastodon.android.ui.compose.navigation.FriendUniverseToolbarModelKt.friendUniverseDataLoadingAfterResponse;
 
 public class FriendRequestListFragment extends LoaderFragment {
 	private RecyclerView recyclerView;
@@ -248,6 +249,7 @@ public class FriendRequestListFragment extends LoaderFragment {
 						loadingMore=false;
 						return;
 					}
+					dataLoading=friendUniverseDataLoadingAfterResponse(requestGeneration, searchGeneration, dataLoading);
 					if(!friendUniverseMayApplySearch(requestGeneration, searchGeneration)) return;
 					List<Map<String, Object>> requests = (List<Map<String, Object>>) result.get("requests");
 					Gson gson = new Gson();
@@ -282,6 +284,7 @@ public class FriendRequestListFragment extends LoaderFragment {
 						loadingMore=false;
 						return;
 					}
+					dataLoading=friendUniverseDataLoadingAfterResponse(requestGeneration, searchGeneration, dataLoading);
 					if(!friendUniverseMayApplySearch(requestGeneration, searchGeneration)) return;
 					swipeRefreshLayout.setRefreshing(false);
 					loadingMore = false;

@@ -15,5 +15,8 @@ fun friendUniverseCaptureHeightDp(searchExpanded: Boolean): Int = if(searchExpan
 fun friendUniverseMayApplySearch(requestGeneration: Int, currentGeneration: Int): Boolean =
 	requestGeneration == currentGeneration
 
+fun friendUniverseDataLoadingAfterResponse(requestGeneration: Int, currentGeneration: Int, dataLoading: Boolean): Boolean =
+	if(requestGeneration == currentGeneration) false else dataLoading
+
 fun friendUniverseCanLoadMore(dataLoading: Boolean, loadingMore: Boolean, hasMore: Boolean, itemCount: Int, lastVisibleItem: Int): Boolean =
 	!dataLoading && !loadingMore && hasMore && itemCount>0 && lastVisibleItem>=itemCount-3

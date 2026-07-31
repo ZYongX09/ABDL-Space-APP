@@ -35,4 +35,10 @@ class FriendUniverseToolbarModelTest {
 		assertFalse(friendUniverseCanLoadMore(dataLoading = false, loadingMore = false, hasMore = true, itemCount = 0, lastVisibleItem = 0))
 		assertTrue(friendUniverseCanLoadMore(dataLoading = false, loadingMore = false, hasMore = true, itemCount = 20, lastVisibleItem = 17))
 	}
+
+	@Test
+	fun currentInitialResponseFinishesLoadingWithoutLettingStaleResponseClearIt() {
+		assertFalse(friendUniverseDataLoadingAfterResponse(requestGeneration = 3, currentGeneration = 3, dataLoading = true))
+		assertTrue(friendUniverseDataLoadingAfterResponse(requestGeneration = 2, currentGeneration = 3, dataLoading = true))
+	}
 }
