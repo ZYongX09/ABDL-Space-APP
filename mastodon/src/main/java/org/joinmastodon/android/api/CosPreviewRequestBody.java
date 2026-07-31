@@ -27,7 +27,12 @@ public class CosPreviewRequestBody extends CountingRequestBody{
 
 	public CosPreviewRequestBody(Uri uri, ProgressListener listener) throws IOException{
 		super(listener);
-		Bitmap bitmap;
+		Bitmap bitmap=null;
+		File tempFile=null;
+		MediaType outputType=null;
+		int outputWidth=0;
+		int outputHeight=0;
+		try{
 		if(Build.VERSION.SDK_INT>=28){
 			ImageDecoder.Source source="file".equals(uri.getScheme())
 					? ImageDecoder.createSource(new File(uri.getPath()))
@@ -63,32 +68,49 @@ public class CosPreviewRequestBody extends CountingRequestBody{
 			try(InputStream input=MastodonApp.context.getContentResolver().openInputStream(uri)){
 				orientation=new ExifInterface(input).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL);
 			}
-			int rotation=switch(orientation){
-				case ExifInterface.ORIENTATION_ROTATE_90 -> 90;
-				case ExifInterface.ORIENTATION_ROTATE_180 -> 180;
-				case ExifInterface.ORIENTATION_ROTATE_270 -> 270;
-				default -> 0;
-			};
-			if(rotation!=0){
-				Matrix matrix=new Matrix();
-				matrix.setRotate(rotation);
+			Matrix matrix=getExifMatrix(orientation);
+			if(!matrix.isIdentity())
 				bitmap=Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), matrix, true);
-			}
 		}
-		width=bitmap.getWidth();
-		height=bitmap.getHeight();
+		outputWidth=bitmap.getWidth();
+		outputHeight=bitmap.getHeight();
 		boolean transparent=bitmap.hasAlpha();
-		file=File.createTempFile("cos_preview", transparent ? ".webp" : ".jpg", MastodonApp.context.getCacheDir());
-		try(FileOutputStream output=new FileOutputStream(file)){
+		tempFile=File.createTempFile("cos_preview", transparent ? ".webp" : ".jpg", MastodonApp.context.getCacheDir());
+		try(FileOutputStream output=new FileOutputStream(tempFile)){
 			Bitmap.CompressFormat format=transparent
 					? (Build.VERSION.SDK_INT>=30 ? Bitmap.CompressFormat.WEBP_LOSSLESS : Bitmap.CompressFormat.WEBP)
 					: Bitmap.CompressFormat.JPEG;
 			if(!bitmap.compress(format, transparent ? 100 : 78, output))
 				throw new IOException("Unable to encode COS preview");
 		}
-		bitmap.recycle();
-		length=file.length();
-		contentType=MediaType.get(transparent ? "image/webp" : "image/jpeg");
+		length=tempFile.length();
+		outputType=MediaType.get(transparent ? "image/webp" : "image/jpeg");
+		}catch(IOException | RuntimeException x){
+			if(tempFile!=null)
+				tempFile.delete();
+			throw x;
+		}finally{
+			if(bitmap!=null && !bitmap.isRecycled())
+				bitmap.recycle();
+		}
+		file=tempFile;
+		contentType=outputType;
+		width=outputWidth;
+		height=outputHeight;
+	}
+
+	private static Matrix getExifMatrix(int orientation){
+		Matrix matrix=new Matrix();
+		switch(orientation){
+			case ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> matrix.setScale(-1, 1);
+			case ExifInterface.ORIENTATION_ROTATE_180 -> matrix.setRotate(180);
+			case ExifInterface.ORIENTATION_FLIP_VERTICAL -> matrix.setScale(1, -1);
+			case ExifInterface.ORIENTATION_TRANSPOSE -> { matrix.setScale(-1, 1); matrix.postRotate(90); }
+			case ExifInterface.ORIENTATION_ROTATE_90 -> matrix.setRotate(90);
+			case ExifInterface.ORIENTATION_TRANSVERSE -> { matrix.setScale(-1, 1); matrix.postRotate(-90); }
+			case ExifInterface.ORIENTATION_ROTATE_270 -> matrix.setRotate(-90);
+		}
+		return matrix;
 	}
 
 	public int getWidth(){ return width; }
