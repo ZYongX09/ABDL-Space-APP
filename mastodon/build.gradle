@@ -17,7 +17,7 @@ android {
 	defaultConfig {
 		manifestPlaceholders = [oAuthScheme:"abdl-space"]
 		applicationId "top.abdl_space.app"
-		minSdk 24
+		minSdk 33
 		targetSdk 35
 		versionCode 22
 		versionName "3.0.0"
