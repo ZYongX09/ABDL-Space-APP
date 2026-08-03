@@ -16,6 +16,12 @@
 		android:visible="false"
 		android:showAsAction="always" />
 	<item
+		android:id="@+id/novel"
+		android:icon="@drawable/ic_fluent_book_24_regular"
+		android:title="@string/novel"
+		android:visible="false"
+		android:showAsAction="never" />
+	<item
 		android:id="@+id/overflow"
 		android:title="@string/more_options"
 		android:icon="@drawable/ic_fluent_more_vertical_24_regular"

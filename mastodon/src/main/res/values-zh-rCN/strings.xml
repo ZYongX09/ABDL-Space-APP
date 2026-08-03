@@ -158,6 +158,13 @@
 	<string name="nbw_forum_selfie">自拍</string>
 	<string name="nbw_forum_share">分享</string>
 	<string name="nbw_forum_novel">小说/漫画</string>
+	<string name="novel">小说</string>
+	<string name="novel_recommend">推荐</string>
+	<string name="novel_bookshelf">书架</string>
+	<string name="novel_creation">创作</string>
+	<string name="novel_recommend_empty">暂无小说推荐</string>
+	<string name="novel_bookshelf_empty">书架还是空的</string>
+	<string name="novel_creation_empty">还没有创作作品</string>
 	<string name="nbw_forum_friends">交友</string>
 	<string name="compose_newbabyworld_title">宝宝新天地</string>
 	<string name="compose_newbabyworld_unbound">发帖前必须绑定宝宝新天地账户。</string>

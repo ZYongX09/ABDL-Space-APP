@@ -587,6 +587,13 @@
 	<string name="nbw_forum_selfie">Selfies</string>
 	<string name="nbw_forum_share">Sharing</string>
 	<string name="nbw_forum_novel">Novels / Comics</string>
+	<string name="novel">Novels</string>
+	<string name="novel_recommend">Recommended</string>
+	<string name="novel_bookshelf">Bookshelf</string>
+	<string name="novel_creation">Create</string>
+	<string name="novel_recommend_empty">No recommendations yet</string>
+	<string name="novel_bookshelf_empty">Your bookshelf is empty</string>
+	<string name="novel_creation_empty">No works created yet</string>
 	<string name="nbw_forum_friends">Friends</string>
 	<string name="nbw_unbind_title">解绑宝宝新天地</string>
 	<string name="nbw_unbind_message">确定解绑 %s？</string>

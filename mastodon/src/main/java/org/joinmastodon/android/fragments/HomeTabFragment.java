@@ -12,6 +12,7 @@ import android.app.Fragment;
 import android.app.FragmentTransaction;
 import android.app.assist.AssistContent;
 import android.content.Context;
+import android.content.Intent;
 import android.content.res.Configuration;
 import android.os.Build;
 import android.os.Bundle;
@@ -58,6 +59,7 @@ import org.joinmastodon.android.model.FollowList;
 import org.joinmastodon.android.model.StatusPrivacy;
 import org.joinmastodon.android.model.TimelineDefinition;
 import org.joinmastodon.android.model.viewmodel.ListItem;
+import org.joinmastodon.android.novel.NovelActivity;
 import org.joinmastodon.android.ui.ExtendedPopupMenu;
 import org.joinmastodon.android.ui.SimpleViewHolder;
 import org.joinmastodon.android.ui.compose.navigation.HomeLiquidToolbarController;
@@ -491,6 +493,7 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		root.add(new HomeToolbarMenuItem(R.id.settings, getString(R.string.settings), R.drawable.ic_fluent_settings_24_regular));
 		root.add(new HomeToolbarMenuItem(R.id.announcements, getString(R.string.sk_announcements), R.drawable.ic_fluent_megaphone_24_regular));
 		root.add(new HomeToolbarMenuItem(R.id.edit_timelines, getString(R.string.sk_edit_timelines), R.drawable.ic_fluent_edit_24_regular));
+		root.add(new HomeToolbarMenuItem(R.id.novel, getString(R.string.novel), R.drawable.ic_fluent_book_24_regular));
 		if(!listItems.isEmpty())
 			root.add(new HomeToolbarMenuItem(R.id.lists, getString(R.string.sk_your_lists), R.drawable.ic_fluent_people_24_regular));
 		if(!hashtagsItems.isEmpty())
@@ -518,6 +521,10 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 	}
 
 	public void onLiquidMenuItem(int id){
+		if(id==R.id.novel){
+			startActivity(new Intent(getActivity(), NovelActivity.class).putExtra("account", accountID));
+			return;
+		}
 		MenuItem item=overflowPopup==null ? null : overflowPopup.getMenu().findItem(id);
 		if(item!=null)
 			onOptionsItemSelected(item);
@@ -640,6 +647,8 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 			Nav.goForResult(getActivity(), AnnouncementsFragment.class, args, ANNOUNCEMENTS_RESULT, this);
 		} else if (id == R.id.edit_timelines) {
 			Nav.go(getActivity(), EditTimelinesFragment.class, args);
+		} else if (id == R.id.novel) {
+			startActivity(new Intent(getActivity(), NovelActivity.class).putExtra("account", accountID));
 		} else if ((list = listItems.get(id)) != null) {
 			args.putString("listID", list.id);
 			args.putString("listTitle", list.title);
