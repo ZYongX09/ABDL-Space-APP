@@ -9,6 +9,7 @@ buildscript {
 		classpath "com.google.android.libraries.mapsplatform.secrets-gradle-plugin:secrets-gradle-plugin:2.0.1"
 		classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:2.4.10"
 		classpath "org.jetbrains.kotlin:compose-compiler-gradle-plugin:2.4.10"
+		classpath "org.jetbrains.kotlin:kotlin-annotation-processing-gradle:2.4.10"
 	}
 }
 
