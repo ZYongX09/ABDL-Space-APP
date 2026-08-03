@@ -49,8 +49,8 @@ dependencies {
 	kapt 'org.jetbrains.kotlin:kotlin-metadata-jvm:2.4.10'
 
 	implementation 'org.jsoup:jsoup:1.18.3'
-	implementation 'org.readium.kotlin-toolkit:readium-shared:3.1.2'
-	implementation 'org.readium.kotlin-toolkit:readium-streamer:3.1.2'
+	compileOnly 'org.readium.kotlin-toolkit:readium-shared:3.1.2'
+	compileOnly 'org.readium.kotlin-toolkit:readium-streamer:3.1.2'
 
 	testImplementation 'junit:junit:4.13.2'
 	testImplementation 'androidx.test:core:1.6.1'

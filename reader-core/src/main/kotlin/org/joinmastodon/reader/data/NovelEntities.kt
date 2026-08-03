@@ -5,14 +5,29 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "novel_books")
+@Entity(
+	tableName = "novel_books",
+	indices = [
+		Index("accountId"),
+		Index(value = ["accountId", "sourceType", "remoteId"], unique = true),
+		Index(value = ["accountId", "deletedAt"]),
+	],
+)
 data class NovelBookEntity(
 	@PrimaryKey val id: String,
+	val accountId: String,
 	val title: String,
 	val author: String? = null,
 	val sourceUri: String? = null,
 	val coverUri: String? = null,
+	val remoteId: String? = null,
+	val sourceType: String = "local",
+	val contentHash: String? = null,
+	val localFilePath: String? = null,
+	val downloadState: String = "pending",
+	val remoteUpdatedAt: Long? = null,
 	val updatedAt: Long = System.currentTimeMillis(),
+	val deletedAt: Long? = null,
 )
 
 @Entity(
@@ -51,14 +66,17 @@ data class NovelChapterEntity(
 			onDelete = ForeignKey.CASCADE,
 		),
 	],
-	indices = [Index("bookId"), Index("chapterId")],
+	indices = [Index("bookId"), Index("chapterId"), Index(value = ["accountId", "bookId", "deletedAt"])],
 )
 data class BookmarkEntity(
 	@PrimaryKey val id: String,
+	val accountId: String,
 	val bookId: String,
 	val chapterId: String,
 	val position: Int,
 	val createdAt: Long = System.currentTimeMillis(),
+	val updatedAt: Long = createdAt,
+	val deletedAt: Long? = null,
 )
 
 @Entity(
@@ -77,10 +95,11 @@ data class BookmarkEntity(
 			onDelete = ForeignKey.CASCADE,
 		),
 	],
-	indices = [Index("bookId"), Index("chapterId")],
+	indices = [Index("bookId"), Index("chapterId"), Index(value = ["accountId", "bookId", "deletedAt"])],
 )
 data class AnnotationEntity(
 	@PrimaryKey val id: String,
+	val accountId: String,
 	val bookId: String,
 	val chapterId: String,
 	val startOffset: Int,
@@ -89,4 +108,5 @@ data class AnnotationEntity(
 	val note: String? = null,
 	val createdAt: Long = System.currentTimeMillis(),
 	val updatedAt: Long = createdAt,
+	val deletedAt: Long? = null,
 )

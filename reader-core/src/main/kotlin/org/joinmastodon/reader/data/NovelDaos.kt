@@ -9,14 +9,20 @@ interface NovelBookDao {
 	@Upsert
 	suspend fun upsert(book: NovelBookEntity)
 
-	@Query("SELECT * FROM novel_books WHERE id = :id")
-	suspend fun getById(id: String): NovelBookEntity?
+	@Query("SELECT * FROM novel_books WHERE accountId = :accountId AND id = :id")
+	suspend fun getById(accountId: String, id: String): NovelBookEntity?
 
-	@Query("DELETE FROM novel_books WHERE id = :id")
-	suspend fun deleteById(id: String)
+	@Query("SELECT * FROM novel_books WHERE accountId = :accountId AND sourceType = :sourceType AND remoteId = :remoteId")
+	suspend fun getByRemoteId(accountId: String, sourceType: String, remoteId: String): NovelBookEntity?
 
-	@Query("SELECT COUNT(*) FROM novel_books")
-	suspend fun count(): Int
+	@Query("SELECT * FROM novel_books WHERE accountId = :accountId AND deletedAt IS NULL ORDER BY updatedAt DESC")
+	suspend fun getActive(accountId: String): List<NovelBookEntity>
+
+	@Query("DELETE FROM novel_books WHERE accountId = :accountId AND id = :id")
+	suspend fun deleteById(accountId: String, id: String)
+
+	@Query("SELECT COUNT(*) FROM novel_books WHERE accountId = :accountId")
+	suspend fun count(accountId: String): Int
 }
 
 @Dao
@@ -36,11 +42,11 @@ interface BookmarkDao {
 	@Upsert
 	suspend fun upsert(bookmark: BookmarkEntity)
 
-	@Query("SELECT * FROM bookmarks WHERE bookId = :bookId ORDER BY createdAt")
-	suspend fun getByBookId(bookId: String): List<BookmarkEntity>
+	@Query("SELECT * FROM bookmarks WHERE accountId = :accountId AND bookId = :bookId AND deletedAt IS NULL ORDER BY createdAt")
+	suspend fun getByBookId(accountId: String, bookId: String): List<BookmarkEntity>
 
-	@Query("DELETE FROM bookmarks WHERE id = :id")
-	suspend fun deleteById(id: String)
+	@Query("DELETE FROM bookmarks WHERE accountId = :accountId AND id = :id")
+	suspend fun deleteById(accountId: String, id: String)
 }
 
 @Dao
@@ -48,9 +54,9 @@ interface AnnotationDao {
 	@Upsert
 	suspend fun upsert(annotation: AnnotationEntity)
 
-	@Query("SELECT * FROM annotations WHERE bookId = :bookId ORDER BY createdAt")
-	suspend fun getByBookId(bookId: String): List<AnnotationEntity>
+	@Query("SELECT * FROM annotations WHERE accountId = :accountId AND bookId = :bookId AND deletedAt IS NULL ORDER BY createdAt")
+	suspend fun getByBookId(accountId: String, bookId: String): List<AnnotationEntity>
 
-	@Query("DELETE FROM annotations WHERE id = :id")
-	suspend fun deleteById(id: String)
+	@Query("DELETE FROM annotations WHERE accountId = :accountId AND id = :id")
+	suspend fun deleteById(accountId: String, id: String)
 }

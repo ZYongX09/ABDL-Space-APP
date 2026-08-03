@@ -8,6 +8,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -34,16 +35,16 @@ class NovelDatabaseTest {
 		val databaseB = open(accountB)
 		val sharedBookId = "book:stable-id"
 
-		databaseA.novelBookDao().upsert(NovelBookEntity(sharedBookId, "Account A book"))
-		databaseB.novelBookDao().upsert(NovelBookEntity(sharedBookId, "Account B book"))
+		databaseA.novelBookDao().upsert(NovelBookEntity(sharedBookId, accountA, "Account A book"))
+		databaseB.novelBookDao().upsert(NovelBookEntity(sharedBookId, accountB, "Account B book"))
 
-		assertEquals("Account A book", databaseA.novelBookDao().getById(sharedBookId)?.title)
-		assertEquals("Account B book", databaseB.novelBookDao().getById(sharedBookId)?.title)
+		assertEquals("Account A book", databaseA.novelBookDao().getById(accountA, sharedBookId)?.title)
+		assertEquals("Account B book", databaseB.novelBookDao().getById(accountB, sharedBookId)?.title)
 
-		databaseA.novelBookDao().deleteById(sharedBookId)
+		databaseA.novelBookDao().deleteById(accountA, sharedBookId)
 
-		assertNull(databaseA.novelBookDao().getById(sharedBookId))
-		assertEquals("Account B book", databaseB.novelBookDao().getById(sharedBookId)?.title)
+		assertNull(databaseA.novelBookDao().getById(accountA, sharedBookId))
+		assertEquals("Account B book", databaseB.novelBookDao().getById(accountB, sharedBookId)?.title)
 	}
 
 	@Test
@@ -51,12 +52,13 @@ class NovelDatabaseTest {
 		val database = open("mastodon.example_300")
 		val stableId = "https://books.example/novel/42"
 
-		database.novelBookDao().upsert(NovelBookEntity(stableId, "First title"))
-		database.novelBookDao().upsert(NovelBookEntity(stableId, "Updated title"))
+		val accountId = "mastodon.example_300"
+		database.novelBookDao().upsert(NovelBookEntity(stableId, accountId, "First title"))
+		database.novelBookDao().upsert(NovelBookEntity(stableId, accountId, "Updated title"))
 
-		assertEquals(1, database.novelBookDao().count())
-		assertEquals(stableId, database.novelBookDao().getById(stableId)?.id)
-		assertEquals("Updated title", database.novelBookDao().getById(stableId)?.title)
+		assertEquals(1, database.novelBookDao().count(accountId))
+		assertEquals(stableId, database.novelBookDao().getById(accountId, stableId)?.id)
+		assertEquals("Updated title", database.novelBookDao().getById(accountId, stableId)?.title)
 	}
 
 	@Test
@@ -72,8 +74,32 @@ class NovelDatabaseTest {
 		assertFalse(databaseName.contains(accountId))
 	}
 
+	@Test
+	fun syncEntitiesExposeRequiredAccountAndLifecycleFields() {
+		assertFields(
+			NovelBookEntity::class.java,
+			"accountId",
+			"remoteId",
+			"sourceType",
+			"contentHash",
+			"localFilePath",
+			"downloadState",
+			"remoteUpdatedAt",
+			"deletedAt",
+		)
+		assertFields(BookmarkEntity::class.java, "accountId", "updatedAt", "deletedAt")
+		assertFields(AnnotationEntity::class.java, "accountId", "updatedAt", "deletedAt")
+	}
+
 	private fun open(accountId: String): NovelDatabase {
 		accountIds += accountId
 		return NovelDatabase.open(context, accountId).also(openedDatabases::add)
+	}
+
+	private fun assertFields(entityClass: Class<*>, vararg expectedFields: String) {
+		val actualFields = entityClass.declaredFields.mapTo(mutableSetOf()) { it.name }
+		expectedFields.forEach { field ->
+			assertTrue("${entityClass.simpleName} must define $field", field in actualFields)
+		}
 	}
 }
