@@ -67,7 +67,7 @@ android {
 			signingConfig signingConfigs.release
 			minifyEnabled false
 			shrinkResources false
-			proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+			proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
 		}
 		debug{
 			debuggable true
@@ -122,6 +122,7 @@ android {
 		}
 	}
 	compileOptions {
+		coreLibraryDesugaringEnabled true
 		sourceCompatibility JavaVersion.VERSION_21
 		targetCompatibility JavaVersion.VERSION_21
 	}
@@ -179,6 +180,7 @@ configurations.all {
 	exclude group: 'androidx.concurrent', module: 'concurrent-futures'
 	exclude group: 'com.google.guava', module: 'listenablefuture'
 	exclude group: 'androidx.viewpager', module: 'viewpager'
+	exclude group: 'androidx.dynamicanimation', module: 'dynamicanimation'
 }
 
 dependencies {
@@ -207,7 +209,7 @@ dependencies {
 	implementation 'org.microg:safe-parcel:1.5.0'
 	implementation 'org.parceler:parceler-api:1.1.12'
 	annotationProcessor 'org.parceler:parceler:1.1.12'
-	coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.3'
+	coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.4'
 	testImplementation 'junit:junit:4.13.2'
 
 	// Compose + miuix
