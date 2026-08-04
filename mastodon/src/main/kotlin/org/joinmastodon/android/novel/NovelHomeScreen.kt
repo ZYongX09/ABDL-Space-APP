@@ -10,16 +10,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -34,10 +24,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.joinmastodon.android.R
+import org.joinmastodon.android.ui.compose.component.BackNavigationIcon
+import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.SmallTopAppBar
+import top.yukonga.miuix.kmp.basic.TabRow
+import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
-@OptIn(ExperimentalMaterial3Api::class)
 fun NovelHomeScreen(onBack: () -> Unit) {
 	val tabs = listOf(
 		R.string.novel_recommend to R.string.novel_recommend_empty,
@@ -50,23 +44,15 @@ fun NovelHomeScreen(onBack: () -> Unit) {
 		containerColor = MiuixTheme.colorScheme.background,
 		topBar = {
 			Column {
-				TopAppBar(
-					title = { Text(stringResource(R.string.novel)) },
-					navigationIcon = {
-						IconButton(onClick = onBack) {
-							Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
-						}
-					},
+				SmallTopAppBar(
+					title = stringResource(R.string.novel),
+					navigationIcon = { BackNavigationIcon(onClick = onBack) },
 				)
-				TabRow(selectedTabIndex = selectedTab) {
-					tabs.forEachIndexed { index, tab ->
-						Tab(
-							selected = selectedTab == index,
-							onClick = { selectedTab = index },
-							text = { Text(stringResource(tab.first)) },
-						)
-					}
-				}
+				TabRow(
+					tabs = tabs.map { stringResource(it.first) },
+					selectedTabIndex = selectedTab,
+					onTabSelected = { selectedTab = it },
+				)
 			}
 		},
 	) { padding ->

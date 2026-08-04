@@ -10,6 +10,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
@@ -29,24 +30,37 @@ fun PagedReader(
 	modifier: Modifier = Modifier,
 ) {
 	val pages = remember(chapter.content, settings.fontSize) { paginate(chapter.content, settings.fontSize) }
-	val pagerState = rememberPagerState(initialPage = initialPage.coerceIn(0, pages.lastIndex), pageCount = { pages.size })
-	LaunchedEffect(pagerState.currentPage) { onPageChanged(pagerState.currentPage) }
-	HorizontalPager(
-		state = pagerState,
-		modifier = modifier
-			.fillMaxSize()
-			.background(settings.palette.background)
-			.pointerInput(chapter.id) { detectTapGestures(onTap = { onToggleControls() }) },
-	) { page ->
-		Box(Modifier.fillMaxSize().padding(horizontal = settings.horizontalPadding.dp, vertical = 52.dp)) {
-			Text(
-				text = pages[page],
-				color = settings.palette.text,
-				style = TextStyle(fontSize = settings.fontSize.sp, lineHeight = (settings.fontSize * settings.lineHeight).sp),
-			)
+	key(pagerStateKey(chapter.id)) {
+		val pagerState = rememberPagerState(initialPage = clampPageIndex(initialPage, pages.size), pageCount = { pages.size })
+		LaunchedEffect(pages.size) {
+			val clampedPage = clampPageIndex(pagerState.currentPage, pages.size)
+			if (clampedPage != pagerState.currentPage) pagerState.scrollToPage(clampedPage)
+		}
+		LaunchedEffect(pagerState.currentPage) { onPageChanged(pagerState.currentPage) }
+		HorizontalPager(
+			state = pagerState,
+			modifier = modifier
+				.fillMaxSize()
+				.background(settings.palette.background)
+				.pointerInput(chapter.id) { detectTapGestures(onTap = { onToggleControls() }) },
+		) { page ->
+			Box(Modifier.fillMaxSize().padding(horizontal = settings.horizontalPadding.dp, vertical = 52.dp)) {
+				Text(
+					text = pages[page],
+					color = settings.palette.text,
+					style = TextStyle(fontSize = settings.fontSize.sp, lineHeight = (settings.fontSize * settings.lineHeight).sp),
+				)
+			}
 		}
 	}
 }
+
+internal fun pagerStateKey(chapterId: String): String = chapterId
+
+internal fun clampPageIndex(pageIndex: Int, pageCount: Int): Int = pageIndex.coerceIn(0, (pageCount - 1).coerceAtLeast(0))
+
+internal fun pageIndexAfterChapterChange(currentChapterId: String, nextChapterId: String, currentPageIndex: Int): Int =
+	if (currentChapterId == nextChapterId) currentPageIndex else 0
 
 private fun paginate(content: String, fontSize: Float): List<String> {
 	val target = (1400f * 19f / fontSize).toInt().coerceAtLeast(400)

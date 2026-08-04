@@ -68,7 +68,12 @@ fun ReaderScreen(
 				palette = settings.palette,
 				onBack = onBack,
 				onSettings = { settingsVisible = true },
-				onChapterSelected = { chapterIndex = it; pageIndex = 0; onPositionChanged(ReaderPosition(it, 0)) },
+				onChapterSelected = {
+					val nextPageIndex = pageIndexAfterChapterChange(chapter.id, chapters[it].id, pageIndex)
+					chapterIndex = it
+					pageIndex = nextPageIndex
+					onPositionChanged(ReaderPosition(it, nextPageIndex))
+				},
 				modifier = Modifier.align(Alignment.TopCenter),
 			)
 		}
