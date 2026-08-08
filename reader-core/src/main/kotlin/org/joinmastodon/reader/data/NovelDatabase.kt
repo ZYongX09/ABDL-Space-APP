@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import java.security.MessageDigest
 
 @Database(
@@ -13,7 +15,7 @@ import java.security.MessageDigest
 		BookmarkEntity::class,
 		AnnotationEntity::class,
 	],
-	version = 1,
+	version = 2,
 	exportSchema = true,
 )
 abstract class NovelDatabase : RoomDatabase() {
@@ -29,7 +31,15 @@ abstract class NovelDatabase : RoomDatabase() {
 				context.applicationContext,
 				NovelDatabase::class.java,
 				databaseName(accountId),
-			).build()
+			).addMigrations(MIGRATION_1_2).build()
+
+		val MIGRATION_1_2 = object : Migration(1, 2) {
+			override fun migrate(database: SupportSQLiteDatabase) {
+				database.execSQL("ALTER TABLE novel_chapters ADD COLUMN deletedAt INTEGER")
+				database.execSQL("DROP INDEX index_novel_chapters_bookId_chapterIndex")
+				database.execSQL("CREATE INDEX IF NOT EXISTS index_novel_chapters_bookId_chapterIndex ON novel_chapters(bookId, chapterIndex)")
+			}
+		}
 
 		fun databaseName(accountId: String): String {
 			val digest = MessageDigest.getInstance("SHA-256")

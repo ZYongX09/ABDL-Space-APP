@@ -6,7 +6,9 @@ import android.net.Uri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import androidx.room.withTransaction
 import org.joinmastodon.android.api.novels.PrivateBookUpload
 import org.joinmastodon.android.api.novels.PrivateNovelApi
 import org.joinmastodon.android.api.session.AccountSessionManager
@@ -37,11 +39,13 @@ class NovelImportCoordinator(
 		val directory = File(context.cacheDir, "novels/import/${accountHash(accountId)}").apply { mkdirs() }
 		val target = File.createTempFile("import_", ".${format.lowercase()}", directory)
 		try {
+			currentCoroutineContext().ensureActive()
 			context.contentResolver.openInputStream(uri)?.use { input ->
 				FileOutputStream(target).use { output ->
 					val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
 					var total = 0L
 					while (true) {
+						currentCoroutineContext().ensureActive()
 						val read = input.read(buffer)
 						if (read < 0) break
 						total += read
@@ -51,6 +55,7 @@ class NovelImportCoordinator(
 				}
 			} ?: error("无法读取选择的小说文件")
 			if (target.length() == 0L) error("小说文件不能为空")
+			currentCoroutineContext().ensureActive()
 			PreparedImport(target, PrivateBookUpload.sha256(target), PrivateBookUpload.md5Base64(target))
 		} catch (error: Throwable) {
 			target.delete()
@@ -69,20 +74,13 @@ class NovelImportCoordinator(
 		try {
 			val session = AccountSessionManager.getInstance().tryGetAccount(accountId) ?: error("账号已退出")
 			val uploader = PrivateBookUpload(PrivateNovelApi(session), progress)
-			val cancellation = currentCoroutineContext()[kotlinx.coroutines.Job]?.invokeOnCompletion { cause ->
-				if (cause is kotlinx.coroutines.CancellationException) uploader.cancel()
-			}
-			try {
-				uploader.upload(prepared.file, metadata)
-			} finally {
-				cancellation?.dispose()
-			}
+			uploadPrepared(uploader, prepared.file, metadata)
 		} finally {
 			prepared.file.delete()
 		}
 	}
 
-	suspend fun importPrivateBook(accountId: String, file: File, remote: PrivateNovelApi.BookDto, officialPath: String = file.absolutePath): Unit = withContext(Dispatchers.IO) {
+	suspend fun importPrivateBook(accountId: String, file: File, remote: PrivateNovelApi.BookDto, officialPath: String = file.absolutePath, sessionGuard: () -> Boolean = { true }): Unit = withContext(Dispatchers.IO) {
 		currentCoroutineContext().ensureActive()
 		val parsed = parser.parse(file)
 		currentCoroutineContext().ensureActive()
@@ -102,7 +100,11 @@ class NovelImportCoordinator(
 		}
 		val database = NovelDatabase.open(context, accountId)
 		try {
-			database.novelImportDao().importBook(book, chapters)
+			database.withTransaction {
+				if (!sessionGuard()) error("账号已退出")
+				database.novelImportDao().importBook(book, chapters)
+				if (!sessionGuard()) error("账号已退出")
+			}
 		} finally {
 			database.close()
 		}
@@ -111,6 +113,21 @@ class NovelImportCoordinator(
 	companion object {
 		const val SOURCE_TYPE_PRIVATE = "private"
 		const val DOWNLOAD_STATE_READY = "ready"
+
+		internal suspend fun uploadPrepared(uploader: PrivateBookUpload, file: File, metadata: PrivateNovelApi.UploadMetadata): PrivateNovelApi.BookDto =
+			suspendCancellableCoroutine { continuation ->
+				continuation.invokeOnCancellation { uploader.cancel() }
+				val thread = Thread {
+					try {
+						val result = uploader.upload(file, metadata)
+						continuation.resume(result) { _, _, _ -> }
+					} catch (error: Throwable) {
+						if (continuation.isActive) continuation.resumeWith(Result.failure(error))
+					}
+				}
+				thread.name = "novel-private-upload"
+				thread.start()
+			}
 
 		fun accountHash(accountId: String): String = MessageDigest.getInstance("SHA-256")
 			.digest(accountId.toByteArray(Charsets.UTF_8))

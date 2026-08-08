@@ -29,6 +29,7 @@ public class PrivateBookUpload{
 	private final PrivateNovelApi api;
 	private final IntConsumer progressListener;
 	private final LongConsumer sleeper;
+	private final Runnable completionGate;
 	private final AtomicReference<Call> currentCall=new AtomicReference<>();
 	private final Object callLock=new Object();
 	private volatile State state=State.IDLE;
@@ -43,13 +44,18 @@ public class PrivateBookUpload{
 				Thread.currentThread().interrupt();
 				throw new RuntimeException(e);
 			}
-		});
+		}, () -> {});
 	}
 
 	public PrivateBookUpload(PrivateNovelApi api, IntConsumer progressListener, LongConsumer sleeper){
+		this(api, progressListener, sleeper, () -> {});
+	}
+
+	PrivateBookUpload(PrivateNovelApi api, IntConsumer progressListener, LongConsumer sleeper, Runnable completionGate){
 		this.api=api;
 		this.progressListener=progressListener;
 		this.sleeper=sleeper;
+		this.completionGate=completionGate;
 	}
 
 	public State getState(){
@@ -73,8 +79,8 @@ public class PrivateBookUpload{
 
 			if(authorization.alreadyUploaded){
 				PrivateNovelApi.BookDto ready=bookResult(authorization.uploadId, metadata, file.length(), sha256, authorization.parseStatus);
-				state=State.COMPLETE;
-				report(100);
+				completionGate.run();
+				publishComplete();
 				return ready;
 			}else{
 				state=State.UPLOADING;
@@ -90,8 +96,8 @@ public class PrivateBookUpload{
 			state=State.COMPLETING;
 			PrivateNovelApi.CompleteResultDto completed=pollComplete(authorization.uploadId);
 			PrivateNovelApi.BookDto result=bookResult(completed.id, metadata, completed.verifiedSize, sha256, completed.parseStatus);
-			state=State.COMPLETE;
-			report(100);
+			completionGate.run();
+			publishComplete();
 			return result;
 		}catch(IOException e){
 			state=canceled ? State.CANCELED : State.FAILED;
@@ -269,6 +275,14 @@ public class PrivateBookUpload{
 	private void checkCanceled() throws IOException{
 		if(canceled)
 			throw new IOException("Canceled");
+	}
+
+	private void publishComplete() throws IOException{
+		synchronized(callLock){
+			checkCanceled();
+			state=State.COMPLETE;
+			report(100);
+		}
 	}
 
 	private synchronized void report(int value){

@@ -31,8 +31,11 @@ interface NovelChapterDao {
 	@Upsert
 	suspend fun upsert(chapters: List<NovelChapterEntity>)
 
-	@Query("SELECT * FROM novel_chapters WHERE bookId = :bookId ORDER BY chapterIndex")
+	@Query("SELECT * FROM novel_chapters WHERE bookId = :bookId AND deletedAt IS NULL ORDER BY chapterIndex")
 	suspend fun getByBookId(bookId: String): List<NovelChapterEntity>
+
+	@Query("SELECT * FROM novel_chapters WHERE id = :id")
+	suspend fun getById(id: String): NovelChapterEntity?
 
 	@Query("DELETE FROM novel_chapters WHERE bookId = :bookId")
 	suspend fun deleteByBookId(bookId: String)
@@ -58,6 +61,9 @@ interface NovelImportDao {
 	@Query("DELETE FROM novel_chapters WHERE id = :chapterId")
 	suspend fun deleteChapter(chapterId: String)
 
+	@Query("UPDATE novel_chapters SET deletedAt = :deletedAt WHERE id = :chapterId")
+	suspend fun hideChapter(chapterId: String, deletedAt: Long)
+
 	@Upsert
 	suspend fun upsertChapters(chapters: List<NovelChapterEntity>)
 
@@ -66,18 +72,25 @@ interface NovelImportDao {
 		val existingBook = book.remoteId?.let { findRemoteBook(book.accountId, book.sourceType, it) }
 		val stableBook = book.copy(id = existingBook?.id ?: book.id)
 		val existingChapters = findChapters(stableBook.id)
-		val existingByIndex = existingChapters.associateBy { it.chapterIndex }
+		val existingByContent = existingChapters
+			.filter { it.deletedAt == null }
+			.groupBy { it.title to it.content }
+			.mapValues { (_, matches) -> ArrayDeque(matches.sortedBy { it.chapterIndex }) }
 		val stableChapters = chapters.map { chapter ->
+			val existing = existingByContent[chapter.title to chapter.content]?.removeFirstOrNull()
 			chapter.copy(
-				id = existingByIndex[chapter.chapterIndex]?.id ?: chapter.id,
+				id = existing?.id ?: chapter.id,
 				bookId = stableBook.id,
+				deletedAt = null,
 			)
 		}
 		upsertBook(stableBook)
 		upsertChapters(stableChapters)
 		val retainedIds = stableChapters.mapTo(HashSet()) { it.id }
-		existingChapters.filter { it.id !in retainedIds }.forEach { chapter ->
+		val deletedAt = System.currentTimeMillis()
+		existingChapters.filter { it.deletedAt == null && it.id !in retainedIds }.forEach { chapter ->
 			if (bookmarkCount(chapter.id) == 0 && annotationCount(chapter.id) == 0) deleteChapter(chapter.id)
+			else hideChapter(chapter.id, deletedAt)
 		}
 		return stableBook.id
 	}

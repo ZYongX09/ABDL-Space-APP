@@ -7,6 +7,7 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import androidx.room.withTransaction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.job
 import kotlinx.coroutines.runInterruptible
@@ -37,12 +38,20 @@ class NovelDownloadWorker(
 		val accountId = inputData.getString(KEY_ACCOUNT_ID) ?: return@withContext Result.failure()
 		val bookId = inputData.getString(KEY_BOOK_ID) ?: return@withContext Result.failure()
 		val session = AccountSessionManager.getInstance().tryGetAccount(accountId) ?: return@withContext Result.failure()
+		val accessToken = session.token.accessToken
+		val sessionGuard = AccountSessionGuard {
+			val current = AccountSessionManager.getInstance().tryGetAccount(accountId)
+			current === session && current.token.accessToken == accessToken
+		}
 		val api = PrivateNovelApi(session)
 		try {
 			if (!SAFE_BOOK_ID.matches(bookId)) return@withContext Result.failure()
+			sessionGuard.requireValid()
 			val book = execute(api, api.newBookCall(bookId), PrivateNovelApi.BookDto::class.java)
 			if (book.id != bookId || book.format !in SUPPORTED_FORMATS || book.verifiedSize <= 0 || book.verifiedSize > PrivateBookUpload.MAX_SIZE || !SHA_256.matches(book.contentHash.orEmpty())) return@withContext Result.failure()
+			sessionGuard.requireValid()
 			val authorization = execute(api, api.newDownloadAuthorizeCall(bookId), PrivateNovelApi.DownloadAuthorization::class.java)
+			sessionGuard.requireValid()
 			val directory = File(applicationContext.filesDir, "novels/${NovelImportCoordinator.accountHash(accountId)}").apply { mkdirs() }
 			val destination = File(directory, "$bookId.${book.format.lowercase(Locale.ROOT)}")
 			val candidate = File(directory, "$bookId.${book.format.lowercase(Locale.ROOT)}.candidate")
@@ -54,12 +63,12 @@ class NovelDownloadWorker(
 				candidate.delete()
 				throw error
 			}
-			if (AccountSessionManager.getInstance().tryGetAccount(accountId) !== session) {
+			if (!sessionGuard.isValid()) {
 				candidate.delete()
 				return@withContext Result.failure()
 			}
-			commitCandidate(destination, candidate) {
-				NovelImportCoordinator(applicationContext).importPrivateBook(accountId, destination, book)
+			commitCandidate(destination, candidate, sessionGuard::isValid) {
+				NovelImportCoordinator(applicationContext).importPrivateBook(accountId, destination, book, sessionGuard = sessionGuard::isValid)
 			}
 			Result.success()
 		} catch (error: IOException) {
@@ -108,9 +117,13 @@ class NovelDownloadWorker(
 			"novel-download:${NovelImportCoordinator.accountHash(accountId)}:$bookId"
 
 		@JvmStatic
+		fun accountWorkTag(accountId: String): String = "novel-download-account:${NovelImportCoordinator.accountHash(accountId)}"
+
+		@JvmStatic
 		fun enqueue(context: Context, accountId: String, bookId: String) {
 			val request = OneTimeWorkRequestBuilder<NovelDownloadWorker>()
 				.setInputData(Data.Builder().putString(KEY_ACCOUNT_ID, accountId).putString(KEY_BOOK_ID, bookId).build())
+				.addTag(accountWorkTag(accountId))
 				.build()
 			WorkManager.getInstance(context).enqueueUniqueWork(uniqueWorkName(accountId, bookId), ExistingWorkPolicy.KEEP, request)
 		}
@@ -167,23 +180,41 @@ class NovelDownloadWorker(
 
 		@JvmStatic
 		@Throws(IOException::class)
-		suspend fun commitCandidate(destination: File, candidate: File, commitDatabase: suspend () -> Unit) {
+		suspend fun commitCandidate(destination: File, candidate: File, commitDatabase: suspend () -> Unit) =
+			commitCandidate(destination, candidate, { true }, commitDatabase)
+
+		@JvmStatic
+		@Throws(IOException::class)
+		suspend fun commitCandidate(destination: File, candidate: File, sessionValid: () -> Boolean, commitDatabase: suspend () -> Unit) {
 			val backup = File(destination.parentFile, destination.name + ".backup")
-			backup.delete()
+			if (backup.exists()) {
+				if (destination.exists()) destination.delete()
+				moveAtomic(backup, destination)
+			}
+			var switched = false
 			try {
+				requireSession(sessionValid)
 				if (destination.exists()) moveAtomic(destination, backup)
+				requireSession(sessionValid)
 				moveAtomic(candidate, destination)
+				switched = true
+				requireSession(sessionValid)
 				commitDatabase()
+				requireSession(sessionValid)
 				backup.delete()
 			} catch (error: Throwable) {
-				destination.delete()
+				if (switched) destination.delete()
 				if (backup.exists()) moveAtomic(backup, destination)
 				throw error
 			} finally {
 				candidate.delete()
 				if (backup.exists() && !destination.exists()) moveAtomic(backup, destination)
-				backup.delete()
+				if (destination.exists()) backup.delete()
 			}
+		}
+
+		private fun requireSession(sessionValid: () -> Boolean) {
+			if (!sessionValid()) throw IOException("Account session changed")
 		}
 
 		private fun moveAtomic(source: File, destination: File) {
@@ -193,5 +224,13 @@ class NovelDownloadWorker(
 				throw IOException("Atomic file replacement is unavailable", error)
 			}
 		}
+	}
+}
+
+fun interface AccountSessionGuard {
+	fun isValid(): Boolean
+
+	fun requireValid() {
+		if (!isValid()) throw IOException("Account session changed")
 	}
 }

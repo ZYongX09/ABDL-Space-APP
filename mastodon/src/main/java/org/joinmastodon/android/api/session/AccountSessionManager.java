@@ -80,6 +80,8 @@ import java.util.stream.Collectors;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.browser.customtabs.CustomTabsIntent;
+import androidx.work.WorkManager;
+import org.joinmastodon.android.novel.download.NovelDownloadWorker;
 import me.grishka.appkit.api.APIRequest;
 import me.grishka.appkit.api.Callback;
 import me.grishka.appkit.api.ErrorResponse;
@@ -202,6 +204,7 @@ public class AccountSessionManager{
 
 	public void removeAccount(String id){
 		AccountSession session=getAccount(id);
+		WorkManager.getInstance(MastodonApp.context).cancelAllWorkByTag(NovelDownloadWorker.accountWorkTag(id));
 		session.getCacheController().closeDatabase();
 		MastodonApp.context.deleteDatabase(id+".db");
 		MastodonApp.context.getSharedPreferences(id, 0).edit().clear().commit();

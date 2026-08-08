@@ -98,6 +98,74 @@ public class PrivateBookUploadTest{
 	}
 
 	@Test
+	public void cancelAfterReadyResponseCannotPublishComplete() throws Exception{
+		File source=write("book.txt", "ready cancellation");
+		server.enqueue(json(200, "{\"upload_id\":\"book-ready-cancel\",\"already_uploaded\":true,\"parse_status\":\"ready\"}"));
+		CountDownLatch responseHandled=new CountDownLatch(1);
+		CountDownLatch continueCompletion=new CountDownLatch(1);
+		PrivateBookUpload upload=new PrivateBookUpload(api(), ignored -> {}, millis -> {}, () -> {
+			responseHandled.countDown();
+			try{
+				continueCompletion.await(2, TimeUnit.SECONDS);
+			}catch(InterruptedException e){
+				Thread.currentThread().interrupt();
+			}
+		});
+		AtomicReference<Throwable> failure=new AtomicReference<>();
+		Thread thread=new Thread(() -> {
+			try{
+				upload.upload(source, metadata());
+			}catch(Throwable error){
+				failure.set(error);
+			}
+		});
+		thread.start();
+
+		assertTrue(responseHandled.await(2, TimeUnit.SECONDS));
+		upload.cancel();
+		continueCompletion.countDown();
+		thread.join(2000);
+
+		assertTrue(failure.get() instanceof IOException);
+		assertEquals(PrivateBookUpload.State.CANCELED, upload.getState());
+	}
+
+	@Test
+	public void cancelAfterCompleteResponseCannotPublishComplete() throws Exception{
+		File source=write("book.txt", "complete cancellation");
+		server.enqueue(authorizeResponse(source, server.url("/cos/cancel-complete").toString(), "book-complete-cancel"));
+		server.enqueue(new MockResponse().setResponseCode(200));
+		server.enqueue(json(200, "{\"id\":\"book-complete-cancel\",\"format\":\"txt\",\"verified_size\":19,\"parse_status\":\"ready\"}"));
+		CountDownLatch responseHandled=new CountDownLatch(1);
+		CountDownLatch continueCompletion=new CountDownLatch(1);
+		PrivateBookUpload upload=new PrivateBookUpload(api(), ignored -> {}, millis -> {}, () -> {
+			responseHandled.countDown();
+			try{
+				continueCompletion.await(2, TimeUnit.SECONDS);
+			}catch(InterruptedException e){
+				Thread.currentThread().interrupt();
+			}
+		});
+		AtomicReference<Throwable> failure=new AtomicReference<>();
+		Thread thread=new Thread(() -> {
+			try{
+				upload.upload(source, metadata());
+			}catch(Throwable error){
+				failure.set(error);
+			}
+		});
+		thread.start();
+
+		assertTrue(responseHandled.await(2, TimeUnit.SECONDS));
+		upload.cancel();
+		continueCompletion.countDown();
+		thread.join(2000);
+
+		assertTrue(failure.get() instanceof IOException);
+		assertEquals(PrivateBookUpload.State.CANCELED, upload.getState());
+	}
+
+	@Test
 	public void parsingCompletePollsUntilReadyAndOnlyThenReportsComplete() throws Exception{
 		File source=write("book.txt", "poll me");
 		server.enqueue(authorizeResponse(source, server.url("/cos/poll").toString(), "book-poll"));
@@ -265,7 +333,9 @@ public class PrivateBookUploadTest{
 		api.executeJson(api.newDownloadAuthorizeCall("book-9"), PrivateNovelApi.DownloadAuthorization.class);
 		assertEquals("/api/v1/novels/private/book-9/download/authorize", server.takeRequest().getPath());
 		assertEquals("novel-download:"+org.joinmastodon.android.novel.importer.NovelImportCoordinator.Companion.accountHash("account-a")+":book-9", NovelDownloadWorker.uniqueWorkName("account-a", "book-9"));
+		assertEquals("novel-download-account:"+org.joinmastodon.android.novel.importer.NovelImportCoordinator.Companion.accountHash("account-a"), NovelDownloadWorker.accountWorkTag("account-a"));
 		assertFalse(NovelDownloadWorker.uniqueWorkName("account-a", "book-9").equals(NovelDownloadWorker.uniqueWorkName("account-b", "book-9")));
+		assertFalse(NovelDownloadWorker.accountWorkTag("account-a").equals(NovelDownloadWorker.accountWorkTag("account-b")));
 	}
 
 	@Test

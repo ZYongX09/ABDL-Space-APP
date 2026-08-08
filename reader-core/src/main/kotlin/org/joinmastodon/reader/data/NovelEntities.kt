@@ -40,7 +40,7 @@ data class NovelBookEntity(
 			onDelete = ForeignKey.CASCADE,
 		),
 	],
-	indices = [Index("bookId"), Index(value = ["bookId", "chapterIndex"], unique = true)],
+	indices = [Index("bookId"), Index(value = ["bookId", "chapterIndex"])],
 )
 data class NovelChapterEntity(
 	@PrimaryKey val id: String,
@@ -48,6 +48,7 @@ data class NovelChapterEntity(
 	val title: String,
 	val content: String,
 	val chapterIndex: Int,
+	val deletedAt: Long? = null,
 )
 
 @Entity(

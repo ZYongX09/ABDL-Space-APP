@@ -3,6 +3,9 @@ package org.joinmastodon.reader.data
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import java.security.MessageDigest
+import java.io.File
+import java.lang.reflect.Proxy
+import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -89,10 +92,31 @@ class NovelDatabaseTest {
 		)
 		assertFields(BookmarkEntity::class.java, "accountId", "updatedAt", "deletedAt")
 		assertFields(AnnotationEntity::class.java, "accountId", "updatedAt", "deletedAt")
+		assertFields(NovelChapterEntity::class.java, "deletedAt")
 	}
 
 	@Test
-	fun repeatedRemoteImportKeepsStableBookChapterBookmarkAndAnnotation() = runBlocking {
+	fun versionTwoExportsSchemaAndProvidesNonDestructiveMigration() {
+		val schema = File("schemas/org.joinmastodon.reader.data.NovelDatabase/2.json")
+		assertTrue(schema.isFile)
+		assertTrue(schema.readText().contains("\"version\": 2"))
+		val statements = mutableListOf<String>()
+		val database = Proxy.newProxyInstance(
+			SupportSQLiteDatabase::class.java.classLoader,
+			arrayOf(SupportSQLiteDatabase::class.java),
+		) { _, method, args ->
+			if (method.name == "execSQL") statements += args!![0] as String
+			null
+		} as SupportSQLiteDatabase
+
+		NovelDatabase.MIGRATION_1_2.migrate(database)
+
+		assertTrue(statements.any { it == "ALTER TABLE novel_chapters ADD COLUMN deletedAt INTEGER" })
+		assertTrue(statements.any { it.startsWith("CREATE INDEX IF NOT EXISTS index_novel_chapters_bookId_chapterIndex") })
+	}
+
+	@Test
+	fun changedChapterGetsNewIdentityAndReferencesKeepOldHiddenChapter() = runBlocking {
 		val accountId = "mastodon.example_400"
 		val database = open(accountId)
 		val originalBook = NovelBookEntity(
@@ -114,10 +138,12 @@ class NovelDatabaseTest {
 		assertEquals(originalBook.id, stableBookId)
 		assertEquals(1, database.novelBookDao().count(accountId))
 		assertEquals("Updated", database.novelBookDao().getByRemoteId(accountId, "private", "remote-1")?.title)
-		assertEquals(listOf(originalChapter.id), database.novelChapterDao().getByBookId(originalBook.id).map { it.id })
+		assertEquals(listOf(updatedChapter.id), database.novelChapterDao().getByBookId(originalBook.id).map { it.id })
 		assertEquals("new content", database.novelChapterDao().getByBookId(originalBook.id).single().content)
 		assertEquals(originalChapter.id, database.bookmarkDao().getByBookId(accountId, originalBook.id).single().chapterId)
 		assertEquals(originalChapter.id, database.annotationDao().getByBookId(accountId, originalBook.id).single().chapterId)
+		assertEquals("old", database.novelChapterDao().getById(originalChapter.id)?.content)
+		assertTrue(database.novelChapterDao().getById(originalChapter.id)?.deletedAt != null)
 	}
 
 	@Test
@@ -132,8 +158,33 @@ class NovelDatabaseTest {
 
 		database.novelImportDao().importBook(book.copy(title = "Updated"), listOf(kept.copy(content = "updated")))
 
-		assertEquals(setOf("chapter-1", "chapter-2"), database.novelChapterDao().getByBookId(book.id).mapTo(mutableSetOf()) { it.id })
+		assertEquals(setOf("chapter-1"), database.novelChapterDao().getByBookId(book.id).mapTo(mutableSetOf()) { it.id })
 		assertEquals("chapter-2", database.bookmarkDao().getByBookId(accountId, book.id).single().chapterId)
+		assertTrue(database.novelChapterDao().getById("chapter-2")?.deletedAt != null)
+	}
+
+	@Test
+	fun insertingReorderingAndDeletingNeverReassignsChapterIdentity() = runBlocking {
+		val accountId = "mastodon.example_600"
+		val database = open(accountId)
+		val book = NovelBookEntity("book-sequence", accountId, "Book", remoteId = "remote-3", sourceType = "private")
+		val a = NovelChapterEntity("a", book.id, "Same", "alpha", 0)
+		val b = NovelChapterEntity("b", book.id, "Same", "beta", 1)
+		val duplicateA = NovelChapterEntity("a-duplicate", book.id, "Same", "alpha", 2)
+		database.novelImportDao().importBook(book, listOf(a, b, duplicateA))
+		database.bookmarkDao().upsert(BookmarkEntity("bookmark-a", accountId, book.id, a.id, 0))
+		database.annotationDao().upsert(AnnotationEntity("annotation-b", accountId, book.id, b.id, 0, 2, "be"))
+
+		val inserted = NovelChapterEntity("new", book.id, "Intro", "intro", 0)
+		val reorderedDuplicate = NovelChapterEntity("parsed-duplicate", book.id, "Same", "alpha", 1)
+		val reorderedA = NovelChapterEntity("parsed-a", book.id, "Same", "alpha", 2)
+		database.novelImportDao().importBook(book, listOf(inserted, reorderedDuplicate, reorderedA))
+
+		val active = database.novelChapterDao().getByBookId(book.id)
+		assertEquals(listOf("new", "a", "a-duplicate"), active.map { it.id })
+		assertEquals("alpha", database.novelChapterDao().getById(database.bookmarkDao().getByBookId(accountId, book.id).single().chapterId)?.content)
+		assertEquals("beta", database.novelChapterDao().getById(database.annotationDao().getByBookId(accountId, book.id).single().chapterId)?.content)
+		assertTrue(database.novelChapterDao().getById("b")?.deletedAt != null)
 	}
 
 	private fun open(accountId: String): NovelDatabase {
