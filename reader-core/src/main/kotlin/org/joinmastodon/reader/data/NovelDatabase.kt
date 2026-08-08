@@ -19,6 +19,7 @@ import java.security.MessageDigest
 abstract class NovelDatabase : RoomDatabase() {
 	abstract fun novelBookDao(): NovelBookDao
 	abstract fun novelChapterDao(): NovelChapterDao
+	abstract fun novelImportDao(): NovelImportDao
 	abstract fun bookmarkDao(): BookmarkDao
 	abstract fun annotationDao(): AnnotationDao
 

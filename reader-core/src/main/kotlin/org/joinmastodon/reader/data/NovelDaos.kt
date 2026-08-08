@@ -2,6 +2,7 @@ package org.joinmastodon.reader.data
 
 import androidx.room.Dao
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Upsert
 
 @Dao
@@ -35,6 +36,25 @@ interface NovelChapterDao {
 
 	@Query("DELETE FROM novel_chapters WHERE bookId = :bookId")
 	suspend fun deleteByBookId(bookId: String)
+}
+
+@Dao
+interface NovelImportDao {
+	@Upsert
+	suspend fun upsertBook(book: NovelBookEntity)
+
+	@Query("DELETE FROM novel_chapters WHERE bookId = :bookId")
+	suspend fun deleteChapters(bookId: String)
+
+	@Upsert
+	suspend fun upsertChapters(chapters: List<NovelChapterEntity>)
+
+	@Transaction
+	suspend fun replaceBook(book: NovelBookEntity, chapters: List<NovelChapterEntity>) {
+		upsertBook(book)
+		deleteChapters(book.id)
+		upsertChapters(chapters)
+	}
 }
 
 @Dao
