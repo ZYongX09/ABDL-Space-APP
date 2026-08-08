@@ -91,6 +91,51 @@ class NovelDatabaseTest {
 		assertFields(AnnotationEntity::class.java, "accountId", "updatedAt", "deletedAt")
 	}
 
+	@Test
+	fun repeatedRemoteImportKeepsStableBookChapterBookmarkAndAnnotation() = runBlocking {
+		val accountId = "mastodon.example_400"
+		val database = open(accountId)
+		val originalBook = NovelBookEntity(
+			id = "parsed-book-v1",
+			accountId = accountId,
+			title = "Original",
+			remoteId = "remote-1",
+			sourceType = "private",
+		)
+		val originalChapter = NovelChapterEntity("parsed-chapter-v1", originalBook.id, "Chapter 1", "old", 0)
+		database.novelImportDao().importBook(originalBook, listOf(originalChapter))
+		database.bookmarkDao().upsert(BookmarkEntity("bookmark-1", accountId, originalBook.id, originalChapter.id, 1))
+		database.annotationDao().upsert(AnnotationEntity("annotation-1", accountId, originalBook.id, originalChapter.id, 0, 3, "old"))
+
+		val updatedBook = originalBook.copy(id = "parsed-book-v2", title = "Updated")
+		val updatedChapter = NovelChapterEntity("parsed-chapter-v2", updatedBook.id, "Chapter 1", "new content", 0)
+		val stableBookId = database.novelImportDao().importBook(updatedBook, listOf(updatedChapter))
+
+		assertEquals(originalBook.id, stableBookId)
+		assertEquals(1, database.novelBookDao().count(accountId))
+		assertEquals("Updated", database.novelBookDao().getByRemoteId(accountId, "private", "remote-1")?.title)
+		assertEquals(listOf(originalChapter.id), database.novelChapterDao().getByBookId(originalBook.id).map { it.id })
+		assertEquals("new content", database.novelChapterDao().getByBookId(originalBook.id).single().content)
+		assertEquals(originalChapter.id, database.bookmarkDao().getByBookId(accountId, originalBook.id).single().chapterId)
+		assertEquals(originalChapter.id, database.annotationDao().getByBookId(accountId, originalBook.id).single().chapterId)
+	}
+
+	@Test
+	fun removedReferencedChapterIsNotPhysicallyDeleted() = runBlocking {
+		val accountId = "mastodon.example_500"
+		val database = open(accountId)
+		val book = NovelBookEntity("book", accountId, "Book", remoteId = "remote-2", sourceType = "private")
+		val kept = NovelChapterEntity("chapter-1", book.id, "One", "one", 0)
+		val removedButReferenced = NovelChapterEntity("chapter-2", book.id, "Two", "two", 1)
+		database.novelImportDao().importBook(book, listOf(kept, removedButReferenced))
+		database.bookmarkDao().upsert(BookmarkEntity("bookmark-2", accountId, book.id, removedButReferenced.id, 0))
+
+		database.novelImportDao().importBook(book.copy(title = "Updated"), listOf(kept.copy(content = "updated")))
+
+		assertEquals(setOf("chapter-1", "chapter-2"), database.novelChapterDao().getByBookId(book.id).mapTo(mutableSetOf()) { it.id })
+		assertEquals("chapter-2", database.bookmarkDao().getByBookId(accountId, book.id).single().chapterId)
+	}
+
 	private fun open(accountId: String): NovelDatabase {
 		accountIds += accountId
 		return NovelDatabase.open(context, accountId).also(openedDatabases::add)

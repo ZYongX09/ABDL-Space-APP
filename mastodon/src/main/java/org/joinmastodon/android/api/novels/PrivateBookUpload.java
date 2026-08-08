@@ -10,6 +10,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.LongConsumer;
 import java.util.function.IntConsumer;
 
 import okhttp3.Call;
@@ -27,14 +28,28 @@ public class PrivateBookUpload{
 
 	private final PrivateNovelApi api;
 	private final IntConsumer progressListener;
+	private final LongConsumer sleeper;
 	private final AtomicReference<Call> currentCall=new AtomicReference<>();
+	private final Object callLock=new Object();
 	private volatile State state=State.IDLE;
 	private volatile boolean canceled;
 	private int lastProgress;
 
 	public PrivateBookUpload(PrivateNovelApi api, IntConsumer progressListener){
+		this(api, progressListener, millis -> {
+			try{
+				Thread.sleep(millis);
+			}catch(InterruptedException e){
+				Thread.currentThread().interrupt();
+				throw new RuntimeException(e);
+			}
+		});
+	}
+
+	public PrivateBookUpload(PrivateNovelApi api, IntConsumer progressListener, LongConsumer sleeper){
 		this.api=api;
 		this.progressListener=progressListener;
+		this.sleeper=sleeper;
 	}
 
 	public State getState(){
@@ -56,34 +71,46 @@ public class PrivateBookUpload{
 			validateAuthorization(authorization, file.length(), sha256, md5, metadata.mimeType);
 			report(5);
 
-			if(!authorization.alreadyUploaded){
+			if(authorization.alreadyUploaded){
+				PrivateNovelApi.BookDto ready=bookResult(authorization.uploadId, metadata, file.length(), sha256, authorization.parseStatus);
+				state=State.COMPLETE;
+				report(100);
+				return ready;
+			}else{
 				state=State.UPLOADING;
-				uploadFile(file, authorization);
+				try{
+					uploadFile(file, authorization);
+				}catch(IOException error){
+					if(!isUncertainPut(error)) throw error;
+				}
 				report(95);
 			}
 
 			checkCanceled();
 			state=State.COMPLETING;
-			PrivateNovelApi.BookDto result=execute(api.newCompleteCall(authorization.uploadId), PrivateNovelApi.BookDto.class);
-			if(!"ready".equals(result.parseStatus) && !"parsing".equals(result.parseStatus))
-				throw new IOException("Unexpected parse status");
+			PrivateNovelApi.CompleteResultDto completed=pollComplete(authorization.uploadId);
+			PrivateNovelApi.BookDto result=bookResult(completed.id, metadata, completed.verifiedSize, sha256, completed.parseStatus);
 			state=State.COMPLETE;
 			report(100);
 			return result;
 		}catch(IOException e){
 			state=canceled ? State.CANCELED : State.FAILED;
 			throw e;
+		}catch(RuntimeException e){
+			state=canceled ? State.CANCELED : State.FAILED;
+			throw new IOException("Upload failed", e);
 		}finally{
 			currentCall.set(null);
 		}
 	}
 
 	public void cancel(){
-		canceled=true;
-		state=State.CANCELED;
-		Call call=currentCall.get();
-		if(call!=null)
-			call.cancel();
+		synchronized(callLock){
+			canceled=true;
+			state=State.CANCELED;
+			Call call=currentCall.get();
+			if(call!=null) call.cancel();
+		}
 	}
 
 	private void uploadFile(File file, PrivateNovelApi.UploadAuthorization authorization) throws IOException{
@@ -117,24 +144,94 @@ public class PrivateBookUpload{
 		for(Map.Entry<String, String> header:authorization.requiredHeaders.entrySet())
 			builder.header(header.getKey(), header.getValue());
 		Call call=api.getCallFactory().newCall(builder.build());
-		currentCall.set(call);
+		register(call);
 		try(Response response=call.execute()){
 			if(response.priorResponse()!=null)
 				throw new IOException("Redirects are not allowed");
 			if(!response.isSuccessful())
-				throw new IOException("Upload failed: HTTP "+response.code());
+				throw new PutException(response.code());
 		}finally{
 			currentCall.compareAndSet(call, null);
 		}
 	}
 
 	private <T> T execute(Call call, Class<T> type) throws IOException{
-		checkCanceled();
-		currentCall.set(call);
+		register(call);
 		try{
 			return api.executeJson(call, type);
 		}finally{
 			currentCall.compareAndSet(call, null);
+		}
+	}
+
+	private PrivateNovelApi.CompleteResultDto pollComplete(String uploadId) throws IOException{
+		IOException lastError=null;
+		for(int attempt=0; attempt<6; attempt++){
+			checkCanceled();
+			try{
+				PrivateNovelApi.ApiResponse<PrivateNovelApi.CompleteResultDto> response=executeResponse(api.newCompleteCall(uploadId), PrivateNovelApi.CompleteResultDto.class);
+				PrivateNovelApi.CompleteResultDto result=response.body;
+				if(result==null || result.id==null || result.format==null || result.verifiedSize<=0 || result.parseStatus==null)
+					throw new IOException("Invalid complete response");
+				if("ready".equals(result.parseStatus)) return result;
+				if(response.status!=202 || !"parsing".equals(result.parseStatus)) throw new IOException("Unexpected parse status");
+			}catch(PrivateNovelApi.ApiException e){
+				if(!isRetryableComplete(e)) throw e;
+				lastError=e;
+			}
+			if(attempt<5) sleeper.accept(Math.min(2000L, 100L << attempt));
+		}
+		throw lastError!=null ? lastError : new IOException("Book parsing timed out");
+	}
+
+	private <T> PrivateNovelApi.ApiResponse<T> executeResponse(Call call, Class<T> type) throws IOException{
+		register(call);
+		try{
+			return api.executeJsonResponse(call, type);
+		}finally{
+			currentCall.compareAndSet(call, null);
+		}
+	}
+
+	private void register(Call call) throws IOException{
+		synchronized(callLock){
+			if(canceled){
+				call.cancel();
+				throw new IOException("Canceled");
+			}
+			currentCall.set(call);
+		}
+	}
+
+	private static boolean isRetryableComplete(PrivateNovelApi.ApiException error){
+		return error.status==408 || error.status==429 || error.status>=500 ||
+				(error.status==422 && ("verification_failed".equals(error.code) || "verification_unavailable".equals(error.code)));
+	}
+
+	private static boolean isUncertainPut(IOException error){
+		if(!(error instanceof PutException)) return true;
+		int status=((PutException) error).status;
+		return status==408 || status==409 || status==429 || status>=500;
+	}
+
+	private static PrivateNovelApi.BookDto bookResult(String id, PrivateNovelApi.UploadMetadata metadata, long size, String hash, String parseStatus){
+		PrivateNovelApi.BookDto result=new PrivateNovelApi.BookDto();
+		result.id=id;
+		result.title=metadata.title;
+		result.author=metadata.author;
+		result.format=metadata.format;
+		result.contentHash=hash;
+		result.verifiedSize=size;
+		result.parseStatus=parseStatus;
+		return result;
+	}
+
+	private static class PutException extends IOException{
+		final int status;
+
+		PutException(int status){
+			super("Upload failed: HTTP "+status);
+			this.status=status;
 		}
 	}
 

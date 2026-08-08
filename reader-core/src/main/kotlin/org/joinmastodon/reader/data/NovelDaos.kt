@@ -40,20 +40,46 @@ interface NovelChapterDao {
 
 @Dao
 interface NovelImportDao {
+	@Query("SELECT * FROM novel_books WHERE accountId = :accountId AND sourceType = :sourceType AND remoteId = :remoteId")
+	suspend fun findRemoteBook(accountId: String, sourceType: String, remoteId: String): NovelBookEntity?
+
+	@Query("SELECT * FROM novel_chapters WHERE bookId = :bookId ORDER BY chapterIndex")
+	suspend fun findChapters(bookId: String): List<NovelChapterEntity>
+
 	@Upsert
 	suspend fun upsertBook(book: NovelBookEntity)
 
-	@Query("DELETE FROM novel_chapters WHERE bookId = :bookId")
-	suspend fun deleteChapters(bookId: String)
+	@Query("SELECT COUNT(*) FROM bookmarks WHERE chapterId = :chapterId")
+	suspend fun bookmarkCount(chapterId: String): Int
+
+	@Query("SELECT COUNT(*) FROM annotations WHERE chapterId = :chapterId")
+	suspend fun annotationCount(chapterId: String): Int
+
+	@Query("DELETE FROM novel_chapters WHERE id = :chapterId")
+	suspend fun deleteChapter(chapterId: String)
 
 	@Upsert
 	suspend fun upsertChapters(chapters: List<NovelChapterEntity>)
 
 	@Transaction
-	suspend fun replaceBook(book: NovelBookEntity, chapters: List<NovelChapterEntity>) {
-		upsertBook(book)
-		deleteChapters(book.id)
-		upsertChapters(chapters)
+	suspend fun importBook(book: NovelBookEntity, chapters: List<NovelChapterEntity>): String {
+		val existingBook = book.remoteId?.let { findRemoteBook(book.accountId, book.sourceType, it) }
+		val stableBook = book.copy(id = existingBook?.id ?: book.id)
+		val existingChapters = findChapters(stableBook.id)
+		val existingByIndex = existingChapters.associateBy { it.chapterIndex }
+		val stableChapters = chapters.map { chapter ->
+			chapter.copy(
+				id = existingByIndex[chapter.chapterIndex]?.id ?: chapter.id,
+				bookId = stableBook.id,
+			)
+		}
+		upsertBook(stableBook)
+		upsertChapters(stableChapters)
+		val retainedIds = stableChapters.mapTo(HashSet()) { it.id }
+		existingChapters.filter { it.id !in retainedIds }.forEach { chapter ->
+			if (bookmarkCount(chapter.id) == 0 && annotationCount(chapter.id) == 0) deleteChapter(chapter.id)
+		}
+		return stableBook.id
 	}
 }
 

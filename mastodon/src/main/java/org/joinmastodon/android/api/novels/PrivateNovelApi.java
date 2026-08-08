@@ -4,6 +4,7 @@ import com.google.gson.annotations.SerializedName;
 import com.google.gson.FieldNamingPolicy;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonParseException;
 
 import org.joinmastodon.android.api.MastodonAPIController;
 import org.joinmastodon.android.api.session.AccountSession;
@@ -72,18 +73,29 @@ public class PrivateNovelApi{
 	}
 
 	public <T> T executeJson(Call call, Class<T> type) throws IOException{
+		return executeJsonResponse(call, type).body;
+	}
+
+	public <T> ApiResponse<T> executeJsonResponse(Call call, Class<T> type) throws IOException{
 		try(Response response=call.execute()){
 			if(response.priorResponse()!=null)
 				throw new IOException("Redirects are not allowed");
-			if(!response.isSuccessful())
-				throw new IOException("HTTP "+response.code());
 			ResponseBody body=response.body();
 			if(body==null)
 				throw new IOException("Empty response body");
-			T parsed=GSON.fromJson(body.charStream(), type);
-			if(parsed==null)
-				throw new IOException("Invalid response body");
-			return parsed;
+			try{
+				if(!response.isSuccessful()){
+					ErrorEnvelope envelope=GSON.fromJson(body.charStream(), ErrorEnvelope.class);
+					String code=envelope==null ? null : envelope.error!=null ? envelope.error.code : envelope.code;
+					throw new ApiException(response.code(), code);
+				}
+				T parsed=GSON.fromJson(body.charStream(), type);
+				if(parsed==null)
+					throw new IOException("Invalid response body");
+				return new ApiResponse<>(response.code(), parsed);
+			}catch(JsonParseException | IllegalStateException e){
+				throw new IOException("Invalid JSON response", e);
+			}
 		}
 	}
 
@@ -102,7 +114,7 @@ public class PrivateNovelApi{
 	}
 
 	private static Call.Factory noRedirectClient(OkHttpClient client){
-		return client.newBuilder().followRedirects(false).followSslRedirects(false).build();
+		return client.newBuilder().followRedirects(false).followSslRedirects(false).retryOnConnectionFailure(false).build();
 	}
 
 	private static Call.Factory withoutRedirects(Call.Factory factory){
@@ -147,6 +159,43 @@ public class PrivateNovelApi{
 		@SerializedName("expires_at") public long expiresAt;
 		@SerializedName("already_uploaded") public boolean alreadyUploaded;
 		@SerializedName("parse_status") public String parseStatus;
+	}
+
+	public static class CompleteResultDto{
+		public String id;
+		public String format;
+		@SerializedName("verified_size") public long verifiedSize;
+		@SerializedName("parse_status") public String parseStatus;
+	}
+
+	public static class ApiResponse<T>{
+		public final int status;
+		public final T body;
+
+		ApiResponse(int status, T body){
+			this.status=status;
+			this.body=body;
+		}
+	}
+
+	public static class ApiException extends IOException{
+		public final int status;
+		public final String code;
+
+		ApiException(int status, String code){
+			super("HTTP "+status+(code==null ? "" : " ("+code+")"));
+			this.status=status;
+			this.code=code;
+		}
+	}
+
+	private static class ErrorEnvelope{
+		ErrorDto error;
+		String code;
+	}
+
+	private static class ErrorDto{
+		String code;
 	}
 
 	public static class DownloadAuthorization{

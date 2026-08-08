@@ -9,6 +9,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.job
+import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
 import org.joinmastodon.android.api.novels.PrivateBookUpload
 import org.joinmastodon.android.api.novels.PrivateNovelApi
@@ -44,16 +45,21 @@ class NovelDownloadWorker(
 			val authorization = execute(api, api.newDownloadAuthorizeCall(bookId), PrivateNovelApi.DownloadAuthorization::class.java)
 			val directory = File(applicationContext.filesDir, "novels/${NovelImportCoordinator.accountHash(accountId)}").apply { mkdirs() }
 			val destination = File(directory, "$bookId.${book.format.lowercase(Locale.ROOT)}")
-			downloadVerified(api.callFactory, authorization.downloadUrl, destination, book.verifiedSize, book.contentHash, false) { call -> currentCall.set(call) }
+			val candidate = File(directory, "$bookId.${book.format.lowercase(Locale.ROOT)}.candidate")
+			try {
+				runInterruptible {
+					downloadVerified(api.callFactory, authorization.downloadUrl, candidate, book.verifiedSize, book.contentHash, false) { call -> registerCall(call) }
+				}
+			} catch (error: Throwable) {
+				candidate.delete()
+				throw error
+			}
 			if (AccountSessionManager.getInstance().tryGetAccount(accountId) !== session) {
-				destination.delete()
+				candidate.delete()
 				return@withContext Result.failure()
 			}
-			try {
+			commitCandidate(destination, candidate) {
 				NovelImportCoordinator(applicationContext).importPrivateBook(accountId, destination, book)
-			} catch (error: Exception) {
-				destination.delete()
-				throw error
 			}
 			Result.success()
 		} catch (error: IOException) {
@@ -65,12 +71,28 @@ class NovelDownloadWorker(
 		}
 	}
 
-	private fun <T> execute(api: PrivateNovelApi, call: Call, type: Class<T>): T {
-		currentCall.set(call)
+	private suspend fun <T> execute(api: PrivateNovelApi, call: Call, type: Class<T>): T {
+		registerCall(call)
+		val cancellation = coroutineContext.job.invokeOnCompletion { cause ->
+			if (cause is kotlinx.coroutines.CancellationException) call.cancel()
+		}
 		return try {
-			api.executeJson(call, type)
+			runInterruptible { api.executeJson(call, type) }
 		} finally {
+			cancellation.dispose()
 			currentCall.compareAndSet(call, null)
+		}
+	}
+
+	private fun registerCall(call: Call) {
+		if (isStopped) {
+			call.cancel()
+			throw IOException("Canceled")
+		}
+		currentCall.set(call)
+		if (isStopped && currentCall.compareAndSet(call, null)) {
+			call.cancel()
+			throw IOException("Canceled")
 		}
 	}
 
@@ -140,6 +162,35 @@ class NovelDownloadWorker(
 				}
 			} finally {
 				part.delete()
+			}
+		}
+
+		@JvmStatic
+		@Throws(IOException::class)
+		suspend fun commitCandidate(destination: File, candidate: File, commitDatabase: suspend () -> Unit) {
+			val backup = File(destination.parentFile, destination.name + ".backup")
+			backup.delete()
+			try {
+				if (destination.exists()) moveAtomic(destination, backup)
+				moveAtomic(candidate, destination)
+				commitDatabase()
+				backup.delete()
+			} catch (error: Throwable) {
+				destination.delete()
+				if (backup.exists()) moveAtomic(backup, destination)
+				throw error
+			} finally {
+				candidate.delete()
+				if (backup.exists() && !destination.exists()) moveAtomic(backup, destination)
+				backup.delete()
+			}
+		}
+
+		private fun moveAtomic(source: File, destination: File) {
+			try {
+				Files.move(source.toPath(), destination.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+			} catch (error: java.nio.file.AtomicMoveNotSupportedException) {
+				throw IOException("Atomic file replacement is unavailable", error)
 			}
 		}
 	}

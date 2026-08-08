@@ -90,14 +90,70 @@ public class PrivateBookUploadTest{
 	public void readyAuthorizationSkipsPut() throws Exception{
 		File source=write("book.txt", "ready");
 		server.enqueue(json(200, "{\"upload_id\":\"book-2\",\"already_uploaded\":true,\"parse_status\":\"ready\"}"));
-		server.enqueue(json(200, "{\"id\":\"book-2\",\"title\":\"Title\",\"author\":\"Author\",\"format\":\"txt\",\"content_hash\":\"hash\",\"verified_size\":5,\"parse_status\":\"ready\"}"));
 
 		PrivateNovelApi.BookDto result=new PrivateBookUpload(api(), ignored -> {}).upload(source, metadata());
 
 		assertEquals("book-2", result.id);
-		assertEquals(2, server.getRequestCount());
+		assertEquals(1, server.getRequestCount());
+	}
+
+	@Test
+	public void parsingCompletePollsUntilReadyAndOnlyThenReportsComplete() throws Exception{
+		File source=write("book.txt", "poll me");
+		server.enqueue(authorizeResponse(source, server.url("/cos/poll").toString(), "book-poll"));
+		server.enqueue(new MockResponse().setResponseCode(200));
+		server.enqueue(json(202, "{\"id\":\"book-poll\",\"format\":\"txt\",\"verified_size\":7,\"parse_status\":\"parsing\"}"));
+		server.enqueue(json(200, "{\"id\":\"book-poll\",\"format\":\"txt\",\"verified_size\":7,\"parse_status\":\"ready\"}"));
+		List<Integer> progress=new ArrayList<>();
+
+		PrivateBookUpload upload=new PrivateBookUpload(api(), progress::add, millis -> {});
+		PrivateNovelApi.BookDto result=upload.upload(source, metadata());
+
+		assertEquals("ready", result.parseStatus);
+		assertEquals(PrivateBookUpload.State.COMPLETE, upload.getState());
+		assertEquals(Integer.valueOf(100), progress.get(progress.size()-1));
+		assertEquals(4, server.getRequestCount());
+	}
+
+	@Test
+	public void lostPutResponseRecoversThroughCompleteWithoutSecondPut() throws Exception{
+		File source=write("book.txt", "lost response");
+		server.enqueue(authorizeResponse(source, server.url("/cos/lost").toString(), "book-lost"));
+		server.enqueue(new MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST));
+		server.enqueue(json(200, "{\"id\":\"book-lost\",\"format\":\"txt\",\"verified_size\":13,\"parse_status\":\"ready\"}"));
+
+		PrivateNovelApi.BookDto result=new PrivateBookUpload(api(), ignored -> {}, millis -> {}).upload(source, metadata());
+
+		assertEquals("book-lost", result.id);
+		assertEquals(3, server.getRequestCount());
 		server.takeRequest();
-		assertEquals("/api/v1/novels/private/book-2/complete", server.takeRequest().getPath());
+		assertEquals("PUT", server.takeRequest().getMethod());
+	}
+
+	@Test
+	public void temporaryCompleteFailureRetriesCompleteWithoutRepeatingPut() throws Exception{
+		File source=write("book.txt", "temporary");
+		server.enqueue(authorizeResponse(source, server.url("/cos/temporary").toString(), "book-temp"));
+		server.enqueue(new MockResponse().setResponseCode(200));
+		server.enqueue(json(502, "{\"error\":{\"code\":\"verification_unavailable\",\"status\":502}}"));
+		server.enqueue(json(200, "{\"id\":\"book-temp\",\"format\":\"txt\",\"verified_size\":9,\"parse_status\":\"ready\"}"));
+
+		new PrivateBookUpload(api(), ignored -> {}, millis -> {}).upload(source, metadata());
+
+		assertEquals(4, server.getRequestCount());
+		server.takeRequest();
+		assertEquals("PUT", server.takeRequest().getMethod());
+	}
+
+	@Test
+	public void malformedJsonFailsAndConvergesToFailed() throws Exception{
+		File source=write("book.txt", "bad json");
+		server.enqueue(json(200, "{not-json"));
+		PrivateBookUpload upload=new PrivateBookUpload(api(), ignored -> {});
+
+		assertThrows(IOException.class, () -> upload.upload(source, metadata()));
+
+		assertEquals(PrivateBookUpload.State.FAILED, upload.getState());
 	}
 
 	@Test
@@ -137,6 +193,18 @@ public class PrivateBookUploadTest{
 		assertTrue(finished.await(2, TimeUnit.SECONDS));
 		assertEquals(PrivateBookUpload.State.CANCELED, upload.getState());
 		assertEquals(2, server.getRequestCount());
+	}
+
+	@Test
+	public void cancelBeforeCallRegistrationPreventsExecutionAndStaysCanceled() throws Exception{
+		File source=write("book.txt", "cancel before start");
+		PrivateBookUpload upload=new PrivateBookUpload(api(), ignored -> {});
+
+		upload.cancel();
+		assertThrows(IOException.class, () -> upload.upload(source, metadata()));
+
+		assertEquals(PrivateBookUpload.State.CANCELED, upload.getState());
+		assertEquals(0, server.getRequestCount());
 	}
 
 	@Test

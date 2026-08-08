@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import org.joinmastodon.android.api.novels.PrivateBookUpload
 import org.joinmastodon.android.api.novels.PrivateNovelApi
@@ -66,14 +68,24 @@ class NovelImportCoordinator(
 		val prepared = prepareContentUri(accountId, uri, metadata.format, takeFlags)
 		try {
 			val session = AccountSessionManager.getInstance().tryGetAccount(accountId) ?: error("账号已退出")
-			PrivateBookUpload(PrivateNovelApi(session), progress).upload(prepared.file, metadata)
+			val uploader = PrivateBookUpload(PrivateNovelApi(session), progress)
+			val cancellation = currentCoroutineContext()[kotlinx.coroutines.Job]?.invokeOnCompletion { cause ->
+				if (cause is kotlinx.coroutines.CancellationException) uploader.cancel()
+			}
+			try {
+				uploader.upload(prepared.file, metadata)
+			} finally {
+				cancellation?.dispose()
+			}
 		} finally {
 			prepared.file.delete()
 		}
 	}
 
-	suspend fun importPrivateBook(accountId: String, file: File, remote: PrivateNovelApi.BookDto): Unit = withContext(Dispatchers.IO) {
+	suspend fun importPrivateBook(accountId: String, file: File, remote: PrivateNovelApi.BookDto, officialPath: String = file.absolutePath): Unit = withContext(Dispatchers.IO) {
+		currentCoroutineContext().ensureActive()
 		val parsed = parser.parse(file)
+		currentCoroutineContext().ensureActive()
 		val book = NovelBookEntity(
 			id = parsed.book.id,
 			accountId = accountId,
@@ -82,7 +94,7 @@ class NovelImportCoordinator(
 			remoteId = remote.id,
 			sourceType = SOURCE_TYPE_PRIVATE,
 			contentHash = remote.contentHash,
-			localFilePath = file.absolutePath,
+			localFilePath = officialPath,
 			downloadState = DOWNLOAD_STATE_READY,
 		)
 		val chapters = parsed.chapters.map { chapter ->
@@ -90,14 +102,14 @@ class NovelImportCoordinator(
 		}
 		val database = NovelDatabase.open(context, accountId)
 		try {
-			database.novelImportDao().replaceBook(book, chapters)
+			database.novelImportDao().importBook(book, chapters)
 		} finally {
 			database.close()
 		}
 	}
 
 	companion object {
-		const val SOURCE_TYPE_PRIVATE = "private_remote"
+		const val SOURCE_TYPE_PRIVATE = "private"
 		const val DOWNLOAD_STATE_READY = "ready"
 
 		fun accountHash(accountId: String): String = MessageDigest.getInstance("SHA-256")
