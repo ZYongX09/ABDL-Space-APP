@@ -28,6 +28,12 @@ interface NovelBookDao {
 
 	@Query("SELECT COUNT(*) FROM novel_books WHERE accountId = :accountId")
 	suspend fun count(accountId: String): Int
+
+	@Query("UPDATE novel_books SET deletedAt = :deletedAt, updatedAt = :deletedAt WHERE accountId = :accountId AND sourceType = 'private' AND remoteId IS NOT NULL AND remoteId NOT IN (:remoteIds) AND deletedAt IS NULL")
+	suspend fun markMissingPrivateRemoteDeleted(accountId: String, remoteIds: List<String>, deletedAt: Long)
+
+	@Query("UPDATE novel_books SET deletedAt = :deletedAt, updatedAt = :deletedAt WHERE accountId = :accountId AND sourceType = 'private' AND remoteId IS NOT NULL AND deletedAt IS NULL")
+	suspend fun markAllPrivateRemoteDeleted(accountId: String, deletedAt: Long)
 }
 
 @Dao

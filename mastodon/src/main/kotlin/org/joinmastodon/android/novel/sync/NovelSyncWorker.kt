@@ -23,11 +23,15 @@ class NovelSyncWorker(context: Context, params: WorkerParameters) : CoroutineWor
 		val lease = NovelAccountDataCleaner.enterOperation(accountId, generation) ?: return Result.failure()
 		val database = NovelDatabase.open(applicationContext, accountId)
 		return try {
-			if (!NovelAccountDataCleaner.isSessionValid(accountId, session, generation)) return Result.failure()
-			NovelSyncEngine(accountId, PrivateNovelSyncRemote(PrivateNovelApi(session)), RoomNovelSyncStore(accountId, database)).use { it.sync() }
-			if (NovelAccountDataCleaner.isSessionValid(accountId, session, generation)) Result.success() else Result.failure()
+			val guard: suspend () -> Unit = { check(NovelAccountDataCleaner.isSessionValid(accountId, session, generation)) { "账号已退出" } }
+			guard()
+			val syncResult = NovelSyncEngine(accountId, PrivateNovelSyncRemote(PrivateNovelApi(session)), RoomNovelSyncStore(accountId, database), guard = guard).use { it.sync() }
+			guard()
+			if (syncResult.retryNeeded) Result.retry() else Result.success()
 		} catch (_: java.io.IOException) {
 			Result.retry()
+		} catch (_: IllegalStateException) {
+			Result.failure()
 		} finally {
 			database.close()
 			lease.close()

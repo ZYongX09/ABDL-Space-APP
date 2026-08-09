@@ -25,7 +25,7 @@ class NovelSyncEngineTest {
 
 		assertEquals(listOf(1L, 2L), store.applied.map { it.seq })
 		assertEquals("2", store.checkpoint)
-		assertEquals(listOf("pull:null", "apply:1", "pull:page-2", "apply:2"), calls)
+		assertEquals(listOf("books:null", "metadata", "pull:null", "apply:1", "pull:page-2", "apply:2"), calls)
 	}
 
 	@Test
@@ -36,8 +36,28 @@ class NovelSyncEngineTest {
 
 		engine(remote, store).sync()
 
+		assertTrue(calls.indexOf("metadata") < calls.indexOf("pull:null"))
 		assertTrue(calls.indexOf("apply:9") < calls.indexOf("push:local"))
 		assertTrue(store.outbox.isEmpty())
+	}
+
+	@Test
+	fun completeMetadataIsReplacedBeforeNewDeviceEventsAreApplied() = runBlocking {
+		val calls = mutableListOf<String>()
+		val remote = FakeRemote(
+			pages = mutableMapOf(null to SyncPage(listOf(item(1, "progress", "progress-1", bookId = "new-book")), null, "1")),
+			calls = calls,
+			bookPages = mutableMapOf(
+				null to RemoteBooksPage(listOf(RemoteBook("new-book", "New", "Author", null, 10)), "books-2"),
+				"books-2" to RemoteBooksPage(emptyList(), null),
+			),
+		)
+		val store = FakeStore(knownRemoteBooks = mutableSetOf(), calls = calls)
+
+		engine(remote, store).sync()
+
+		assertEquals(listOf("books:null", "books:books-2", "metadata", "pull:null", "apply:1"), calls)
+		assertEquals(listOf("progress-1"), store.applied.map { it.itemId })
 	}
 
 	@Test
@@ -119,10 +139,30 @@ class NovelSyncEngineTest {
 		val store = FakeStore().apply { outbox += change("note", "retry") }
 		val remote = FakeRemote(putFailure = IOException("offline"))
 
-		engine(remote, store).sync()
+		val result = engine(remote, store).sync()
 
 		assertEquals(listOf("retry"), store.outbox.map { it.itemId })
 		assertEquals(1, store.outbox.single().attempts)
+		assertTrue(result.retryNeeded)
+	}
+
+	@Test
+	fun guardRunsAroundRemoteCallsAndBeforeApplyAndStopsMidPageLogout() = runBlocking {
+		var guards = 0
+		val remote = FakeRemote(
+			pages = mutableMapOf(null to SyncPage(listOf(item(1, "note", "blocked")), null, "1")),
+			onGetSync = { guards = 3 },
+		)
+		val store = FakeStore()
+		val engine = NovelSyncEngine("account-a", remote, store, guard = {
+			guards++
+			check(guards < 5) { "logged out" }
+		})
+
+		runCatching { engine.sync() }
+
+		assertTrue(store.applied.isEmpty())
+		assertEquals(null, store.checkpoint)
 	}
 
 	private fun engine(
@@ -142,9 +182,17 @@ class NovelSyncEngineTest {
 		private val pages: MutableMap<String?, SyncPage> = mutableMapOf(null to SyncPage(emptyList(), null, "0")),
 		private val calls: MutableList<String> = mutableListOf(),
 		private val putFailure: IOException? = null,
+		private val bookPages: MutableMap<String?, RemoteBooksPage> = mutableMapOf(null to RemoteBooksPage(listOf(RemoteBook("known-book", "Known", "Author", null, 1)), null)),
+		private val onGetSync: () -> Unit = {},
 	) : SyncRemote {
+		override suspend fun getBooks(cursor: String?, limit: Int): RemoteBooksPage {
+			calls += "books:$cursor"
+			return requireNotNull(bookPages[cursor])
+		}
+
 		override suspend fun getSync(cursor: String?, limit: Int): SyncPage {
 			calls += "pull:$cursor"
+			onGetSync()
 			return requireNotNull(pages[cursor])
 		}
 
@@ -180,6 +228,12 @@ class NovelSyncEngineTest {
 			}
 			checkpoint = checkpointCursor
 			calls += "apply:$checkpointCursor"
+		}
+
+		override suspend fun replaceRemoteBooks(books: List<RemoteBook>) {
+			knownRemoteBooks.clear()
+			knownRemoteBooks += books.map { it.id }
+			calls += "metadata"
 		}
 
 		override suspend fun pendingChanges(): List<LocalSyncChange> = outbox.toList()

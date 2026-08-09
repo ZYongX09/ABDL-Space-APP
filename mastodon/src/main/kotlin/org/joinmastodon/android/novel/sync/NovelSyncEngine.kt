@@ -17,6 +17,17 @@ data class RemoteSyncItem(
 	val deletedAt: Long?,
 )
 
+data class RemoteBook(
+	val id: String,
+	val title: String,
+	val author: String?,
+	val contentHash: String?,
+	val updatedAt: Long,
+)
+
+data class RemoteBooksPage(val items: List<RemoteBook>, val nextCursor: String?)
+data class SyncResult(val retryNeeded: Boolean = false)
+
 data class SyncPage(
 	val items: List<RemoteSyncItem>,
 	val nextCursor: String?,
@@ -37,6 +48,7 @@ data class LocalSyncChange(
 }
 
 interface SyncRemote {
+	suspend fun getBooks(cursor: String?, limit: Int): RemoteBooksPage
 	suspend fun getSync(cursor: String?, limit: Int): SyncPage
 	suspend fun put(change: LocalSyncChange): RemoteSyncItem
 }
@@ -44,6 +56,7 @@ interface SyncRemote {
 class RemoteBookDeletedException : IOException()
 
 interface SyncStore {
+	suspend fun replaceRemoteBooks(books: List<RemoteBook>)
 	suspend fun checkpoint(): String?
 	suspend fun applyPage(items: List<RemoteSyncItem>, checkpointCursor: String)
 	suspend fun pendingChanges(): List<LocalSyncChange>
@@ -82,32 +95,54 @@ class NovelSyncEngine(
 	private val now: () -> Long = System::currentTimeMillis,
 	private val scheduler: SyncScheduler = ExecutorSyncScheduler(),
 	private val requestSync: () -> Unit = {},
+	private val guard: suspend () -> Unit = {},
 ) : Closeable {
 	private val lock = Any()
 	private val pendingProgress = mutableMapOf<String, SyncCancellation>()
 	@Volatile private var closed = false
 
-	suspend fun sync(limit: Int = 100) {
-		if (closed) return
+	suspend fun sync(limit: Int = 100): SyncResult {
+		if (closed) return SyncResult()
+		val books = mutableListOf<RemoteBook>()
+		var booksCursor: String? = null
+		do {
+			if (closed) return SyncResult()
+			guard()
+			val page = remote.getBooks(booksCursor, limit)
+			guard()
+			books += page.items
+			booksCursor = page.nextCursor
+		} while (booksCursor != null)
+		guard()
+		store.replaceRemoteBooks(books)
 		var cursor = store.checkpoint()
 		do {
-			if (closed) return
+			if (closed) return SyncResult()
+			guard()
 			val page = remote.getSync(cursor, limit)
-			if (closed) return
+			guard()
+			if (closed) return SyncResult()
+			guard()
 			store.applyPage(page.items, page.checkpointCursor)
 			cursor = page.nextCursor
 		} while (cursor != null)
 
+		var retryNeeded = false
 		store.pendingChanges().forEach { change ->
-			if (closed) return
+			if (closed) return SyncResult(retryNeeded)
 			try {
-				store.markPushed(change, remote.put(change))
+				guard()
+				val pushed = remote.put(change)
+				guard()
+				store.markPushed(change, pushed)
 			} catch (error: RemoteBookDeletedException) {
 				store.markPushed(change, RemoteSyncItem(0, change.remoteBookId, change.itemType, change.itemId, change.payload, change.clientUpdatedAt, now(), change.deletedAt))
 			} catch (error: IOException) {
 				store.markFailed(change)
+				retryNeeded = true
 			}
 		}
+		return SyncResult(retryNeeded)
 	}
 
 	fun updateProgress(localBookId: String, remoteBookId: String, itemId: String, payload: String, clientUpdatedAt: Long = now()) {

@@ -3,6 +3,7 @@ package org.joinmastodon.android.api.novels;
 import com.google.gson.annotations.SerializedName;
 import com.google.gson.FieldNamingPolicy;
 import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonParseException;
 
@@ -14,6 +15,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 import okhttp3.Call;
 import okhttp3.MediaType;
@@ -174,8 +176,8 @@ public class PrivateNovelApi{
 		@SerializedName("mime_type") public final String mimeType;
 
 		public UploadMetadata(String title, String author, String format, String mimeType){
-			this.title=title;
-			this.author=author;
+			this.title=Objects.requireNonNull(title);
+			this.author=Objects.requireNonNull(author);
 			this.format=format;
 			this.mimeType=mimeType;
 		}
@@ -266,7 +268,7 @@ public class PrivateNovelApi{
 		public final String title;
 		public final String author;
 		public final String text;
-		public PasteRequest(String title, String author, String text){ this.title=title; this.author=author; this.text=text; }
+		public PasteRequest(String title, String author, String text){ this.title=Objects.requireNonNull(title); this.author=Objects.requireNonNull(author); this.text=Objects.requireNonNull(text); }
 	}
 
 	public static class SyncPageDto{
@@ -280,7 +282,7 @@ public class PrivateNovelApi{
 		@SerializedName("book_id") public String bookId;
 		@SerializedName("item_type") public String itemType;
 		@SerializedName("item_id") public String itemId;
-		public String payload;
+		public JsonObject payload;
 		@SerializedName("client_updated_at") public long clientUpdatedAt;
 		@SerializedName("server_updated_at") public long serverUpdatedAt;
 		@SerializedName("deleted_at") public Long deletedAt;
@@ -290,10 +292,10 @@ public class PrivateNovelApi{
 		@SerializedName("book_id") public final String bookId;
 		@SerializedName("item_type") public final String itemType;
 		@SerializedName("item_id") public final String itemId;
-		public final String payload;
+		public final JsonObject payload;
 		@SerializedName("client_updated_at") public final long clientUpdatedAt;
 		@SerializedName("deleted_at") public final Long deletedAt;
-		public SyncPutRequest(String bookId, String itemType, String itemId, String payload, long clientUpdatedAt, Long deletedAt){
+		public SyncPutRequest(String bookId, String itemType, String itemId, JsonObject payload, long clientUpdatedAt, Long deletedAt){
 			this.bookId=bookId; this.itemType=itemType; this.itemId=itemId; this.payload=payload; this.clientUpdatedAt=clientUpdatedAt; this.deletedAt=deletedAt;
 		}
 	}

@@ -36,4 +36,13 @@ class NovelHomeUiContractTest {
 		assertFalse(screen.contains("androidx.compose.material3.TopAppBar"))
 		assertFalse(screen.contains("androidx.compose.material3.TabRow"))
 	}
+
+	@Test fun libraryUsesMiuixDialogsAndRendersDismissibleErrors() {
+		assertFalse(library.contains("androidx.compose.material3.AlertDialog"))
+		assertFalse(library.contains("OutlinedTextField"))
+		assertTrue(library.contains("SuperDialog"))
+		assertTrue(library.contains("top.yukonga.miuix.kmp.basic.TextField"))
+		assertTrue(library.contains("state.error"))
+		assertTrue(library.contains("onDismissError"))
+	}
 }

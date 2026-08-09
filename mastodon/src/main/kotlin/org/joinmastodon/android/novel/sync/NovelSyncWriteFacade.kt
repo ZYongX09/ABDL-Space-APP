@@ -1,10 +1,12 @@
 package org.joinmastodon.android.novel.sync
 
 import com.google.gson.Gson
+import androidx.room.withTransaction
 import org.joinmastodon.reader.data.AnnotationEntity
 import org.joinmastodon.reader.data.BookmarkEntity
 import org.joinmastodon.reader.data.NovelDatabase
 import org.joinmastodon.reader.data.NovelSyncOutboxEntity
+import org.joinmastodon.reader.data.NovelProgressEntity
 
 /** Host-facing entry point for local reading mutations that must be cloud-synced. */
 class NovelSyncWriteFacade(
@@ -24,6 +26,18 @@ class NovelSyncWriteFacade(
 		database.bookmarkDao().saveWithOutbox(bookmark, outbox("bookmark", id, bookId, requireNotNull(book.remoteId), gson.toJson(BookmarkPayload(chapterId, position)), timestamp, null))
 		requestSync()
 		return bookmark
+	}
+
+	suspend fun saveProgress(bookId: String, chapterIndex: Int, pageIndex: Int) {
+		val book = requireSyncableBook(bookId)
+		val timestamp = now()
+		val itemId = "progress:$bookId"
+		val payload = gson.toJson(ProgressPayload(chapterIndex, pageIndex))
+		database.withTransaction {
+			database.syncDao().upsertProgress(NovelProgressEntity(itemId, accountId, bookId, payload, timestamp, null))
+			database.syncDao().enqueue(outbox("progress", itemId, bookId, requireNotNull(book.remoteId), payload, timestamp, null))
+		}
+		requestSync()
 	}
 
 	suspend fun deleteBookmark(id: String): BookmarkEntity? {
@@ -73,4 +87,5 @@ class NovelSyncWriteFacade(
 
 	private data class BookmarkPayload(val chapterId: String, val position: Int)
 	private data class NotePayload(val chapterId: String, val startOffset: Int, val endOffset: Int, val selectedText: String, val note: String?)
+	private data class ProgressPayload(val chapterIndex: Int, val pageIndex: Int)
 }

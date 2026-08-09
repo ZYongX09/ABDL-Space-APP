@@ -1,5 +1,6 @@
 package org.joinmastodon.android.novel
 
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
@@ -23,19 +24,36 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import org.joinmastodon.android.R
+import org.joinmastodon.reader.data.NovelBookEntity
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
-fun NovelLibraryScreen(state: NovelLibraryState, onRefresh: () -> Unit, onUpload: (android.net.Uri, String) -> Unit, onPaste: (String, String?, String) -> Unit, onDelete: (org.joinmastodon.reader.data.NovelBookEntity) -> Unit, onDownload: (org.joinmastodon.reader.data.NovelBookEntity) -> Unit) {
+fun NovelLibraryScreen(
+	state: NovelLibraryState,
+	onRefresh: () -> Unit,
+	onUpload: (Uri, String, String, String, String) -> Unit,
+	onPaste: (String, String, String) -> Unit,
+	onDelete: (NovelBookEntity) -> Unit,
+	onDownload: (NovelBookEntity) -> Unit,
+	onOpen: (NovelBookEntity) -> Unit,
+	onDismissError: () -> Unit,
+) {
 	var pasteVisible by remember { mutableStateOf(false) }
-	val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let { onUpload(it, if (it.toString().lowercase().endsWith(".epub")) "epub" else "txt") } }
+	var upload by remember { mutableStateOf<Pair<Uri, NovelDocument>?>(null) }
+	val resolver = NovelDocumentResolver(LocalContext.current.contentResolver)
+	val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+		uri?.let { selected -> runCatching { resolver.resolve(selected) }.onSuccess { upload = selected to it } }
+	}
 	Column(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
 		Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
 			Text(if (state.refreshing) "同步中" else "刷新", modifier = Modifier.clickable(onClick = onRefresh), color = MiuixTheme.colorScheme.primary)
@@ -47,7 +65,7 @@ fun NovelLibraryScreen(state: NovelLibraryState, onRefresh: () -> Unit, onUpload
 			Spacer(Modifier.height(18.dp)); Text("书架还是空的，上传或粘贴一本私人小说", fontSize = 17.sp)
 		} else LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
 			items(state.books, key = { it.id }) { book ->
-				Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp)) {
+				Card(Modifier.fillMaxWidth().clickable { onOpen(book) }) { Column(Modifier.padding(16.dp)) {
 					Text(book.title, fontSize = 18.sp, fontWeight = FontWeight.Medium)
 					Text(listOfNotNull(book.author, if (book.downloadState == "ready") "已下载" else "云端").joinToString(" · "), color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
 					Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
@@ -58,10 +76,36 @@ fun NovelLibraryScreen(state: NovelLibraryState, onRefresh: () -> Unit, onUpload
 			}
 		}
 	}
-	if (pasteVisible) NovelPasteDialog(onDismiss = { pasteVisible = false }) { title, author, text -> pasteVisible = false; onPaste(title, author, text) }
+	if (pasteVisible) NovelPasteDialog({ pasteVisible = false }) { title, author, text -> pasteVisible = false; onPaste(title, author, text) }
+	upload?.let { (uri, document) -> NovelUploadMetadataDialog(document, { upload = null }) { title, author -> upload = null; onUpload(uri, title, author, document.format, document.mimeType) } }
+	state.error?.let { message -> SuperDialog("操作失败", onDismissError, onDismissError) { Text(message) } }
 }
 
-@Composable private fun NovelPasteDialog(onDismiss: () -> Unit, onPaste: (String, String?, String) -> Unit) {
+@Composable
+private fun NovelPasteDialog(onDismiss: () -> Unit, onPaste: (String, String, String) -> Unit) {
 	var title by remember { mutableStateOf("") }; var author by remember { mutableStateOf("") }; var text by remember { mutableStateOf("") }
-	androidx.compose.material3.AlertDialog(onDismissRequest = onDismiss, title = { Text("粘贴私人小说") }, text = { Column { androidx.compose.material3.OutlinedTextField(title, { title = it }, label = { Text("标题") }); androidx.compose.material3.OutlinedTextField(author, { author = it }, label = { Text("作者") }); androidx.compose.material3.OutlinedTextField(text, { text = it }, label = { Text("正文") }) } }, confirmButton = { Text("保存", Modifier.clickable(enabled = title.isNotBlank() && text.isNotBlank()) { onPaste(title, author.ifBlank { null }, text) }, color = MiuixTheme.colorScheme.primary) }, dismissButton = { Text("取消", Modifier.clickable(onClick = onDismiss)) })
+	SuperDialog("粘贴私人小说", onDismiss, { if (title.isNotBlank() && author.isNotBlank() && text.isNotBlank()) onPaste(title, author, text) }) {
+		TextField(title, { title = it }, label = "标题"); TextField(author, { author = it }, label = "作者"); TextField(text, { text = it }, label = "正文")
+	}
+}
+
+@Composable
+private fun NovelUploadMetadataDialog(document: NovelDocument, onDismiss: () -> Unit, onConfirm: (String, String) -> Unit) {
+	var title by remember(document) { mutableStateOf(document.displayName) }; var author by remember(document) { mutableStateOf("") }
+	SuperDialog("小说信息", onDismiss, { if (title.isNotBlank() && author.isNotBlank()) onConfirm(title, author) }) {
+		TextField(title, { title = it }, label = "标题"); TextField(author, { author = it }, label = "作者")
+	}
+}
+
+@Composable
+private fun SuperDialog(title: String, onDismiss: () -> Unit, onConfirm: () -> Unit, content: @Composable () -> Unit) {
+	Dialog(onDismissRequest = onDismiss) {
+		Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+			Text(title, fontSize = 20.sp, fontWeight = FontWeight.Medium)
+			content()
+			Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+				Text("取消", Modifier.clickable(onClick = onDismiss).padding(12.dp)); Text("确定", Modifier.clickable(onClick = onConfirm).padding(12.dp), color = MiuixTheme.colorScheme.primary)
+			}
+		} }
+	}
 }

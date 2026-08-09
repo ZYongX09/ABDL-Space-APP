@@ -31,9 +31,15 @@ import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.TabRow
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import org.joinmastodon.reader.ui.ReaderScreen
 
 @Composable
 fun NovelHomeScreen(accountId: String, libraryViewModel: NovelLibraryViewModel, onBack: () -> Unit) {
+	val libraryState by libraryViewModel.state.collectAsState()
+	libraryState.reader?.let { reader ->
+		ReaderScreen(reader.book, reader.chapters, onPositionChanged = { libraryViewModel.onReaderPositionChanged(reader.book.id, it) }, onBack = libraryViewModel::closeReader)
+		return
+	}
 	val tabs = listOf(
 		R.string.novel_recommend to R.string.novel_recommend_empty,
 		R.string.novel_bookshelf to R.string.novel_bookshelf_empty,
@@ -62,8 +68,7 @@ fun NovelHomeScreen(accountId: String, libraryViewModel: NovelLibraryViewModel, 
 			contentAlignment = Alignment.Center,
 		) {
 			if (selectedTab == 1) {
-				val state by libraryViewModel.state.collectAsState()
-				NovelLibraryScreen(state, libraryViewModel::refresh, libraryViewModel::upload, libraryViewModel::paste, libraryViewModel::delete, libraryViewModel::download)
+				NovelLibraryScreen(libraryState, libraryViewModel::refresh, libraryViewModel::upload, libraryViewModel::paste, libraryViewModel::delete, libraryViewModel::download, libraryViewModel::openReader, libraryViewModel::dismissError)
 				return@Box
 			}
 			Column(
