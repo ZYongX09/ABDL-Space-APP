@@ -13,9 +13,12 @@ import org.joinmastodon.android.novel.upload.NovelUploadWorker
 import org.joinmastodon.reader.data.NovelDatabase
 
 object NovelAccountDataCleaner {
+	private const val CLEANUP_PREFS = "novel_account_cleanup"
+	private const val CLEANUP_ACCOUNTS = "pending_accounts"
 	private val generations = ConcurrentHashMap<String, AtomicLong>()
 	private val uploads = ConcurrentHashMap<String, MutableSet<PrivateBookUpload>>()
 	private val leases = ConcurrentHashMap<String, AtomicLong>()
+	private val cleaningAccounts = ConcurrentHashMap.newKeySet<String>()
 	private val lock = java.lang.Object()
 
 	@JvmStatic
@@ -65,7 +68,7 @@ object NovelAccountDataCleaner {
 
 	@JvmStatic
 	fun enterOperation(accountId: String, generation: Long): OperationLease? = synchronized(lock) {
-		if (!isGenerationValid(accountId, generation)) return@synchronized null
+		if (accountId in cleaningAccounts || !isGenerationValid(accountId, generation)) return@synchronized null
 		leases.computeIfAbsent(accountId) { AtomicLong() }.incrementAndGet()
 		OperationLease(accountId)
 	}
@@ -87,22 +90,57 @@ object NovelAccountDataCleaner {
 	fun clean(context: Context, accountId: String) {
 		NovelDownloadWorker.cancelAccount(context, accountId)
 		NovelUploadWorker.cancelAccount(context, accountId)
-		Thread {
-			synchronized(lock) {
-				while ((leases[accountId]?.get() ?: 0L) > 0L) lock.wait()
-			}
-			NovelDatabase.closeAccount(accountId)
-			deleteAccountData(context.filesDir, context.cacheDir, requireNotNull(context.getDatabasePath("placeholder").parentFile), accountId)
-		}.apply { name = "novel-account-cleanup" }.start()
+		markCleanupPending(context, accountId)
+		NovelAccountCleanupWorker.enqueue(context, accountId)
 	}
 
 	@JvmStatic
-	fun deleteAccountData(filesDir: File, cacheDir: File, databasesDir: File, accountId: String) {
+	fun cleanIfIdle(context: Context, accountId: String): Boolean = cleanIfIdle(
+		context.filesDir,
+		context.cacheDir,
+		requireNotNull(context.getDatabasePath("placeholder").parentFile),
+		accountId,
+	)
+
+	internal fun cleanIfIdle(filesDir: File, cacheDir: File, databasesDir: File, accountId: String): Boolean {
+		synchronized(lock) {
+			if ((leases[accountId]?.get() ?: 0L) > 0L) return false
+		}
+		NovelDatabase.closeAccount(accountId)
+		return deleteAccountData(filesDir, cacheDir, databasesDir, accountId)
+	}
+
+	@JvmStatic
+	fun markCleanupPending(context: Context, accountId: String) = synchronized(lock) {
+		cleaningAccounts.add(accountId)
+		val prefs = context.getSharedPreferences(CLEANUP_PREFS, Context.MODE_PRIVATE)
+		prefs.edit().putStringSet(CLEANUP_ACCOUNTS, prefs.getStringSet(CLEANUP_ACCOUNTS, emptySet()).orEmpty() + accountId).commit()
+	}
+
+	@JvmStatic
+	fun clearCleanupPending(context: Context, accountId: String) = synchronized(lock) {
+		val prefs = context.getSharedPreferences(CLEANUP_PREFS, Context.MODE_PRIVATE)
+		prefs.edit().putStringSet(CLEANUP_ACCOUNTS, prefs.getStringSet(CLEANUP_ACCOUNTS, emptySet()).orEmpty() - accountId).commit()
+		cleaningAccounts.remove(accountId)
+	}
+
+	@JvmStatic
+	fun pendingCleanupAccounts(context: Context): Set<String> = synchronized(lock) {
+		context.getSharedPreferences(CLEANUP_PREFS, Context.MODE_PRIVATE).getStringSet(CLEANUP_ACCOUNTS, emptySet()).orEmpty().toSet().also(cleaningAccounts::addAll)
+	}
+
+	@JvmStatic
+	fun deleteAccountData(filesDir: File, cacheDir: File, databasesDir: File, accountId: String): Boolean {
 		val hash = NovelImportCoordinator.accountHash(accountId)
-		File(filesDir, "novels/$hash").deleteRecursively()
-		File(filesDir, "novels/transfers/$hash").deleteRecursively()
-		File(cacheDir, "novels/import/$hash").deleteRecursively()
+		val roots = listOf(
+			File(filesDir, "novels/$hash"),
+			File(filesDir, "novels/transfers/$hash"),
+			File(cacheDir, "novels/import/$hash"),
+		)
+		roots.forEach { it.deleteRecursively() }
 		val database = NovelDatabase.databaseName(accountId)
-		listOf(database, "$database-wal", "$database-shm", "$database-journal").forEach { File(databasesDir, it).delete() }
+		val databaseFiles = listOf(database, "$database-wal", "$database-shm", "$database-journal").map { File(databasesDir, it) }
+		databaseFiles.forEach { it.delete() }
+		return roots.none(File::exists) && databaseFiles.none(File::exists)
 	}
 }

@@ -58,10 +58,19 @@ interface NovelTransferDao {
 	@Query("DELETE FROM novel_transfers WHERE transferId = :transferId")
 	suspend fun delete(transferId: String)
 
-	@Query("UPDATE novel_transfers SET claimOwner = :owner WHERE transferId = :transferId AND claimOwner IS NULL")
-	suspend fun claim(transferId: String, owner: String): Int
+	@Query("UPDATE novel_transfers SET claimOwner = :owner, claimExpiresAt = :expiresAt WHERE transferId = :transferId AND (claimOwner IS NULL OR claimOwner = :owner OR claimExpiresAt <= :now)")
+	suspend fun claim(transferId: String, owner: String, now: Long, expiresAt: Long): Int
 
-	@Query("UPDATE novel_transfers SET claimOwner = NULL WHERE transferId = :transferId AND claimOwner = :owner")
+	@Query("UPDATE novel_transfers SET claimExpiresAt = :expiresAt WHERE transferId = :transferId AND claimOwner = :owner")
+	suspend fun renewClaim(transferId: String, owner: String, expiresAt: Long): Int
+
+	@Query("UPDATE novel_transfers SET uploadId = :uploadId, remoteBookId = :uploadId, phase = :phase, updatedAt = :updatedAt WHERE transferId = :transferId")
+	suspend fun updateUploadProgress(transferId: String, uploadId: String, phase: String, updatedAt: Long): Int
+
+	@Query("UPDATE novel_transfers SET phase = :phase, updatedAt = :updatedAt WHERE transferId = :transferId")
+	suspend fun updatePhase(transferId: String, phase: String, updatedAt: Long): Int
+
+	@Query("UPDATE novel_transfers SET claimOwner = NULL, claimExpiresAt = NULL WHERE transferId = :transferId AND claimOwner = :owner")
 	suspend fun release(transferId: String, owner: String): Int
 }
 

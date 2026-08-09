@@ -18,7 +18,7 @@ import java.util.WeakHashMap
 		AnnotationEntity::class,
 		NovelTransferEntity::class,
 	],
-	version = 4,
+	version = 5,
 	exportSchema = true,
 )
 abstract class NovelDatabase : RoomDatabase() {
@@ -37,7 +37,7 @@ abstract class NovelDatabase : RoomDatabase() {
 				context.applicationContext,
 				NovelDatabase::class.java,
 				databaseName(accountId),
-			).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build().also { database ->
+			).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build().also { database ->
 				synchronized(openDatabases) {
 					openDatabases.getOrPut(accountId) { Collections.newSetFromMap(WeakHashMap()) }.add(database)
 				}
@@ -66,6 +66,13 @@ abstract class NovelDatabase : RoomDatabase() {
 		val MIGRATION_3_4 = object : Migration(3, 4) {
 			override fun migrate(db: SupportSQLiteDatabase) {
 				db.execSQL("ALTER TABLE novel_transfers ADD COLUMN claimOwner TEXT")
+			}
+		}
+
+		val MIGRATION_4_5 = object : Migration(4, 5) {
+			override fun migrate(db: SupportSQLiteDatabase) {
+				db.execSQL("ALTER TABLE novel_transfers ADD COLUMN claimExpiresAt INTEGER")
+				db.execSQL("UPDATE novel_transfers SET claimExpiresAt = 0 WHERE claimOwner IS NOT NULL")
 			}
 		}
 

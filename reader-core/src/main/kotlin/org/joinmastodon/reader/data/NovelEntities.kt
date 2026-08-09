@@ -129,6 +129,7 @@ data class NovelTransferEntity(
 	val contentMd5: String?,
 	val size: Long,
 	val claimOwner: String? = null,
+	val claimExpiresAt: Long? = null,
 	val updatedAt: Long = System.currentTimeMillis(),
 ) {
 	companion object {

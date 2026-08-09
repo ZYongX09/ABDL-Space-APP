@@ -6,6 +6,7 @@ import org.joinmastodon.android.api.novels.PrivateBookUpload
 import org.joinmastodon.android.novel.importer.NovelImportCoordinator
 import org.joinmastodon.reader.data.NovelDatabase
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -79,5 +80,39 @@ class NovelAccountDataCleanerTest {
 
 		paths.forEach { assertFalse(it.exists()) }
 		root.deleteRecursively()
+	}
+
+	@Test
+	fun cleanupRetriesWhileOperationLeaseExistsThenDeletesWhenReleased() {
+		val root = Files.createTempDirectory("novel-account-cleaner-lease").toFile()
+		val files = File(root, "files")
+		val cache = File(root, "cache")
+		val databases = File(root, "databases")
+		val accountId = "logout.example_lease"
+		val target = File(files, "novels/${NovelImportCoordinator.accountHash(accountId)}/book.txt")
+		target.parentFile?.mkdirs()
+		target.writeText("data")
+		val lease = requireNotNull(NovelAccountDataCleaner.enterOperation(accountId, NovelAccountDataCleaner.captureGeneration(accountId)))
+
+		assertFalse(NovelAccountDataCleaner.cleanIfIdle(files, cache, databases, accountId))
+		assertTrue(target.exists())
+		lease.close()
+		assertTrue(NovelAccountDataCleaner.cleanIfIdle(files, cache, databases, accountId))
+		assertFalse(target.exists())
+		root.deleteRecursively()
+	}
+
+	@Test
+	fun logoutCleanupUsesPersistentMarkerAndIndependentWorkIdentity() {
+		val source = File("src/main/kotlin/org/joinmastodon/android/novel/NovelAccountDataCleaner.kt").readText()
+		val worker = File("src/main/kotlin/org/joinmastodon/android/novel/NovelAccountCleanupWorker.kt").readText()
+
+		assertTrue(source.contains("markCleanupPending"))
+		assertTrue(source.contains("NovelAccountCleanupWorker.enqueue"))
+		assertTrue(worker.contains("Result.retry()"))
+		assertTrue(worker.contains("clearCleanupPending"))
+		assertTrue(worker.contains("enqueuePending"))
+		assertTrue(worker.contains("novel-cleanup-account-"))
+		assertFalse(worker.contains("NovelUploadWorker.accountWorkTag"))
 	}
 }

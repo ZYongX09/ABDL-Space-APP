@@ -29,5 +29,7 @@ class NovelUploadWorkerTest {
 		assertFalse(source.contains("token"))
 		assertFalse(source.contains(":pending"))
 		assertTrue(source.contains("transferDao().claim("))
+		assertTrue(source.contains("Result.retry()"))
+		assertTrue(source.contains("renewClaim("))
 	}
 }

@@ -80,8 +80,17 @@ class NovelImportCoordinator(
 		}
 	}
 
-	suspend fun prepareContentUri(accountId: String, uri: Uri, format: String, takeFlags: Int): PreparedImport =
-		copyContentUri(accountId, uri, format, takeFlags)
+	suspend fun prepareContentUri(accountId: String, uri: Uri, format: String, takeFlags: Int): PreparedImport {
+		if (AccountSessionManager.getInstance().tryGetAccount(accountId) == null) error("账号已退出")
+		val generation = NovelAccountDataCleaner.captureGeneration(accountId)
+		val lease = NovelAccountDataCleaner.enterOperation(accountId, generation) ?: error("账号已退出")
+		return try {
+			if (AccountSessionManager.getInstance().tryGetAccount(accountId) == null) error("账号已退出")
+			copyContentUri(accountId, uri, format, takeFlags)
+		} finally {
+			lease.close()
+		}
+	}
 
 	suspend fun uploadContentUri(
 		accountId: String,
@@ -90,11 +99,14 @@ class NovelImportCoordinator(
 		takeFlags: Int,
 		progress: (Int) -> Unit,
 	): PrivateNovelApi.BookDto = withContext(Dispatchers.IO) {
+		val generation = NovelAccountDataCleaner.captureGeneration(accountId)
+		val lease = NovelAccountDataCleaner.enterOperation(accountId, generation) ?: error("账号已退出")
 		val transferId = UUID.randomUUID().toString()
 		val directory = File(context.filesDir, "novels/transfers/${accountHash(accountId)}/$transferId").apply { mkdirs() }
 		val target = File(directory, "source.${metadata.format.lowercase()}")
 		val database = NovelDatabase.open(context, accountId)
 		try {
+			if (AccountSessionManager.getInstance().tryGetAccount(accountId) == null) error("账号已退出")
 			var transfer = NovelTransferEntity(
 				transferId = transferId,
 				accountId = accountId,
@@ -115,31 +127,26 @@ class NovelImportCoordinator(
 			val prepared = copyContentUri(accountId, uri, metadata.format, takeFlags, transferId)
 			transfer = transfer.copy(contentHash = prepared.contentHash, contentMd5 = prepared.contentMd5, size = prepared.file.length(), updatedAt = System.currentTimeMillis())
 			database.transferDao().upsert(transfer)
-			val session = AccountSessionManager.getInstance().tryGetAccount(accountId) ?: error("账号已退出")
-			val uploader = PrivateBookUpload(PrivateNovelApi(session), progress)
-			val generation = NovelAccountDataCleaner.captureGeneration(accountId)
-			if (!NovelAccountDataCleaner.registerUpload(accountId, generation, uploader)) error("账号已退出")
-			NovelUploadWorker.enqueue(context, accountId, transferId)
-			val result = try {
-				uploadPrepared(uploader, prepared.file, metadata, null) { uploadId, phase ->
-					if (!NovelAccountDataCleaner.isGenerationValid(accountId, generation)) throw IOException("账号已退出")
-					transfer = transfer.copy(uploadId = uploadId, remoteBookId = uploadId, phase = phase, updatedAt = System.currentTimeMillis())
-					runBlocking { database.transferDao().upsert(transfer) }
-				}
-			} finally {
-				NovelAccountDataCleaner.unregisterUpload(accountId, uploader)
-			}
 			if (!NovelAccountDataCleaner.isGenerationValid(accountId, generation)) error("账号已退出")
-			transfer = transfer.copy(phase = NovelTransferEntity.COMPLETE, updatedAt = System.currentTimeMillis())
-			database.transferDao().upsert(transfer)
-			if (prepared.file.parentFile?.deleteRecursively() != false) database.transferDao().delete(prepared.transferId)
-			result
+			NovelUploadWorker.enqueue(context, accountId, transferId)
+			PrivateNovelApi.BookDto().apply {
+				id = transferId
+				title = metadata.title
+				author = metadata.author
+				format = metadata.format
+				contentHash = prepared.contentHash
+				verifiedSize = prepared.file.length()
+				parseStatus = "queued"
+			}
 		} finally {
 			database.close()
+			lease.close()
 		}
 	}
 
 	suspend fun resumeUpload(accountId: String, transferId: String, progress: (Int) -> Unit): PrivateNovelApi.BookDto = withContext(Dispatchers.IO) {
+		val operationGeneration = NovelAccountDataCleaner.captureGeneration(accountId)
+		val operationLease = NovelAccountDataCleaner.enterOperation(accountId, operationGeneration) ?: error("账号已退出")
 		val database = NovelDatabase.open(context, accountId)
 		try {
 			var transfer = database.transferDao().get(transferId) ?: error("找不到待恢复的小说传输")
@@ -169,53 +176,63 @@ class NovelImportCoordinator(
 			val result = try {
 				uploadPrepared(uploader, file, metadata, recovery) { uploadId, phase ->
 					if (!NovelAccountDataCleaner.isGenerationValid(accountId, generation)) throw IOException("账号已退出")
-					transfer = transfer.copy(uploadId = uploadId, remoteBookId = uploadId, phase = phase, updatedAt = System.currentTimeMillis())
-					runBlocking { database.transferDao().upsert(transfer) }
+					val updatedAt = System.currentTimeMillis()
+					transfer = transfer.copy(uploadId = uploadId, remoteBookId = uploadId, phase = phase, updatedAt = updatedAt)
+					runBlocking { database.transferDao().updateUploadProgress(transferId, uploadId, phase, updatedAt) }
 				}
 			} finally {
 				NovelAccountDataCleaner.unregisterUpload(accountId, uploader)
 			}
 			if (!NovelAccountDataCleaner.isGenerationValid(accountId, generation)) error("账号已退出")
 			transfer = transfer.copy(phase = NovelTransferEntity.COMPLETE, updatedAt = System.currentTimeMillis())
-			database.transferDao().upsert(transfer)
+			database.transferDao().updatePhase(transferId, NovelTransferEntity.COMPLETE, transfer.updatedAt)
 			if (file.parentFile?.deleteRecursively() != false) database.transferDao().delete(transferId)
 			result
 		} finally {
 			database.close()
+			operationLease.close()
 		}
 	}
 
-	suspend fun importPrivateBook(accountId: String, file: File, remote: PrivateNovelApi.BookDto, officialPath: String = file.absolutePath, transferId: String? = null, sessionGuard: () -> Boolean = { true }): Unit = withContext(Dispatchers.IO) {
+	suspend fun importPrivateBook(accountId: String, file: File, remote: PrivateNovelApi.BookDto, officialPath: String = file.absolutePath, transferId: String? = null, sessionGuard: () -> Boolean = { AccountSessionManager.getInstance().tryGetAccount(accountId) != null }): Unit = withContext(Dispatchers.IO) {
+		if (!sessionGuard()) error("账号已退出")
+		val generation = NovelAccountDataCleaner.captureGeneration(accountId)
+		val lease = NovelAccountDataCleaner.enterOperation(accountId, generation) ?: error("账号已退出")
 		currentCoroutineContext().ensureActive()
-		val parsed = parser.parse(file)
-		currentCoroutineContext().ensureActive()
-		val book = NovelBookEntity(
-			id = parsed.book.id,
-			accountId = accountId,
-			title = remote.title ?: parsed.book.title,
-			author = remote.author ?: parsed.book.author,
-			remoteId = remote.id,
-			sourceType = SOURCE_TYPE_PRIVATE,
-			contentHash = remote.contentHash,
-			localFilePath = officialPath,
-			downloadState = DOWNLOAD_STATE_READY,
-		)
-		val chapters = parsed.chapters.map { chapter ->
-			NovelChapterEntity(chapter.id, book.id, chapter.title, chapter.content, chapter.index)
-		}
-		val database = NovelDatabase.open(context, accountId)
 		try {
-			database.withTransaction {
-				if (!sessionGuard()) error("账号已退出")
-				database.novelImportDao().importBook(book, chapters)
-				if (transferId != null) {
-					val transfer = database.transferDao().get(transferId) ?: error("下载恢复记录不存在")
-					database.transferDao().upsert(transfer.copy(phase = NovelTransferEntity.DATABASE_COMMITTED, updatedAt = System.currentTimeMillis()))
+			if (!sessionGuard()) error("账号已退出")
+			val parsed = parser.parse(file)
+			currentCoroutineContext().ensureActive()
+			val book = NovelBookEntity(
+				id = parsed.book.id,
+				accountId = accountId,
+				title = remote.title ?: parsed.book.title,
+				author = remote.author ?: parsed.book.author,
+				remoteId = remote.id,
+				sourceType = SOURCE_TYPE_PRIVATE,
+				contentHash = remote.contentHash,
+				localFilePath = officialPath,
+				downloadState = DOWNLOAD_STATE_READY,
+			)
+			val chapters = parsed.chapters.map { chapter ->
+				NovelChapterEntity(chapter.id, book.id, chapter.title, chapter.content, chapter.index)
+			}
+			val database = NovelDatabase.open(context, accountId)
+			try {
+				database.withTransaction {
+					if (!sessionGuard()) error("账号已退出")
+					database.novelImportDao().importBook(book, chapters)
+					if (transferId != null) {
+						val transfer = database.transferDao().get(transferId) ?: error("下载恢复记录不存在")
+						database.transferDao().upsert(transfer.copy(phase = NovelTransferEntity.DATABASE_COMMITTED, updatedAt = System.currentTimeMillis()))
+					}
+					if (!sessionGuard()) error("账号已退出")
 				}
-				if (!sessionGuard()) error("账号已退出")
+			} finally {
+				database.close()
 			}
 		} finally {
-			database.close()
+			lease.close()
 		}
 	}
 

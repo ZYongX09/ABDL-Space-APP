@@ -12,6 +12,7 @@ import android.webkit.WebView;
 import org.joinmastodon.android.api.PushSubscriptionManager;
 import org.joinmastodon.android.api.session.AccountSession;
 import org.joinmastodon.android.api.session.AccountSessionManager;
+import org.joinmastodon.android.novel.NovelAccountCleanupWorker;
 import org.joinmastodon.android.novel.upload.NovelUploadWorker;
 import org.joinmastodon.android.ui.utils.UiUtils;
 
@@ -67,6 +68,7 @@ public class MastodonApp extends Application{
 		}
 		GlobalUserPreferences.load();
 		if(isMainProcess(getPackageName(), processName)){
+			NovelAccountCleanupWorker.enqueuePending(context);
 			for(AccountSession session:AccountSessionManager.getInstance().getLoggedInAccounts())
 				NovelUploadWorker.enqueuePending(context, session.getID());
 		}

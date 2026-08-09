@@ -11,6 +11,10 @@ import java.io.File
 import java.io.IOException
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.runBlocking
 import org.joinmastodon.android.api.session.AccountSessionManager
@@ -20,16 +24,19 @@ import org.joinmastodon.reader.data.NovelDatabase
 import org.joinmastodon.reader.data.NovelTransferEntity
 
 class NovelUploadWorker(appContext: Context, params: WorkerParameters) : CoroutineWorker(appContext, params) {
+	private class LostClaimException : IOException("小说上传租约已被接管")
+
 	override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
 		val accountId = inputData.getString(KEY_ACCOUNT_ID) ?: return@withContext Result.failure()
 		val transferId = inputData.getString(KEY_TRANSFER_ID) ?: return@withContext Result.failure()
 		val generation = NovelAccountDataCleaner.captureGeneration(accountId)
 		val session = AccountSessionManager.getInstance().tryGetAccount(accountId) ?: return@withContext Result.failure()
 		val lease = NovelAccountDataCleaner.enterOperation(accountId, generation) ?: return@withContext Result.failure()
-		val database = NovelDatabase.open(applicationContext, accountId)
 		val owner = id.toString()
+		val database = NovelDatabase.open(applicationContext, accountId)
 		try {
-			if (database.transferDao().claim(transferId, owner) == 0) return@withContext Result.success()
+			val now = System.currentTimeMillis()
+			if (database.transferDao().claim(transferId, owner, now, now + CLAIM_LEASE_MILLIS) == 0) return@withContext Result.retry()
 			var transfer = database.transferDao().get(transferId) ?: return@withContext Result.success()
 			if (transfer.accountId != accountId || transfer.direction != NovelTransferEntity.UPLOAD) return@withContext Result.failure()
 			if (!NovelAccountDataCleaner.isSessionValid(accountId, session, generation)) return@withContext Result.failure()
@@ -47,11 +54,23 @@ class NovelUploadWorker(appContext: Context, params: WorkerParameters) : Corouti
 				database.transferDao().upsert(transfer)
 			}
 			if (!NovelImportCoordinator.isVerifiedTransferFile(file, transfer.size, transfer.contentHash, transfer.contentMd5.orEmpty())) {
-				database.transferDao().upsert(transfer.copy(phase = NovelTransferEntity.FAILED, claimOwner = null, updatedAt = System.currentTimeMillis()))
+				database.transferDao().upsert(transfer.copy(phase = NovelTransferEntity.FAILED, claimOwner = null, claimExpiresAt = null, updatedAt = System.currentTimeMillis()))
 				file.parentFile?.deleteRecursively()
 				return@withContext Result.failure()
 			}
-			NovelImportCoordinator(applicationContext).resumeUpload(accountId, transfer.transferId) {}
+			coroutineScope {
+				val renewal = launch {
+					while (true) {
+						delay(CLAIM_RENEW_MILLIS)
+						if (database.transferDao().renewClaim(transferId, owner, System.currentTimeMillis() + CLAIM_LEASE_MILLIS) == 0) throw LostClaimException()
+					}
+				}
+				try {
+					NovelImportCoordinator(applicationContext).resumeUpload(accountId, transfer.transferId) {}
+				} finally {
+					renewal.cancelAndJoin()
+				}
+			}
 			Result.success()
 		} catch (error: IOException) {
 			if (isStopped) Result.failure() else Result.retry()
@@ -67,6 +86,8 @@ class NovelUploadWorker(appContext: Context, params: WorkerParameters) : Corouti
 	companion object {
 		const val KEY_ACCOUNT_ID = "account_id"
 		const val KEY_TRANSFER_ID = "transfer_id"
+		private const val CLAIM_LEASE_MILLIS = 10 * 60 * 1000L
+		private const val CLAIM_RENEW_MILLIS = 5 * 60 * 1000L
 
 		@JvmStatic fun workName(accountId: String, transferId: String) = "novel-upload:${NovelImportCoordinator.accountHash(accountId)}:$transferId"
 		@JvmStatic fun uniqueWorkName(accountId: String, transferId: String) = workName(accountId, transferId)

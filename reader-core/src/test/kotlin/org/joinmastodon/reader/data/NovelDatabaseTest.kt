@@ -109,15 +109,16 @@ class NovelDatabaseTest {
 			"contentMd5",
 			"size",
 			"claimOwner",
+			"claimExpiresAt",
 			"updatedAt",
 		)
 	}
 
 	@Test
-	fun versionFourExportsSchemaAndMigratesRealVersionOneData() = runBlocking {
-		val schema = File("schemas/org.joinmastodon.reader.data.NovelDatabase/4.json")
+	fun versionFiveExportsSchemaAndMigratesRealVersionOneData() = runBlocking {
+		val schema = File("schemas/org.joinmastodon.reader.data.NovelDatabase/5.json")
 		assertTrue(schema.isFile)
-		assertTrue(schema.readText().contains("\"version\": 4"))
+		assertTrue(schema.readText().contains("\"version\": 5"))
 		val accountId = "migration.example_1"
 		createVersionOneDatabase(accountId)
 
@@ -183,7 +184,7 @@ class NovelDatabaseTest {
 	}
 
 	@Test
-	fun transferClaimIsAtomicAndOnlyOneWorkerOwnsTransfer() = runBlocking {
+	fun transferClaimLeaseRejectsSecondOwnerAllowsReentryAndExpires() = runBlocking {
 		val database = open("claim.example_1")
 		val pending = NovelTransferEntity(
 			transferId = "transfer-claim", accountId = "claim.example_1", direction = NovelTransferEntity.UPLOAD,
@@ -193,11 +194,23 @@ class NovelDatabaseTest {
 		)
 		database.transferDao().upsert(pending)
 
-		assertEquals(1, database.transferDao().claim("transfer-claim", "worker-a"))
-		assertEquals(0, database.transferDao().claim("transfer-claim", "worker-b"))
+		assertEquals(1, database.transferDao().claim("transfer-claim", "worker-a", 1_000, 11_000))
+		assertEquals(0, database.transferDao().claim("transfer-claim", "worker-b", 2_000, 12_000))
+		assertEquals(1, database.transferDao().claim("transfer-claim", "worker-a", 3_000, 13_000))
 		assertEquals("worker-a", database.transferDao().get("transfer-claim")?.claimOwner)
-		database.transferDao().release("transfer-claim", "worker-a")
-		assertEquals(1, database.transferDao().claim("transfer-claim", "worker-b"))
+		assertEquals(13_000L, database.transferDao().get("transfer-claim")?.claimExpiresAt)
+		assertEquals(1, database.transferDao().claim("transfer-claim", "worker-b", 13_000, 23_000))
+		assertEquals("worker-b", database.transferDao().get("transfer-claim")?.claimOwner)
+	}
+
+	@Test
+	fun versionFourClaimWithoutExpiryBecomesImmediatelyClaimable() = runBlocking {
+		val accountId = "claim.migration.example"
+		createVersionFourDatabaseWithClaim(accountId)
+		val database = open(accountId)
+
+		assertEquals(1, database.transferDao().claim("transfer-v4", "worker-new", 1, 10_001))
+		assertEquals("worker-new", database.transferDao().get("transfer-v4")?.claimOwner)
 	}
 
 	@Test
@@ -300,6 +313,19 @@ class NovelDatabaseTest {
 		database.execSQL("INSERT INTO bookmarks VALUES ('bookmark-1', ?, 'book-1', 'chapter-1', 3, 1, 1, NULL)", arrayOf(accountId))
 		database.execSQL("INSERT INTO annotations VALUES ('annotation-1', ?, 'book-1', 'chapter-1', 0, 3, 'Con', NULL, 1, 1, NULL)", arrayOf(accountId))
 		database.version = 1
+		database.close()
+	}
+
+	private fun createVersionFourDatabaseWithClaim(accountId: String) {
+		createVersionOneDatabase(accountId)
+		val database = context.openOrCreateDatabase(NovelDatabase.databaseName(accountId), Context.MODE_PRIVATE, null)
+		database.execSQL("ALTER TABLE novel_chapters ADD COLUMN deletedAt INTEGER")
+		database.execSQL("DROP INDEX index_novel_chapters_bookId_chapterIndex")
+		database.execSQL("CREATE INDEX index_novel_chapters_bookId_chapterIndex ON novel_chapters(bookId, chapterIndex)")
+		database.execSQL("CREATE TABLE novel_transfers (transferId TEXT NOT NULL, accountId TEXT NOT NULL, direction TEXT NOT NULL, remoteBookId TEXT, uploadId TEXT, localTempPath TEXT NOT NULL, title TEXT, author TEXT, format TEXT NOT NULL, mimeType TEXT NOT NULL, phase TEXT NOT NULL, contentHash TEXT NOT NULL, contentMd5 TEXT, size INTEGER NOT NULL, updatedAt INTEGER NOT NULL, PRIMARY KEY(transferId))")
+		database.execSQL("ALTER TABLE novel_transfers ADD COLUMN claimOwner TEXT")
+		database.execSQL("INSERT INTO novel_transfers VALUES ('transfer-v4', ?, 'UPLOAD', NULL, NULL, '/tmp/book.txt', 'Book', NULL, 'txt', 'text/plain', 'PREPARED', 'hash', 'md5', 4, 1, 'worker-old')", arrayOf(accountId))
+		database.version = 4
 		database.close()
 	}
 

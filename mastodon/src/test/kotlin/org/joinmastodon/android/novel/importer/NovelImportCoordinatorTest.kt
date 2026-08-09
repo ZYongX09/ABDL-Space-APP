@@ -54,6 +54,18 @@ class NovelImportCoordinatorTest {
 	}
 
 	@Test
+	fun coordinatorQueuesPreparedUploadWithoutRunningNetwork() {
+		val source = File("src/main/kotlin/org/joinmastodon/android/novel/importer/NovelImportCoordinator.kt").readText()
+		val uploadEntry = source.substringAfter("suspend fun uploadContentUri(").substringBefore("suspend fun resumeUpload(")
+
+		assertTrue(uploadEntry.contains("NovelUploadWorker.enqueue("))
+		assertTrue(uploadEntry.contains("parseStatus = \"queued\""))
+		assertTrue(uploadEntry.contains("enterOperation("))
+		assertFalse(uploadEntry.contains("uploadPrepared("))
+		assertFalse(uploadEntry.contains("PrivateBookUpload("))
+	}
+
+	@Test
 	fun cancelCoordinatorUploadCancelsBlockingCallAndNeverCompletes() = runBlocking {
 		val file = Files.createTempFile("novel-upload-cancel", ".txt").toFile().apply { writeText("book") }
 		val entered = CountDownLatch(1)
