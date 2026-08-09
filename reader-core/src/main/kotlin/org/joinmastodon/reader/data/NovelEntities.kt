@@ -111,3 +111,33 @@ data class AnnotationEntity(
 	val updatedAt: Long = createdAt,
 	val deletedAt: Long? = null,
 )
+
+@Entity(tableName = "novel_transfers")
+data class NovelTransferEntity(
+	@PrimaryKey val transferId: String,
+	val accountId: String,
+	val direction: String,
+	val remoteBookId: String?,
+	val uploadId: String?,
+	val localTempPath: String,
+	val title: String?,
+	val author: String?,
+	val format: String,
+	val mimeType: String,
+	val phase: String,
+	val contentHash: String,
+	val contentMd5: String?,
+	val size: Long,
+	val updatedAt: Long = System.currentTimeMillis(),
+) {
+	companion object {
+		const val UPLOAD = "UPLOAD"
+		const val DOWNLOAD = "DOWNLOAD"
+		const val PREPARED = "PREPARED"
+		const val PUT_PENDING = "PUT_PENDING"
+		const val COMPLETE_PENDING = "COMPLETE_PENDING"
+		const val CANDIDATE_READY = "CANDIDATE_READY"
+		const val FILE_SWITCHING = "FILE_SWITCHING"
+		const val DATABASE_COMMITTED = "DATABASE_COMMITTED"
+	}
+}

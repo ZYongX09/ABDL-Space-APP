@@ -16,6 +16,8 @@ import org.joinmastodon.android.api.novels.PrivateBookUpload
 import org.joinmastodon.android.api.novels.PrivateNovelApi
 import org.joinmastodon.android.api.session.AccountSessionManager
 import org.joinmastodon.android.novel.importer.NovelImportCoordinator
+import org.joinmastodon.reader.data.NovelDatabase
+import org.joinmastodon.reader.data.NovelTransferEntity
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -46,6 +48,18 @@ class NovelDownloadWorker(
 		val api = PrivateNovelApi(session)
 		try {
 			if (!SAFE_BOOK_ID.matches(bookId)) return@withContext Result.failure()
+			val recoveryDatabase = NovelDatabase.open(applicationContext, accountId)
+			try {
+				val existing = recoveryDatabase.transferDao().getByRemoteBook(NovelTransferEntity.DOWNLOAD, bookId)
+				if (existing?.phase == NovelTransferEntity.DATABASE_COMMITTED) {
+					val destination = File(existing.localTempPath)
+					commitCandidate(destination, File(destination.parentFile, destination.name + ".candidate"), sessionGuard::isValid, true) {}
+					recoveryDatabase.transferDao().delete(existing.transferId)
+					return@withContext Result.success()
+				}
+			} finally {
+				recoveryDatabase.close()
+			}
 			sessionGuard.requireValid()
 			val book = execute(api, api.newBookCall(bookId), PrivateNovelApi.BookDto::class.java)
 			if (book.id != bookId || book.format !in SUPPORTED_FORMATS || book.verifiedSize <= 0 || book.verifiedSize > PrivateBookUpload.MAX_SIZE || !SHA_256.matches(book.contentHash.orEmpty())) return@withContext Result.failure()
@@ -55,20 +69,46 @@ class NovelDownloadWorker(
 			val directory = File(applicationContext.filesDir, "novels/${NovelImportCoordinator.accountHash(accountId)}").apply { mkdirs() }
 			val destination = File(directory, "$bookId.${book.format.lowercase(Locale.ROOT)}")
 			val candidate = File(directory, "$bookId.${book.format.lowercase(Locale.ROOT)}.candidate")
+			val transferId = "download:$bookId"
+			val transferDatabase = NovelDatabase.open(applicationContext, accountId)
 			try {
+				transferDatabase.transferDao().upsert(NovelTransferEntity(
+					transferId = transferId,
+					accountId = accountId,
+					direction = NovelTransferEntity.DOWNLOAD,
+					remoteBookId = bookId,
+					uploadId = null,
+					localTempPath = destination.absolutePath,
+					title = book.title,
+					author = book.author,
+					format = book.format,
+					mimeType = if (book.format == "txt") "text/plain" else "application/epub+zip",
+					phase = NovelTransferEntity.CANDIDATE_READY,
+					contentHash = book.contentHash.orEmpty(),
+					contentMd5 = null,
+					size = book.verifiedSize,
+				))
 				runInterruptible {
 					downloadVerified(api.callFactory, authorization.downloadUrl, candidate, book.verifiedSize, book.contentHash, false) { call -> registerCall(call) }
 				}
 			} catch (error: Throwable) {
 				candidate.delete()
 				throw error
+			} finally {
+				transferDatabase.close()
 			}
 			if (!sessionGuard.isValid()) {
 				candidate.delete()
 				return@withContext Result.failure()
 			}
 			commitCandidate(destination, candidate, sessionGuard::isValid) {
-				NovelImportCoordinator(applicationContext).importPrivateBook(accountId, destination, book, sessionGuard = sessionGuard::isValid)
+				NovelImportCoordinator(applicationContext).importPrivateBook(accountId, destination, book, transferId = transferId, sessionGuard = sessionGuard::isValid)
+			}
+			val cleanupDatabase = NovelDatabase.open(applicationContext, accountId)
+			try {
+				cleanupDatabase.transferDao().delete(transferId)
+			} finally {
+				cleanupDatabase.close()
 			}
 			Result.success()
 		} catch (error: IOException) {
@@ -181,12 +221,24 @@ class NovelDownloadWorker(
 		@JvmStatic
 		@Throws(IOException::class)
 		suspend fun commitCandidate(destination: File, candidate: File, commitDatabase: suspend () -> Unit) =
-			commitCandidate(destination, candidate, { true }, commitDatabase)
+			commitCandidate(destination, candidate, { true }, false, commitDatabase)
 
 		@JvmStatic
 		@Throws(IOException::class)
 		suspend fun commitCandidate(destination: File, candidate: File, sessionValid: () -> Boolean, commitDatabase: suspend () -> Unit) {
+			commitCandidate(destination, candidate, sessionValid, false, commitDatabase)
+		}
+
+		@JvmStatic
+		@Throws(IOException::class)
+		suspend fun commitCandidate(destination: File, candidate: File, sessionValid: () -> Boolean, databaseCommitted: Boolean, commitDatabase: suspend () -> Unit) {
 			val backup = File(destination.parentFile, destination.name + ".backup")
+			if (databaseCommitted) {
+				if (!destination.exists()) throw IOException("Committed novel file is missing")
+				backup.delete()
+				candidate.delete()
+				return
+			}
 			if (backup.exists()) {
 				if (destination.exists()) destination.delete()
 				moveAtomic(backup, destination)
@@ -200,7 +252,6 @@ class NovelDownloadWorker(
 				switched = true
 				requireSession(sessionValid)
 				commitDatabase()
-				requireSession(sessionValid)
 				backup.delete()
 			} catch (error: Throwable) {
 				if (switched) destination.delete()

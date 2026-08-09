@@ -214,6 +214,47 @@ public class PrivateBookUploadTest{
 	}
 
 	@Test
+	public void persistedCompletePendingResumesWithoutAuthorizeOrPut() throws Exception{
+		File source=write("book.txt", "resume complete");
+		server.enqueue(json(200, "{\"id\":\"book-resume\",\"format\":\"txt\",\"verified_size\":15,\"parse_status\":\"ready\"}"));
+		List<String> phases=new ArrayList<>();
+
+		PrivateNovelApi.BookDto result=new PrivateBookUpload(api(), ignored -> {}, millis -> {}).resume(
+				source,
+				metadata(),
+				new PrivateBookUpload.Recovery("book-resume", PrivateBookUpload.Recovery.COMPLETE_PENDING),
+				(uploadId, phase) -> phases.add(uploadId+":"+phase)
+		);
+
+		assertEquals("book-resume", result.id);
+		assertEquals(List.of("book-resume:"+PrivateBookUpload.Recovery.COMPLETE), phases);
+		assertEquals(1, server.getRequestCount());
+		assertEquals("/api/v1/novels/private/book-resume/complete", server.takeRequest().getPath());
+	}
+
+	@Test
+	public void uploadPersistsPutAndCompleteRecoveryBoundaries() throws Exception{
+		File source=write("book.txt", "persist phases");
+		server.enqueue(authorizeResponse(source, server.url("/cos/persist").toString(), "book-persist"));
+		server.enqueue(new MockResponse().setResponseCode(200));
+		server.enqueue(json(200, "{\"id\":\"book-persist\",\"format\":\"txt\",\"verified_size\":14,\"parse_status\":\"ready\"}"));
+		List<String> phases=new ArrayList<>();
+
+		new PrivateBookUpload(api(), ignored -> {}, millis -> {}).resume(
+				source,
+				metadata(),
+				null,
+				(uploadId, phase) -> phases.add(uploadId+":"+phase)
+		);
+
+		assertEquals(List.of(
+				"book-persist:"+PrivateBookUpload.Recovery.PUT_PENDING,
+				"book-persist:"+PrivateBookUpload.Recovery.COMPLETE_PENDING,
+				"book-persist:"+PrivateBookUpload.Recovery.COMPLETE
+		), phases);
+	}
+
+	@Test
 	public void malformedJsonFailsAndConvergesToFailed() throws Exception{
 		File source=write("book.txt", "bad json");
 		server.enqueue(json(200, "{not-json"));

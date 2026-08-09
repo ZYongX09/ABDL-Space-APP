@@ -26,6 +26,24 @@ public class PrivateBookUpload{
 
 	public enum State{ IDLE, PREPARING, AUTHORIZING, UPLOADING, COMPLETING, COMPLETE, FAILED, CANCELED }
 
+	public static class Recovery{
+		public static final String PUT_PENDING="PUT_PENDING";
+		public static final String COMPLETE_PENDING="COMPLETE_PENDING";
+		public static final String COMPLETE="COMPLETE";
+		public final String uploadId;
+		public final String phase;
+
+		public Recovery(String uploadId, String phase){
+			this.uploadId=uploadId;
+			this.phase=phase;
+		}
+	}
+
+	@FunctionalInterface
+	public interface RecoveryListener{
+		void onPhase(String uploadId, String phase) throws IOException;
+	}
+
 	private final PrivateNovelApi api;
 	private final IntConsumer progressListener;
 	private final LongConsumer sleeper;
@@ -63,6 +81,10 @@ public class PrivateBookUpload{
 	}
 
 	public PrivateNovelApi.BookDto upload(File file, PrivateNovelApi.UploadMetadata metadata) throws IOException{
+		return resume(file, metadata, null, (uploadId, phase) -> {});
+	}
+
+	public PrivateNovelApi.BookDto resume(File file, PrivateNovelApi.UploadMetadata metadata, Recovery recovery, RecoveryListener recoveryListener) throws IOException{
 		try{
 			validateFile(file, metadata);
 			state=State.PREPARING;
@@ -71,33 +93,42 @@ public class PrivateBookUpload{
 			String md5=md5Base64(file);
 			checkCanceled();
 
-			state=State.AUTHORIZING;
-			PrivateNovelApi.AuthorizeRequest request=new PrivateNovelApi.AuthorizeRequest(metadata, file.length(), sha256, md5);
-			PrivateNovelApi.UploadAuthorization authorization=execute(api.newAuthorizeCall(request), PrivateNovelApi.UploadAuthorization.class);
-			validateAuthorization(authorization, file.length(), sha256, md5, metadata.mimeType);
-			report(5);
+			String uploadId=recovery==null ? null : recovery.uploadId;
+			if(recovery==null || !Recovery.COMPLETE_PENDING.equals(recovery.phase)){
+				state=State.AUTHORIZING;
+				PrivateNovelApi.AuthorizeRequest request=new PrivateNovelApi.AuthorizeRequest(metadata, file.length(), sha256, md5);
+				PrivateNovelApi.UploadAuthorization authorization=execute(api.newAuthorizeCall(request), PrivateNovelApi.UploadAuthorization.class);
+				validateAuthorization(authorization, file.length(), sha256, md5, metadata.mimeType);
+				uploadId=authorization.uploadId;
+				recoveryListener.onPhase(uploadId, Recovery.PUT_PENDING);
+				report(5);
 
-			if(authorization.alreadyUploaded){
-				PrivateNovelApi.BookDto ready=bookResult(authorization.uploadId, metadata, file.length(), sha256, authorization.parseStatus);
-				completionGate.run();
-				publishComplete();
-				return ready;
-			}else{
+				if(authorization.alreadyUploaded){
+					PrivateNovelApi.BookDto ready=bookResult(uploadId, metadata, file.length(), sha256, authorization.parseStatus);
+					completionGate.run();
+					publishComplete();
+					recoveryListener.onPhase(uploadId, Recovery.COMPLETE);
+					return ready;
+				}
 				state=State.UPLOADING;
 				try{
 					uploadFile(file, authorization);
 				}catch(IOException error){
 					if(!isUncertainPut(error)) throw error;
 				}
+				recoveryListener.onPhase(uploadId, Recovery.COMPLETE_PENDING);
 				report(95);
+			}else if(uploadId==null || uploadId.isEmpty()){
+				throw new IOException("Missing recovery upload id");
 			}
 
 			checkCanceled();
 			state=State.COMPLETING;
-			PrivateNovelApi.CompleteResultDto completed=pollComplete(authorization.uploadId);
+			PrivateNovelApi.CompleteResultDto completed=pollComplete(uploadId);
 			PrivateNovelApi.BookDto result=bookResult(completed.id, metadata, completed.verifiedSize, sha256, completed.parseStatus);
 			completionGate.run();
 			publishComplete();
+			recoveryListener.onPhase(uploadId, Recovery.COMPLETE);
 			return result;
 		}catch(IOException e){
 			state=canceled ? State.CANCELED : State.FAILED;

@@ -69,6 +69,27 @@ class NovelDownloadTransactionTest {
 	}
 
 	@Test
+	fun committedTransferKeepsNewOfficialAndOnlyCleansBackup() = runBlocking {
+		val directory = Files.createTempDirectory("novel-download-committed-recovery").toFile()
+		val official = File(directory, "book.txt").apply { writeText("new") }
+		val backup = File(directory, "book.txt.backup").apply { writeText("old") }
+		var databaseCalled = false
+
+		NovelDownloadWorker.commitCandidate(
+			official,
+			File(directory, "book.txt.candidate"),
+			{ true },
+			true,
+		) { databaseCalled = true }
+
+		assertEquals("new", official.readText())
+		assertFalse(backup.exists())
+		assertFalse(databaseCalled)
+		directory.deleteRecursively()
+		Unit
+	}
+
+	@Test
 	fun invalidSessionBeforeCommitKeepsOldFileAndSkipsDatabase() = runBlocking {
 		val directory = Files.createTempDirectory("novel-download-session").toFile()
 		val official = File(directory, "book.txt").apply { writeText("old") }

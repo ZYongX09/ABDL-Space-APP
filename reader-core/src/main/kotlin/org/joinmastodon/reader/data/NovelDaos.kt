@@ -42,6 +42,24 @@ interface NovelChapterDao {
 }
 
 @Dao
+interface NovelTransferDao {
+	@Upsert
+	suspend fun upsert(transfer: NovelTransferEntity)
+
+	@Query("SELECT * FROM novel_transfers WHERE transferId = :transferId")
+	suspend fun get(transferId: String): NovelTransferEntity?
+
+	@Query("SELECT * FROM novel_transfers WHERE direction = :direction AND remoteBookId = :remoteBookId LIMIT 1")
+	suspend fun getByRemoteBook(direction: String, remoteBookId: String): NovelTransferEntity?
+
+	@Query("SELECT * FROM novel_transfers ORDER BY updatedAt")
+	suspend fun list(): List<NovelTransferEntity>
+
+	@Query("DELETE FROM novel_transfers WHERE transferId = :transferId")
+	suspend fun delete(transferId: String)
+}
+
+@Dao
 interface NovelImportDao {
 	@Query("SELECT * FROM novel_books WHERE accountId = :accountId AND sourceType = :sourceType AND remoteId = :remoteId")
 	suspend fun findRemoteBook(accountId: String, sourceType: String, remoteId: String): NovelBookEntity?

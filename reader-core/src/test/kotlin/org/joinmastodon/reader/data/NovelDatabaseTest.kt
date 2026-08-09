@@ -1,11 +1,10 @@
 package org.joinmastodon.reader.data
 
 import android.content.Context
+import android.database.sqlite.SQLiteDatabase
 import androidx.test.core.app.ApplicationProvider
-import java.security.MessageDigest
 import java.io.File
-import java.lang.reflect.Proxy
-import androidx.sqlite.db.SupportSQLiteDatabase
+import java.security.MessageDigest
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -93,26 +92,93 @@ class NovelDatabaseTest {
 		assertFields(BookmarkEntity::class.java, "accountId", "updatedAt", "deletedAt")
 		assertFields(AnnotationEntity::class.java, "accountId", "updatedAt", "deletedAt")
 		assertFields(NovelChapterEntity::class.java, "deletedAt")
+		assertFields(
+			NovelTransferEntity::class.java,
+			"transferId",
+			"accountId",
+			"direction",
+			"remoteBookId",
+			"uploadId",
+			"localTempPath",
+			"title",
+			"author",
+			"format",
+			"mimeType",
+			"phase",
+			"contentHash",
+			"contentMd5",
+			"size",
+			"updatedAt",
+		)
 	}
 
 	@Test
-	fun versionTwoExportsSchemaAndProvidesNonDestructiveMigration() {
-		val schema = File("schemas/org.joinmastodon.reader.data.NovelDatabase/2.json")
+	fun versionThreeExportsSchemaAndMigratesRealVersionOneData() = runBlocking {
+		val schema = File("schemas/org.joinmastodon.reader.data.NovelDatabase/3.json")
 		assertTrue(schema.isFile)
-		assertTrue(schema.readText().contains("\"version\": 2"))
-		val statements = mutableListOf<String>()
-		val database = Proxy.newProxyInstance(
-			SupportSQLiteDatabase::class.java.classLoader,
-			arrayOf(SupportSQLiteDatabase::class.java),
-		) { _, method, args ->
-			if (method.name == "execSQL") statements += args!![0] as String
-			null
-		} as SupportSQLiteDatabase
+		assertTrue(schema.readText().contains("\"version\": 3"))
+		val accountId = "migration.example_1"
+		createVersionOneDatabase(accountId)
 
-		NovelDatabase.MIGRATION_1_2.migrate(database)
+		val database = open(accountId)
 
-		assertTrue(statements.any { it == "ALTER TABLE novel_chapters ADD COLUMN deletedAt INTEGER" })
-		assertTrue(statements.any { it.startsWith("CREATE INDEX IF NOT EXISTS index_novel_chapters_bookId_chapterIndex") })
+		assertEquals("Migrated book", database.novelBookDao().getById(accountId, "book-1")?.title)
+		assertEquals(null, database.novelChapterDao().getById("chapter-1")?.deletedAt)
+		assertEquals("chapter-1", database.bookmarkDao().getByBookId(accountId, "book-1").single().chapterId)
+		assertEquals("chapter-1", database.annotationDao().getByBookId(accountId, "book-1").single().chapterId)
+		assertTrue(database.transferDao().list().isEmpty())
+		val sqlite = database.openHelper.writableDatabase
+		assertEquals(setOf("bookId", "bookId,chapterIndex"), sqlite.query("PRAGMA index_list('novel_chapters')").use { cursor ->
+			buildSet {
+				while (cursor.moveToNext()) {
+					val indexName = cursor.getString(cursor.getColumnIndexOrThrow("name"))
+					if (indexName.startsWith("sqlite_autoindex_")) continue
+					sqlite.query("PRAGMA index_info('$indexName')").use { columns ->
+						val names = mutableListOf<String>()
+						while (columns.moveToNext()) names += columns.getString(columns.getColumnIndexOrThrow("name"))
+						add(names.joinToString(","))
+					}
+				}
+			}
+		})
+		assertEquals(listOf("novel_books"), sqlite.query("PRAGMA foreign_key_list('novel_chapters')").use { cursor ->
+			buildList {
+				while (cursor.moveToNext()) add(cursor.getString(cursor.getColumnIndexOrThrow("table")))
+			}
+		})
+	}
+
+	@Test
+	fun transferDaoPersistsAndMutatesPendingTransfer() = runBlocking {
+		val database = open("transfer.example_1")
+		val pending = NovelTransferEntity(
+			transferId = "transfer-1",
+			accountId = "transfer.example_1",
+			direction = NovelTransferEntity.UPLOAD,
+			remoteBookId = null,
+			uploadId = "upload-1",
+			localTempPath = "/tmp/book.txt",
+			title = "Book",
+			author = "Author",
+			format = "txt",
+			mimeType = "text/plain",
+			phase = NovelTransferEntity.PUT_PENDING,
+			contentHash = "sha256",
+			contentMd5 = "md5",
+			size = 42,
+			updatedAt = 100,
+		)
+
+		database.transferDao().upsert(pending)
+		assertEquals(pending, database.transferDao().get("transfer-1"))
+		assertEquals(listOf(pending), database.transferDao().list())
+
+		val completePending = pending.copy(phase = NovelTransferEntity.COMPLETE_PENDING, updatedAt = 200)
+		database.transferDao().upsert(completePending)
+		assertEquals(completePending, database.transferDao().get("transfer-1"))
+
+		database.transferDao().delete("transfer-1")
+		assertNull(database.transferDao().get("transfer-1"))
 	}
 
 	@Test
@@ -185,6 +251,34 @@ class NovelDatabaseTest {
 		assertEquals("alpha", database.novelChapterDao().getById(database.bookmarkDao().getByBookId(accountId, book.id).single().chapterId)?.content)
 		assertEquals("beta", database.novelChapterDao().getById(database.annotationDao().getByBookId(accountId, book.id).single().chapterId)?.content)
 		assertTrue(database.novelChapterDao().getById("b")?.deletedAt != null)
+	}
+
+	private fun createVersionOneDatabase(accountId: String) {
+		accountIds += accountId
+		context.deleteDatabase(NovelDatabase.databaseName(accountId))
+		val database = context.openOrCreateDatabase(NovelDatabase.databaseName(accountId), Context.MODE_PRIVATE, null)
+		database.execSQL("PRAGMA foreign_keys = ON")
+		database.execSQL("CREATE TABLE novel_books (id TEXT NOT NULL PRIMARY KEY, accountId TEXT NOT NULL, title TEXT NOT NULL, author TEXT, sourceUri TEXT, coverUri TEXT, remoteId TEXT, sourceType TEXT NOT NULL, contentHash TEXT, localFilePath TEXT, downloadState TEXT NOT NULL, remoteUpdatedAt INTEGER, updatedAt INTEGER NOT NULL, deletedAt INTEGER)")
+		database.execSQL("CREATE INDEX index_novel_books_accountId ON novel_books(accountId)")
+		database.execSQL("CREATE UNIQUE INDEX index_novel_books_accountId_sourceType_remoteId ON novel_books(accountId, sourceType, remoteId)")
+		database.execSQL("CREATE INDEX index_novel_books_accountId_deletedAt ON novel_books(accountId, deletedAt)")
+		database.execSQL("CREATE TABLE novel_chapters (id TEXT NOT NULL PRIMARY KEY, bookId TEXT NOT NULL, title TEXT NOT NULL, content TEXT NOT NULL, chapterIndex INTEGER NOT NULL, FOREIGN KEY(bookId) REFERENCES novel_books(id) ON DELETE CASCADE)")
+		database.execSQL("CREATE INDEX index_novel_chapters_bookId ON novel_chapters(bookId)")
+		database.execSQL("CREATE UNIQUE INDEX index_novel_chapters_bookId_chapterIndex ON novel_chapters(bookId, chapterIndex)")
+		database.execSQL("CREATE TABLE bookmarks (id TEXT NOT NULL PRIMARY KEY, accountId TEXT NOT NULL, bookId TEXT NOT NULL, chapterId TEXT NOT NULL, position INTEGER NOT NULL, createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL, deletedAt INTEGER, FOREIGN KEY(bookId) REFERENCES novel_books(id) ON DELETE CASCADE, FOREIGN KEY(chapterId) REFERENCES novel_chapters(id) ON DELETE CASCADE)")
+		database.execSQL("CREATE INDEX index_bookmarks_bookId ON bookmarks(bookId)")
+		database.execSQL("CREATE INDEX index_bookmarks_chapterId ON bookmarks(chapterId)")
+		database.execSQL("CREATE INDEX index_bookmarks_accountId_bookId_deletedAt ON bookmarks(accountId, bookId, deletedAt)")
+		database.execSQL("CREATE TABLE annotations (id TEXT NOT NULL PRIMARY KEY, accountId TEXT NOT NULL, bookId TEXT NOT NULL, chapterId TEXT NOT NULL, startOffset INTEGER NOT NULL, endOffset INTEGER NOT NULL, selectedText TEXT NOT NULL, note TEXT, createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL, deletedAt INTEGER, FOREIGN KEY(bookId) REFERENCES novel_books(id) ON DELETE CASCADE, FOREIGN KEY(chapterId) REFERENCES novel_chapters(id) ON DELETE CASCADE)")
+		database.execSQL("CREATE INDEX index_annotations_bookId ON annotations(bookId)")
+		database.execSQL("CREATE INDEX index_annotations_chapterId ON annotations(chapterId)")
+		database.execSQL("CREATE INDEX index_annotations_accountId_bookId_deletedAt ON annotations(accountId, bookId, deletedAt)")
+		database.execSQL("INSERT INTO novel_books VALUES ('book-1', ?, 'Migrated book', NULL, NULL, NULL, 'remote-1', 'private', NULL, NULL, 'pending', NULL, 1, NULL)", arrayOf(accountId))
+		database.execSQL("INSERT INTO novel_chapters VALUES ('chapter-1', 'book-1', 'Chapter', 'Content', 0)")
+		database.execSQL("INSERT INTO bookmarks VALUES ('bookmark-1', ?, 'book-1', 'chapter-1', 3, 1, 1, NULL)", arrayOf(accountId))
+		database.execSQL("INSERT INTO annotations VALUES ('annotation-1', ?, 'book-1', 'chapter-1', 0, 3, 'Con', NULL, 1, 1, NULL)", arrayOf(accountId))
+		database.version = 1
+		database.close()
 	}
 
 	private fun open(accountId: String): NovelDatabase {
