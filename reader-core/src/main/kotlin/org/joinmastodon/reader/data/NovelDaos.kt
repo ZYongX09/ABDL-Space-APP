@@ -57,6 +57,12 @@ interface NovelTransferDao {
 
 	@Query("DELETE FROM novel_transfers WHERE transferId = :transferId")
 	suspend fun delete(transferId: String)
+
+	@Query("UPDATE novel_transfers SET claimOwner = :owner WHERE transferId = :transferId AND claimOwner IS NULL")
+	suspend fun claim(transferId: String, owner: String): Int
+
+	@Query("UPDATE novel_transfers SET claimOwner = NULL WHERE transferId = :transferId AND claimOwner = :owner")
+	suspend fun release(transferId: String, owner: String): Int
 }
 
 @Dao

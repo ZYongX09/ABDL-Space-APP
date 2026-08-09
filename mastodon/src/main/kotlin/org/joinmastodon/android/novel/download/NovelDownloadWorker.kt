@@ -11,11 +11,13 @@ import androidx.room.withTransaction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.job
 import kotlinx.coroutines.runInterruptible
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import org.joinmastodon.android.api.novels.PrivateBookUpload
 import org.joinmastodon.android.api.novels.PrivateNovelApi
 import org.joinmastodon.android.api.session.AccountSessionManager
 import org.joinmastodon.android.novel.importer.NovelImportCoordinator
+import org.joinmastodon.android.novel.NovelAccountDataCleaner
 import org.joinmastodon.reader.data.NovelDatabase
 import org.joinmastodon.reader.data.NovelTransferEntity
 import java.io.File
@@ -33,6 +35,8 @@ class NovelDownloadWorker(
 	appContext: Context,
 	params: WorkerParameters,
 ) : CoroutineWorker(appContext, params) {
+	class DatabaseCommittedException(val original: Throwable) : Exception(original)
+
 	private val currentCall = AtomicReference<Call?>()
 
 	override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
@@ -40,10 +44,12 @@ class NovelDownloadWorker(
 		val accountId = inputData.getString(KEY_ACCOUNT_ID) ?: return@withContext Result.failure()
 		val bookId = inputData.getString(KEY_BOOK_ID) ?: return@withContext Result.failure()
 		val session = AccountSessionManager.getInstance().tryGetAccount(accountId) ?: return@withContext Result.failure()
+		val generation = NovelAccountDataCleaner.captureGeneration(accountId)
+		val lease = NovelAccountDataCleaner.enterOperation(accountId, generation) ?: return@withContext Result.failure()
 		val accessToken = session.token.accessToken
 		val sessionGuard = AccountSessionGuard {
 			val current = AccountSessionManager.getInstance().tryGetAccount(accountId)
-			current === session && current.token.accessToken == accessToken
+			current === session && current.token.accessToken == accessToken && NovelAccountDataCleaner.isGenerationValid(accountId, generation)
 		}
 		val api = PrivateNovelApi(session)
 		try {
@@ -52,11 +58,13 @@ class NovelDownloadWorker(
 			try {
 				val existing = recoveryDatabase.transferDao().getByRemoteBook(NovelTransferEntity.DOWNLOAD, bookId)
 				if (existing?.phase == NovelTransferEntity.DATABASE_COMMITTED) {
-					sessionGuard.requireValid()
 					val destination = File(existing.localTempPath)
-					commitCandidate(destination, File(destination.parentFile, destination.name + ".candidate"), sessionGuard::isValid, true) {}
-					recoveryDatabase.transferDao().delete(existing.transferId)
-					return@withContext Result.success()
+					if (recoverCommitted(destination, File(destination.parentFile, destination.name + ".candidate"), existing.size, existing.contentHash)) {
+						recoveryDatabase.transferDao().delete(existing.transferId)
+						return@withContext Result.success()
+					} else {
+						recoveryDatabase.transferDao().upsert(existing.copy(phase = NovelTransferEntity.CANDIDATE_READY, updatedAt = System.currentTimeMillis()))
+					}
 				}
 			} finally {
 				recoveryDatabase.close()
@@ -118,6 +126,7 @@ class NovelDownloadWorker(
 			Result.failure()
 		} finally {
 			currentCall.set(null)
+			lease.close()
 		}
 	}
 
@@ -251,6 +260,7 @@ class NovelDownloadWorker(
 				moveAtomic(backup, destination)
 			}
 			var switched = false
+			var committed = false
 			try {
 				requireSession(sessionValid)
 				if (destination.exists()) moveAtomic(destination, backup)
@@ -258,17 +268,55 @@ class NovelDownloadWorker(
 				moveAtomic(candidate, destination)
 				switched = true
 				requireSession(sessionValid)
-				commitDatabase()
+				try {
+					withContext(NonCancellable) {
+						commitDatabase()
+						committed = true
+					}
+				} catch (error: DatabaseCommittedException) {
+					committed = true
+					throw error.original
+				}
 				backup.delete()
 			} catch (error: Throwable) {
-				if (switched) destination.delete()
-				if (backup.exists()) moveAtomic(backup, destination)
+				if (!committed) {
+					if (switched) destination.delete()
+					if (backup.exists()) moveAtomic(backup, destination)
+				}
 				throw error
 			} finally {
 				candidate.delete()
-				if (backup.exists() && !destination.exists()) moveAtomic(backup, destination)
-				if (destination.exists()) backup.delete()
+				if (!committed && backup.exists() && !destination.exists()) moveAtomic(backup, destination)
+				if (committed && destination.exists()) backup.delete()
 			}
+		}
+
+		@JvmStatic
+		fun recoverCommitted(destination: File, candidate: File, expectedSize: Long, expectedHash: String): Boolean {
+			val backup = File(destination.parentFile, destination.name + ".backup")
+			val valid = destination.isFile && destination.length() == expectedSize && sha256(destination).equals(expectedHash, ignoreCase = true)
+			if (valid) {
+				backup.delete()
+				candidate.delete()
+				return true
+			}
+			destination.delete()
+			if (backup.exists()) moveAtomic(backup, destination)
+			candidate.delete()
+			return false
+		}
+
+		private fun sha256(file: File): String {
+			val digest = MessageDigest.getInstance("SHA-256")
+			file.inputStream().use { input ->
+				val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+				while (true) {
+					val read = input.read(buffer)
+					if (read < 0) break
+					digest.update(buffer, 0, read)
+				}
+			}
+			return digest.digest().joinToString("") { "%02x".format(it) }
 		}
 
 		private fun requireSession(sessionValid: () -> Boolean) {

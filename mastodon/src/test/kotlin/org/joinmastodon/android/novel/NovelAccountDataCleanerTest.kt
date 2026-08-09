@@ -20,12 +20,41 @@ class NovelAccountDataCleanerTest {
 				canceled = true
 			}
 		}
-		NovelAccountDataCleaner.registerUpload(accountId, upload)
+		assertTrue(NovelAccountDataCleaner.registerUpload(accountId, generation, upload) { true })
 
 		NovelAccountDataCleaner.invalidate(accountId)
 
 		assertTrue(canceled)
 		assertFalse(NovelAccountDataCleaner.isGenerationValid(accountId, generation))
+	}
+
+	@Test
+	fun uploadRegistrationAfterInvalidationIsRejectedAndCanceled() {
+		val accountId = "logout.example_race"
+		val generation = NovelAccountDataCleaner.captureGeneration(accountId)
+		NovelAccountDataCleaner.invalidate(accountId)
+		var canceled = false
+		val upload = object : PrivateBookUpload(null, {}) {
+			override fun cancel() { canceled = true }
+		}
+
+		assertFalse(NovelAccountDataCleaner.registerUpload(accountId, generation, upload) { true })
+		assertTrue(canceled)
+	}
+
+	@Test
+	fun revokeAndRegistrationAreAtomicallyFenced() {
+		val accountId = "logout.example_atomic"
+		val generation = NovelAccountDataCleaner.captureGeneration(accountId)
+		var sessionPresent = true
+		NovelAccountDataCleaner.revoke(accountId) { sessionPresent = false }
+		var canceled = false
+		val upload = object : PrivateBookUpload(null, {}) {
+			override fun cancel() { canceled = true }
+		}
+
+		assertFalse(NovelAccountDataCleaner.registerUpload(accountId, generation, upload) { sessionPresent })
+		assertTrue(canceled)
 	}
 
 	@Test

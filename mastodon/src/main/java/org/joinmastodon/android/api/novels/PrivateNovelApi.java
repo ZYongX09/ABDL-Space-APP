@@ -164,7 +164,7 @@ public class PrivateNovelApi{
 	public static class CompleteResultDto{
 		public String id;
 		public String format;
-		@SerializedName("verified_size") public long verifiedSize;
+		@SerializedName("verified_size") public Long verifiedSize;
 		@SerializedName("parse_status") public String parseStatus;
 	}
 

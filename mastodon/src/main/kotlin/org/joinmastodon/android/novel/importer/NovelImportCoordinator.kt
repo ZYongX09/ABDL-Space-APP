@@ -118,7 +118,7 @@ class NovelImportCoordinator(
 			val session = AccountSessionManager.getInstance().tryGetAccount(accountId) ?: error("账号已退出")
 			val uploader = PrivateBookUpload(PrivateNovelApi(session), progress)
 			val generation = NovelAccountDataCleaner.captureGeneration(accountId)
-			NovelAccountDataCleaner.registerUpload(accountId, uploader)
+			if (!NovelAccountDataCleaner.registerUpload(accountId, generation, uploader)) error("账号已退出")
 			NovelUploadWorker.enqueue(context, accountId, transferId)
 			val result = try {
 				uploadPrepared(uploader, prepared.file, metadata, null) { uploadId, phase ->
@@ -130,8 +130,9 @@ class NovelImportCoordinator(
 				NovelAccountDataCleaner.unregisterUpload(accountId, uploader)
 			}
 			if (!NovelAccountDataCleaner.isGenerationValid(accountId, generation)) error("账号已退出")
-			database.transferDao().delete(prepared.transferId)
-			prepared.file.parentFile?.deleteRecursively()
+			transfer = transfer.copy(phase = NovelTransferEntity.COMPLETE, updatedAt = System.currentTimeMillis())
+			database.transferDao().upsert(transfer)
+			if (prepared.file.parentFile?.deleteRecursively() != false) database.transferDao().delete(prepared.transferId)
 			result
 		} finally {
 			database.close()
@@ -164,7 +165,7 @@ class NovelImportCoordinator(
 			val recovery = transfer.uploadId?.let { PrivateBookUpload.Recovery(it, transfer.phase) }
 			val uploader = PrivateBookUpload(PrivateNovelApi(session), progress)
 			val generation = NovelAccountDataCleaner.captureGeneration(accountId)
-			NovelAccountDataCleaner.registerUpload(accountId, uploader)
+			if (!NovelAccountDataCleaner.registerUpload(accountId, generation, uploader)) error("账号已退出")
 			val result = try {
 				uploadPrepared(uploader, file, metadata, recovery) { uploadId, phase ->
 					if (!NovelAccountDataCleaner.isGenerationValid(accountId, generation)) throw IOException("账号已退出")
@@ -175,8 +176,9 @@ class NovelImportCoordinator(
 				NovelAccountDataCleaner.unregisterUpload(accountId, uploader)
 			}
 			if (!NovelAccountDataCleaner.isGenerationValid(accountId, generation)) error("账号已退出")
-			database.transferDao().delete(transferId)
-			file.parentFile?.deleteRecursively()
+			transfer = transfer.copy(phase = NovelTransferEntity.COMPLETE, updatedAt = System.currentTimeMillis())
+			database.transferDao().upsert(transfer)
+			if (file.parentFile?.deleteRecursively() != false) database.transferDao().delete(transferId)
 			result
 		} finally {
 			database.close()
@@ -234,6 +236,10 @@ class NovelImportCoordinator(
 			}
 			return PreparedRecovery.READY
 		}
+
+		internal fun isVerifiedTransferFile(file: File, size: Long, contentHash: String, contentMd5: String): Boolean =
+			file.isFile && size > 0 && contentHash.isNotEmpty() && contentMd5.isNotEmpty() && file.length() == size &&
+				PrivateBookUpload.sha256(file) == contentHash && PrivateBookUpload.md5Base64(file) == contentMd5
 
 		internal suspend fun uploadPrepared(uploader: PrivateBookUpload, file: File, metadata: PrivateNovelApi.UploadMetadata): PrivateNovelApi.BookDto =
 			uploadPreparedCall(uploader) { uploader.upload(file, metadata) }

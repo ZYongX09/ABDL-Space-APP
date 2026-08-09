@@ -9,8 +9,10 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import java.io.File
 import java.io.IOException
+import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.runBlocking
 import org.joinmastodon.android.api.session.AccountSessionManager
 import org.joinmastodon.android.novel.NovelAccountDataCleaner
 import org.joinmastodon.android.novel.importer.NovelImportCoordinator
@@ -20,41 +22,45 @@ import org.joinmastodon.reader.data.NovelTransferEntity
 class NovelUploadWorker(appContext: Context, params: WorkerParameters) : CoroutineWorker(appContext, params) {
 	override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
 		val accountId = inputData.getString(KEY_ACCOUNT_ID) ?: return@withContext Result.failure()
-		val requestedTransferId = inputData.getString(KEY_TRANSFER_ID)
+		val transferId = inputData.getString(KEY_TRANSFER_ID) ?: return@withContext Result.failure()
 		val generation = NovelAccountDataCleaner.captureGeneration(accountId)
-		if (AccountSessionManager.getInstance().tryGetAccount(accountId) == null) return@withContext Result.failure()
-		if (NovelAccountDataCleaner.hasActiveUpload(accountId)) return@withContext Result.retry()
+		val session = AccountSessionManager.getInstance().tryGetAccount(accountId) ?: return@withContext Result.failure()
+		val lease = NovelAccountDataCleaner.enterOperation(accountId, generation) ?: return@withContext Result.failure()
 		val database = NovelDatabase.open(applicationContext, accountId)
+		val owner = id.toString()
 		try {
-			val transfers = database.transferDao().list()
-				.filter { it.accountId == accountId && it.direction == NovelTransferEntity.UPLOAD }
-				.filter { requestedTransferId == null || it.transferId == requestedTransferId }
-			for (transfer in transfers) {
-				if (!NovelAccountDataCleaner.isGenerationValid(accountId, generation)) return@withContext Result.failure()
-				if (transfer.phase == NovelTransferEntity.PREPARED) {
-					val file = File(transfer.localTempPath)
-					when (NovelImportCoordinator.recoverPreparedFile(file, transfer.size, transfer.contentHash, transfer.contentMd5.orEmpty()) {
-						database.transferDao().delete(transfer.transferId)
-					}) {
-						NovelImportCoordinator.PreparedRecovery.MISSING -> continue
-						NovelImportCoordinator.PreparedRecovery.REBUILD_SUMMARY -> database.transferDao().upsert(transfer.copy(
-							contentHash = org.joinmastodon.android.api.novels.PrivateBookUpload.sha256(file),
-							contentMd5 = org.joinmastodon.android.api.novels.PrivateBookUpload.md5Base64(file),
-							size = file.length(),
-							updatedAt = System.currentTimeMillis(),
-						))
-						NovelImportCoordinator.PreparedRecovery.READY -> Unit
-					}
-				}
-				NovelImportCoordinator(applicationContext).resumeUpload(accountId, transfer.transferId) {}
+			if (database.transferDao().claim(transferId, owner) == 0) return@withContext Result.success()
+			var transfer = database.transferDao().get(transferId) ?: return@withContext Result.success()
+			if (transfer.accountId != accountId || transfer.direction != NovelTransferEntity.UPLOAD) return@withContext Result.failure()
+			if (!NovelAccountDataCleaner.isSessionValid(accountId, session, generation)) return@withContext Result.failure()
+			val file = File(transfer.localTempPath)
+			if (transfer.phase == NovelTransferEntity.COMPLETE) {
+				if (file.parentFile?.deleteRecursively() != false) database.transferDao().delete(transferId)
+				return@withContext Result.success()
 			}
+			if (transfer.phase == NovelTransferEntity.PREPARED && transfer.size <= 0 && file.isFile) {
+				transfer = transfer.copy(
+					contentHash = org.joinmastodon.android.api.novels.PrivateBookUpload.sha256(file),
+					contentMd5 = org.joinmastodon.android.api.novels.PrivateBookUpload.md5Base64(file),
+					size = file.length(), updatedAt = System.currentTimeMillis(),
+				)
+				database.transferDao().upsert(transfer)
+			}
+			if (!NovelImportCoordinator.isVerifiedTransferFile(file, transfer.size, transfer.contentHash, transfer.contentMd5.orEmpty())) {
+				database.transferDao().upsert(transfer.copy(phase = NovelTransferEntity.FAILED, claimOwner = null, updatedAt = System.currentTimeMillis()))
+				file.parentFile?.deleteRecursively()
+				return@withContext Result.failure()
+			}
+			NovelImportCoordinator(applicationContext).resumeUpload(accountId, transfer.transferId) {}
 			Result.success()
 		} catch (error: IOException) {
 			if (isStopped) Result.failure() else Result.retry()
 		} catch (error: Exception) {
 			if (AccountSessionManager.getInstance().tryGetAccount(accountId) == null) Result.failure() else Result.retry()
 		} finally {
+			database.transferDao().release(transferId, owner)
 			database.close()
+			lease.close()
 		}
 	}
 
@@ -62,7 +68,8 @@ class NovelUploadWorker(appContext: Context, params: WorkerParameters) : Corouti
 		const val KEY_ACCOUNT_ID = "account_id"
 		const val KEY_TRANSFER_ID = "transfer_id"
 
-		@JvmStatic fun uniqueWorkName(accountId: String, transferId: String) = "novel-upload:${NovelImportCoordinator.accountHash(accountId)}:$transferId"
+		@JvmStatic fun workName(accountId: String, transferId: String) = "novel-upload:${NovelImportCoordinator.accountHash(accountId)}:$transferId"
+		@JvmStatic fun uniqueWorkName(accountId: String, transferId: String) = workName(accountId, transferId)
 		@JvmStatic fun accountWorkTag(accountId: String) = "novel-transfer-account-${NovelImportCoordinator.accountHash(accountId)}"
 
 		@JvmStatic
@@ -71,16 +78,21 @@ class NovelUploadWorker(appContext: Context, params: WorkerParameters) : Corouti
 				.setInputData(Data.Builder().putString(KEY_ACCOUNT_ID, accountId).putString(KEY_TRANSFER_ID, transferId).build())
 				.addTag(accountWorkTag(accountId))
 				.build()
-			WorkManager.getInstance(context).enqueueUniqueWork(uniqueWorkName(accountId, transferId), ExistingWorkPolicy.KEEP, request)
+			WorkManager.getInstance(context).enqueueUniqueWork(workName(accountId, transferId), ExistingWorkPolicy.KEEP, request)
 		}
 
 		@JvmStatic
 		fun enqueuePending(context: Context, accountId: String) {
-			val request = OneTimeWorkRequestBuilder<NovelUploadWorker>()
-				.setInputData(Data.Builder().putString(KEY_ACCOUNT_ID, accountId).build())
-				.addTag(accountWorkTag(accountId))
-				.build()
-			WorkManager.getInstance(context).enqueueUniqueWork("novel-upload:${NovelImportCoordinator.accountHash(accountId)}:pending", ExistingWorkPolicy.KEEP, request)
+			Thread {
+				val database = NovelDatabase.open(context, accountId)
+				try {
+					runBlocking { database.transferDao().list() }
+						.filter { it.accountId == accountId && it.direction == NovelTransferEntity.UPLOAD }
+						.forEach { enqueue(context, accountId, it.transferId) }
+				} finally {
+					database.close()
+				}
+			}.apply { name = "novel-upload-scan" }.start()
 		}
 
 		@JvmStatic fun cancelAccount(context: Context, accountId: String) = WorkManager.getInstance(context).cancelAllWorkByTag(accountWorkTag(accountId))

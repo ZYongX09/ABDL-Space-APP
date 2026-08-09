@@ -203,7 +203,7 @@ public class AccountSessionManager{
 
 	public void removeAccount(String id){
 		AccountSession session=getAccount(id);
-		NovelAccountDataCleaner.invalidate(id);
+		NovelAccountDataCleaner.revoke(id, ()->sessions.remove(id));
 		NovelAccountDataCleaner.clean(MastodonApp.context, id);
 		session.getCacheController().closeDatabase();
 		MastodonApp.context.deleteDatabase(id+".db");
@@ -217,8 +217,7 @@ public class AccountSessionManager{
 				new File(prefsDir, id+".xml").delete();
 			}
 		}
-		sessions.remove(id);
-		if(lastActiveAccountID.equals(id)){
+		if(id.equals(lastActiveAccountID)){
 			if(sessions.isEmpty())
 				lastActiveAccountID=null;
 			else

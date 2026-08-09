@@ -27,6 +27,7 @@ public class PrivateBookUpload{
 	public enum State{ IDLE, PREPARING, AUTHORIZING, UPLOADING, COMPLETING, COMPLETE, FAILED, CANCELED }
 
 	public static class Recovery{
+		public static final String PREPARED="PREPARED";
 		public static final String PUT_PENDING="PUT_PENDING";
 		public static final String COMPLETE_PENDING="COMPLETE_PENDING";
 		public static final String COMPLETE="COMPLETE";
@@ -125,7 +126,25 @@ public class PrivateBookUpload{
 
 			checkCanceled();
 			state=State.COMPLETING;
-			PrivateNovelApi.CompleteResultDto completed=pollComplete(uploadId);
+			PrivateNovelApi.CompleteResultDto completed;
+			try{
+				completed=pollComplete(uploadId);
+			}catch(PrivateNovelApi.ApiException error){
+				if(!isExpiredComplete(error)) throw error;
+				recoveryListener.onPhase(null, Recovery.PREPARED);
+				state=State.AUTHORIZING;
+				PrivateNovelApi.AuthorizeRequest request=new PrivateNovelApi.AuthorizeRequest(metadata, file.length(), sha256, md5);
+				PrivateNovelApi.UploadAuthorization authorization=execute(api.newAuthorizeCall(request), PrivateNovelApi.UploadAuthorization.class);
+				validateAuthorization(authorization, file.length(), sha256, md5, metadata.mimeType);
+				uploadId=authorization.uploadId;
+				recoveryListener.onPhase(uploadId, Recovery.PUT_PENDING);
+				if(!authorization.alreadyUploaded){
+					state=State.UPLOADING;
+					uploadFile(file, authorization);
+					recoveryListener.onPhase(uploadId, Recovery.COMPLETE_PENDING);
+				}
+				completed=pollComplete(uploadId);
+			}
 			PrivateNovelApi.BookDto result=bookResult(completed.id, metadata, completed.verifiedSize, sha256, completed.parseStatus);
 			completionGate.run();
 			checkCanceled();
@@ -210,10 +229,11 @@ public class PrivateBookUpload{
 			try{
 				PrivateNovelApi.ApiResponse<PrivateNovelApi.CompleteResultDto> response=executeResponse(api.newCompleteCall(uploadId), PrivateNovelApi.CompleteResultDto.class);
 				PrivateNovelApi.CompleteResultDto result=response.body;
-				if(result==null || result.id==null || result.format==null || result.verifiedSize<=0 || result.parseStatus==null)
+				if(result==null || result.id==null || result.format==null || result.parseStatus==null)
 					throw new IOException("Invalid complete response");
-				if("ready".equals(result.parseStatus)) return result;
-				if(response.status!=202 || !"parsing".equals(result.parseStatus)) throw new IOException("Unexpected parse status");
+				if(response.status==202 && "parsing".equals(result.parseStatus)) continue;
+				if("ready".equals(result.parseStatus) && result.verifiedSize!=null && result.verifiedSize>0) return result;
+				throw new IOException("Unexpected complete response");
 			}catch(PrivateNovelApi.ApiException e){
 				if(!isRetryableComplete(e)) throw e;
 				lastError=e;
@@ -245,6 +265,11 @@ public class PrivateBookUpload{
 	private static boolean isRetryableComplete(PrivateNovelApi.ApiException error){
 		return error.status==408 || error.status==429 || error.status>=500 ||
 				(error.status==422 && ("verification_failed".equals(error.code) || "verification_unavailable".equals(error.code)));
+	}
+
+	private static boolean isExpiredComplete(PrivateNovelApi.ApiException error){
+		return error.status==404 && "book_not_found".equals(error.code) ||
+				error.status==410 && "upload_expired".equals(error.code);
 	}
 
 	private static boolean isUncertainPut(IOException error){

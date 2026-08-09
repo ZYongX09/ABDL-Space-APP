@@ -4,6 +4,7 @@ import java.io.File
 import java.io.IOException
 import java.nio.file.Files
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.CancellationException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -149,4 +150,41 @@ class NovelDownloadTransactionTest {
 		directory.deleteRecursively()
 		Unit
 	}
+
+	@Test
+	fun cancellationAfterDatabaseCommitKeepsNewOfficialFile() = runBlocking {
+		val directory = Files.createTempDirectory("novel-download-post-commit-cancel").toFile()
+		val official = File(directory, "book.txt").apply { writeText("old") }
+		val candidate = File(directory, "book.txt.candidate").apply { writeText("new") }
+
+		val failure = runCatching {
+			NovelDownloadWorker.commitCandidate(official, candidate) {
+				throw NovelDownloadWorker.DatabaseCommittedException(CancellationException("cancel after commit"))
+			}
+		}.exceptionOrNull()
+
+		assertTrue(failure is CancellationException)
+		assertEquals("new", official.readText())
+		assertFalse(File(directory, "book.txt.backup").exists())
+		directory.deleteRecursively()
+		Unit
+	}
+
+	@Test
+	fun corruptCommittedDestinationRestoresBackupInsteadOfDeletingIt() = runBlocking {
+		val directory = Files.createTempDirectory("novel-download-corrupt-committed").toFile()
+		val official = File(directory, "book.txt").apply { writeText("corrupt") }
+		val backup = File(directory, "book.txt.backup").apply { writeText("old") }
+
+		val recovered = NovelDownloadWorker.recoverCommitted(official, File(directory, "book.txt.candidate"), 3, sha256("new"))
+
+		assertFalse(recovered)
+		assertEquals("old", official.readText())
+		assertFalse(backup.exists())
+		directory.deleteRecursively()
+		Unit
+	}
+
+	private fun sha256(value: String): String = java.security.MessageDigest.getInstance("SHA-256")
+		.digest(value.toByteArray()).joinToString("") { "%02x".format(it) }
 }

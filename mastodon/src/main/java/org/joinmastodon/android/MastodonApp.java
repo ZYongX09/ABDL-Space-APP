@@ -66,8 +66,14 @@ public class MastodonApp extends Application{
 			// 快捷方式发布失败不影响正常功能（SplashActivity 改变了 LAUNCHER 入口）
 		}
 		GlobalUserPreferences.load();
-		for(AccountSession session:AccountSessionManager.getInstance().getLoggedInAccounts())
-			NovelUploadWorker.enqueuePending(context, session.getID());
+		if(isMainProcess(getPackageName(), processName)){
+			for(AccountSession session:AccountSessionManager.getInstance().getLoggedInAccounts())
+				NovelUploadWorker.enqueuePending(context, session.getID());
+		}
+	}
+
+	static boolean isMainProcess(String packageName, String processName){
+		return packageName.equals(processName);
 	}
 
 	private String getCurrentProcessName(){

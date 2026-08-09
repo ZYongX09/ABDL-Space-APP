@@ -27,5 +27,7 @@ class NovelUploadWorkerTest {
 		assertTrue(source.contains("enqueueUniqueWork"))
 		assertTrue(source.contains("ExistingWorkPolicy.KEEP"))
 		assertFalse(source.contains("token"))
+		assertFalse(source.contains(":pending"))
+		assertTrue(source.contains("transferDao().claim("))
 	}
 }

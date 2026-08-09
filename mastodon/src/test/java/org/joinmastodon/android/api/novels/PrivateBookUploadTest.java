@@ -233,6 +233,39 @@ public class PrivateBookUploadTest{
 	}
 
 	@Test
+	public void parsing202AcceptsNullVerifiedSizeUntilReady() throws Exception{
+		File source=write("book.txt", "resume complete");
+		server.enqueue(json(202, "{\"id\":\"book-resume\",\"format\":\"txt\",\"verified_size\":null,\"parse_status\":\"parsing\"}"));
+		server.enqueue(json(200, "{\"id\":\"book-resume\",\"format\":\"txt\",\"verified_size\":15,\"parse_status\":\"ready\"}"));
+
+		PrivateNovelApi.BookDto result=new PrivateBookUpload(api(), ignored -> {}, millis -> {}).resume(
+				source, metadata(), new PrivateBookUpload.Recovery("book-resume", PrivateBookUpload.Recovery.COMPLETE_PENDING), (uploadId, phase) -> {}
+		);
+
+		assertEquals(15, result.verifiedSize);
+		assertEquals(2, server.getRequestCount());
+	}
+
+	@Test
+	public void expiredCompletePendingReauthorizesAndUploadsSameVerifiedFile() throws Exception{
+		File source=write("book.txt", "expired upload");
+		server.enqueue(json(404, "{\"error\":{\"code\":\"book_not_found\"}}"));
+		server.enqueue(authorizeResponse(source, server.url("/cos/new").toString(), "book-new"));
+		server.enqueue(new MockResponse().setResponseCode(200));
+		server.enqueue(json(200, "{\"id\":\"book-new\",\"format\":\"txt\",\"verified_size\":14,\"parse_status\":\"ready\"}"));
+		List<String> phases=new ArrayList<>();
+
+		PrivateNovelApi.BookDto result=new PrivateBookUpload(api(), ignored -> {}, millis -> {}).resume(
+				source, metadata(), new PrivateBookUpload.Recovery("book-old", PrivateBookUpload.Recovery.COMPLETE_PENDING),
+				(uploadId, phase) -> phases.add((uploadId==null ? "null" : uploadId)+":"+phase)
+		);
+
+		assertEquals("book-new", result.id);
+		assertTrue(phases.contains("null:"+PrivateBookUpload.Recovery.PREPARED));
+		assertEquals(4, server.getRequestCount());
+	}
+
+	@Test
 	public void uploadPersistsPutAndCompleteRecoveryBoundaries() throws Exception{
 		File source=write("book.txt", "persist phases");
 		server.enqueue(authorizeResponse(source, server.url("/cos/persist").toString(), "book-persist"));

@@ -108,15 +108,16 @@ class NovelDatabaseTest {
 			"contentHash",
 			"contentMd5",
 			"size",
+			"claimOwner",
 			"updatedAt",
 		)
 	}
 
 	@Test
-	fun versionThreeExportsSchemaAndMigratesRealVersionOneData() = runBlocking {
-		val schema = File("schemas/org.joinmastodon.reader.data.NovelDatabase/3.json")
+	fun versionFourExportsSchemaAndMigratesRealVersionOneData() = runBlocking {
+		val schema = File("schemas/org.joinmastodon.reader.data.NovelDatabase/4.json")
 		assertTrue(schema.isFile)
-		assertTrue(schema.readText().contains("\"version\": 3"))
+		assertTrue(schema.readText().contains("\"version\": 4"))
 		val accountId = "migration.example_1"
 		createVersionOneDatabase(accountId)
 
@@ -179,6 +180,24 @@ class NovelDatabaseTest {
 
 		database.transferDao().delete("transfer-1")
 		assertNull(database.transferDao().get("transfer-1"))
+	}
+
+	@Test
+	fun transferClaimIsAtomicAndOnlyOneWorkerOwnsTransfer() = runBlocking {
+		val database = open("claim.example_1")
+		val pending = NovelTransferEntity(
+			transferId = "transfer-claim", accountId = "claim.example_1", direction = NovelTransferEntity.UPLOAD,
+			remoteBookId = null, uploadId = null, localTempPath = "/tmp/book.txt", title = "Book", author = "Author",
+			format = "txt", mimeType = "text/plain", phase = NovelTransferEntity.PREPARED, contentHash = "hash",
+			contentMd5 = "md5", size = 4,
+		)
+		database.transferDao().upsert(pending)
+
+		assertEquals(1, database.transferDao().claim("transfer-claim", "worker-a"))
+		assertEquals(0, database.transferDao().claim("transfer-claim", "worker-b"))
+		assertEquals("worker-a", database.transferDao().get("transfer-claim")?.claimOwner)
+		database.transferDao().release("transfer-claim", "worker-a")
+		assertEquals(1, database.transferDao().claim("transfer-claim", "worker-b"))
 	}
 
 	@Test

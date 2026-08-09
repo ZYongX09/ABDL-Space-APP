@@ -128,6 +128,7 @@ data class NovelTransferEntity(
 	val contentHash: String,
 	val contentMd5: String?,
 	val size: Long,
+	val claimOwner: String? = null,
 	val updatedAt: Long = System.currentTimeMillis(),
 ) {
 	companion object {
@@ -136,6 +137,8 @@ data class NovelTransferEntity(
 		const val PREPARED = "PREPARED"
 		const val PUT_PENDING = "PUT_PENDING"
 		const val COMPLETE_PENDING = "COMPLETE_PENDING"
+		const val COMPLETE = "COMPLETE"
+		const val FAILED = "FAILED"
 		const val CANDIDATE_READY = "CANDIDATE_READY"
 		const val FILE_SWITCHING = "FILE_SWITCHING"
 		const val DATABASE_COMMITTED = "DATABASE_COMMITTED"
