@@ -164,6 +164,48 @@ class NovelDatabaseTest {
 	}
 
 	@Test
+	fun bookmarkAndAnnotationWritesAtomicallyMaintainOutbox() = runBlocking {
+		val accountId = "sync-writes.example_1"
+		val database = open(accountId)
+		val book = NovelBookEntity("book-1", accountId, "Book", remoteId = "remote-1", sourceType = "private")
+		val chapter = NovelChapterEntity("chapter-1", book.id, "Chapter", "Content", 0)
+		database.novelBookDao().upsert(book)
+		database.novelChapterDao().upsert(listOf(chapter))
+		val bookmark = BookmarkEntity("bookmark-1", accountId, book.id, chapter.id, 12, updatedAt = 100)
+		val annotation = AnnotationEntity("note-1", accountId, book.id, chapter.id, 1, 4, "ont", "note", updatedAt = 200)
+
+		database.bookmarkDao().saveWithOutbox(bookmark, NovelSyncOutboxEntity("bookmark:bookmark-1", accountId, "bookmark", bookmark.id, book.id, "remote-1", "{\"chapterId\":\"chapter-1\",\"position\":12}", 100, null))
+		database.annotationDao().saveWithOutbox(annotation, NovelSyncOutboxEntity("note:note-1", accountId, "note", annotation.id, book.id, "remote-1", "{\"chapterId\":\"chapter-1\"}", 200, null))
+
+		assertEquals(bookmark, database.bookmarkDao().get(accountId, bookmark.id))
+		assertEquals(annotation, database.annotationDao().get(accountId, annotation.id))
+		assertEquals(listOf("bookmark", "note"), database.syncDao().pending(accountId).map { it.itemType })
+
+		val deletedAt = 300L
+		database.bookmarkDao().saveWithOutbox(bookmark.copy(updatedAt = deletedAt, deletedAt = deletedAt), NovelSyncOutboxEntity("bookmark:bookmark-1", accountId, "bookmark", bookmark.id, book.id, "remote-1", "{\"chapterId\":\"chapter-1\",\"position\":12}", deletedAt, deletedAt))
+		database.annotationDao().saveWithOutbox(annotation.copy(updatedAt = deletedAt, deletedAt = deletedAt), NovelSyncOutboxEntity("note:note-1", accountId, "note", annotation.id, book.id, "remote-1", "{\"chapterId\":\"chapter-1\"}", deletedAt, deletedAt))
+
+		assertEquals(deletedAt, database.bookmarkDao().get(accountId, bookmark.id)?.deletedAt)
+		assertEquals(deletedAt, database.annotationDao().get(accountId, annotation.id)?.deletedAt)
+		assertTrue(database.syncDao().pending(accountId).all { it.deletedAt == deletedAt })
+	}
+
+	@Test
+	fun remoteBookmarkAndAnnotationWritesDoNotEchoIntoOutbox() = runBlocking {
+		val accountId = "sync-pull.example_1"
+		val database = open(accountId)
+		val book = NovelBookEntity("book-1", accountId, "Book", remoteId = "remote-1", sourceType = "private")
+		val chapter = NovelChapterEntity("chapter-1", book.id, "Chapter", "Content", 0)
+		database.novelBookDao().upsert(book)
+		database.novelChapterDao().upsert(listOf(chapter))
+
+		database.bookmarkDao().applyRemote(BookmarkEntity("bookmark-1", accountId, book.id, chapter.id, 12))
+		database.annotationDao().applyRemote(AnnotationEntity("note-1", accountId, book.id, chapter.id, 1, 4, "ont"))
+
+		assertTrue(database.syncDao().pending(accountId).isEmpty())
+	}
+
+	@Test
 	fun transferDaoPersistsAndMutatesPendingTransfer() = runBlocking {
 		val database = open("transfer.example_1")
 		val pending = NovelTransferEntity(
@@ -239,8 +281,8 @@ class NovelDatabaseTest {
 		)
 		val originalChapter = NovelChapterEntity("parsed-chapter-v1", originalBook.id, "Chapter 1", "old", 0)
 		database.novelImportDao().importBook(originalBook, listOf(originalChapter))
-		database.bookmarkDao().upsert(BookmarkEntity("bookmark-1", accountId, originalBook.id, originalChapter.id, 1))
-		database.annotationDao().upsert(AnnotationEntity("annotation-1", accountId, originalBook.id, originalChapter.id, 0, 3, "old"))
+		database.bookmarkDao().applyRemote(BookmarkEntity("bookmark-1", accountId, originalBook.id, originalChapter.id, 1))
+		database.annotationDao().applyRemote(AnnotationEntity("annotation-1", accountId, originalBook.id, originalChapter.id, 0, 3, "old"))
 
 		val updatedBook = originalBook.copy(id = "parsed-book-v2", title = "Updated")
 		val updatedChapter = NovelChapterEntity("parsed-chapter-v2", updatedBook.id, "Chapter 1", "new content", 0)
@@ -265,7 +307,7 @@ class NovelDatabaseTest {
 		val kept = NovelChapterEntity("chapter-1", book.id, "One", "one", 0)
 		val removedButReferenced = NovelChapterEntity("chapter-2", book.id, "Two", "two", 1)
 		database.novelImportDao().importBook(book, listOf(kept, removedButReferenced))
-		database.bookmarkDao().upsert(BookmarkEntity("bookmark-2", accountId, book.id, removedButReferenced.id, 0))
+		database.bookmarkDao().applyRemote(BookmarkEntity("bookmark-2", accountId, book.id, removedButReferenced.id, 0))
 
 		database.novelImportDao().importBook(book.copy(title = "Updated"), listOf(kept.copy(content = "updated")))
 
@@ -283,9 +325,9 @@ class NovelDatabaseTest {
 		val b = NovelChapterEntity("b", book.id, "Same", "beta", 1)
 		val duplicateA = NovelChapterEntity("a-duplicate", book.id, "Same", "alpha", 2)
 		database.novelImportDao().importBook(book, listOf(a, b, duplicateA))
-		database.bookmarkDao().upsert(BookmarkEntity("bookmark-a", accountId, book.id, a.id, 0))
-		database.bookmarkDao().upsert(BookmarkEntity("bookmark-a-duplicate", accountId, book.id, duplicateA.id, 0))
-		database.annotationDao().upsert(AnnotationEntity("annotation-b", accountId, book.id, b.id, 0, 2, "be"))
+		database.bookmarkDao().applyRemote(BookmarkEntity("bookmark-a", accountId, book.id, a.id, 0))
+		database.bookmarkDao().applyRemote(BookmarkEntity("bookmark-a-duplicate", accountId, book.id, duplicateA.id, 0))
+		database.annotationDao().applyRemote(AnnotationEntity("annotation-b", accountId, book.id, b.id, 0, 2, "be"))
 
 		val inserted = NovelChapterEntity("new", book.id, "Intro", "intro", 0)
 		val reorderedDuplicate = NovelChapterEntity("parsed-duplicate", book.id, "Same", "alpha", 1)

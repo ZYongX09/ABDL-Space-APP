@@ -176,13 +176,31 @@ class NovelDownloadTransactionTest {
 		val official = File(directory, "book.txt").apply { writeText("corrupt") }
 		val backup = File(directory, "book.txt.backup").apply { writeText("old") }
 
-		val recovered = NovelDownloadWorker.recoverCommitted(official, File(directory, "book.txt.candidate"), 3, sha256("new"))
+		val recovered = NovelDownloadWorker.recoverCommitted(official, File(directory, "book.txt.candidate"), 3, sha256("new")) { true }
 
 		assertFalse(recovered)
 		assertEquals("old", official.readText())
 		assertFalse(backup.exists())
 		directory.deleteRecursively()
 		Unit
+	}
+
+	@Test
+	fun invalidSessionPreservesCommittedRecoveryFiles() {
+		val directory = Files.createTempDirectory("novel-download-committed-invalid-session").toFile()
+		val official = File(directory, "book.txt").apply { writeText("corrupt") }
+		val backup = File(directory, "book.txt.backup").apply { writeText("old") }
+		val candidate = File(directory, "book.txt.candidate").apply { writeText("candidate") }
+
+		val failure = runCatching {
+			NovelDownloadWorker.recoverCommitted(official, candidate, 3, sha256("new")) { false }
+		}.exceptionOrNull()
+
+		assertTrue(failure is IOException)
+		assertEquals("corrupt", official.readText())
+		assertEquals("old", backup.readText())
+		assertEquals("candidate", candidate.readText())
+		directory.deleteRecursively()
 	}
 
 	private fun sha256(value: String): String = java.security.MessageDigest.getInstance("SHA-256")

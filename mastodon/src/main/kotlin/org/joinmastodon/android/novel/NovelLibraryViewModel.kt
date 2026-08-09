@@ -18,6 +18,7 @@ import org.joinmastodon.android.api.session.AccountSessionManager
 import org.joinmastodon.android.novel.download.NovelDownloadWorker
 import org.joinmastodon.android.novel.importer.NovelImportCoordinator
 import org.joinmastodon.android.novel.sync.NovelSyncWorker
+import org.joinmastodon.android.novel.sync.NovelSyncWriteFacade
 import org.joinmastodon.reader.data.NovelBookEntity
 import org.joinmastodon.reader.data.NovelDatabase
 
@@ -32,6 +33,7 @@ class NovelLibraryViewModel(application: Application, val accountId: String) : A
 	private val session = AccountSessionManager.getInstance().tryGetAccount(accountId)
 	private val api = session?.let(::PrivateNovelApi)
 	private val coordinator = NovelImportCoordinator(application)
+	val syncWrites = NovelSyncWriteFacade(accountId, database, requestSync = { NovelSyncWorker.enqueue(application, accountId) })
 	private val mutableState = MutableStateFlow(NovelLibraryState())
 	val state: StateFlow<NovelLibraryState> = mutableState.asStateFlow()
 

@@ -59,7 +59,8 @@ class NovelDownloadWorker(
 				val existing = recoveryDatabase.transferDao().getByRemoteBook(NovelTransferEntity.DOWNLOAD, bookId)
 				if (existing?.phase == NovelTransferEntity.DATABASE_COMMITTED) {
 					val destination = File(existing.localTempPath)
-					if (recoverCommitted(destination, File(destination.parentFile, destination.name + ".candidate"), existing.size, existing.contentHash)) {
+					if (recoverCommitted(destination, File(destination.parentFile, destination.name + ".candidate"), existing.size, existing.contentHash, sessionGuard::isValid)) {
+						sessionGuard.requireValid()
 						recoveryDatabase.transferDao().delete(existing.transferId)
 						return@withContext Result.success()
 					} else {
@@ -292,9 +293,11 @@ class NovelDownloadWorker(
 		}
 
 		@JvmStatic
-		fun recoverCommitted(destination: File, candidate: File, expectedSize: Long, expectedHash: String): Boolean {
+		fun recoverCommitted(destination: File, candidate: File, expectedSize: Long, expectedHash: String, sessionValid: () -> Boolean): Boolean {
+			requireSession(sessionValid)
 			val backup = File(destination.parentFile, destination.name + ".backup")
 			val valid = destination.isFile && destination.length() == expectedSize && sha256(destination).equals(expectedHash, ignoreCase = true)
+			requireSession(sessionValid)
 			if (valid) {
 				backup.delete()
 				candidate.delete()

@@ -137,7 +137,18 @@ interface NovelImportDao {
 @Dao
 interface BookmarkDao {
 	@Upsert
-	suspend fun upsert(bookmark: BookmarkEntity)
+	suspend fun applyRemote(bookmark: BookmarkEntity)
+
+	@Upsert
+	suspend fun enqueueOutbox(change: NovelSyncOutboxEntity)
+
+	@Transaction
+	suspend fun saveWithOutbox(bookmark: BookmarkEntity, change: NovelSyncOutboxEntity) {
+		require(change.accountId == bookmark.accountId)
+		require(change.itemType == "bookmark" && change.itemId == bookmark.id && change.bookId == bookmark.bookId)
+		applyRemote(bookmark)
+		enqueueOutbox(change)
+	}
 
 	@Query("SELECT * FROM bookmarks WHERE accountId = :accountId AND bookId = :bookId AND deletedAt IS NULL ORDER BY createdAt")
 	suspend fun getByBookId(accountId: String, bookId: String): List<BookmarkEntity>
@@ -145,14 +156,23 @@ interface BookmarkDao {
 	@Query("SELECT * FROM bookmarks WHERE accountId = :accountId AND id = :id")
 	suspend fun get(accountId: String, id: String): BookmarkEntity?
 
-	@Query("DELETE FROM bookmarks WHERE accountId = :accountId AND id = :id")
-	suspend fun deleteById(accountId: String, id: String)
 }
 
 @Dao
 interface AnnotationDao {
 	@Upsert
-	suspend fun upsert(annotation: AnnotationEntity)
+	suspend fun applyRemote(annotation: AnnotationEntity)
+
+	@Upsert
+	suspend fun enqueueOutbox(change: NovelSyncOutboxEntity)
+
+	@Transaction
+	suspend fun saveWithOutbox(annotation: AnnotationEntity, change: NovelSyncOutboxEntity) {
+		require(change.accountId == annotation.accountId)
+		require(change.itemType == "note" && change.itemId == annotation.id && change.bookId == annotation.bookId)
+		applyRemote(annotation)
+		enqueueOutbox(change)
+	}
 
 	@Query("SELECT * FROM annotations WHERE accountId = :accountId AND bookId = :bookId AND deletedAt IS NULL ORDER BY createdAt")
 	suspend fun getByBookId(accountId: String, bookId: String): List<AnnotationEntity>
@@ -160,8 +180,6 @@ interface AnnotationDao {
 	@Query("SELECT * FROM annotations WHERE accountId = :accountId AND id = :id")
 	suspend fun get(accountId: String, id: String): AnnotationEntity?
 
-	@Query("DELETE FROM annotations WHERE accountId = :accountId AND id = :id")
-	suspend fun deleteById(accountId: String, id: String)
 }
 
 @Dao

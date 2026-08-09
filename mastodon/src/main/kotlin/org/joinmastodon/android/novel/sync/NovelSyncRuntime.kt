@@ -66,7 +66,7 @@ class RoomNovelSyncStore(
 		if (chapter.bookId != bookId) return
 		val current = database.bookmarkDao().get(accountId, item.itemId)
 		if (current?.deletedAt != null && item.deletedAt == null) return
-		database.bookmarkDao().upsert(BookmarkEntity(item.itemId, accountId, bookId, chapter.id, payload.position, item.clientUpdatedAt, item.clientUpdatedAt, item.deletedAt))
+		database.bookmarkDao().applyRemote(BookmarkEntity(item.itemId, accountId, bookId, chapter.id, payload.position, item.clientUpdatedAt, item.clientUpdatedAt, item.deletedAt))
 	}
 
 	private suspend fun applyNote(bookId: String, item: RemoteSyncItem) {
@@ -75,7 +75,7 @@ class RoomNovelSyncStore(
 		if (chapter.bookId != bookId) return
 		val current = database.annotationDao().get(accountId, item.itemId)
 		if (current?.deletedAt != null && item.deletedAt == null) return
-		database.annotationDao().upsert(AnnotationEntity(item.itemId, accountId, bookId, chapter.id, payload.startOffset, payload.endOffset, payload.selectedText.orEmpty(), payload.note, item.clientUpdatedAt, item.clientUpdatedAt, item.deletedAt))
+		database.annotationDao().applyRemote(AnnotationEntity(item.itemId, accountId, bookId, chapter.id, payload.startOffset, payload.endOffset, payload.selectedText.orEmpty(), payload.note, item.clientUpdatedAt, item.clientUpdatedAt, item.deletedAt))
 	}
 
 	override suspend fun pendingChanges(): List<LocalSyncChange> = database.syncDao().pending(accountId).map {
