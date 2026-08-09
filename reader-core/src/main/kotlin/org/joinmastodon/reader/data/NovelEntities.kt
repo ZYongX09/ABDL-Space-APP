@@ -145,3 +145,41 @@ data class NovelTransferEntity(
 		const val DATABASE_COMMITTED = "DATABASE_COMMITTED"
 	}
 }
+
+@Entity(tableName = "novel_sync_checkpoint")
+data class NovelSyncCheckpointEntity(
+	@PrimaryKey val accountId: String,
+	val cursor: String?,
+	val updatedAt: Long = System.currentTimeMillis(),
+)
+
+@Entity(
+	tableName = "novel_sync_outbox",
+	indices = [Index(value = ["accountId", "itemType", "itemId"], unique = true), Index(value = ["accountId", "state"])],
+)
+data class NovelSyncOutboxEntity(
+	@PrimaryKey val identity: String,
+	val accountId: String,
+	val itemType: String,
+	val itemId: String,
+	val bookId: String,
+	val remoteBookId: String,
+	val payload: String,
+	val clientUpdatedAt: Long,
+	val deletedAt: Long?,
+	val state: String = "pending",
+	val attempts: Int = 0,
+)
+
+@Entity(
+	tableName = "novel_progress",
+	indices = [Index(value = ["accountId", "bookId"], unique = true)],
+)
+data class NovelProgressEntity(
+	@PrimaryKey val itemId: String,
+	val accountId: String,
+	val bookId: String,
+	val payload: String,
+	val updatedAt: Long,
+	val deletedAt: Long?,
+)

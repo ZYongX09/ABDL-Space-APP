@@ -17,8 +17,11 @@ import java.util.WeakHashMap
 		BookmarkEntity::class,
 		AnnotationEntity::class,
 		NovelTransferEntity::class,
+		NovelSyncCheckpointEntity::class,
+		NovelSyncOutboxEntity::class,
+		NovelProgressEntity::class,
 	],
-	version = 5,
+	version = 6,
 	exportSchema = true,
 )
 abstract class NovelDatabase : RoomDatabase() {
@@ -28,6 +31,7 @@ abstract class NovelDatabase : RoomDatabase() {
 	abstract fun bookmarkDao(): BookmarkDao
 	abstract fun annotationDao(): AnnotationDao
 	abstract fun transferDao(): NovelTransferDao
+	abstract fun syncDao(): NovelSyncDao
 
 	companion object {
 		private val openDatabases = mutableMapOf<String, MutableSet<NovelDatabase>>()
@@ -37,7 +41,7 @@ abstract class NovelDatabase : RoomDatabase() {
 				context.applicationContext,
 				NovelDatabase::class.java,
 				databaseName(accountId),
-			).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build().also { database ->
+			).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6).build().also { database ->
 				synchronized(openDatabases) {
 					openDatabases.getOrPut(accountId) { Collections.newSetFromMap(WeakHashMap()) }.add(database)
 				}
@@ -73,6 +77,17 @@ abstract class NovelDatabase : RoomDatabase() {
 			override fun migrate(db: SupportSQLiteDatabase) {
 				db.execSQL("ALTER TABLE novel_transfers ADD COLUMN claimExpiresAt INTEGER")
 				db.execSQL("UPDATE novel_transfers SET claimExpiresAt = 0 WHERE claimOwner IS NOT NULL")
+			}
+		}
+
+		val MIGRATION_5_6 = object : Migration(5, 6) {
+			override fun migrate(db: SupportSQLiteDatabase) {
+				db.execSQL("CREATE TABLE IF NOT EXISTS novel_sync_checkpoint (accountId TEXT NOT NULL, cursor TEXT, updatedAt INTEGER NOT NULL, PRIMARY KEY(accountId))")
+				db.execSQL("CREATE TABLE IF NOT EXISTS novel_sync_outbox (identity TEXT NOT NULL, accountId TEXT NOT NULL, itemType TEXT NOT NULL, itemId TEXT NOT NULL, bookId TEXT NOT NULL, remoteBookId TEXT NOT NULL, payload TEXT NOT NULL, clientUpdatedAt INTEGER NOT NULL, deletedAt INTEGER, state TEXT NOT NULL, attempts INTEGER NOT NULL, PRIMARY KEY(identity))")
+				db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_novel_sync_outbox_accountId_itemType_itemId ON novel_sync_outbox(accountId, itemType, itemId)")
+				db.execSQL("CREATE INDEX IF NOT EXISTS index_novel_sync_outbox_accountId_state ON novel_sync_outbox(accountId, state)")
+				db.execSQL("CREATE TABLE IF NOT EXISTS novel_progress (itemId TEXT NOT NULL, accountId TEXT NOT NULL, bookId TEXT NOT NULL, payload TEXT NOT NULL, updatedAt INTEGER NOT NULL, deletedAt INTEGER, PRIMARY KEY(itemId))")
+				db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_novel_progress_accountId_bookId ON novel_progress(accountId, bookId)")
 			}
 		}
 

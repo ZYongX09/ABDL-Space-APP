@@ -115,10 +115,10 @@ class NovelDatabaseTest {
 	}
 
 	@Test
-	fun versionFiveExportsSchemaAndMigratesRealVersionOneData() = runBlocking {
-		val schema = File("schemas/org.joinmastodon.reader.data.NovelDatabase/5.json")
+	fun versionSixExportsSchemaAndMigratesRealVersionOneData() = runBlocking {
+		val schema = File("schemas/org.joinmastodon.reader.data.NovelDatabase/6.json")
 		assertTrue(schema.isFile)
-		assertTrue(schema.readText().contains("\"version\": 5"))
+		assertTrue(schema.readText().contains("\"version\": 6"))
 		val accountId = "migration.example_1"
 		createVersionOneDatabase(accountId)
 
@@ -129,6 +129,7 @@ class NovelDatabaseTest {
 		assertEquals("chapter-1", database.bookmarkDao().getByBookId(accountId, "book-1").single().chapterId)
 		assertEquals("chapter-1", database.annotationDao().getByBookId(accountId, "book-1").single().chapterId)
 		assertTrue(database.transferDao().list().isEmpty())
+		assertNull(database.syncDao().checkpoint(accountId))
 		val sqlite = database.openHelper.writableDatabase
 		assertEquals(setOf("bookId", "bookId,chapterIndex"), sqlite.query("PRAGMA index_list('novel_chapters')").use { cursor ->
 			buildSet {
@@ -148,6 +149,18 @@ class NovelDatabaseTest {
 				while (cursor.moveToNext()) add(cursor.getString(cursor.getColumnIndexOrThrow("table")))
 			}
 		})
+	}
+
+	@Test
+	fun syncCheckpointAndOutboxAreAccountScoped() = runBlocking {
+		val accountId = "sync.example_1"
+		val database = open(accountId)
+		database.syncDao().setCheckpoint(NovelSyncCheckpointEntity(accountId, "42", 1))
+		database.syncDao().enqueue(NovelSyncOutboxEntity("bookmark-1", accountId, "bookmark", "bookmark-1", "local", "remote", "{}", 2, null))
+
+		assertEquals("42", database.syncDao().checkpoint(accountId))
+		assertEquals("bookmark-1", database.syncDao().pending(accountId).single().itemId)
+		assertTrue(database.syncDao().pending("other").isEmpty())
 	}
 
 	@Test

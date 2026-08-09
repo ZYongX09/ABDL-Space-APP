@@ -6,6 +6,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import org.joinmastodon.android.api.session.AccountSessionManager
 import org.joinmastodon.android.ui.compose.MiuixAppTheme
 import org.joinmastodon.android.ui.utils.UiUtils
@@ -18,6 +20,16 @@ class NovelActivity : ComponentActivity() {
 		}
 		UiUtils.setUserPreferredTheme(this, session)
 		super.onCreate(savedInstanceState)
+		if (session == null) {
+			finish()
+			return
+		}
+		val libraryViewModel = ViewModelProvider(this, object : ViewModelProvider.Factory {
+			override fun <T : ViewModel> create(modelClass: Class<T>): T {
+				@Suppress("UNCHECKED_CAST")
+				return NovelLibraryViewModel(application, accountID) as T
+			}
+		})[NovelLibraryViewModel::class.java]
 
 		val darkTheme = UiUtils.isDarkTheme()
 		enableEdgeToEdge(
@@ -26,7 +38,7 @@ class NovelActivity : ComponentActivity() {
 		)
 		setContent {
 			MiuixAppTheme {
-				NovelHomeScreen(onBack = ::finish)
+				NovelHomeScreen(accountId = accountID, libraryViewModel = libraryViewModel, onBack = ::finish)
 			}
 		}
 	}

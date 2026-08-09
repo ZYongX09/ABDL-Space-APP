@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Upsert
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface NovelBookDao {
@@ -18,6 +19,9 @@ interface NovelBookDao {
 
 	@Query("SELECT * FROM novel_books WHERE accountId = :accountId AND deletedAt IS NULL ORDER BY updatedAt DESC")
 	suspend fun getActive(accountId: String): List<NovelBookEntity>
+
+	@Query("SELECT * FROM novel_books WHERE accountId = :accountId AND deletedAt IS NULL ORDER BY updatedAt DESC")
+	fun observeActive(accountId: String): Flow<List<NovelBookEntity>>
 
 	@Query("DELETE FROM novel_books WHERE accountId = :accountId AND id = :id")
 	suspend fun deleteById(accountId: String, id: String)
@@ -138,6 +142,9 @@ interface BookmarkDao {
 	@Query("SELECT * FROM bookmarks WHERE accountId = :accountId AND bookId = :bookId AND deletedAt IS NULL ORDER BY createdAt")
 	suspend fun getByBookId(accountId: String, bookId: String): List<BookmarkEntity>
 
+	@Query("SELECT * FROM bookmarks WHERE accountId = :accountId AND id = :id")
+	suspend fun get(accountId: String, id: String): BookmarkEntity?
+
 	@Query("DELETE FROM bookmarks WHERE accountId = :accountId AND id = :id")
 	suspend fun deleteById(accountId: String, id: String)
 }
@@ -150,6 +157,33 @@ interface AnnotationDao {
 	@Query("SELECT * FROM annotations WHERE accountId = :accountId AND bookId = :bookId AND deletedAt IS NULL ORDER BY createdAt")
 	suspend fun getByBookId(accountId: String, bookId: String): List<AnnotationEntity>
 
+	@Query("SELECT * FROM annotations WHERE accountId = :accountId AND id = :id")
+	suspend fun get(accountId: String, id: String): AnnotationEntity?
+
 	@Query("DELETE FROM annotations WHERE accountId = :accountId AND id = :id")
 	suspend fun deleteById(accountId: String, id: String)
+}
+
+@Dao
+interface NovelSyncDao {
+	@Query("SELECT cursor FROM novel_sync_checkpoint WHERE accountId = :accountId")
+	suspend fun checkpoint(accountId: String): String?
+
+	@Upsert suspend fun setCheckpoint(checkpoint: NovelSyncCheckpointEntity)
+
+	@Query("SELECT * FROM novel_sync_outbox WHERE accountId = :accountId AND state = 'pending' ORDER BY clientUpdatedAt")
+	suspend fun pending(accountId: String): List<NovelSyncOutboxEntity>
+
+	@Upsert suspend fun enqueue(change: NovelSyncOutboxEntity)
+
+	@Query("DELETE FROM novel_sync_outbox WHERE accountId = :accountId AND identity = :identity")
+	suspend fun delete(accountId: String, identity: String)
+
+	@Query("UPDATE novel_sync_outbox SET attempts = attempts + 1 WHERE accountId = :accountId AND identity = :identity")
+	suspend fun incrementAttempts(accountId: String, identity: String)
+
+	@Upsert suspend fun upsertProgress(progress: NovelProgressEntity)
+
+	@Query("SELECT * FROM novel_progress WHERE accountId = :accountId AND itemId = :itemId")
+	suspend fun progress(accountId: String, itemId: String): NovelProgressEntity?
 }

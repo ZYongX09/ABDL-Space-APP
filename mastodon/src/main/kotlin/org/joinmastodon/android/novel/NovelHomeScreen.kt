@@ -15,6 +15,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ColorFilter
@@ -32,7 +33,7 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
-fun NovelHomeScreen(onBack: () -> Unit) {
+fun NovelHomeScreen(accountId: String, libraryViewModel: NovelLibraryViewModel, onBack: () -> Unit) {
 	val tabs = listOf(
 		R.string.novel_recommend to R.string.novel_recommend_empty,
 		R.string.novel_bookshelf to R.string.novel_bookshelf_empty,
@@ -60,6 +61,11 @@ fun NovelHomeScreen(onBack: () -> Unit) {
 			modifier = Modifier.fillMaxSize().padding(padding),
 			contentAlignment = Alignment.Center,
 		) {
+			if (selectedTab == 1) {
+				val state by libraryViewModel.state.collectAsState()
+				NovelLibraryScreen(state, libraryViewModel::refresh, libraryViewModel::upload, libraryViewModel::paste, libraryViewModel::delete, libraryViewModel::download)
+				return@Box
+			}
 			Column(
 				modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp),
 				horizontalAlignment = Alignment.CenterHorizontally,

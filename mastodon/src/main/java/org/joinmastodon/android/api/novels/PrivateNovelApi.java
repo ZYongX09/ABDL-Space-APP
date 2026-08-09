@@ -10,6 +10,9 @@ import org.joinmastodon.android.api.MastodonAPIController;
 import org.joinmastodon.android.api.session.AccountSession;
 
 import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Map;
 
 import okhttp3.Call;
@@ -68,8 +71,43 @@ public class PrivateNovelApi{
 	}
 
 	public Call newBookCall(String bookId){
-		Request request=authorizedRequest(baseUrl+"/books/"+bookId).get().build();
+		Request request=authorizedRequest(baseUrl+"/books/"+encode(bookId)).get().build();
 		return callFactory.newCall(request);
+	}
+
+	public Call newBooksCall(String cursor, int limit){
+		String url=baseUrl+"/books?limit="+limit+(cursor==null ? "" : "&cursor="+encode(cursor));
+		return callFactory.newCall(authorizedRequest(url).get().build());
+	}
+
+	public Call newDeleteBookCall(String bookId){
+		return callFactory.newCall(authorizedRequest(baseUrl+"/books/"+encode(bookId)).delete().build());
+	}
+
+	public Call newPasteCall(PasteRequest request){
+		return newJsonCall("/paste", GSON.toJson(request));
+	}
+
+	public Call newSyncCall(String cursor, int limit){
+		String url=baseUrl+"/sync?limit="+limit+(cursor==null ? "" : "&cursor="+encode(cursor));
+		return callFactory.newCall(authorizedRequest(url).get().build());
+	}
+
+	public Call newPutSyncItemCall(String id, SyncPutRequest request){
+		Request httpRequest=authorizedRequest(baseUrl+"/sync/items/"+encode(id)).put(RequestBody.create(JSON, GSON.toJson(request))).build();
+		return callFactory.newCall(httpRequest);
+	}
+
+	public void executeEmpty(Call call) throws IOException{
+		try(Response response=call.execute()){
+			if(response.priorResponse()!=null) throw new IOException("Redirects are not allowed");
+			if(!response.isSuccessful()){
+				ResponseBody body=response.body();
+				ErrorEnvelope envelope=body==null ? null : GSON.fromJson(body.charStream(), ErrorEnvelope.class);
+				String code=envelope==null ? null : envelope.error!=null ? envelope.error.code : envelope.code;
+				throw new ApiException(response.code(), code);
+			}
+		}
 	}
 
 	public <T> T executeJson(Call call, Class<T> type) throws IOException{
@@ -123,6 +161,10 @@ public class PrivateNovelApi{
 
 	private static String stripTrailingSlash(String value){
 		return value.endsWith("/") ? value.substring(0, value.length()-1) : value;
+	}
+
+	private static String encode(String value){
+		return URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20");
 	}
 
 	public static class UploadMetadata{
@@ -211,5 +253,48 @@ public class PrivateNovelApi{
 		@SerializedName("content_hash") public String contentHash;
 		@SerializedName("verified_size") public long verifiedSize;
 		@SerializedName("parse_status") public String parseStatus;
+		@SerializedName("created_at") public long createdAt;
+		@SerializedName("updated_at") public long updatedAt;
+	}
+
+	public static class BooksPage{
+		public List<BookDto> items;
+		@SerializedName("next_cursor") public String nextCursor;
+	}
+
+	public static class PasteRequest{
+		public final String title;
+		public final String author;
+		public final String text;
+		public PasteRequest(String title, String author, String text){ this.title=title; this.author=author; this.text=text; }
+	}
+
+	public static class SyncPageDto{
+		public List<SyncItemDto> items;
+		@SerializedName("next_cursor") public String nextCursor;
+		@SerializedName("checkpoint_cursor") public String checkpointCursor;
+	}
+
+	public static class SyncItemDto{
+		public long seq;
+		@SerializedName("book_id") public String bookId;
+		@SerializedName("item_type") public String itemType;
+		@SerializedName("item_id") public String itemId;
+		public String payload;
+		@SerializedName("client_updated_at") public long clientUpdatedAt;
+		@SerializedName("server_updated_at") public long serverUpdatedAt;
+		@SerializedName("deleted_at") public Long deletedAt;
+	}
+
+	public static class SyncPutRequest{
+		@SerializedName("book_id") public final String bookId;
+		@SerializedName("item_type") public final String itemType;
+		@SerializedName("item_id") public final String itemId;
+		public final String payload;
+		@SerializedName("client_updated_at") public final long clientUpdatedAt;
+		@SerializedName("deleted_at") public final Long deletedAt;
+		public SyncPutRequest(String bookId, String itemType, String itemId, String payload, long clientUpdatedAt, Long deletedAt){
+			this.bookId=bookId; this.itemType=itemType; this.itemId=itemId; this.payload=payload; this.clientUpdatedAt=clientUpdatedAt; this.deletedAt=deletedAt;
+		}
 	}
 }
