@@ -4,6 +4,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -11,11 +12,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ColorFilter
@@ -26,18 +28,33 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.joinmastodon.android.R
 import org.joinmastodon.android.ui.compose.component.BackNavigationIcon
+import org.joinmastodon.reader.domain.ReaderPosition
+import org.joinmastodon.reader.ui.ReaderScreen
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.TabRow
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.basic.TextField
+import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import org.joinmastodon.reader.ui.ReaderScreen
 
 @Composable
 fun NovelHomeScreen(accountId: String, libraryViewModel: NovelLibraryViewModel, onBack: () -> Unit) {
 	val libraryState by libraryViewModel.state.collectAsState()
+	var pendingNote by remember { mutableStateOf<Triple<String, String, ReaderPosition>?>(null) }
 	libraryState.reader?.let { reader ->
-		ReaderScreen(reader.book, reader.chapters, onPositionChanged = { libraryViewModel.onReaderPositionChanged(reader.book.id, it) }, onBack = libraryViewModel::closeReader)
+		ReaderScreen(
+			reader.book,
+			reader.chapters,
+			onPositionChanged = { libraryViewModel.onReaderPositionChanged(reader.book.id, it) },
+			onBookmark = { position -> reader.chapters.getOrNull(position.chapterIndex)?.let { libraryViewModel.addBookmark(reader.book.id, it.id, position) } },
+			onNote = { position -> reader.chapters.getOrNull(position.chapterIndex)?.let { pendingNote = Triple(reader.book.id, it.id, position) } },
+			onBack = libraryViewModel::closeReader,
+		)
+		pendingNote?.let { (bookId, chapterId, position) ->
+			NovelNoteDialog({ pendingNote = null }) { note -> pendingNote = null; libraryViewModel.addNote(bookId, chapterId, position, note) }
+		}
 		return
 	}
 	val tabs = listOf(
@@ -68,7 +85,7 @@ fun NovelHomeScreen(accountId: String, libraryViewModel: NovelLibraryViewModel, 
 			contentAlignment = Alignment.Center,
 		) {
 			if (selectedTab == 1) {
-				NovelLibraryScreen(libraryState, libraryViewModel::refresh, libraryViewModel::upload, libraryViewModel::paste, libraryViewModel::delete, libraryViewModel::download, libraryViewModel::openReader, libraryViewModel::dismissError)
+				NovelLibraryScreen(libraryState, libraryViewModel::refresh, libraryViewModel::upload, libraryViewModel::paste, libraryViewModel::delete, libraryViewModel::download, libraryViewModel::openReader, libraryViewModel::reportError, libraryViewModel::dismissError)
 				return@Box
 			}
 			Column(
@@ -89,6 +106,20 @@ fun NovelHomeScreen(accountId: String, libraryViewModel: NovelLibraryViewModel, 
 					fontSize = 18.sp,
 					fontWeight = FontWeight.Medium,
 				)
+			}
+		}
+	}
+}
+
+@Composable
+private fun NovelNoteDialog(onDismiss: () -> Unit, onSave: (String) -> Unit) {
+	var note by remember { mutableStateOf("") }
+	OverlayDialog(show = true, title = "添加笔记", onDismissRequest = onDismiss) {
+		Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+			TextField(note, { note = it }, label = "笔记正文")
+			Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+				TextButton("取消", onClick = onDismiss)
+				TextButton("保存", onClick = { if (note.isNotBlank()) onSave(note) })
 			}
 		}
 	}

@@ -59,6 +59,35 @@ class RoomNovelSyncStoreTest {
 		assertTrue(database.syncDao().pending(accountId).isEmpty())
 	}
 
+	@Test fun markPushedNormalizesEqualTimestampPayloadFromServer() = runBlocking {
+		val book = book("book-1", "remote-1")
+		database.novelBookDao().upsert(book)
+		database.syncDao().upsertProgress(NovelProgressEntity("progress-1", accountId, book.id, "{\"position\":1}", 200, null))
+		val change = LocalSyncChange("progress-1", "progress", book.id, "remote-1", "{\"position\":1}", 200, null, 0)
+		database.syncDao().enqueue(NovelSyncOutboxEntity("progress:progress-1", accountId, "progress", "progress-1", book.id, "remote-1", change.payload, 200, null))
+
+		store.markPushed(change, remote("progress", "progress-1", "{\"pageIndex\":1,\"chapterIndex\":0}", 200, null))
+
+		assertEquals("{\"pageIndex\":1,\"chapterIndex\":0}", database.syncDao().progress(accountId, "progress-1")?.payload)
+		assertTrue(database.syncDao().pending(accountId).isEmpty())
+	}
+
+	@Test fun markPushedAppliesEqualTimestampAuthoritativeTombstone() = runBlocking {
+		val book = book("book-1", "remote-1")
+		val chapter = NovelChapterEntity("chapter-1", book.id, "Chapter", "Body", 0)
+		database.novelBookDao().upsert(book)
+		database.novelChapterDao().upsert(listOf(chapter))
+		database.bookmarkDao().applyRemote(BookmarkEntity("bookmark-1", accountId, book.id, chapter.id, 3, 100, 200, null))
+		val payload = "{\"chapterId\":\"chapter-1\",\"position\":3}"
+		val change = LocalSyncChange("bookmark-1", "bookmark", book.id, "remote-1", payload, 200, null, 0)
+		database.syncDao().enqueue(NovelSyncOutboxEntity("bookmark:bookmark-1", accountId, "bookmark", "bookmark-1", book.id, "remote-1", payload, 200, null))
+
+		store.markPushed(change, remote("bookmark", "bookmark-1", payload, 200, 200))
+
+		assertEquals(200L, database.bookmarkDao().get(accountId, "bookmark-1")?.deletedAt)
+		assertTrue(database.syncDao().pending(accountId).isEmpty())
+	}
+
 	@Test fun completeMetadataMarksMissingPrivateRemoteDeletedButKeepsLocalBooks() = runBlocking {
 		database.novelBookDao().upsert(book("keep", "remote-keep"))
 		database.novelBookDao().upsert(book("missing", "remote-missing"))

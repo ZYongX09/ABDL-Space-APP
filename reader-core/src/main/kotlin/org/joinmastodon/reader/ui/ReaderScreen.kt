@@ -31,6 +31,8 @@ fun ReaderScreen(
 	chapters: List<ReaderChapter>,
 	initialPosition: ReaderPosition = ReaderPosition(),
 	onPositionChanged: (ReaderPosition) -> Unit = {},
+	onBookmark: (ReaderPosition) -> Unit = {},
+	onNote: (ReaderPosition) -> Unit = {},
 	onBack: () -> Unit,
 ) {
 	var chapterIndex by remember(book.id) { mutableIntStateOf(initialPosition.chapterIndex.coerceIn(0, chapters.lastIndex.coerceAtLeast(0))) }
@@ -68,6 +70,8 @@ fun ReaderScreen(
 				palette = settings.palette,
 				onBack = onBack,
 				onSettings = { settingsVisible = true },
+				onBookmark = { onBookmark(ReaderPosition(chapterIndex, pageIndex)) },
+				onNote = { onNote(ReaderPosition(chapterIndex, pageIndex)) },
 				onChapterSelected = {
 					val nextPageIndex = pageIndexAfterChapterChange(chapter.id, chapters[it].id, pageIndex)
 					chapterIndex = it

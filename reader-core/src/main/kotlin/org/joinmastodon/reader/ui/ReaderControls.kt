@@ -24,6 +24,8 @@ fun ReaderControls(
 	palette: ReaderPalette,
 	onBack: () -> Unit,
 	onSettings: () -> Unit,
+	onBookmark: () -> Unit,
+	onNote: () -> Unit,
 	onChapterSelected: (Int) -> Unit,
 	modifier: Modifier = Modifier,
 ) {
@@ -43,6 +45,10 @@ fun ReaderControls(
 				valueRange = 0f..(chapterCount - 1).toFloat(),
 				steps = (chapterCount - 2).coerceAtLeast(0),
 			)
+		}
+		Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+			TextButton(onClick = onBookmark) { Text("添加书签", color = palette.text) }
+			TextButton(onClick = onNote) { Text("添加笔记", color = palette.text) }
 		}
 		Text("第 ${chapterIndex + 1} / $chapterCount 章", color = palette.secondaryText, modifier = Modifier.align(Alignment.CenterHorizontally))
 	}

@@ -29,12 +29,13 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
 import org.joinmastodon.android.R
 import org.joinmastodon.reader.data.NovelBookEntity
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
+import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
@@ -46,13 +47,14 @@ fun NovelLibraryScreen(
 	onDelete: (NovelBookEntity) -> Unit,
 	onDownload: (NovelBookEntity) -> Unit,
 	onOpen: (NovelBookEntity) -> Unit,
+	onError: (String) -> Unit,
 	onDismissError: () -> Unit,
 ) {
 	var pasteVisible by remember { mutableStateOf(false) }
 	var upload by remember { mutableStateOf<Pair<Uri, NovelDocument>?>(null) }
 	val resolver = NovelDocumentResolver(LocalContext.current.contentResolver)
 	val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-		uri?.let { selected -> runCatching { resolver.resolve(selected) }.onSuccess { upload = selected to it } }
+		uri?.let { selected -> handleSelectedDocument(selected, resolver::resolve, { upload = it }, onError) }
 	}
 	Column(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
 		Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
@@ -78,13 +80,13 @@ fun NovelLibraryScreen(
 	}
 	if (pasteVisible) NovelPasteDialog({ pasteVisible = false }) { title, author, text -> pasteVisible = false; onPaste(title, author, text) }
 	upload?.let { (uri, document) -> NovelUploadMetadataDialog(document, { upload = null }) { title, author -> upload = null; onUpload(uri, title, author, document.format, document.mimeType) } }
-	state.error?.let { message -> SuperDialog("操作失败", onDismissError, onDismissError) { Text(message) } }
+	state.error?.let { message -> NovelDialog("操作失败", onDismissError, onDismissError) { Text(message) } }
 }
 
 @Composable
 private fun NovelPasteDialog(onDismiss: () -> Unit, onPaste: (String, String, String) -> Unit) {
 	var title by remember { mutableStateOf("") }; var author by remember { mutableStateOf("") }; var text by remember { mutableStateOf("") }
-	SuperDialog("粘贴私人小说", onDismiss, { if (title.isNotBlank() && author.isNotBlank() && text.isNotBlank()) onPaste(title, author, text) }) {
+	NovelDialog("粘贴私人小说", onDismiss, { if (title.isNotBlank() && author.isNotBlank() && text.isNotBlank()) onPaste(title, author, text) }) {
 		TextField(title, { title = it }, label = "标题"); TextField(author, { author = it }, label = "作者"); TextField(text, { text = it }, label = "正文")
 	}
 }
@@ -92,20 +94,24 @@ private fun NovelPasteDialog(onDismiss: () -> Unit, onPaste: (String, String, St
 @Composable
 private fun NovelUploadMetadataDialog(document: NovelDocument, onDismiss: () -> Unit, onConfirm: (String, String) -> Unit) {
 	var title by remember(document) { mutableStateOf(document.displayName) }; var author by remember(document) { mutableStateOf("") }
-	SuperDialog("小说信息", onDismiss, { if (title.isNotBlank() && author.isNotBlank()) onConfirm(title, author) }) {
+	NovelDialog("小说信息", onDismiss, { if (title.isNotBlank() && author.isNotBlank()) onConfirm(title, author) }) {
 		TextField(title, { title = it }, label = "标题"); TextField(author, { author = it }, label = "作者")
 	}
 }
 
 @Composable
-private fun SuperDialog(title: String, onDismiss: () -> Unit, onConfirm: () -> Unit, content: @Composable () -> Unit) {
-	Dialog(onDismissRequest = onDismiss) {
-		Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-			Text(title, fontSize = 20.sp, fontWeight = FontWeight.Medium)
+private fun NovelDialog(title: String, onDismiss: () -> Unit, onConfirm: () -> Unit, content: @Composable () -> Unit) {
+	OverlayDialog(show = true, title = title, onDismissRequest = onDismiss) {
+		Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
 			content()
 			Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-				Text("取消", Modifier.clickable(onClick = onDismiss).padding(12.dp)); Text("确定", Modifier.clickable(onClick = onConfirm).padding(12.dp), color = MiuixTheme.colorScheme.primary)
+				TextButton("取消", onClick = onDismiss)
+				TextButton("确定", onClick = onConfirm)
 			}
-		} }
+		}
 	}
+}
+
+internal fun handleSelectedDocument(uri: Uri, resolve: (Uri) -> NovelDocument, onResolved: (Pair<Uri, NovelDocument>) -> Unit, onError: (String) -> Unit) {
+	runCatching { resolve(uri) }.onSuccess { onResolved(uri to it) }.onFailure { onError(it.message ?: "无法读取所选文件") }
 }

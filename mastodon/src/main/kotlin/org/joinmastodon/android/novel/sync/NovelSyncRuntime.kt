@@ -110,7 +110,7 @@ class RoomNovelSyncStore(
 	}
 
 	override suspend fun markPushed(change: LocalSyncChange, remote: RemoteSyncItem) = database.withTransaction {
-		applyItem(remote)
+		applyAuthoritative(remote)
 		database.syncDao().delete(accountId, "${change.itemType}:${change.itemId}")
 	}
 	override suspend fun markFailed(change: LocalSyncChange) = database.syncDao().incrementAttempts(accountId, "${change.itemType}:${change.itemId}")
@@ -118,16 +118,29 @@ class RoomNovelSyncStore(
 	private data class BookmarkPayload(val chapterId: String = "", val position: Int = 0)
 	private data class NotePayload(val chapterId: String = "", val startOffset: Int = 0, val endOffset: Int = 0, val selectedText: String? = null, val note: String? = null)
 
-	private suspend fun applyItem(item: RemoteSyncItem) {
-		val book = database.novelBookDao().getByRemoteId(accountId, "private", item.bookId) ?: return
+	private suspend fun applyAuthoritative(item: RemoteSyncItem) {
+		val book = requireNotNull(database.novelBookDao().getByRemoteId(accountId, "private", item.bookId)) { "Authoritative sync book does not belong to the active account" }
 		when (item.itemType) {
-			"progress" -> {
-				val current = database.syncDao().progress(accountId, item.itemId)
-				if (shouldApply(current?.updatedAt, current?.deletedAt, item.clientUpdatedAt, item.deletedAt)) database.syncDao().upsertProgress(NovelProgressEntity(item.itemId, accountId, book.id, item.payload, item.clientUpdatedAt, item.deletedAt))
-			}
-			"bookmark" -> applyBookmark(book.id, item)
-			"note" -> applyNote(book.id, item)
+			"progress" -> database.syncDao().upsertProgress(NovelProgressEntity(item.itemId, accountId, book.id, item.payload, item.clientUpdatedAt, item.deletedAt))
+			"bookmark" -> applyAuthoritativeBookmark(book.id, item)
+			"note" -> applyAuthoritativeNote(book.id, item)
 		}
+	}
+
+	private suspend fun applyAuthoritativeBookmark(bookId: String, item: RemoteSyncItem) {
+		val payload = requireNotNull(runCatching { gson.fromJson(item.payload, BookmarkPayload::class.java) }.getOrNull()) { "Invalid authoritative bookmark payload" }
+		val chapter = requireNotNull(database.novelChapterDao().getById(payload.chapterId)) { "Authoritative bookmark chapter does not exist" }
+		require(chapter.bookId == bookId) { "Authoritative bookmark chapter does not belong to the book" }
+		val createdAt = database.bookmarkDao().get(accountId, item.itemId)?.createdAt ?: item.clientUpdatedAt
+		database.bookmarkDao().applyRemote(BookmarkEntity(item.itemId, accountId, bookId, chapter.id, payload.position, createdAt, item.clientUpdatedAt, item.deletedAt))
+	}
+
+	private suspend fun applyAuthoritativeNote(bookId: String, item: RemoteSyncItem) {
+		val payload = requireNotNull(runCatching { gson.fromJson(item.payload, NotePayload::class.java) }.getOrNull()) { "Invalid authoritative note payload" }
+		val chapter = requireNotNull(database.novelChapterDao().getById(payload.chapterId)) { "Authoritative note chapter does not exist" }
+		require(chapter.bookId == bookId) { "Authoritative note chapter does not belong to the book" }
+		val createdAt = database.annotationDao().get(accountId, item.itemId)?.createdAt ?: item.clientUpdatedAt
+		database.annotationDao().applyRemote(AnnotationEntity(item.itemId, accountId, bookId, chapter.id, payload.startOffset, payload.endOffset, payload.selectedText.orEmpty(), payload.note, createdAt, item.clientUpdatedAt, item.deletedAt))
 	}
 
 	private fun shouldApply(localUpdatedAt: Long?, localDeletedAt: Long?, remoteUpdatedAt: Long, remoteDeletedAt: Long?): Boolean {

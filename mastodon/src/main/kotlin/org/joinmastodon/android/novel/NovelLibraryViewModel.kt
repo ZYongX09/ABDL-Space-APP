@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import java.util.UUID
+import java.nio.charset.StandardCharsets
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -101,6 +102,16 @@ class NovelLibraryViewModel(application: Application, val accountId: String) : A
 
 	fun closeReader() { mutableState.update { it.copy(reader = null) } }
 	fun onReaderPositionChanged(bookId: String, position: ReaderPosition) = readerSync.onPositionChanged(bookId, position)
+	fun addBookmark(bookId: String, chapterId: String, position: ReaderPosition) = viewModelScope.launch(Dispatchers.IO) {
+		runCatching { syncWrites.saveBookmark(stableReaderItemId("bookmark", bookId, chapterId, position), bookId, chapterId, position.pageIndex) }
+			.onFailure { reportError(it.message ?: "添加书签失败") }
+	}
+	fun addNote(bookId: String, chapterId: String, position: ReaderPosition, note: String) = viewModelScope.launch(Dispatchers.IO) {
+		if (note.isBlank()) return@launch
+		runCatching { syncWrites.saveAnnotation(stableReaderItemId("note", bookId, chapterId, position), bookId, chapterId, position.pageIndex, position.pageIndex, "", note) }
+			.onFailure { reportError(it.message ?: "添加笔记失败") }
+	}
+	fun reportError(message: String) { mutableState.update { it.copy(error = message) } }
 	fun dismissError() { mutableState.update { it.copy(error = null) } }
 
 	fun delete(book: NovelBookEntity) = viewModelScope.launch(Dispatchers.IO) {
@@ -121,4 +132,7 @@ class NovelLibraryViewModel(application: Application, val accountId: String) : A
 	private fun guard() {
 		check(session != null && NovelAccountDataCleaner.isSessionValid(accountId, session, generation)) { "账号已退出" }
 	}
+
+	private fun stableReaderItemId(type: String, bookId: String, chapterId: String, position: ReaderPosition): String =
+		UUID.nameUUIDFromBytes("$accountId:$type:$bookId:$chapterId:${position.chapterIndex}:${position.pageIndex}".toByteArray(StandardCharsets.UTF_8)).toString()
 }

@@ -9,6 +9,7 @@ class NovelHomeUiContractTest {
 	private val projectDir = File(requireNotNull(System.getProperty("user.dir")))
 	private val screen = File(projectDir, "src/main/kotlin/org/joinmastodon/android/novel/NovelHomeScreen.kt").readText()
 	private val library = File(projectDir, "src/main/kotlin/org/joinmastodon/android/novel/NovelLibraryScreen.kt").readText()
+	private val viewModel = File(projectDir, "src/main/kotlin/org/joinmastodon/android/novel/NovelLibraryViewModel.kt").readText()
 	private val activity = File(projectDir, "src/main/kotlin/org/joinmastodon/android/novel/NovelActivity.kt").readText()
 
 	@Test
@@ -39,10 +40,29 @@ class NovelHomeUiContractTest {
 
 	@Test fun libraryUsesMiuixDialogsAndRendersDismissibleErrors() {
 		assertFalse(library.contains("androidx.compose.material3.AlertDialog"))
+		assertFalse(library.contains("androidx.compose.ui.window.Dialog"))
 		assertFalse(library.contains("OutlinedTextField"))
-		assertTrue(library.contains("SuperDialog"))
+		assertTrue(library.contains("top.yukonga.miuix.kmp.overlay.OverlayDialog"))
 		assertTrue(library.contains("top.yukonga.miuix.kmp.basic.TextField"))
+		assertTrue(library.contains("top.yukonga.miuix.kmp.basic.TextButton"))
 		assertTrue(library.contains("state.error"))
 		assertTrue(library.contains("onDismissError"))
+	}
+
+	@Test fun readerActionsReachViewModelAndProductionSyncFacade() {
+		assertTrue(screen.contains("onBookmark ="))
+		assertTrue(screen.contains("libraryViewModel.addBookmark"))
+		assertTrue(screen.contains("onNote ="))
+		assertTrue(screen.contains("libraryViewModel.addNote"))
+		assertTrue(viewModel.contains("fun addBookmark("))
+		assertTrue(viewModel.contains("syncWrites.saveBookmark"))
+		assertTrue(viewModel.contains("fun addNote("))
+		assertTrue(viewModel.contains("syncWrites.saveAnnotation"))
+	}
+
+	@Test fun safFailureIsReportedThroughVisibleViewModelError() {
+		assertTrue(library.contains("handleSelectedDocument"))
+		assertTrue(screen.contains("libraryViewModel::reportError"))
+		assertTrue(viewModel.contains("fun reportError(message: String)"))
 	}
 }
