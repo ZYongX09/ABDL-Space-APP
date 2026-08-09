@@ -15,10 +15,44 @@ import okhttp3.OkHttpClient
 import org.joinmastodon.android.api.novels.PrivateBookUpload
 import org.joinmastodon.android.api.novels.PrivateNovelApi
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class NovelImportCoordinatorTest {
+	@Test
+	fun preparedJournalWithoutFileIsRemovedDuringRecovery() = runBlocking {
+		val directory = Files.createTempDirectory("novel-upload-journal-only").toFile()
+		val target = File(directory, "source.txt")
+		var journalDeleted = false
+
+		val outcome = NovelImportCoordinator.recoverPreparedFile(target, 0, "", "") {
+			journalDeleted = true
+		}
+
+		assertEquals(NovelImportCoordinator.PreparedRecovery.MISSING, outcome)
+		assertTrue(journalDeleted)
+		directory.deleteRecursively()
+		Unit
+	}
+
+	@Test
+	fun movedFileBeforeSummaryIsRecoveredWithoutBecomingOrphan() = runBlocking {
+		val directory = Files.createTempDirectory("novel-upload-file-window").toFile()
+		val target = File(directory, "source.txt").apply { writeText("book") }
+		var journalDeleted = false
+
+		val outcome = NovelImportCoordinator.recoverPreparedFile(target, 0, "", "") {
+			journalDeleted = true
+		}
+
+		assertEquals(NovelImportCoordinator.PreparedRecovery.REBUILD_SUMMARY, outcome)
+		assertFalse(journalDeleted)
+		assertTrue(target.exists())
+		directory.deleteRecursively()
+		Unit
+	}
+
 	@Test
 	fun cancelCoordinatorUploadCancelsBlockingCallAndNeverCompletes() = runBlocking {
 		val file = Files.createTempFile("novel-upload-cancel", ".txt").toFile().apply { writeText("book") }

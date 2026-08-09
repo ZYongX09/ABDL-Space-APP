@@ -93,9 +93,10 @@ interface NovelImportDao {
 		val existingByContent = existingChapters
 			.filter { it.deletedAt == null }
 			.groupBy { it.title to it.content }
-			.mapValues { (_, matches) -> ArrayDeque(matches.sortedBy { it.chapterIndex }) }
+		val incomingCounts = chapters.groupingBy { it.title to it.content }.eachCount()
 		val stableChapters = chapters.map { chapter ->
-			val existing = existingByContent[chapter.title to chapter.content]?.removeFirstOrNull()
+			val key = chapter.title to chapter.content
+			val existing = existingByContent[key]?.singleOrNull()?.takeIf { incomingCounts[key] == 1 }
 			chapter.copy(
 				id = existing?.id ?: chapter.id,
 				bookId = stableBook.id,

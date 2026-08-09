@@ -106,8 +106,9 @@ public class PrivateBookUpload{
 				if(authorization.alreadyUploaded){
 					PrivateNovelApi.BookDto ready=bookResult(uploadId, metadata, file.length(), sha256, authorization.parseStatus);
 					completionGate.run();
-					publishComplete();
+					checkCanceled();
 					recoveryListener.onPhase(uploadId, Recovery.COMPLETE);
+					publishComplete();
 					return ready;
 				}
 				state=State.UPLOADING;
@@ -127,8 +128,9 @@ public class PrivateBookUpload{
 			PrivateNovelApi.CompleteResultDto completed=pollComplete(uploadId);
 			PrivateNovelApi.BookDto result=bookResult(completed.id, metadata, completed.verifiedSize, sha256, completed.parseStatus);
 			completionGate.run();
-			publishComplete();
+			checkCanceled();
 			recoveryListener.onPhase(uploadId, Recovery.COMPLETE);
+			publishComplete();
 			return result;
 		}catch(IOException e){
 			state=canceled ? State.CANCELED : State.FAILED;

@@ -52,6 +52,7 @@ class NovelDownloadWorker(
 			try {
 				val existing = recoveryDatabase.transferDao().getByRemoteBook(NovelTransferEntity.DOWNLOAD, bookId)
 				if (existing?.phase == NovelTransferEntity.DATABASE_COMMITTED) {
+					sessionGuard.requireValid()
 					val destination = File(existing.localTempPath)
 					commitCandidate(destination, File(destination.parentFile, destination.name + ".candidate"), sessionGuard::isValid, true) {}
 					recoveryDatabase.transferDao().delete(existing.transferId)
@@ -160,6 +161,11 @@ class NovelDownloadWorker(
 		fun accountWorkTag(accountId: String): String = "novel-download-account:${NovelImportCoordinator.accountHash(accountId)}"
 
 		@JvmStatic
+		fun cancelAccount(context: Context, accountId: String) {
+			WorkManager.getInstance(context).cancelAllWorkByTag(accountWorkTag(accountId))
+		}
+
+		@JvmStatic
 		fun enqueue(context: Context, accountId: String, bookId: String) {
 			val request = OneTimeWorkRequestBuilder<NovelDownloadWorker>()
 				.setInputData(Data.Builder().putString(KEY_ACCOUNT_ID, accountId).putString(KEY_BOOK_ID, bookId).build())
@@ -234,6 +240,7 @@ class NovelDownloadWorker(
 		suspend fun commitCandidate(destination: File, candidate: File, sessionValid: () -> Boolean, databaseCommitted: Boolean, commitDatabase: suspend () -> Unit) {
 			val backup = File(destination.parentFile, destination.name + ".backup")
 			if (databaseCommitted) {
+				requireSession(sessionValid)
 				if (!destination.exists()) throw IOException("Committed novel file is missing")
 				backup.delete()
 				candidate.delete()

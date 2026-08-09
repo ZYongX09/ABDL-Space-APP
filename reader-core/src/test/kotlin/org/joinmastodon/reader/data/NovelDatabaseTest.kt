@@ -239,6 +239,7 @@ class NovelDatabaseTest {
 		val duplicateA = NovelChapterEntity("a-duplicate", book.id, "Same", "alpha", 2)
 		database.novelImportDao().importBook(book, listOf(a, b, duplicateA))
 		database.bookmarkDao().upsert(BookmarkEntity("bookmark-a", accountId, book.id, a.id, 0))
+		database.bookmarkDao().upsert(BookmarkEntity("bookmark-a-duplicate", accountId, book.id, duplicateA.id, 0))
 		database.annotationDao().upsert(AnnotationEntity("annotation-b", accountId, book.id, b.id, 0, 2, "be"))
 
 		val inserted = NovelChapterEntity("new", book.id, "Intro", "intro", 0)
@@ -247,9 +248,11 @@ class NovelDatabaseTest {
 		database.novelImportDao().importBook(book, listOf(inserted, reorderedDuplicate, reorderedA))
 
 		val active = database.novelChapterDao().getByBookId(book.id)
-		assertEquals(listOf("new", "a", "a-duplicate"), active.map { it.id })
-		assertEquals("alpha", database.novelChapterDao().getById(database.bookmarkDao().getByBookId(accountId, book.id).single().chapterId)?.content)
+		assertEquals(listOf("new", "parsed-duplicate", "parsed-a"), active.map { it.id })
+		assertEquals(setOf("a", "a-duplicate"), database.bookmarkDao().getByBookId(accountId, book.id).mapTo(mutableSetOf()) { it.chapterId })
 		assertEquals("beta", database.novelChapterDao().getById(database.annotationDao().getByBookId(accountId, book.id).single().chapterId)?.content)
+		assertTrue(database.novelChapterDao().getById("a")?.deletedAt != null)
+		assertTrue(database.novelChapterDao().getById("a-duplicate")?.deletedAt != null)
 		assertTrue(database.novelChapterDao().getById("b")?.deletedAt != null)
 	}
 

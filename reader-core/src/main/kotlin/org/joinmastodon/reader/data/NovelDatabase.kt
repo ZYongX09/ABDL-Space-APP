@@ -7,6 +7,8 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import java.security.MessageDigest
+import java.util.Collections
+import java.util.WeakHashMap
 
 @Database(
 	entities = [
@@ -28,12 +30,24 @@ abstract class NovelDatabase : RoomDatabase() {
 	abstract fun transferDao(): NovelTransferDao
 
 	companion object {
+		private val openDatabases = mutableMapOf<String, MutableSet<NovelDatabase>>()
+
 		fun open(context: Context, accountId: String): NovelDatabase =
 			Room.databaseBuilder(
 				context.applicationContext,
 				NovelDatabase::class.java,
 				databaseName(accountId),
-			).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build()
+			).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build().also { database ->
+				synchronized(openDatabases) {
+					openDatabases.getOrPut(accountId) { Collections.newSetFromMap(WeakHashMap()) }.add(database)
+				}
+			}
+
+		@JvmStatic
+		fun closeAccount(accountId: String) {
+			val databases = synchronized(openDatabases) { openDatabases.remove(accountId)?.toList().orEmpty() }
+			databases.forEach { runCatching { it.close() } }
+		}
 
 		val MIGRATION_1_2 = object : Migration(1, 2) {
 			override fun migrate(database: SupportSQLiteDatabase) {

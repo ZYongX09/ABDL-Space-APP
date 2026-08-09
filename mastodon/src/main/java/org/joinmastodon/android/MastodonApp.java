@@ -10,6 +10,9 @@ import android.util.Log;
 import android.webkit.WebView;
 
 import org.joinmastodon.android.api.PushSubscriptionManager;
+import org.joinmastodon.android.api.session.AccountSession;
+import org.joinmastodon.android.api.session.AccountSessionManager;
+import org.joinmastodon.android.novel.upload.NovelUploadWorker;
 import org.joinmastodon.android.ui.utils.UiUtils;
 
 import cn.jiguang.api.utils.JCollectionAuth;
@@ -63,6 +66,8 @@ public class MastodonApp extends Application{
 			// 快捷方式发布失败不影响正常功能（SplashActivity 改变了 LAUNCHER 入口）
 		}
 		GlobalUserPreferences.load();
+		for(AccountSession session:AccountSessionManager.getInstance().getLoggedInAccounts())
+			NovelUploadWorker.enqueuePending(context, session.getID());
 	}
 
 	private String getCurrentProcessName(){

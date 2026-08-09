@@ -90,6 +90,25 @@ class NovelDownloadTransactionTest {
 	}
 
 	@Test
+	fun committedTransferWithoutValidSessionPreservesRecoveryFiles() = runBlocking {
+		val directory = Files.createTempDirectory("novel-download-committed-session").toFile()
+		val official = File(directory, "book.txt").apply { writeText("new") }
+		val backup = File(directory, "book.txt.backup").apply { writeText("old") }
+		val candidate = File(directory, "book.txt.candidate").apply { writeText("candidate") }
+
+		val failure = runCatching {
+			NovelDownloadWorker.commitCandidate(official, candidate, { false }, true) {}
+		}.exceptionOrNull()
+
+		assertTrue(failure is IOException)
+		assertTrue(backup.exists())
+		assertTrue(candidate.exists())
+		assertEquals("new", official.readText())
+		directory.deleteRecursively()
+		Unit
+	}
+
+	@Test
 	fun invalidSessionBeforeCommitKeepsOldFileAndSkipsDatabase() = runBlocking {
 		val directory = Files.createTempDirectory("novel-download-session").toFile()
 		val official = File(directory, "book.txt").apply { writeText("old") }
