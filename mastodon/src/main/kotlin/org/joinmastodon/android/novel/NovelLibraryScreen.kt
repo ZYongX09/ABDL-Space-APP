@@ -53,13 +53,13 @@ fun NovelLibraryScreen(
 	var pasteVisible by remember { mutableStateOf(false) }
 	var upload by remember { mutableStateOf<Pair<Uri, NovelDocument>?>(null) }
 	val resolver = NovelDocumentResolver(LocalContext.current.contentResolver)
-	val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+	val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
 		uri?.let { selected -> handleSelectedDocument(selected, resolver::resolve, { upload = it }, onError) }
 	}
 	Column(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
 		Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
 			Text(if (state.refreshing) "同步中" else "刷新", modifier = Modifier.clickable(onClick = onRefresh), color = MiuixTheme.colorScheme.primary)
-			Text("上传 TXT/EPUB", modifier = Modifier.clickable { picker.launch(arrayOf("text/plain", "application/epub+zip")) }, color = MiuixTheme.colorScheme.primary)
+			Text("上传 TXT/EPUB", modifier = Modifier.clickable { picker.launch("*/*") }, color = MiuixTheme.colorScheme.primary)
 			Text("粘贴文本", modifier = Modifier.clickable { pasteVisible = true }, color = MiuixTheme.colorScheme.primary)
 		}
 		if (state.books.isEmpty()) Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {

@@ -49,6 +49,14 @@ class NovelHomeUiContractTest {
 		assertTrue(library.contains("onDismissError"))
 	}
 
+	@Test fun miuixDialogsPackageTheirNavigationEventRuntime() {
+		val build = File(projectDir, "build.gradle").readText()
+		val rootBuild = File(projectDir.parentFile, "build.gradle").readText()
+		assertTrue(build.contains("androidx.navigationevent:navigationevent:1.0.2"))
+		assertTrue(build.contains("androidx.navigationevent:navigationevent-compose:1.0.2"))
+		assertTrue(rootBuild.contains("com.android.tools.build:gradle:8.9.1"))
+	}
+
 	@Test fun readerActionsReachViewModelAndProductionSyncFacade() {
 		assertTrue(screen.contains("onBookmark ="))
 		assertTrue(screen.contains("libraryViewModel.addBookmark"))
@@ -64,5 +72,11 @@ class NovelHomeUiContractTest {
 		assertTrue(library.contains("handleSelectedDocument"))
 		assertTrue(screen.contains("libraryViewModel::reportError"))
 		assertTrue(viewModel.contains("fun reportError(message: String)"))
+	}
+
+	@Test fun libraryUsesCompatibleSingleDocumentPicker() {
+		assertTrue(library.contains("ActivityResultContracts.GetContent()"))
+		assertTrue(library.contains("picker.launch(\"*/*\")"))
+		assertFalse(library.contains("ActivityResultContracts.OpenDocument()"))
 	}
 }
