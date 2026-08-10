@@ -6,13 +6,19 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.navigationevent.NavigationEventDispatcher
+import androidx.navigationevent.NavigationEventDispatcherOwner
+import androidx.navigationevent.compose.LocalNavigationEventDispatcherOwner
 import org.joinmastodon.android.api.session.AccountSessionManager
 import org.joinmastodon.android.ui.compose.MiuixAppTheme
 import org.joinmastodon.android.ui.utils.UiUtils
 
-class NovelActivity : ComponentActivity() {
+class NovelActivity : ComponentActivity(), NavigationEventDispatcherOwner {
+	override val navigationEventDispatcher = NavigationEventDispatcher { finish() }
+
 	override fun onCreate(savedInstanceState: Bundle?) {
 		val accountID = intent.getStringExtra(EXTRA_ACCOUNT_ID)
 		val session = accountID?.let {
@@ -37,8 +43,10 @@ class NovelActivity : ComponentActivity() {
 			navigationBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT) { darkTheme },
 		)
 		setContent {
-			MiuixAppTheme {
-				NovelHomeScreen(accountId = accountID, libraryViewModel = libraryViewModel, onBack = ::finish)
+			CompositionLocalProvider(LocalNavigationEventDispatcherOwner provides this) {
+				MiuixAppTheme {
+					NovelHomeScreen(accountId = accountID, libraryViewModel = libraryViewModel, onBack = ::finish)
+				}
 			}
 		}
 	}

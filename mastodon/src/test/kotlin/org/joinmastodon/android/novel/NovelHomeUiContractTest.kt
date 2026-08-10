@@ -55,6 +55,8 @@ class NovelHomeUiContractTest {
 		assertTrue(build.contains("androidx.navigationevent:navigationevent:1.0.2"))
 		assertTrue(build.contains("androidx.navigationevent:navigationevent-compose:1.0.2"))
 		assertTrue(rootBuild.contains("com.android.tools.build:gradle:8.9.1"))
+		assertTrue(activity.contains("NavigationEventDispatcherOwner"))
+		assertTrue(activity.contains("LocalNavigationEventDispatcherOwner provides this"))
 	}
 
 	@Test fun readerActionsReachViewModelAndProductionSyncFacade() {
