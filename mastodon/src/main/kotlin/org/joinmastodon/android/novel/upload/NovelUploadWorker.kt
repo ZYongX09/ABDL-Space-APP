@@ -1,6 +1,7 @@
 package org.joinmastodon.android.novel.upload
 
 import android.content.Context
+import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
@@ -73,8 +74,10 @@ class NovelUploadWorker(appContext: Context, params: WorkerParameters) : Corouti
 			}
 			Result.success()
 		} catch (error: IOException) {
+			Log.w(LOG_TAG, "Upload retry: ${error.javaClass.simpleName}: ${safeFailureMessage(error)}")
 			if (isStopped) Result.failure() else Result.retry()
 		} catch (error: Exception) {
+			Log.w(LOG_TAG, "Upload retry: ${error.javaClass.simpleName}: ${safeFailureMessage(error)}")
 			if (AccountSessionManager.getInstance().tryGetAccount(accountId) == null) Result.failure() else Result.retry()
 		} finally {
 			database.transferDao().release(transferId, owner)
@@ -84,10 +87,28 @@ class NovelUploadWorker(appContext: Context, params: WorkerParameters) : Corouti
 	}
 
 	companion object {
+		private const val LOG_TAG = "NovelUploadWorker"
 		const val KEY_ACCOUNT_ID = "account_id"
 		const val KEY_TRANSFER_ID = "transfer_id"
 		private const val CLAIM_LEASE_MILLIS = 10 * 60 * 1000L
 		private const val CLAIM_RENEW_MILLIS = 5 * 60 * 1000L
+
+		private fun safeFailureMessage(error: Throwable): String {
+			val message = error.message.orEmpty()
+			return when {
+				message.matches(Regex("HTTP \\d{3}( \\([a-z_]+\\))?")) -> message
+				message.matches(Regex("Upload failed: HTTP \\d{3}")) -> message
+				message in setOf(
+					"Signed upload headers do not match the file",
+					"Missing required upload headers",
+					"Upload URL must use HTTPS",
+					"Invalid complete response",
+					"Unexpected complete response",
+					"Book parsing timed out",
+				) -> message
+				else -> "upload_failed"
+			}
+		}
 
 		@JvmStatic fun workName(accountId: String, transferId: String) = "novel-upload:${NovelImportCoordinator.accountHash(accountId)}:$transferId"
 		@JvmStatic fun uniqueWorkName(accountId: String, transferId: String) = workName(accountId, transferId)

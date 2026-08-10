@@ -31,5 +31,8 @@ class NovelUploadWorkerTest {
 		assertTrue(source.contains("transferDao().claim("))
 		assertTrue(source.contains("Result.retry()"))
 		assertTrue(source.contains("renewClaim("))
+		assertTrue(source.contains("Log.w(LOG_TAG"))
+		assertTrue(source.contains("safeFailureMessage(error)"))
+		assertFalse(source.contains("error.stackTraceToString()"))
 	}
 }
