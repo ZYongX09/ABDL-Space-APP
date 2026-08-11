@@ -1,6 +1,7 @@
 package org.joinmastodon.android.novel.download
 
 import android.content.Context
+import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
@@ -52,8 +53,10 @@ class NovelDownloadWorker(
 			current === session && current.token.accessToken == accessToken && NovelAccountDataCleaner.isGenerationValid(accountId, generation)
 		}
 		val api = PrivateNovelApi(session)
+		var stage = "validate"
 		try {
 			if (!SAFE_BOOK_ID.matches(bookId)) return@withContext Result.failure()
+			stage = "recover"
 			val recoveryDatabase = NovelDatabase.open(applicationContext, accountId)
 			try {
 				val existing = recoveryDatabase.transferDao().getByRemoteBook(NovelTransferEntity.DOWNLOAD, bookId)
@@ -71,9 +74,11 @@ class NovelDownloadWorker(
 				recoveryDatabase.close()
 			}
 			sessionGuard.requireValid()
+			stage = "book"
 			val book = execute(api, api.newBookCall(bookId), PrivateNovelApi.BookDto::class.java)
-			if (book.id != bookId || book.format !in SUPPORTED_FORMATS || book.verifiedSize <= 0 || book.verifiedSize > PrivateBookUpload.MAX_SIZE || !SHA_256.matches(book.contentHash.orEmpty())) return@withContext Result.failure()
+			if (book.id != bookId || book.format !in SUPPORTED_FORMATS || book.verifiedSize <= 0 || book.verifiedSize > PrivateBookUpload.MAX_SIZE || !SHA_256.matches(book.contentHash.orEmpty())) throw IOException("Invalid book metadata")
 			sessionGuard.requireValid()
+			stage = "authorize"
 			val authorization = execute(api, api.newDownloadAuthorizeCall(bookId), PrivateNovelApi.DownloadAuthorization::class.java)
 			sessionGuard.requireValid()
 			val directory = File(applicationContext.filesDir, "novels/${NovelImportCoordinator.accountHash(accountId)}").apply { mkdirs() }
@@ -98,7 +103,8 @@ class NovelDownloadWorker(
 					contentMd5 = null,
 					size = book.verifiedSize,
 				))
-				runInterruptible {
+					stage = "download"
+					runInterruptible {
 					downloadVerified(api.callFactory, authorization.downloadUrl, candidate, book.verifiedSize, book.contentHash, false) { call -> registerCall(call) }
 				}
 			} catch (error: Throwable) {
@@ -111,6 +117,7 @@ class NovelDownloadWorker(
 				candidate.delete()
 				return@withContext Result.failure()
 			}
+			stage = "commit"
 			commitCandidate(destination, candidate, sessionGuard::isValid) {
 				NovelImportCoordinator(applicationContext).importPrivateBook(accountId, destination, book, transferId = transferId, sessionGuard = sessionGuard::isValid)
 			}
@@ -122,8 +129,10 @@ class NovelDownloadWorker(
 			}
 			Result.success()
 		} catch (error: IOException) {
+			Log.w(LOG_TAG, "Download $stage retry: ${error.javaClass.simpleName}: ${safeFailureMessage(error)}")
 			if (isStopped) Result.failure() else Result.retry()
 		} catch (error: Exception) {
+			Log.w(LOG_TAG, "Download $stage failed: ${error.javaClass.simpleName}: ${safeFailureMessage(error)}")
 			Result.failure()
 		} finally {
 			currentCall.set(null)
@@ -157,11 +166,29 @@ class NovelDownloadWorker(
 	}
 
 	companion object {
+		private const val LOG_TAG = "NovelDownloadWorker"
 		const val KEY_ACCOUNT_ID = "account_id"
 		const val KEY_BOOK_ID = "book_id"
 		private val SAFE_BOOK_ID = Regex("[A-Za-z0-9_-]{1,128}")
 		private val SHA_256 = Regex("[a-fA-F0-9]{64}")
 		private val SUPPORTED_FORMATS = setOf("txt", "epub")
+
+		private fun safeFailureMessage(error: Throwable): String {
+			val message = error.message.orEmpty()
+			return when {
+				message.matches(Regex("HTTP \\d{3}( \\([a-z_]+\\))?")) -> message
+				message.matches(Regex("Download failed: HTTP \\d{3}")) -> message
+				message in setOf(
+					"Invalid book metadata",
+					"Invalid download contract",
+					"Empty download body",
+					"Downloaded book failed integrity verification",
+					"Download exceeds expected size",
+					"Redirects are not allowed",
+				) -> message
+				else -> "download_failed"
+			}
+		}
 
 		@JvmStatic
 		fun uniqueWorkName(accountId: String, bookId: String): String =

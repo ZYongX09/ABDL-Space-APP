@@ -59,7 +59,8 @@ fun NovelLibraryScreen(
 	Column(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
 		Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
 			Text(if (state.refreshing) "同步中" else "刷新", modifier = Modifier.clickable(onClick = onRefresh), color = MiuixTheme.colorScheme.primary)
-			Text("上传 TXT/EPUB", modifier = Modifier.clickable { picker.launch("*/*") }, color = MiuixTheme.colorScheme.primary)
+			Text("上传 TXT", modifier = Modifier.clickable { picker.launch("text/plain") }, color = MiuixTheme.colorScheme.primary)
+			Text("上传 EPUB", modifier = Modifier.clickable { picker.launch("application/epub+zip") }, color = MiuixTheme.colorScheme.primary)
 			Text("粘贴文本", modifier = Modifier.clickable { pasteVisible = true }, color = MiuixTheme.colorScheme.primary)
 		}
 		if (state.books.isEmpty()) Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {

@@ -12,6 +12,14 @@ import org.junit.Test
 
 class NovelDownloadTransactionTest {
 	@Test
+	fun downloadWorkerReportsSafeFailureStages() {
+		val source = File("src/main/kotlin/org/joinmastodon/android/novel/download/NovelDownloadWorker.kt").readText()
+		assertTrue(source.contains("Log.w(LOG_TAG"))
+		assertTrue(source.contains("safeFailureMessage(error)"))
+		assertFalse(source.contains("error.stackTraceToString()"))
+	}
+
+	@Test
 	fun failedImportKeepsOldOfficialFileAndCleansCandidate() {
 		runBlocking {
 			val directory = Files.createTempDirectory("novel-download-transaction").toFile()

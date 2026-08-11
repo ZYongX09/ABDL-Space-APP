@@ -24,7 +24,8 @@ class NovelHomeUiContractTest {
 		assertTrue(screen.contains("fun NovelHomeScreen(accountId: String, libraryViewModel: NovelLibraryViewModel"))
 		assertTrue(screen.contains("NovelLibraryScreen"))
 		assertTrue(activity.contains("NovelHomeScreen(accountId = accountID"))
-		assertTrue(library.contains("上传 TXT/EPUB"))
+		assertTrue(library.contains("上传 TXT"))
+		assertTrue(library.contains("上传 EPUB"))
 		assertTrue(library.contains("粘贴文本"))
 		assertTrue(library.contains("onDownload"))
 		assertTrue(library.contains("onDelete"))
@@ -78,7 +79,9 @@ class NovelHomeUiContractTest {
 
 	@Test fun libraryUsesCompatibleSingleDocumentPicker() {
 		assertTrue(library.contains("ActivityResultContracts.GetContent()"))
-		assertTrue(library.contains("picker.launch(\"*/*\")"))
+		assertTrue(library.contains("picker.launch(\"text/plain\")"))
+		assertTrue(library.contains("picker.launch(\"application/epub+zip\")"))
+		assertFalse(library.contains("picker.launch(\"*/*\")"))
 		assertFalse(library.contains("ActivityResultContracts.OpenDocument()"))
 	}
 }
