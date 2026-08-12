@@ -11,9 +11,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
@@ -33,6 +35,7 @@ import me.grishka.appkit.imageloader.requests.UrlImageLoaderRequest
 import me.grishka.appkit.utils.V
 import org.joinmastodon.android.R
 import org.joinmastodon.android.ui.OutlineProviders
+import org.joinmastodon.android.ui.views.ItshoverNavigationIconView
 import org.joinmastodon.android.ui.compose.AppState
 import org.joinmastodon.android.ui.compose.LocalAppState
 import org.joinmastodon.android.ui.compose.MiuixAppTheme
@@ -119,11 +122,11 @@ class HomeLiquidNavigationController(
 			NavigationItem(view.context.getString(R.string.friend_request), androidx.compose.ui.graphics.vector.ImageVector.vectorResource(R.drawable.ic_tab_rating)),
 			NavigationItem(view.context.getString(R.string.my_profile), androidx.compose.ui.graphics.vector.ImageVector.vectorResource(R.drawable.ic_tab_rating)),
 		)
-		val iconResources = intArrayOf(
-			R.drawable.ic_tab_home,
-			R.drawable.ic_tab_search,
-			R.drawable.ic_tab_rating,
-			R.drawable.ic_tab_dream,
+		val iconTypes = intArrayOf(
+			ItshoverNavigationIconView.ICON_HOME,
+			ItshoverNavigationIconView.ICON_MAGNIFIER,
+			ItshoverNavigationIconView.ICON_STAR,
+			ItshoverNavigationIconView.ICON_GLOBE,
 		)
 		val bottomPadding = with(LocalDensity.current) {
 			if (bottomInsetState > 0) bottomInsetState.toDp() + 8.dp else 36.dp
@@ -149,11 +152,11 @@ class HomeLiquidNavigationController(
 						else -> null
 					}
 				},
-				iconContent = { index, selected ->
+				iconContent = { index, selected, animationToken ->
 					if (index == 4) {
-						AvatarIcon(avatarUrl)
+						AvatarIcon(avatarUrl, animationToken)
 					} else {
-						ResourceIcon(iconResources[index], selected)
+						ItshoverIcon(iconTypes[index], animationToken)
 					}
 				},
 			)
@@ -162,30 +165,39 @@ class HomeLiquidNavigationController(
 }
 
 @Composable
-private fun ResourceIcon(@DrawableRes drawableRes: Int, selected: Boolean) {
+private fun ItshoverIcon(iconType: Int, animationToken: Int) {
 	val tint = LocalContentColor.current.toArgb()
+	var iconView by remember { mutableStateOf<ItshoverNavigationIconView?>(null) }
+	var consumedToken by remember { mutableIntStateOf(animationToken) }
 	AndroidView(
 		modifier = Modifier.size(22.dp),
 		factory = { context ->
-			ImageView(context).apply {
-				scaleType = ImageView.ScaleType.CENTER
-				importantForAccessibility = ImageView.IMPORTANT_FOR_ACCESSIBILITY_NO
+			ItshoverNavigationIconView(context).apply {
+				this.iconType = iconType
+				iconView = this
 			}
 		},
-		update = { imageView ->
-			imageView.setImageResource(drawableRes)
-			imageView.isSelected = selected
-			imageView.setColorFilter(tint, PorterDuff.Mode.SRC_IN)
+		update = { iconView ->
+			iconView.setIconColor(tint)
 		},
 	)
+	LaunchedEffect(animationToken, iconView) {
+		if (animationToken > consumedToken) {
+			consumedToken = animationToken
+			iconView?.playAnimation()
+		}
+	}
 }
 
 @Composable
-private fun AvatarIcon(avatarUrl: String?) {
+private fun AvatarIcon(avatarUrl: String?, animationToken: Int) {
+	var imageView by remember { mutableStateOf<ImageView?>(null) }
+	var consumedToken by remember { mutableIntStateOf(animationToken) }
 	AndroidView(
 		modifier = Modifier.size(22.dp),
 		factory = { context ->
 			ImageView(context).apply {
+				imageView = this
 				layoutParams = ViewGroup.LayoutParams(V.dp(22f), V.dp(22f))
 				scaleType = ImageView.ScaleType.CENTER_CROP
 				outlineProvider = OutlineProviders.OVAL
@@ -197,4 +209,15 @@ private fun AvatarIcon(avatarUrl: String?) {
 			}
 		},
 	)
+	LaunchedEffect(animationToken, imageView) {
+		if (animationToken > consumedToken) {
+			consumedToken = animationToken
+			imageView?.let { avatar ->
+				avatar.animate().cancel()
+				avatar.animate().scaleX(0.9f).scaleY(0.9f).setDuration(90).withEndAction {
+					avatar.animate().scaleX(1f).scaleY(1f).setDuration(180).start()
+				}.start()
+			}
+		}
+	}
 }

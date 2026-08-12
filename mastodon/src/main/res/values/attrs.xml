@@ -48,6 +48,15 @@
 	<attr name="colorRichTextDecorations" format="color"/>
 
 	<attr name="composePollStyleInactiveAlpha" format="float"/>
+	<declare-styleable name="ItshoverNavigationIconView">
+		<attr name="iconType" format="enum">
+			<enum name="home" value="0"/>
+			<enum name="magnifier" value="1"/>
+			<enum name="star" value="2"/>
+			<enum name="globe" value="3"/>
+		</attr>
+		<attr name="iconTint" format="color"/>
+	</declare-styleable>
 
 	<declare-styleable name="MaxWidthFrameLayout">
 		<attr name="android:maxWidth" format="dimension"/>

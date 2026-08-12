@@ -40,6 +40,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
@@ -197,7 +198,7 @@ internal fun IosLiquidGlassNavigationBar(
     isBlurActive: Boolean,
     modifier: Modifier = Modifier,
     badge: (Int) -> (@Composable () -> Unit)? = { null },
-    iconContent: (@Composable (index: Int, selected: Boolean) -> Unit)? = null,
+    iconContent: (@Composable (index: Int, selected: Boolean, animationToken: Int) -> Unit)? = null,
     onItemLongClick: (Int) -> Boolean = { false },
     bottomPaddingOverride: Dp? = null,
 ) {
@@ -232,6 +233,11 @@ internal fun IosLiquidGlassNavigationBar(
     }
 
     var currentIndex by remember { mutableIntStateOf(selectedIndex) }
+    val iconAnimationTokens = remember(tabsCount) { mutableStateListOf<Int>().apply { repeat(tabsCount) { add(0) } } }
+
+    fun animateIcon(index: Int) {
+        iconAnimationTokens[index] = iconAnimationTokens[index] + 1
+    }
 
     class DampedDragHolder {
         var instance: DampedDragAnimation? = null
@@ -261,7 +267,10 @@ internal fun IosLiquidGlassNavigationBar(
                 globalTouchX in 0f..totalWidthPx
             },
             onDragStarted = {},
-            onClick = { onItemClickUpdated(currentIndex) },
+            onClick = {
+                animateIcon(currentIndex)
+                onItemClickUpdated(currentIndex)
+            },
             onLongClick = { onItemLongClick(currentIndex) },
             onDragStopped = {
                 val targetIndex = snapNavigationDragTarget(targetValue, tabsCount)
@@ -339,6 +348,7 @@ internal fun IosLiquidGlassNavigationBar(
                         indication = null,
                         role = Role.Tab,
                         onClick = {
+                            animateIcon(index)
                             if (currentIndex == index) {
                                 onItemClickUpdated(index)
                             } else {
@@ -362,7 +372,7 @@ internal fun IosLiquidGlassNavigationBar(
             ) {
                 BadgedBox(badge = { badge(index)?.invoke() }) {
                     if (iconContent != null) {
-                        iconContent(index, index == currentIndex)
+                        iconContent(index, index == currentIndex, iconAnimationTokens[index])
                     } else {
                         Icon(
                             modifier = Modifier.size(22.dp),

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+	xmlns:app="http://schemas.android.com/apk/res-auto"
 	xmlns:tools="http://schemas.android.com/tools"
 	android:id="@+id/tabbar_wrap"
 	android:layout_width="match_parent"
@@ -23,14 +24,14 @@
 			android:paddingHorizontal="4dp"
 			android:contentDescription="@string/home_timeline">
 
-			<ImageView
+			<org.joinmastodon.android.ui.views.ItshoverNavigationIconView
 				android:layout_width="28dp"
 				android:layout_height="28dp"
 				android:layout_gravity="center"
-				android:scaleType="center"
 				android:importantForAccessibility="no"
-				android:tint="@color/tab_bar_icon"
-				android:src="@drawable/ic_tab_home"/>
+				android:duplicateParentState="true"
+				app:iconType="home"
+				app:iconTint="@color/tab_bar_icon"/>
 		</FrameLayout>
 
 		<FrameLayout
@@ -41,14 +42,14 @@
 			android:paddingHorizontal="4dp"
 			android:contentDescription="@string/search_hint">
 
-			<ImageView
+			<org.joinmastodon.android.ui.views.ItshoverNavigationIconView
 				android:layout_width="28dp"
 				android:layout_height="28dp"
 				android:layout_gravity="center"
-				android:scaleType="center"
 				android:importantForAccessibility="no"
-				android:tint="@color/tab_bar_icon"
-				android:src="@drawable/ic_tab_search"/>
+				android:duplicateParentState="true"
+				app:iconType="magnifier"
+				app:iconTint="@color/tab_bar_icon"/>
 		</FrameLayout>
 
 		<FrameLayout
@@ -59,14 +60,14 @@
 			android:paddingHorizontal="4dp"
 			android:contentDescription="@string/diaper">
 
-			<ImageView
+			<org.joinmastodon.android.ui.views.ItshoverNavigationIconView
 				android:layout_width="28dp"
 				android:layout_height="28dp"
 				android:layout_gravity="center"
-				android:scaleType="center"
 				android:importantForAccessibility="no"
-				android:tint="@color/tab_bar_icon"
-				android:src="@drawable/ic_tab_rating"/>
+				android:duplicateParentState="true"
+				app:iconType="star"
+				app:iconTint="@color/tab_bar_icon"/>
 
 			<TextView
 				android:id="@+id/diaper_new_feature_badge"
@@ -95,14 +96,14 @@
 			android:paddingHorizontal="4dp"
 			android:contentDescription="@string/friend_request">
 
-			<ImageView
+			<org.joinmastodon.android.ui.views.ItshoverNavigationIconView
 				android:layout_width="28dp"
 				android:layout_height="28dp"
 				android:layout_gravity="center"
-				android:scaleType="center"
 				android:importantForAccessibility="no"
-				android:tint="@color/tab_bar_icon"
-				android:src="@drawable/ic_tab_dream"/>
+				android:duplicateParentState="true"
+				app:iconType="globe"
+				app:iconTint="@color/tab_bar_icon"/>
 		</FrameLayout>
 
 		<FrameLayout

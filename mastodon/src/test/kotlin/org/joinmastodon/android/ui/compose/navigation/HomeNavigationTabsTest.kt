@@ -5,6 +5,7 @@ import org.junit.Assert.assertArrayEquals
 import org.joinmastodon.android.R
 import org.joinmastodon.android.ui.compose.navigation.animation.stabilizeDragVelocity
 import org.junit.Test
+import java.io.File
 
 class HomeNavigationTabsTest {
 	@Test
@@ -48,5 +49,29 @@ class HomeNavigationTabsTest {
 		assertEquals(-4f, stabilizeDragVelocity(-8f, 8f), 0f)
 		assertEquals(2f, stabilizeDragVelocity(0f, 8f), 0f)
 		assertEquals(7.5f, stabilizeDragVelocity(8f, 6f), 0f)
+	}
+
+	@Test
+	fun bottomNavigationUsesItshoverIconsAndOnlyClicksTriggerMotion() {
+		val projectDir = File(requireNotNull(System.getProperty("user.dir")))
+		val layout = File(projectDir, "src/main/res/layout/tab_bar.xml").readText()
+		val tabBar = File(projectDir, "src/main/java/org/joinmastodon/android/ui/views/TabBar.java").readText()
+		val liquidView = File(projectDir, "src/main/kotlin/org/joinmastodon/android/ui/compose/navigation/HomeLiquidNavigationView.kt").readText()
+		val liquidBar = File(projectDir, "src/main/kotlin/org/joinmastodon/android/ui/compose/navigation/liquid/IosLiquidGlassNavigationBar.kt").readText()
+		val iconView = File(projectDir, "src/main/kotlin/org/joinmastodon/android/ui/views/ItshoverNavigationIconView.kt").readText()
+
+		assertEquals(4, Regex("ItshoverNavigationIconView").findAll(layout).count())
+		listOf("home", "magnifier", "star", "globe").forEach { assert(layout.contains("app:iconType=\"$it\"")) }
+		assert(layout.contains("@+id/tab_profile_ava"))
+		assert(tabBar.substringAfter("private void onChildClick").substringBefore("private boolean onChildLongClick").contains("playAnimation()"))
+		assert(!tabBar.substringAfter("public void selectTab").contains("playAnimation()"))
+		assertEquals(2, Regex("animateIcon\\(").findAll(liquidBar).count() - 1)
+		assert(!liquidBar.substringAfter("LaunchedEffect(selectedIndex)").substringBefore("val interactiveHighlight").contains("animateIcon("))
+		assert(liquidView.contains("ICON_HOME"))
+		assert(liquidView.contains("ICON_MAGNIFIER"))
+		assert(liquidView.contains("ICON_STAR"))
+		assert(liquidView.contains("ICON_GLOBE"))
+		assert(iconView.contains("private var progress = 1f"))
+		assert(iconView.contains("Original SVG paths and motion design"))
 	}
 }

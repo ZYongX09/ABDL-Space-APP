@@ -1,0 +1,9 @@
+itshover animated icons
+Copyright 2026 itshover
+https://github.com/itshover/itshover
+
+The home, magnifier, star and globe icon paths and motion designs used by
+ABDL Space are adapted for Android and modified from the itshover project.
+
+Licensed under the Apache License, Version 2.0. A full copy is included at
+licenses/Apache-2.0.txt.
