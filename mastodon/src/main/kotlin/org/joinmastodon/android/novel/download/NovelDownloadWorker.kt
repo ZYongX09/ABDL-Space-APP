@@ -127,9 +127,10 @@ class NovelDownloadWorker(
 			}
 			Result.success()
 		} catch (error: IOException) {
-			Log.w(LOG_TAG, "Download $stage retry: ${error.javaClass.simpleName}: ${safeFailureMessage(error)}")
-			updateDownloadState(accountId, bookId, "remote")
-			if (isStopped) Result.failure() else Result.retry()
+			val retry = !isStopped && isRetryable(error)
+			Log.w(LOG_TAG, "Download $stage ${if (retry) "retry" else "failed"}: ${error.javaClass.simpleName}: ${safeFailureMessage(error)}")
+			updateDownloadState(accountId, bookId, if (retry) "remote" else "failed")
+			if (retry) Result.retry() else Result.failure()
 		} catch (error: Exception) {
 			Log.w(LOG_TAG, "Download $stage failed: ${error.javaClass.simpleName}: ${safeFailureMessage(error)}")
 			updateDownloadState(accountId, bookId, "failed")
@@ -197,6 +198,20 @@ class NovelDownloadWorker(
 				) -> message
 				else -> "download_failed"
 			}
+		}
+
+		internal fun isRetryable(error: IOException): Boolean {
+			if (error is PrivateNovelApi.ApiException) return error.status >= 500 || error.status == 408 || error.status == 429
+			return error.message !in setOf(
+				"Invalid book metadata",
+				"Invalid download contract",
+				"Empty download body",
+				"Downloaded book failed integrity verification",
+				"Download exceeds expected size",
+				"Redirects are not allowed",
+				"Atomic file replacement is unavailable",
+			)
+				&& !error.message.orEmpty().matches(Regex("Download failed: HTTP (4\\d\\d|3\\d\\d)"))
 		}
 
 		@JvmStatic

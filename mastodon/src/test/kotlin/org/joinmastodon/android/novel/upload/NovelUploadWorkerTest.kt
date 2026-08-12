@@ -34,7 +34,9 @@ class NovelUploadWorkerTest {
 		assertTrue(source.contains("Log.w(LOG_TAG"))
 		assertTrue(source.contains("safeFailureMessage(error)"))
 		assertTrue(source.contains("importUploadedBook(accountId, file, remote)"))
-		assertTrue(source.indexOf("importUploadedBook(accountId, file, remote)") < source.indexOf("file.parentFile?.deleteRecursively()"))
+		val importIndex = source.indexOf("importUploadedBook(accountId, file, remote)")
+		assertTrue(importIndex < source.indexOf("file.parentFile?.deleteRecursively()", importIndex))
+		assertTrue(source.indexOf("isVerifiedTransferFile(file") < source.indexOf("transfer.phase == NovelTransferEntity.COMPLETE"))
 		assertFalse(source.contains("error.stackTraceToString()"))
 	}
 }

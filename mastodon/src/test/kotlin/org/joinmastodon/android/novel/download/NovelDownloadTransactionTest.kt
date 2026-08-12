@@ -11,6 +11,13 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class NovelDownloadTransactionTest {
+	@Test fun deterministicFailuresDoNotRetry() {
+		assertFalse(NovelDownloadWorker.isRetryable(IOException("Invalid book metadata")))
+		assertFalse(NovelDownloadWorker.isRetryable(IOException("Downloaded book failed integrity verification")))
+		assertFalse(NovelDownloadWorker.isRetryable(IOException("Download failed: HTTP 404")))
+		assertTrue(NovelDownloadWorker.isRetryable(IOException("Download failed: HTTP 503")))
+		assertTrue(NovelDownloadWorker.isRetryable(IOException("timeout")))
+	}
 	@Test
 	fun downloadWorkerReportsSafeFailureStages() {
 		val source = File("src/main/kotlin/org/joinmastodon/android/novel/download/NovelDownloadWorker.kt").readText()

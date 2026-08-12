@@ -33,6 +33,8 @@ class NovelHomeUiContractTest {
 		assertTrue(activity.contains("Intent.ACTION_VIEW"))
 		assertTrue(activity.contains("Intent.ACTION_SEND"))
 		assertTrue(activity.contains("if (externalDocument != null) AccountSessionManager.getInstance().lastActiveAccountID"))
+		assertTrue(activity.contains("if (savedInstanceState == null) externalDocument(intent) else null"))
+		assertTrue(screen.contains("mutableIntStateOf(if (externalDocument == null) 0 else 1)"))
 	}
 
 	@Test

@@ -22,7 +22,7 @@ class NovelActivity : ComponentActivity(), NavigationEventDispatcherOwner {
 	override val navigationEventDispatcher = NavigationEventDispatcher { finish() }
 
 	override fun onCreate(savedInstanceState: Bundle?) {
-		val externalDocument = externalDocument(intent)
+		val externalDocument = if (savedInstanceState == null) externalDocument(intent) else null
 		val accountID = if (externalDocument != null) AccountSessionManager.getInstance().lastActiveAccountID else intent.getStringExtra(EXTRA_ACCOUNT_ID)
 		val session = accountID?.let {
 			runCatching { AccountSessionManager.getInstance().getAccount(it) }.getOrNull()

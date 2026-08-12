@@ -42,6 +42,19 @@ class NovelUploadWorker(appContext: Context, params: WorkerParameters) : Corouti
 			if (transfer.accountId != accountId || transfer.direction != NovelTransferEntity.UPLOAD) return@withContext Result.failure()
 			if (!NovelAccountDataCleaner.isSessionValid(accountId, session, generation)) return@withContext Result.failure()
 			val file = File(transfer.localTempPath)
+			if (transfer.phase == NovelTransferEntity.PREPARED && transfer.size <= 0 && file.isFile) {
+				transfer = transfer.copy(
+					contentHash = org.joinmastodon.android.api.novels.PrivateBookUpload.sha256(file),
+					contentMd5 = org.joinmastodon.android.api.novels.PrivateBookUpload.md5Base64(file),
+					size = file.length(), updatedAt = System.currentTimeMillis(),
+				)
+				database.transferDao().upsert(transfer)
+			}
+			if (!NovelImportCoordinator.isVerifiedTransferFile(file, transfer.size, transfer.contentHash, transfer.contentMd5.orEmpty())) {
+				database.transferDao().upsert(transfer.copy(phase = NovelTransferEntity.FAILED, claimOwner = null, claimExpiresAt = null, updatedAt = System.currentTimeMillis()))
+				file.parentFile?.deleteRecursively()
+				return@withContext Result.failure()
+			}
 			if (transfer.phase == NovelTransferEntity.COMPLETE) {
 				val remoteId = transfer.remoteBookId ?: return@withContext Result.failure()
 				val remote = org.joinmastodon.android.api.novels.PrivateNovelApi.BookDto().apply {
@@ -57,19 +70,6 @@ class NovelUploadWorker(appContext: Context, params: WorkerParameters) : Corouti
 				database.transferDao().delete(transferId)
 				file.parentFile?.deleteRecursively()
 				return@withContext Result.success()
-			}
-			if (transfer.phase == NovelTransferEntity.PREPARED && transfer.size <= 0 && file.isFile) {
-				transfer = transfer.copy(
-					contentHash = org.joinmastodon.android.api.novels.PrivateBookUpload.sha256(file),
-					contentMd5 = org.joinmastodon.android.api.novels.PrivateBookUpload.md5Base64(file),
-					size = file.length(), updatedAt = System.currentTimeMillis(),
-				)
-				database.transferDao().upsert(transfer)
-			}
-			if (!NovelImportCoordinator.isVerifiedTransferFile(file, transfer.size, transfer.contentHash, transfer.contentMd5.orEmpty())) {
-				database.transferDao().upsert(transfer.copy(phase = NovelTransferEntity.FAILED, claimOwner = null, claimExpiresAt = null, updatedAt = System.currentTimeMillis()))
-				file.parentFile?.deleteRecursively()
-				return@withContext Result.failure()
 			}
 			coroutineScope {
 				val renewal = launch {

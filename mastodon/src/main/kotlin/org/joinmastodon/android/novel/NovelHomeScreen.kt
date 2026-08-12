@@ -63,7 +63,7 @@ fun NovelHomeScreen(accountId: String, libraryViewModel: NovelLibraryViewModel, 
 		R.string.novel_bookshelf to R.string.novel_bookshelf_empty,
 		R.string.novel_creation to R.string.novel_creation_empty,
 	)
-	var selectedTab by remember { mutableIntStateOf(0) }
+	var selectedTab by remember { mutableIntStateOf(if (externalDocument == null) 0 else 1) }
 
 	Scaffold(
 		containerColor = MiuixTheme.colorScheme.background,
