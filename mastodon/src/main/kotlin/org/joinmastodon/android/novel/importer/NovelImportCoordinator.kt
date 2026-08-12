@@ -186,7 +186,6 @@ class NovelImportCoordinator(
 			if (!NovelAccountDataCleaner.isGenerationValid(accountId, generation)) error("账号已退出")
 			transfer = transfer.copy(phase = NovelTransferEntity.COMPLETE, updatedAt = System.currentTimeMillis())
 			database.transferDao().updatePhase(transferId, NovelTransferEntity.COMPLETE, transfer.updatedAt)
-			if (file.parentFile?.deleteRecursively() != false) database.transferDao().delete(transferId)
 			result
 		} finally {
 			database.close()
@@ -233,6 +232,26 @@ class NovelImportCoordinator(
 			}
 		} finally {
 			lease.close()
+		}
+	}
+
+	suspend fun importUploadedBook(accountId: String, source: File, remote: PrivateNovelApi.BookDto) = withContext(Dispatchers.IO) {
+		val directory = File(context.filesDir, "novels/${accountHash(accountId)}").apply { mkdirs() }
+		val destination = File(directory, "${remote.id}.${remote.format.lowercase()}")
+		val candidate = File(directory, "${destination.name}.candidate")
+		Files.copy(source.toPath(), candidate.toPath(), StandardCopyOption.REPLACE_EXISTING)
+		org.joinmastodon.android.novel.download.NovelDownloadWorker.commitCandidate(destination, candidate) {
+			importPrivateBook(accountId, destination, remote, officialPath = destination.absolutePath)
+		}
+	}
+
+	suspend fun importPastedText(accountId: String, text: String, remote: PrivateNovelApi.BookDto) = withContext(Dispatchers.IO) {
+		val directory = File(context.filesDir, "novels/${accountHash(accountId)}").apply { mkdirs() }
+		val destination = File(directory, "${remote.id}.txt")
+		val candidate = File(directory, "${destination.name}.candidate")
+		candidate.writeText(text.replace("\r\n", "\n").replace('\r', '\n'))
+		org.joinmastodon.android.novel.download.NovelDownloadWorker.commitCandidate(destination, candidate) {
+			importPrivateBook(accountId, destination, remote, officialPath = destination.absolutePath)
 		}
 	}
 

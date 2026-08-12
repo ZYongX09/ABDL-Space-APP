@@ -75,7 +75,7 @@ class NovelLibraryViewModel(application: Application, val accountId: String) : A
 			guard()
 			val remote = runInterruptible { client.executeJson(client.newPasteCall(PrivateNovelApi.PasteRequest(title, author, text)), PrivateNovelApi.BookDto::class.java) }
 			guard()
-			database.novelBookDao().upsert(NovelBookEntity(UUID.randomUUID().toString(), accountId, remote.title.orEmpty(), remote.author, remoteId = remote.id, sourceType = "private", contentHash = remote.contentHash, downloadState = "remote", remoteUpdatedAt = remote.updatedAt, updatedAt = remote.updatedAt))
+			coordinator.importPastedText(accountId, text, remote)
 			guard()
 		} catch (error: Exception) { mutableState.update { it.copy(error = error.message) } }
 	}
@@ -85,7 +85,14 @@ class NovelLibraryViewModel(application: Application, val accountId: String) : A
 			.onFailure { error -> mutableState.update { it.copy(error = error.message) } }
 	}
 
-	fun download(book: NovelBookEntity) { book.remoteId?.let { NovelDownloadWorker.enqueue(getApplication(), accountId, it) } }
+	fun download(book: NovelBookEntity) {
+		book.remoteId?.let { remoteId ->
+			viewModelScope.launch(Dispatchers.IO) {
+				database.novelBookDao().updatePrivateDownloadState(accountId, remoteId, "downloading", System.currentTimeMillis())
+				NovelDownloadWorker.enqueue(getApplication(), accountId, remoteId)
+			}
+		}
+	}
 
 	fun openReader(book: NovelBookEntity) = viewModelScope.launch(Dispatchers.IO) {
 		val chapters = database.novelChapterDao().getByBookId(book.id)

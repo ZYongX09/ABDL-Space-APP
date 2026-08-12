@@ -43,7 +43,19 @@ class NovelUploadWorker(appContext: Context, params: WorkerParameters) : Corouti
 			if (!NovelAccountDataCleaner.isSessionValid(accountId, session, generation)) return@withContext Result.failure()
 			val file = File(transfer.localTempPath)
 			if (transfer.phase == NovelTransferEntity.COMPLETE) {
-				if (file.parentFile?.deleteRecursively() != false) database.transferDao().delete(transferId)
+				val remoteId = transfer.remoteBookId ?: return@withContext Result.failure()
+				val remote = org.joinmastodon.android.api.novels.PrivateNovelApi.BookDto().apply {
+					id = remoteId
+					title = transfer.title
+					author = transfer.author
+					format = transfer.format
+					contentHash = transfer.contentHash
+					verifiedSize = transfer.size
+					parseStatus = "ready"
+				}
+				NovelImportCoordinator(applicationContext).importUploadedBook(accountId, file, remote)
+				database.transferDao().delete(transferId)
+				file.parentFile?.deleteRecursively()
 				return@withContext Result.success()
 			}
 			if (transfer.phase == NovelTransferEntity.PREPARED && transfer.size <= 0 && file.isFile) {
@@ -67,7 +79,10 @@ class NovelUploadWorker(appContext: Context, params: WorkerParameters) : Corouti
 					}
 				}
 				try {
-					NovelImportCoordinator(applicationContext).resumeUpload(accountId, transfer.transferId) {}
+					val remote = NovelImportCoordinator(applicationContext).resumeUpload(accountId, transfer.transferId) {}
+					NovelImportCoordinator(applicationContext).importUploadedBook(accountId, file, remote)
+					database.transferDao().delete(transferId)
+					file.parentFile?.deleteRecursively()
 				} finally {
 					renewal.cancelAndJoin()
 				}

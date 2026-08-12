@@ -1,6 +1,8 @@
 package org.joinmastodon.android.novel
 
 import android.graphics.Color
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -20,7 +22,8 @@ class NovelActivity : ComponentActivity(), NavigationEventDispatcherOwner {
 	override val navigationEventDispatcher = NavigationEventDispatcher { finish() }
 
 	override fun onCreate(savedInstanceState: Bundle?) {
-		val accountID = intent.getStringExtra(EXTRA_ACCOUNT_ID)
+		val externalDocument = externalDocument(intent)
+		val accountID = if (externalDocument != null) AccountSessionManager.getInstance().lastActiveAccountID else intent.getStringExtra(EXTRA_ACCOUNT_ID)
 		val session = accountID?.let {
 			runCatching { AccountSessionManager.getInstance().getAccount(it) }.getOrNull()
 		}
@@ -45,10 +48,16 @@ class NovelActivity : ComponentActivity(), NavigationEventDispatcherOwner {
 		setContent {
 			CompositionLocalProvider(LocalNavigationEventDispatcherOwner provides this) {
 				MiuixAppTheme {
-					NovelHomeScreen(accountId = accountID, libraryViewModel = libraryViewModel, onBack = ::finish)
+					NovelHomeScreen(accountId = accountID, libraryViewModel = libraryViewModel, externalDocument = externalDocument, onBack = ::finish)
 				}
 			}
 		}
+	}
+
+	private fun externalDocument(intent: Intent): Uri? = when (intent.action) {
+		Intent.ACTION_VIEW -> intent.data
+		Intent.ACTION_SEND -> intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
+		else -> null
 	}
 
 	companion object {

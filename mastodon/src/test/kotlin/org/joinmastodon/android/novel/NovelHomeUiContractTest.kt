@@ -24,12 +24,15 @@ class NovelHomeUiContractTest {
 		assertTrue(screen.contains("fun NovelHomeScreen(accountId: String, libraryViewModel: NovelLibraryViewModel"))
 		assertTrue(screen.contains("NovelLibraryScreen"))
 		assertTrue(activity.contains("NovelHomeScreen(accountId = accountID"))
-		assertTrue(library.contains("上传 TXT"))
-		assertTrue(library.contains("上传 EPUB"))
-		assertTrue(library.contains("粘贴文本"))
+		assertTrue(library.contains("添加到书架"))
+		assertTrue(library.contains("若系统选择器无法返回文件"))
+		assertTrue(library.contains("已保存到本机"))
 		assertTrue(library.contains("onDownload"))
 		assertTrue(library.contains("onDelete"))
 		assertTrue(library.contains("top.yukonga.miuix.kmp.basic.Card"))
+		assertTrue(activity.contains("Intent.ACTION_VIEW"))
+		assertTrue(activity.contains("Intent.ACTION_SEND"))
+		assertTrue(activity.contains("if (externalDocument != null) AccountSessionManager.getInstance().lastActiveAccountID"))
 	}
 
 	@Test

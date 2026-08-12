@@ -11,7 +11,6 @@ import androidx.work.WorkerParameters
 import androidx.room.withTransaction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.job
-import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import org.joinmastodon.android.api.novels.PrivateBookUpload
@@ -56,6 +55,7 @@ class NovelDownloadWorker(
 		var stage = "validate"
 		try {
 			if (!SAFE_BOOK_ID.matches(bookId)) return@withContext Result.failure()
+			updateDownloadState(accountId, bookId, "downloading")
 			stage = "recover"
 			val recoveryDatabase = NovelDatabase.open(applicationContext, accountId)
 			try {
@@ -104,9 +104,7 @@ class NovelDownloadWorker(
 					size = book.verifiedSize,
 				))
 					stage = "download"
-					runInterruptible {
 					downloadVerified(api.callFactory, authorization.downloadUrl, candidate, book.verifiedSize, book.contentHash, false) { call -> registerCall(call) }
-				}
 			} catch (error: Throwable) {
 				candidate.delete()
 				throw error
@@ -130,13 +128,24 @@ class NovelDownloadWorker(
 			Result.success()
 		} catch (error: IOException) {
 			Log.w(LOG_TAG, "Download $stage retry: ${error.javaClass.simpleName}: ${safeFailureMessage(error)}")
+			updateDownloadState(accountId, bookId, "remote")
 			if (isStopped) Result.failure() else Result.retry()
 		} catch (error: Exception) {
 			Log.w(LOG_TAG, "Download $stage failed: ${error.javaClass.simpleName}: ${safeFailureMessage(error)}")
+			updateDownloadState(accountId, bookId, "failed")
 			Result.failure()
 		} finally {
 			currentCall.set(null)
 			lease.close()
+		}
+	}
+
+	private suspend fun updateDownloadState(accountId: String, bookId: String, state: String) {
+		val database = NovelDatabase.open(applicationContext, accountId)
+		try {
+			database.novelBookDao().updatePrivateDownloadState(accountId, bookId, state, System.currentTimeMillis())
+		} finally {
+			database.close()
 		}
 	}
 
@@ -146,7 +155,7 @@ class NovelDownloadWorker(
 			if (cause is kotlinx.coroutines.CancellationException) call.cancel()
 		}
 		return try {
-			runInterruptible { api.executeJson(call, type) }
+			api.executeJson(call, type)
 		} finally {
 			cancellation.dispose()
 			currentCall.compareAndSet(call, null)

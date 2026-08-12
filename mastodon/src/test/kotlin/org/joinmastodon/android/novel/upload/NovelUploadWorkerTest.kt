@@ -33,6 +33,8 @@ class NovelUploadWorkerTest {
 		assertTrue(source.contains("renewClaim("))
 		assertTrue(source.contains("Log.w(LOG_TAG"))
 		assertTrue(source.contains("safeFailureMessage(error)"))
+		assertTrue(source.contains("importUploadedBook(accountId, file, remote)"))
+		assertTrue(source.indexOf("importUploadedBook(accountId, file, remote)") < source.indexOf("file.parentFile?.deleteRecursively()"))
 		assertFalse(source.contains("error.stackTraceToString()"))
 	}
 }

@@ -26,6 +26,9 @@ interface NovelBookDao {
 	@Query("DELETE FROM novel_books WHERE accountId = :accountId AND id = :id")
 	suspend fun deleteById(accountId: String, id: String)
 
+	@Query("UPDATE novel_books SET downloadState = :state, updatedAt = :updatedAt WHERE accountId = :accountId AND sourceType = 'private' AND remoteId = :remoteId AND deletedAt IS NULL")
+	suspend fun updatePrivateDownloadState(accountId: String, remoteId: String, state: String, updatedAt: Long)
+
 	@Query("SELECT COUNT(*) FROM novel_books WHERE accountId = :accountId")
 	suspend fun count(accountId: String): Int
 

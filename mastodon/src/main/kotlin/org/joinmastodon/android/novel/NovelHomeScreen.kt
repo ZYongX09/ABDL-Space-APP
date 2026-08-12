@@ -26,6 +26,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.net.Uri
 import org.joinmastodon.android.R
 import org.joinmastodon.android.ui.compose.component.BackNavigationIcon
 import org.joinmastodon.reader.domain.ReaderPosition
@@ -40,7 +41,7 @@ import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
-fun NovelHomeScreen(accountId: String, libraryViewModel: NovelLibraryViewModel, onBack: () -> Unit) {
+fun NovelHomeScreen(accountId: String, libraryViewModel: NovelLibraryViewModel, externalDocument: Uri? = null, onBack: () -> Unit) {
 	val libraryState by libraryViewModel.state.collectAsState()
 	var pendingNote by remember { mutableStateOf<Triple<String, String, ReaderPosition>?>(null) }
 	libraryState.reader?.let { reader ->
@@ -85,7 +86,7 @@ fun NovelHomeScreen(accountId: String, libraryViewModel: NovelLibraryViewModel, 
 			contentAlignment = Alignment.Center,
 		) {
 			if (selectedTab == 1) {
-				NovelLibraryScreen(libraryState, libraryViewModel::refresh, libraryViewModel::upload, libraryViewModel::paste, libraryViewModel::delete, libraryViewModel::download, libraryViewModel::openReader, libraryViewModel::reportError, libraryViewModel::dismissError)
+				NovelLibraryScreen(libraryState, externalDocument, libraryViewModel::refresh, libraryViewModel::upload, libraryViewModel::paste, libraryViewModel::delete, libraryViewModel::download, libraryViewModel::openReader, libraryViewModel::reportError, libraryViewModel::dismissError)
 				return@Box
 			}
 			Column(
