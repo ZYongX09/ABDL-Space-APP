@@ -64,6 +64,21 @@ class NovelDatabaseTest {
 	}
 
 	@Test
+	fun readsVeryLargeChapterWithoutCursorWindowOverflow() = runBlocking {
+		val accountId = "mastodon.example_large-reader"
+		val database = open(accountId)
+		val book = NovelBookEntity("large-book", accountId, "长篇小说")
+		val content = "长篇正文。".repeat(500_000)
+		database.novelBookDao().upsert(book)
+		database.novelChapterDao().upsert(listOf(NovelChapterEntity("large-chapter", book.id, "全部内容", content, 0)))
+
+		val chapter = database.novelChapterDao().getReaderChapters(book.id).single()
+
+		assertEquals(content.length, chapter.content.length)
+		assertEquals(content, chapter.content)
+	}
+
+	@Test
 	fun databaseNameUsesAccountHashWithoutLeakingAccountId() {
 		val accountId = "social.example_123456789"
 		val expectedHash = MessageDigest.getInstance("SHA-256")
@@ -341,6 +356,35 @@ class NovelDatabaseTest {
 		assertTrue(database.novelChapterDao().getById("a")?.deletedAt != null)
 		assertTrue(database.novelChapterDao().getById("a-duplicate")?.deletedAt != null)
 		assertTrue(database.novelChapterDao().getById("b")?.deletedAt != null)
+	}
+
+	@Test
+	fun readerChaptersLoadOversizedContentInBoundedQueries() = runBlocking {
+		val accountId = "large-reader.example_1"
+		val database = open(accountId)
+		val book = NovelBookEntity("large-book", accountId, "Large book")
+		val content = buildString(3_000_000) {
+			repeat(300_000) { append("长正文段落。") }
+		}
+		database.novelBookDao().upsert(book)
+		database.novelChapterDao().upsert(listOf(NovelChapterEntity("large-chapter", book.id, "全部内容", content, 0)))
+
+		val chapter = database.novelChapterDao().getReaderChapters(book.id).single()
+
+		assertEquals("large-chapter", chapter.id)
+		assertEquals(content, chapter.content)
+	}
+
+	@Test
+	fun readerChapterChunksPreserveEmojiAndSupplementaryCharacters() = runBlocking {
+		val accountId = "unicode-reader.example_1"
+		val database = open(accountId)
+		val book = NovelBookEntity("unicode-book", accountId, "Unicode book")
+		val content = "宝宝😀𠮷野家📚".repeat(80_000)
+		database.novelBookDao().upsert(book)
+		database.novelChapterDao().upsert(listOf(NovelChapterEntity("unicode-chapter", book.id, "正文", content, 0)))
+
+		assertEquals(content, database.novelChapterDao().getReaderChapters(book.id).single().content)
 	}
 
 	private fun createVersionOneDatabase(accountId: String) {

@@ -44,6 +44,29 @@ interface NovelChapterDao {
 	@Upsert
 	suspend fun upsert(chapters: List<NovelChapterEntity>)
 
+	@Query("SELECT id, bookId, title, chapterIndex, deletedAt, length(content) AS contentLength FROM novel_chapters WHERE bookId = :bookId AND deletedAt IS NULL ORDER BY chapterIndex")
+	suspend fun getHeadersByBookId(bookId: String): List<NovelChapterHeader>
+
+	@Query("SELECT substr(content, :start, :length) FROM novel_chapters WHERE id = :id")
+	suspend fun getContentChunk(id: String, start: Int, length: Int): String?
+
+	@Query("SELECT COUNT(*) FROM novel_chapters WHERE bookId = :bookId AND deletedAt IS NULL")
+	suspend fun countByBookId(bookId: String): Int
+
+	@Transaction
+	suspend fun getReaderChapters(bookId: String): List<NovelChapterEntity> = getHeadersByBookId(bookId).map { header ->
+		val content = buildString(header.contentLength) {
+			var start = 1
+			while (true) {
+				val chunk = getContentChunk(header.id, start, CHAPTER_CURSOR_CHUNK_SIZE).orEmpty()
+				if (chunk.isEmpty()) break
+				append(chunk)
+				start += CHAPTER_CURSOR_CHUNK_SIZE
+			}
+		}
+		NovelChapterEntity(header.id, header.bookId, header.title, content, header.chapterIndex, header.deletedAt)
+	}
+
 	@Query("SELECT * FROM novel_chapters WHERE bookId = :bookId AND deletedAt IS NULL ORDER BY chapterIndex")
 	suspend fun getByBookId(bookId: String): List<NovelChapterEntity>
 
@@ -52,6 +75,10 @@ interface NovelChapterDao {
 
 	@Query("DELETE FROM novel_chapters WHERE bookId = :bookId")
 	suspend fun deleteByBookId(bookId: String)
+
+	companion object {
+		const val CHAPTER_CURSOR_CHUNK_SIZE = 128_000
+	}
 }
 
 @Dao

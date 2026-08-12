@@ -6,6 +6,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import java.util.UUID
 import java.nio.charset.StandardCharsets
+import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -30,10 +31,13 @@ import org.joinmastodon.reader.domain.ReaderPosition
 
 data class NovelLibraryState(
 	val books: List<NovelBookEntity> = emptyList(),
+	val bookDetails: Map<String, NovelBookDetails> = emptyMap(),
 	val refreshing: Boolean = false,
 	val error: String? = null,
 	val reader: NovelReaderState? = null,
 )
+
+data class NovelBookDetails(val chapterCount: Int, val localBytes: Long?)
 
 data class NovelReaderState(val book: ReaderBook, val chapters: List<ReaderChapter>)
 
@@ -51,7 +55,13 @@ class NovelLibraryViewModel(application: Application, val accountId: String) : A
 	init {
 		viewModelScope.launch {
 			database.novelBookDao().observeActive(accountId).catch { mutableState.update { state -> state.copy(error = it.message) } }
-				.collect { books -> mutableState.update { it.copy(books = books) } }
+				.collect { books ->
+					val details = books.associate { book ->
+						val localFile = book.localFilePath?.let(::File)?.takeIf(File::isFile)
+						book.id to NovelBookDetails(database.novelChapterDao().countByBookId(book.id), localFile?.length())
+					}
+					mutableState.update { it.copy(books = books, bookDetails = details) }
+				}
 		}
 		NovelSyncWorker.enqueue(application, accountId)
 	}
@@ -95,16 +105,20 @@ class NovelLibraryViewModel(application: Application, val accountId: String) : A
 	}
 
 	fun openReader(book: NovelBookEntity) = viewModelScope.launch(Dispatchers.IO) {
-		val chapters = database.novelChapterDao().getByBookId(book.id)
-		if (chapters.isEmpty()) {
-			mutableState.update { it.copy(error = "请先下载小说") }
-			return@launch
+		try {
+			val chapters = database.novelChapterDao().getReaderChapters(book.id)
+			if (chapters.isEmpty()) {
+				mutableState.update { it.copy(error = "这本小说尚未保存到本机") }
+				return@launch
+			}
+			val format = if (book.localFilePath?.endsWith(".epub", true) == true) BookFormat.EPUB else BookFormat.TXT
+			mutableState.update { state -> state.copy(reader = NovelReaderState(
+				ReaderBook(book.id, book.title, book.author, format),
+				chapters.map { ReaderChapter(it.id, it.bookId, it.chapterIndex, it.title, it.content, it.id) },
+			)) }
+		} catch (error: Exception) {
+			mutableState.update { it.copy(error = error.message ?: "无法打开这本小说") }
 		}
-		val format = if (book.localFilePath?.endsWith(".epub", true) == true) BookFormat.EPUB else BookFormat.TXT
-		mutableState.update { state -> state.copy(reader = NovelReaderState(
-			ReaderBook(book.id, book.title, book.author, format),
-			chapters.map { ReaderChapter(it.id, it.bookId, it.chapterIndex, it.title, it.content, it.id) },
-		)) }
 	}
 
 	fun closeReader() { mutableState.update { it.copy(reader = null) } }

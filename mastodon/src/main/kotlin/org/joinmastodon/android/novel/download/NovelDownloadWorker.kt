@@ -49,7 +49,7 @@ class NovelDownloadWorker(
 		val accessToken = session.token.accessToken
 		val sessionGuard = AccountSessionGuard {
 			val current = AccountSessionManager.getInstance().tryGetAccount(accountId)
-			current === session && current.token.accessToken == accessToken && NovelAccountDataCleaner.isGenerationValid(accountId, generation)
+			current?.token?.accessToken == accessToken && NovelAccountDataCleaner.isGenerationValid(accountId, generation)
 		}
 		val api = PrivateNovelApi(session)
 		var stage = "validate"
@@ -74,9 +74,13 @@ class NovelDownloadWorker(
 				recoveryDatabase.close()
 			}
 			sessionGuard.requireValid()
-			stage = "book"
-			val book = execute(api, api.newBookCall(bookId), PrivateNovelApi.BookDto::class.java)
+			stage = "book_call"
+			val bookCall = api.newBookCall(bookId)
+			stage = "book_json"
+			val book = execute(api, bookCall, PrivateNovelApi.BookDto::class.java)
+			stage = "book_metadata"
 			if (book.id != bookId || book.format !in SUPPORTED_FORMATS || book.verifiedSize <= 0 || book.verifiedSize > PrivateBookUpload.MAX_SIZE || !SHA_256.matches(book.contentHash.orEmpty())) throw IOException("Invalid book metadata")
+			stage = "book_session"
 			sessionGuard.requireValid()
 			stage = "authorize"
 			val authorization = execute(api, api.newDownloadAuthorizeCall(bookId), PrivateNovelApi.DownloadAuthorization::class.java)

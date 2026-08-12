@@ -94,18 +94,17 @@ fun NovelHomeScreen(accountId: String, libraryViewModel: NovelLibraryViewModel, 
 				horizontalAlignment = Alignment.CenterHorizontally,
 				verticalArrangement = Arrangement.Center,
 			) {
-				Image(
-					painter = painterResource(R.drawable.ic_fluent_book_48_regular),
-					contentDescription = null,
-					modifier = Modifier.size(64.dp),
-					colorFilter = ColorFilter.tint(MiuixTheme.colorScheme.onSurfaceVariantSummary),
-				)
-				Spacer(Modifier.height(20.dp))
 				Text(
-					text = stringResource(tabs[selectedTab].second),
+					text = if (selectedTab == 0) "公开书城将在创作功能完成后开放" else "作者功能正在建设",
 					color = MiuixTheme.colorScheme.onSurface,
-					fontSize = 18.sp,
-					fontWeight = FontWeight.Medium,
+					fontSize = 20.sp,
+					fontWeight = FontWeight.SemiBold,
+				)
+				Spacer(Modifier.height(10.dp))
+				Text(
+					text = if (selectedTab == 0) "当前先确保私人书库、离线阅读和云同步稳定。" else "注册满 72 小时且至少发布过 1 条未删除帖子即可成为作者。后续将提供作品、分卷、章节、云草稿、MiMo 审核、评级、发布与申诉。",
+					color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+					fontSize = 15.sp,
 				)
 			}
 		}

@@ -77,6 +77,36 @@ class BookParserTest {
 		assertNotEquals(first.book.title, second.book.title)
 	}
 
+	@Test
+	fun longTxtWithoutHeadingsIsSplitIntoBoundedReaderChapters() {
+		val paragraph = "这是一段没有章节标题的长正文。".repeat(1_000)
+		val fixture = temporaryFolder.newFile("long-plain.txt").apply {
+			writeText(List(30) { paragraph }.joinToString("\n\n"), Charsets.UTF_8)
+		}
+
+		val parsed = parser.parse(fixture)
+
+		assertTrue(parsed.chapters.size > 1)
+		assertTrue(parsed.chapters.all { it.content.length <= BookParser.MAX_CHAPTER_CHARACTERS })
+		assertEquals(
+			fixture.readText().replace("\r\n", "\n").replace('\r', '\n').trim(),
+			parsed.chapters.joinToString("\n\n") { it.content }.trim(),
+		)
+	}
+
+	@Test
+	fun longTxtWithoutHeadingsIsSplitIntoCursorSafeReadingSections() {
+		val paragraph = "这是一段用于验证长篇小说导入的正文。".repeat(5000)
+		val content = List(8) { paragraph }.joinToString("\n\n")
+		val fixture = temporaryFolder.newFile("long-novel.txt").apply { writeText(content, Charsets.UTF_8) }
+
+		val parsed = parser.parse(fixture)
+
+		assertTrue(parsed.chapters.size > 1)
+		assertEquals(content.filterNot(Char::isWhitespace), parsed.chapters.joinToString("") { it.content }.filterNot(Char::isWhitespace))
+		assertTrue(parsed.chapters.all { it.content.length <= 240_000 })
+	}
+
 	private fun createEpubFixture(name: String): File = temporaryFolder.newFile(name).also { file ->
 		ZipOutputStream(file.outputStream()).use { zip ->
 			val mimetype = "application/epub+zip".toByteArray()

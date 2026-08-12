@@ -18,6 +18,12 @@ class NovelDownloadTransactionTest {
 		assertTrue(NovelDownloadWorker.isRetryable(IOException("Download failed: HTTP 503")))
 		assertTrue(NovelDownloadWorker.isRetryable(IOException("timeout")))
 	}
+
+	@Test fun sessionGuardUsesStableTokenInsteadOfSessionObjectIdentity() {
+		val source = File("src/main/kotlin/org/joinmastodon/android/novel/download/NovelDownloadWorker.kt").readText()
+		assertFalse(source.contains("current === session"))
+		assertTrue(source.contains("current?.token?.accessToken == accessToken"))
+	}
 	@Test
 	fun downloadWorkerReportsSafeFailureStages() {
 		val source = File("src/main/kotlin/org/joinmastodon/android/novel/download/NovelDownloadWorker.kt").readText()

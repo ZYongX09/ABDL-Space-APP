@@ -19,6 +19,7 @@ data class NovelBookEntity(
 	val title: String,
 	val author: String? = null,
 	val sourceUri: String? = null,
+	@Deprecated("小说产品不使用封面；仅保留此列用于现有 Room schema 兼容")
 	val coverUri: String? = null,
 	val remoteId: String? = null,
 	val sourceType: String = "local",
@@ -49,6 +50,15 @@ data class NovelChapterEntity(
 	val content: String,
 	val chapterIndex: Int,
 	val deletedAt: Long? = null,
+)
+
+data class NovelChapterHeader(
+	val id: String,
+	val bookId: String,
+	val title: String,
+	val chapterIndex: Int,
+	val deletedAt: Long?,
+	val contentLength: Int,
 )
 
 @Entity(

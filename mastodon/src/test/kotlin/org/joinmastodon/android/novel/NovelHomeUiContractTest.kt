@@ -24,9 +24,9 @@ class NovelHomeUiContractTest {
 		assertTrue(screen.contains("fun NovelHomeScreen(accountId: String, libraryViewModel: NovelLibraryViewModel"))
 		assertTrue(screen.contains("NovelLibraryScreen"))
 		assertTrue(activity.contains("NovelHomeScreen(accountId = accountID"))
-		assertTrue(library.contains("添加到书架"))
-		assertTrue(library.contains("若系统选择器无法返回文件"))
-		assertTrue(library.contains("已保存到本机"))
+		assertTrue(library.contains("导入小说"))
+		assertTrue(library.contains("若系统文件选择器无法返回"))
+		assertTrue(library.contains("可离线阅读"))
 		assertTrue(library.contains("onDownload"))
 		assertTrue(library.contains("onDelete"))
 		assertTrue(library.contains("top.yukonga.miuix.kmp.basic.Card"))
@@ -35,6 +35,17 @@ class NovelHomeUiContractTest {
 		assertTrue(activity.contains("if (externalDocument != null) AccountSessionManager.getInstance().lastActiveAccountID"))
 		assertTrue(activity.contains("if (savedInstanceState == null) externalDocument(intent) else null"))
 		assertTrue(screen.contains("mutableIntStateOf(if (externalDocument == null) 0 else 1)"))
+	}
+
+	@Test fun novelLibraryIsTextFirstAndHasNoCoverSystem() {
+		assertFalse(library.contains("coverUri"))
+		assertFalse(library.contains("封面"))
+		assertFalse(library.contains("RoundedCornerShape(18.dp)"))
+		assertTrue(library.contains("章节"))
+		assertTrue(library.contains("下载到本机"))
+		assertTrue(screen.contains("作者功能正在建设"))
+		assertTrue(screen.contains("注册满 72 小时"))
+		assertTrue(library.contains("else if (!downloading) onDownload(book)"))
 	}
 
 	@Test

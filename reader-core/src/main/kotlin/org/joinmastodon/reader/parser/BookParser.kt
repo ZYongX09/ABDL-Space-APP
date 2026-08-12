@@ -99,6 +99,24 @@ class BookParser {
 		}
 		flush()
 		return chapters.ifEmpty { listOf(ChapterDraft("全部内容", text)) }
+			.flatMap(::splitOversizedChapter)
+	}
+
+	private fun splitOversizedChapter(chapter: ChapterDraft): List<ChapterDraft> {
+		if (chapter.content.length <= MAX_CHAPTER_CHARACTERS) return listOf(chapter)
+		val sections = mutableListOf<ChapterDraft>()
+		var remaining = chapter.content
+		var part = 1
+		while (remaining.length > MAX_CHAPTER_CHARACTERS) {
+			val split = remaining.lastIndexOf("\n\n", MAX_CHAPTER_CHARACTERS).takeIf { it >= MAX_CHAPTER_CHARACTERS / 2 }
+				?: remaining.lastIndexOf('\n', MAX_CHAPTER_CHARACTERS).takeIf { it >= MAX_CHAPTER_CHARACTERS / 2 }
+				?: remaining.lastIndexOf(' ', MAX_CHAPTER_CHARACTERS).takeIf { it >= MAX_CHAPTER_CHARACTERS / 2 }
+				?: MAX_CHAPTER_CHARACTERS
+			sections += ChapterDraft("${chapter.title} · ${part++}", remaining.substring(0, split).trimEnd())
+			remaining = remaining.substring(split).trimStart()
+		}
+		if (remaining.isNotBlank()) sections += ChapterDraft("${chapter.title} · $part", remaining)
+		return sections
 	}
 
 	private fun isChapterHeading(line: String): Boolean {
@@ -174,7 +192,8 @@ class BookParser {
 
 	private data class ChapterDraft(val title: String, val content: String)
 
-	private companion object {
+	internal companion object {
+		internal const val MAX_CHAPTER_CHARACTERS = 200_000
 		val UTF8_BOM = byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte())
 	}
 }

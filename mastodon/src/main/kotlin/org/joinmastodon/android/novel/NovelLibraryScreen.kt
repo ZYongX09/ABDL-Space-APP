@@ -3,10 +3,8 @@ package org.joinmastodon.android.novel
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -14,10 +12,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -26,14 +22,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.joinmastodon.android.R
+import java.text.DateFormat
+import java.util.Date
+import java.util.Locale
 import org.joinmastodon.reader.data.NovelBookEntity
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Text
@@ -55,8 +51,10 @@ fun NovelLibraryScreen(
 	onError: (String) -> Unit,
 	onDismissError: () -> Unit,
 ) {
+	var importVisible by remember { mutableStateOf(false) }
 	var pasteVisible by remember { mutableStateOf(false) }
 	var upload by remember { mutableStateOf<Pair<Uri, NovelDocument>?>(null) }
+	var selectedBook by remember { mutableStateOf<NovelBookEntity?>(null) }
 	var pendingDelete by remember { mutableStateOf<NovelBookEntity?>(null) }
 	val resolver = NovelDocumentResolver(LocalContext.current.contentResolver)
 	val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
@@ -68,85 +66,132 @@ fun NovelLibraryScreen(
 
 	LazyColumn(
 		modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-		verticalArrangement = Arrangement.spacedBy(12.dp),
+		verticalArrangement = Arrangement.spacedBy(10.dp),
 	) {
 		item {
-			Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+			Row(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
 				Column(Modifier.weight(1f)) {
-					Text("我的书架", fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
-					Text("${state.books.size} 本 · ${if (state.refreshing) "正在同步" else "云端已连接"}", color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
+					Text("私人书库", fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
+					Text(
+						when {
+							state.refreshing -> "正在同步书库"
+							state.books.isEmpty() -> "TXT、EPUB 与粘贴文本"
+							else -> "${state.books.size} 本小说"
+						},
+						color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+					)
 				}
-				Text(if (state.refreshing) "同步中" else "同步", Modifier.clickable(onClick = onRefresh), color = MiuixTheme.colorScheme.primary)
-			}
-		}
-		item {
-			Card(Modifier.fillMaxWidth()) {
-				Text("添加到书架", fontSize = 18.sp, fontWeight = FontWeight.Medium)
-				Spacer(Modifier.height(10.dp))
-				Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-					ImportAction("TXT", R.drawable.ic_fluent_document_24_regular, Modifier.weight(1f)) { picker.launch("text/plain") }
-					ImportAction("EPUB", R.drawable.ic_fluent_book_24_regular, Modifier.weight(1f)) { picker.launch("application/epub+zip") }
-					ImportAction("粘贴", R.drawable.ic_fluent_add_24_regular, Modifier.weight(1f)) { pasteVisible = true }
-				}
-				Spacer(Modifier.height(10.dp))
-				Text("若系统选择器无法返回文件，可在文件管理器中选择“用其他应用打开”或“分享”，再选择 ABDL Space。", fontSize = 13.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
+				Text("同步", Modifier.clickable(onClick = onRefresh).padding(8.dp), color = MiuixTheme.colorScheme.primary)
+				Text("导入小说", Modifier.clickable { importVisible = true }.padding(8.dp), color = MiuixTheme.colorScheme.primary, fontWeight = FontWeight.Medium)
 			}
 		}
 		if (state.books.isEmpty()) item {
-			Column(Modifier.fillMaxWidth().padding(vertical = 72.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-				Image(painterResource(R.drawable.ic_fluent_book_48_regular), null, Modifier.size(58.dp), colorFilter = ColorFilter.tint(MiuixTheme.colorScheme.onSurfaceVariantSummary))
-				Spacer(Modifier.height(16.dp))
-				Text("还没有小说", fontSize = 18.sp, fontWeight = FontWeight.Medium)
-				Text("导入后会自动保存到本机并同步到云端", color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
+			Card(Modifier.fillMaxWidth()) {
+				Column(Modifier.fillMaxWidth().padding(vertical = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+					Text("书库还是空的", fontSize = 18.sp, fontWeight = FontWeight.Medium)
+					Spacer(Modifier.height(6.dp))
+					Text("导入后即可离线阅读，并自动同步到私人云端", color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
+					Spacer(Modifier.height(14.dp))
+					TextButton("导入小说", onClick = { importVisible = true })
+				}
 			}
 		} else {
 			items(state.books, key = { it.id }) { book ->
-				BookCard(book, onOpen, onDownload) { pendingDelete = book }
+				BookRow(book, state.bookDetails[book.id], onOpen, onDownload) { selectedBook = book }
 			}
 		}
-		item { Spacer(Modifier.height(24.dp)) }
+		item { Spacer(Modifier.height(28.dp)) }
 	}
 
+	if (importVisible) ImportDialog(
+		onDismiss = { importVisible = false },
+		onTxt = { importVisible = false; picker.launch("text/plain") },
+		onEpub = { importVisible = false; picker.launch("application/epub+zip") },
+		onPaste = { importVisible = false; pasteVisible = true },
+	)
 	if (pasteVisible) NovelPasteDialog({ pasteVisible = false }) { title, author, text -> pasteVisible = false; onPaste(title, author, text) }
 	upload?.let { (uri, document) -> NovelUploadMetadataDialog(document, { upload = null }) { title, author -> upload = null; onUpload(uri, title, author, document.format, document.mimeType) } }
+	selectedBook?.let { book -> BookActionsDialog(book, { selectedBook = null }, {
+		selectedBook = null
+		if (book.downloadState == "ready") onOpen(book) else onDownload(book)
+	}, {
+		selectedBook = null
+		pendingDelete = book
+	}) }
 	pendingDelete?.let { book ->
-		NovelDialog("删除《${book.title}》？", { pendingDelete = null }, { pendingDelete = null; onDelete(book) }) {
-			Text("将同时从本机和云端书架移除。此操作无法撤销。")
+		NovelDialog("从书库移除？", { pendingDelete = null }, { pendingDelete = null; onDelete(book) }) {
+			Text("《${book.title}》将从本机和私人云端移除，此操作无法撤销。")
 		}
 	}
 	state.error?.let { message -> NovelDialog("操作失败", onDismissError, onDismissError) { Text(message) } }
 }
 
 @Composable
-private fun ImportAction(label: String, icon: Int, modifier: Modifier, onClick: () -> Unit) {
-	Card(modifier, onClick = onClick) {
-		Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-			Image(painterResource(icon), null, Modifier.size(26.dp), colorFilter = ColorFilter.tint(MiuixTheme.colorScheme.primary))
-			Spacer(Modifier.height(6.dp))
-			Text(label, fontWeight = FontWeight.Medium)
+private fun BookRow(book: NovelBookEntity, details: NovelBookDetails?, onOpen: (NovelBookEntity) -> Unit, onDownload: (NovelBookEntity) -> Unit, onManage: () -> Unit) {
+	val ready = book.downloadState == "ready"
+	val downloading = book.downloadState == "downloading"
+	val format = book.localFilePath?.substringAfterLast('.', "")?.uppercase(Locale.ROOT)?.takeIf { it.isNotBlank() } ?: "云端"
+	val metadata = buildList {
+		book.author?.takeIf(String::isNotBlank)?.let(::add)
+		add(format)
+		details?.chapterCount?.takeIf { it > 0 }?.let { add("$it 章节") }
+		details?.localBytes?.let { add(formatBytes(it)) }
+	}.joinToString(" · ")
+	val status = when {
+		ready -> "可离线阅读"
+		book.downloadState == "downloading" -> "正在下载到本机"
+		book.downloadState == "failed" -> "下载失败，点按重试"
+		else -> "仅在云端"
+	}
+	Card(Modifier.fillMaxWidth(), onClick = { if (ready) onOpen(book) else if (!downloading) onDownload(book) }) {
+		Column(Modifier.fillMaxWidth()) {
+			Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+				Column(Modifier.weight(1f)) {
+					Text(book.title, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+					if (metadata.isNotBlank()) Text(metadata, fontSize = 13.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+				}
+				Text("管理", Modifier.clickable(onClick = onManage).padding(start = 12.dp, bottom = 8.dp), color = MiuixTheme.colorScheme.onSurfaceVariantSummary, fontSize = 13.sp)
+			}
+			Spacer(Modifier.height(8.dp))
+			Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+				Text(status, Modifier.weight(1f), fontSize = 13.sp, color = if (book.downloadState == "failed") MiuixTheme.colorScheme.error else MiuixTheme.colorScheme.primary)
+				Text(if (ready) "继续阅读" else if (downloading) "请稍候" else "下载到本机", fontSize = 13.sp, color = if (downloading) MiuixTheme.colorScheme.onSurfaceVariantSummary else MiuixTheme.colorScheme.primary, fontWeight = FontWeight.Medium)
+			}
+			Text("更新于 ${DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(book.updatedAt))}", fontSize = 12.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
 		}
 	}
 }
 
 @Composable
-private fun BookCard(book: NovelBookEntity, onOpen: (NovelBookEntity) -> Unit, onDownload: (NovelBookEntity) -> Unit, onDelete: () -> Unit) {
-	val ready = book.downloadState == "ready"
-	val downloading = book.downloadState == "downloading"
-	val failed = book.downloadState == "failed"
-	Card(Modifier.fillMaxWidth(), onClick = { if (ready) onOpen(book) else onDownload(book) }) {
-		Row(verticalAlignment = Alignment.CenterVertically) {
-			Box(Modifier.size(64.dp).clip(RoundedCornerShape(18.dp)), contentAlignment = Alignment.Center) {
-				Image(painterResource(if (ready) R.drawable.ic_fluent_book_48_regular else R.drawable.ic_fluent_cloud_24_regular), null, Modifier.size(34.dp), colorFilter = ColorFilter.tint(MiuixTheme.colorScheme.primary))
-			}
-			Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
-				Text(book.title, fontSize = 18.sp, fontWeight = FontWeight.Medium)
-				Text(listOfNotNull(book.author, book.localFilePath?.substringAfterLast('.')?.uppercase()).joinToString(" · "), color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
-				Text(when { ready -> "已保存到本机"; downloading -> "正在下载并整理章节"; failed -> "下载失败，点按重试"; else -> "仅在云端，点按下载" }, fontSize = 13.sp, color = if (failed) MiuixTheme.colorScheme.error else MiuixTheme.colorScheme.primary)
-			}
-			Text(if (ready) "阅读" else if (downloading) "等待" else "下载", color = MiuixTheme.colorScheme.primary)
+private fun ImportDialog(onDismiss: () -> Unit, onTxt: () -> Unit, onEpub: () -> Unit, onPaste: () -> Unit) {
+	OverlayDialog(show = true, title = "导入小说", onDismissRequest = onDismiss) {
+		Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+			ImportRow("选择 TXT 文件", "支持 UTF-8 与 GB18030，导入后可离线阅读", onTxt)
+			ImportRow("选择 EPUB 文件", "按书籍目录导入章节", onEpub)
+			ImportRow("粘贴文本", "适合短篇、草稿或临时保存的正文", onPaste)
+			Text("若系统文件选择器无法返回，可从文件管理器“打开方式”或“分享”到 ABDL Space。", fontSize = 13.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
+			Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { TextButton("关闭", onClick = onDismiss) }
 		}
-		Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-			Text("移除", Modifier.clickable(onClick = onDelete).padding(horizontal = 8.dp, vertical = 6.dp), fontSize = 13.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
+	}
+}
+
+@Composable
+private fun ImportRow(title: String, summary: String, onClick: () -> Unit) {
+	Card(Modifier.fillMaxWidth(), onClick = onClick) {
+		Column(Modifier.fillMaxWidth()) {
+			Text(title, fontWeight = FontWeight.Medium)
+			Text(summary, fontSize = 13.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
+		}
+	}
+}
+
+@Composable
+private fun BookActionsDialog(book: NovelBookEntity, onDismiss: () -> Unit, onPrimary: () -> Unit, onDelete: () -> Unit) {
+	OverlayDialog(show = true, title = book.title, onDismissRequest = onDismiss) {
+		Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+			TextButton(if (book.downloadState == "ready") "继续阅读" else "下载到本机", onClick = onPrimary)
+			TextButton("从书库移除", onClick = onDelete)
+			TextButton("取消", onClick = onDismiss)
 		}
 	}
 }
@@ -162,7 +207,7 @@ private fun NovelPasteDialog(onDismiss: () -> Unit, onPaste: (String, String, St
 @Composable
 private fun NovelUploadMetadataDialog(document: NovelDocument, onDismiss: () -> Unit, onConfirm: (String, String) -> Unit) {
 	var title by remember(document) { mutableStateOf(document.displayName) }; var author by remember(document) { mutableStateOf("") }
-	NovelDialog("加入书架", onDismiss, { if (title.isNotBlank() && author.isNotBlank()) onConfirm(title, author) }) {
+	NovelDialog("加入私人书库", onDismiss, { if (title.isNotBlank() && author.isNotBlank()) onConfirm(title, author) }) {
 		TextField(title, { title = it }, label = "标题"); TextField(author, { author = it }, label = "作者")
 	}
 }
@@ -178,6 +223,12 @@ private fun NovelDialog(title: String, onDismiss: () -> Unit, onConfirm: () -> U
 			}
 		}
 	}
+}
+
+private fun formatBytes(bytes: Long): String = when {
+	bytes >= 1024 * 1024 -> String.format(Locale.getDefault(), "%.1f MB", bytes / 1024f / 1024f)
+	bytes >= 1024 -> String.format(Locale.getDefault(), "%.0f KB", bytes / 1024f)
+	else -> "$bytes B"
 }
 
 internal fun handleSelectedDocument(uri: Uri, resolve: (Uri) -> NovelDocument, onResolved: (Pair<Uri, NovelDocument>) -> Unit, onError: (String) -> Unit) {
