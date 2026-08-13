@@ -4,7 +4,11 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,6 +16,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
@@ -22,7 +29,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -30,6 +41,7 @@ import androidx.compose.ui.unit.sp
 import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
+import org.joinmastodon.android.R
 import org.joinmastodon.reader.data.NovelBookEntity
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Text
@@ -65,24 +77,31 @@ fun NovelLibraryScreen(
 	}
 
 	LazyColumn(
-		modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-		verticalArrangement = Arrangement.spacedBy(10.dp),
+		modifier = Modifier.fillMaxSize().padding(horizontal = 18.dp),
+		verticalArrangement = Arrangement.spacedBy(12.dp),
 	) {
 		item {
-			Row(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+			Row(Modifier.fillMaxWidth().padding(top = 18.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
 				Column(Modifier.weight(1f)) {
-					Text("私人书库", fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
+					Text("私人书库", fontSize = 27.sp, fontWeight = FontWeight.Bold)
 					Text(
 						when {
 							state.refreshing -> "正在同步书库"
 							state.books.isEmpty() -> "TXT、EPUB 与粘贴文本"
 							else -> "${state.books.size} 本小说"
 						},
+						fontSize = 15.sp,
 						color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
 					)
 				}
-				Text("同步", Modifier.clickable(onClick = onRefresh).padding(8.dp), color = MiuixTheme.colorScheme.primary)
-				Text("导入小说", Modifier.clickable { importVisible = true }.padding(8.dp), color = MiuixTheme.colorScheme.primary, fontWeight = FontWeight.Medium)
+				Row(
+					Modifier.clip(RoundedCornerShape(14.dp)).border(1.dp, MiuixTheme.colorScheme.onSurface.copy(alpha = 0.12f), RoundedCornerShape(14.dp)),
+					verticalAlignment = Alignment.CenterVertically,
+				) {
+					HeaderAction(R.drawable.ic_fluent_arrow_sync_24_regular, if (state.refreshing) "同步中" else "同步", onRefresh)
+					Box(Modifier.width(1.dp).height(24.dp).background(MiuixTheme.colorScheme.onSurface.copy(alpha = 0.12f)))
+					HeaderAction(R.drawable.ic_fluent_document_arrow_up_20_regular, "导入小说") { importVisible = true }
+				}
 			}
 		}
 		if (state.books.isEmpty()) item {
@@ -143,23 +162,78 @@ private fun BookRow(book: NovelBookEntity, details: NovelBookDetails?, onOpen: (
 		book.downloadState == "failed" -> "下载失败，点按重试"
 		else -> "仅在云端"
 	}
-	Card(Modifier.fillMaxWidth(), onClick = { if (ready) onOpen(book) else if (!downloading) onDownload(book) }) {
-		Column(Modifier.fillMaxWidth()) {
-			Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-				Column(Modifier.weight(1f)) {
-					Text(book.title, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-					if (metadata.isNotBlank()) Text(metadata, fontSize = 13.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+	Card(Modifier.fillMaxWidth()) {
+		Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+			BookStateTile(ready, book.downloadState == "failed")
+			Spacer(Modifier.width(14.dp))
+			Column(Modifier.weight(1f)) {
+				Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+					Text(book.title, Modifier.weight(1f), fontSize = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+					Row(Modifier.clip(RoundedCornerShape(10.dp)).clickable(onClick = onManage).padding(start = 8.dp, end = 2.dp, top = 2.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+						ResourceIcon(R.drawable.ic_fluent_settings_20_regular, 18.dp, MiuixTheme.colorScheme.onSurfaceVariantSummary)
+						Spacer(Modifier.width(4.dp))
+						Text("管理", color = MiuixTheme.colorScheme.onSurfaceVariantSummary, fontSize = 13.sp)
+					}
 				}
-				Text("管理", Modifier.clickable(onClick = onManage).padding(start = 12.dp, bottom = 8.dp), color = MiuixTheme.colorScheme.onSurfaceVariantSummary, fontSize = 13.sp)
+				if (metadata.isNotBlank()) Text(metadata, fontSize = 13.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+				Spacer(Modifier.height(6.dp))
+				StatusBadge(status, ready, book.downloadState == "failed", downloading)
+				Spacer(Modifier.height(7.dp))
+				Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+					Text("更新于 ${DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(book.updatedAt))}", Modifier.weight(1f), fontSize = 12.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
+					PrimaryBookAction(ready, downloading) { if (ready) onOpen(book) else onDownload(book) }
+				}
 			}
-			Spacer(Modifier.height(8.dp))
-			Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-				Text(status, Modifier.weight(1f), fontSize = 13.sp, color = if (book.downloadState == "failed") MiuixTheme.colorScheme.error else MiuixTheme.colorScheme.primary)
-				Text(if (ready) "继续阅读" else if (downloading) "请稍候" else "下载到本机", fontSize = 13.sp, color = if (downloading) MiuixTheme.colorScheme.onSurfaceVariantSummary else MiuixTheme.colorScheme.primary, fontWeight = FontWeight.Medium)
-			}
-			Text("更新于 ${DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(book.updatedAt))}", fontSize = 12.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
 		}
 	}
+}
+
+@Composable
+private fun HeaderAction(icon: Int, label: String, onClick: () -> Unit) {
+	Row(Modifier.clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) {
+		ResourceIcon(icon, 20.dp, MiuixTheme.colorScheme.primary)
+		Spacer(Modifier.width(6.dp))
+		Text(label, color = MiuixTheme.colorScheme.primary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+	}
+}
+
+@Composable
+private fun BookStateTile(ready: Boolean, failed: Boolean) {
+	val tint = when { failed -> MiuixTheme.colorScheme.error; else -> MiuixTheme.colorScheme.primary }
+	val background = tint.copy(alpha = 0.10f)
+	Box(Modifier.size(54.dp).clip(RoundedCornerShape(14.dp)).background(background), contentAlignment = Alignment.Center) {
+		ResourceIcon(if (ready) R.drawable.ic_fluent_book_open_24_regular else R.drawable.ic_fluent_arrow_download_24_regular, 28.dp, tint)
+	}
+}
+
+@Composable
+private fun StatusBadge(label: String, ready: Boolean, failed: Boolean, downloading: Boolean) {
+	val tint = when { failed -> MiuixTheme.colorScheme.error; ready -> Color(0xFF168A5B); else -> MiuixTheme.colorScheme.primary }
+	Row(Modifier.clip(RoundedCornerShape(8.dp)).background(tint.copy(alpha = 0.10f)).padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+		ResourceIcon(when { failed -> R.drawable.ic_fluent_error_circle_20_regular; ready -> R.drawable.ic_fluent_checkmark_circle_20_regular; downloading -> R.drawable.ic_fluent_arrow_sync_20_regular; else -> R.drawable.ic_fluent_cloud_20_regular }, 16.dp, tint)
+		Spacer(Modifier.width(5.dp))
+		Text(label, fontSize = 12.sp, color = tint, fontWeight = FontWeight.Medium)
+	}
+}
+
+@Composable
+private fun PrimaryBookAction(ready: Boolean, downloading: Boolean, onClick: () -> Unit) {
+	val enabled = !downloading
+	val tint = if (enabled) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurfaceVariantSummary
+	val modifier = Modifier.clip(RoundedCornerShape(12.dp))
+		.then(if (ready) Modifier.background(tint) else Modifier.border(1.dp, tint, RoundedCornerShape(12.dp)))
+		.clickable(enabled = enabled, onClick = onClick)
+		.padding(horizontal = 13.dp, vertical = 9.dp)
+	Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+		ResourceIcon(if (ready) R.drawable.ic_fluent_book_open_20_regular else R.drawable.ic_fluent_arrow_download_20_regular, 19.dp, if (ready) Color.White else tint)
+		Spacer(Modifier.width(6.dp))
+		Text(if (ready) "继续阅读" else if (downloading) "请稍候" else "下载到本机", fontSize = 13.sp, color = if (ready) Color.White else tint, fontWeight = FontWeight.Medium)
+	}
+}
+
+@Composable
+private fun ResourceIcon(icon: Int, size: androidx.compose.ui.unit.Dp, tint: Color) {
+	Image(painterResource(icon), contentDescription = null, modifier = Modifier.size(size), colorFilter = ColorFilter.tint(tint))
 }
 
 @Composable

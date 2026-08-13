@@ -45,7 +45,10 @@ class NovelHomeUiContractTest {
 		assertTrue(library.contains("下载到本机"))
 		assertTrue(screen.contains("作者功能正在建设"))
 		assertTrue(screen.contains("注册满 72 小时"))
-		assertTrue(library.contains("else if (!downloading) onDownload(book)"))
+		assertTrue(library.contains("BookStateTile"))
+		assertTrue(library.contains("StatusBadge"))
+		assertTrue(library.contains("PrimaryBookAction"))
+		assertTrue(library.contains("clickable(enabled = enabled"))
 	}
 
 	@Test
