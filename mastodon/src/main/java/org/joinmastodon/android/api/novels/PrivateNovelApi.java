@@ -154,7 +154,7 @@ public class PrivateNovelApi{
 	}
 
 	private static Call.Factory noRedirectClient(OkHttpClient client){
-		return client.newBuilder().followRedirects(false).followSslRedirects(false).retryOnConnectionFailure(false).build();
+		return client.newBuilder().cache(null).followRedirects(false).followSslRedirects(false).retryOnConnectionFailure(false).build();
 	}
 
 	private static Call.Factory withoutRedirects(Call.Factory factory){
