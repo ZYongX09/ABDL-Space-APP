@@ -25,7 +25,7 @@ class NovelHomeUiContractTest {
 		assertTrue(screen.contains("NovelLibraryScreen"))
 		assertTrue(activity.contains("NovelHomeScreen(accountId = accountID"))
 		assertTrue(library.contains("导入小说"))
-		assertTrue(library.contains("若系统文件选择器无法返回"))
+		assertTrue(library.contains("也可从文件管理器“打开方式”或“分享”到 ABDL Space"))
 		assertTrue(library.contains("可离线阅读"))
 		assertTrue(library.contains("onDownload"))
 		assertTrue(library.contains("onDelete"))
@@ -66,6 +66,18 @@ class NovelHomeUiContractTest {
 		assertTrue(library.contains("top.yukonga.miuix.kmp.basic.TextButton"))
 		assertTrue(library.contains("state.error"))
 		assertTrue(library.contains("onDismissError"))
+	}
+
+	@Test fun novelInteractionsUseSheetsLoadingBackAndAnimatedTabs() {
+		assertTrue(library.contains("OverlayBottomSheet"))
+		assertTrue(library.contains("BasicComponent"))
+		assertTrue(library.contains("CircularProgressIndicator"))
+		assertTrue(library.contains("同步请求已提交"))
+		assertTrue(viewModel.contains("openingBookId"))
+		assertTrue(screen.contains("BackHandler(enabled = libraryState.reader != null)"))
+		assertTrue(screen.contains("ReaderPalette.NIGHT"))
+		assertTrue(screen.contains("animateDpAsState"))
+		assertTrue(screen.contains("NovelTabIndicatorOffset"))
 	}
 
 	@Test fun miuixDialogsPackageTheirNavigationEventRuntime() {

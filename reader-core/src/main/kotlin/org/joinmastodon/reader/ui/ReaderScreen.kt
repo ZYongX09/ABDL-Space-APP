@@ -3,8 +3,11 @@ package org.joinmastodon.reader.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
@@ -23,6 +26,7 @@ import androidx.compose.ui.unit.sp
 import org.joinmastodon.reader.domain.ReaderBook
 import org.joinmastodon.reader.domain.ReaderChapter
 import org.joinmastodon.reader.domain.ReaderPosition
+import org.joinmastodon.reader.domain.ReaderPalette
 import org.joinmastodon.reader.domain.ReadingSettings
 
 @Composable
@@ -33,15 +37,16 @@ fun ReaderScreen(
 	onPositionChanged: (ReaderPosition) -> Unit = {},
 	onBookmark: (ReaderPosition) -> Unit = {},
 	onNote: (ReaderPosition) -> Unit = {},
+	initialPalette: ReaderPalette = ReaderPalette.PAPER,
 	onBack: () -> Unit,
 ) {
 	var chapterIndex by remember(book.id) { mutableIntStateOf(initialPosition.chapterIndex.coerceIn(0, chapters.lastIndex.coerceAtLeast(0))) }
 	var pageIndex by remember(book.id) { mutableIntStateOf(initialPosition.pageIndex) }
-	var settings by remember { mutableStateOf(ReadingSettings()) }
+	var settings by remember(book.id, initialPalette) { mutableStateOf(ReadingSettings(palette = initialPalette)) }
 	var controlsVisible by remember { mutableStateOf(false) }
 	var settingsVisible by remember { mutableStateOf(false) }
 	val chapter = chapters.getOrNull(chapterIndex)
-	Box(Modifier.fillMaxSize().background(settings.palette.background)) {
+	Box(Modifier.fillMaxSize().background(settings.palette.background).windowInsetsPadding(WindowInsets.safeDrawing)) {
 		if (chapter == null) {
 			Text("暂无正文", color = settings.palette.secondaryText, modifier = Modifier.align(Alignment.Center))
 		} else if (settings.paged) {
@@ -57,7 +62,7 @@ fun ReaderScreen(
 				text = chapter.content,
 				color = settings.palette.text,
 				style = TextStyle(fontSize = settings.fontSize.sp, lineHeight = (settings.fontSize * settings.lineHeight).sp),
-				modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = settings.horizontalPadding.dp, vertical = 52.dp)
+				modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = settings.horizontalPadding.dp, vertical = 28.dp)
 					.pointerInput(chapter.id) { detectTapGestures(onTap = { controlsVisible = !controlsVisible }) },
 			)
 		}

@@ -42,11 +42,14 @@ import java.util.Date
 import java.util.Locale
 import org.joinmastodon.reader.data.NovelBookEntity
 import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.BasicComponent
+import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
+import top.yukonga.miuix.kmp.overlay.OverlayBottomSheet
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.CloudFill
@@ -76,6 +79,7 @@ fun NovelLibraryScreen(
 	var upload by remember { mutableStateOf<Pair<Uri, NovelDocument>?>(null) }
 	var selectedBook by remember { mutableStateOf<NovelBookEntity?>(null) }
 	var pendingDelete by remember { mutableStateOf<NovelBookEntity?>(null) }
+	var syncFeedbackVisible by remember { mutableStateOf(false) }
 	val resolver = NovelDocumentResolver(LocalContext.current.contentResolver)
 	val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
 		uri?.let { selected -> handleSelectedDocument(selected, resolver::resolve, { upload = it }, onError) }
@@ -106,7 +110,7 @@ fun NovelLibraryScreen(
 					Modifier.clip(RoundedCornerShape(14.dp)).border(1.dp, MiuixTheme.colorScheme.onSurface.copy(alpha = 0.12f), RoundedCornerShape(14.dp)),
 					verticalAlignment = Alignment.CenterVertically,
 				) {
-					HeaderAction(MiuixIcons.Refresh, if (state.refreshing) "同步中" else "同步", onRefresh)
+					HeaderAction(MiuixIcons.Refresh, if (state.refreshing) "同步中" else "同步") { syncFeedbackVisible = true; onRefresh() }
 					Box(Modifier.width(1.dp).height(24.dp).background(MiuixTheme.colorScheme.onSurface.copy(alpha = 0.12f)))
 					HeaderAction(MiuixIcons.Import, "导入小说") { importVisible = true }
 				}
@@ -124,7 +128,7 @@ fun NovelLibraryScreen(
 			}
 		} else {
 			items(state.books, key = { it.id }) { book ->
-				BookRow(book, state.bookDetails[book.id], onOpen, onDownload) { selectedBook = book }
+				BookRow(book, state.bookDetails[book.id], state.openingBookId == book.id, onOpen, onDownload) { selectedBook = book }
 			}
 		}
 		item { Spacer(Modifier.height(28.dp)) }
@@ -151,10 +155,13 @@ fun NovelLibraryScreen(
 		}
 	}
 	state.error?.let { message -> NovelDialog("操作失败", onDismissError, onDismissError) { Text(message) } }
+	if (syncFeedbackVisible) OverlayDialog(show = true, title = "同步请求已提交", summary = "同步将在后台执行，完成后书架会自动更新", onDismissRequest = { syncFeedbackVisible = false }) {
+		Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { TextButton("知道了", onClick = { syncFeedbackVisible = false }) }
+	}
 }
 
 @Composable
-private fun BookRow(book: NovelBookEntity, details: NovelBookDetails?, onOpen: (NovelBookEntity) -> Unit, onDownload: (NovelBookEntity) -> Unit, onManage: () -> Unit) {
+private fun BookRow(book: NovelBookEntity, details: NovelBookDetails?, opening: Boolean, onOpen: (NovelBookEntity) -> Unit, onDownload: (NovelBookEntity) -> Unit, onManage: () -> Unit) {
 	val ready = book.downloadState == "ready"
 	val downloading = book.downloadState == "downloading"
 	val format = book.localFilePath?.substringAfterLast('.', "")?.uppercase(Locale.ROOT)?.takeIf { it.isNotBlank() } ?: "云端"
@@ -197,7 +204,7 @@ private fun BookRow(book: NovelBookEntity, details: NovelBookDetails?, onOpen: (
 				Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
 					Text("更新于 ${DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(book.updatedAt))}", Modifier.weight(1f), fontSize = 11.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary, maxLines = 1)
 					Spacer(Modifier.width(8.dp))
-					PrimaryBookAction(ready, downloading) { if (ready) onOpen(book) else onDownload(book) }
+					PrimaryBookAction(ready, downloading, opening) { if (ready) onOpen(book) else onDownload(book) }
 				}
 			}
 		}
@@ -233,17 +240,17 @@ private fun StatusBadge(label: String, ready: Boolean, failed: Boolean, download
 }
 
 @Composable
-private fun PrimaryBookAction(ready: Boolean, downloading: Boolean, onClick: () -> Unit) {
-	val enabled = !downloading
+private fun PrimaryBookAction(ready: Boolean, downloading: Boolean, opening: Boolean, onClick: () -> Unit) {
+	val enabled = !downloading && !opening
 	val tint = if (enabled) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurfaceVariantSummary
 	val modifier = Modifier.clip(RoundedCornerShape(12.dp))
 		.then(if (ready) Modifier.background(tint) else Modifier.border(1.dp, tint, RoundedCornerShape(12.dp)))
 		.clickable(enabled = enabled, onClick = onClick)
 		.padding(horizontal = 10.dp, vertical = 8.dp)
 	Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-		MiuixIcon(if (ready) MiuixIcons.Notes else MiuixIcons.FileDownloads, 17.dp, if (ready) Color.White else tint)
+		if (opening) CircularProgressIndicator(size = 17.dp, strokeWidth = 2.dp) else MiuixIcon(if (ready) MiuixIcons.Notes else MiuixIcons.FileDownloads, 17.dp, if (ready) Color.White else tint)
 		Spacer(Modifier.width(5.dp))
-		Text(if (ready) "继续阅读" else if (downloading) "请稍候" else "下载到本机", fontSize = 12.sp, color = if (ready) Color.White else tint, fontWeight = FontWeight.Medium, maxLines = 1)
+		Text(if (opening) "正在打开" else if (ready) "继续阅读" else if (downloading) "请稍候" else "下载到本机", fontSize = 12.sp, color = if (ready) Color.White else tint, fontWeight = FontWeight.Medium, maxLines = 1)
 	}
 }
 
@@ -254,34 +261,27 @@ private fun MiuixIcon(icon: ImageVector, size: androidx.compose.ui.unit.Dp, tint
 
 @Composable
 private fun ImportDialog(onDismiss: () -> Unit, onTxt: () -> Unit, onEpub: () -> Unit, onPaste: () -> Unit) {
-	OverlayDialog(show = true, title = "导入小说", onDismissRequest = onDismiss) {
-		Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-			ImportRow("选择 TXT 文件", "支持 UTF-8 与 GB18030，导入后可离线阅读", onTxt)
-			ImportRow("选择 EPUB 文件", "按书籍目录导入章节", onEpub)
-			ImportRow("粘贴文本", "适合短篇、草稿或临时保存的正文", onPaste)
-			Text("若系统文件选择器无法返回，可从文件管理器“打开方式”或“分享”到 ABDL Space。", fontSize = 13.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
-			Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { TextButton("关闭", onClick = onDismiss) }
+	OverlayBottomSheet(show = true, title = "导入小说", onDismissRequest = onDismiss) {
+		Card(Modifier.fillMaxWidth()) {
+			SheetAction("选择 TXT 文件", "支持 UTF-8 与 GB18030", MiuixIcons.Import, onTxt)
+			SheetAction("选择 EPUB 文件", "按书籍目录导入章节", MiuixIcons.Notes, onEpub)
+			SheetAction("粘贴文本", "适合短篇、草稿或临时保存", MiuixIcons.Notes, onPaste)
 		}
+		Text("也可从文件管理器“打开方式”或“分享”到 ABDL Space。", Modifier.padding(horizontal = 16.dp, vertical = 12.dp), fontSize = 13.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
 	}
 }
 
 @Composable
-private fun ImportRow(title: String, summary: String, onClick: () -> Unit) {
-	Card(Modifier.fillMaxWidth(), onClick = onClick) {
-		Column(Modifier.fillMaxWidth()) {
-			Text(title, fontWeight = FontWeight.Medium)
-			Text(summary, fontSize = 13.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
-		}
-	}
+private fun SheetAction(title: String, summary: String, icon: ImageVector, onClick: () -> Unit) {
+	BasicComponent(title = title, summary = summary, startAction = { MiuixIcon(icon, 24.dp, MiuixTheme.colorScheme.primary) }, onClick = onClick)
 }
 
 @Composable
 private fun BookActionsDialog(book: NovelBookEntity, onDismiss: () -> Unit, onPrimary: () -> Unit, onDelete: () -> Unit) {
-	OverlayDialog(show = true, title = book.title, onDismissRequest = onDismiss) {
-		Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-			TextButton(if (book.downloadState == "ready") "继续阅读" else "下载到本机", onClick = onPrimary)
-			TextButton("从书库移除", onClick = onDelete)
-			TextButton("取消", onClick = onDismiss)
+	OverlayBottomSheet(show = true, title = book.title, onDismissRequest = onDismiss) {
+		Card(Modifier.fillMaxWidth()) {
+			SheetAction(if (book.downloadState == "ready") "继续阅读" else "下载到本机", if (book.downloadState == "ready") "从上次位置继续" else "保存到本机后离线阅读", if (book.downloadState == "ready") MiuixIcons.Notes else MiuixIcons.FileDownloads, onPrimary)
+			SheetAction("从书库移除", "同时从本机和私人云端移除", MiuixIcons.Report, onDelete)
 		}
 	}
 }

@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -14,6 +15,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.offset
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -34,6 +41,8 @@ import androidx.compose.ui.unit.sp
 import android.net.Uri
 import org.joinmastodon.android.R
 import org.joinmastodon.android.ui.compose.component.BackNavigationIcon
+import org.joinmastodon.android.ui.compose.ui.isInDarkTheme
+import org.joinmastodon.reader.domain.ReaderPalette
 import org.joinmastodon.reader.domain.ReaderPosition
 import org.joinmastodon.reader.ui.ReaderScreen
 import top.yukonga.miuix.kmp.basic.Scaffold
@@ -48,6 +57,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 fun NovelHomeScreen(accountId: String, libraryViewModel: NovelLibraryViewModel, externalDocument: Uri? = null, onBack: () -> Unit) {
 	val libraryState by libraryViewModel.state.collectAsState()
 	var pendingNote by remember { mutableStateOf<Triple<String, String, ReaderPosition>?>(null) }
+	BackHandler(enabled = libraryState.reader != null) { libraryViewModel.closeReader() }
 	libraryState.reader?.let { reader ->
 		ReaderScreen(
 			reader.book,
@@ -55,6 +65,7 @@ fun NovelHomeScreen(accountId: String, libraryViewModel: NovelLibraryViewModel, 
 			onPositionChanged = { libraryViewModel.onReaderPositionChanged(reader.book.id, it) },
 			onBookmark = { position -> reader.chapters.getOrNull(position.chapterIndex)?.let { libraryViewModel.addBookmark(reader.book.id, it.id, position) } },
 			onNote = { position -> reader.chapters.getOrNull(position.chapterIndex)?.let { pendingNote = Triple(reader.book.id, it.id, position) } },
+			initialPalette = if (isInDarkTheme()) ReaderPalette.NIGHT else ReaderPalette.PAPER,
 			onBack = libraryViewModel::closeReader,
 		)
 		pendingNote?.let { (bookId, chapterId, position) ->
@@ -114,22 +125,30 @@ fun NovelHomeScreen(accountId: String, libraryViewModel: NovelLibraryViewModel, 
 @Composable
 private fun NovelTabBar(tabs: List<String>, selectedIndex: Int, onSelected: (Int) -> Unit) {
 	val shape = RoundedCornerShape(18.dp)
-	Row(
+	BoxWithConstraints(
 		Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)
 			.clip(shape)
 			.border(1.dp, MiuixTheme.colorScheme.onSurface.copy(alpha = 0.10f), shape)
 			.background(MiuixTheme.colorScheme.surface.copy(alpha = 0.72f))
 			.padding(3.dp),
 	) {
-		tabs.forEachIndexed { index, label ->
-			val selected = index == selectedIndex
-			Box(
-				Modifier.weight(1f).clip(RoundedCornerShape(15.dp))
-					.background(if (selected) MiuixTheme.colorScheme.primary.copy(alpha = 0.11f) else androidx.compose.ui.graphics.Color.Transparent)
-					.clickable { onSelected(index) }.padding(vertical = 12.dp),
-				contentAlignment = Alignment.Center,
-			) {
-				Text(label, color = if (selected) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurfaceVariantSummary, fontSize = 15.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
+		val itemWidth = maxWidth / tabs.size
+		val indicatorOffset by animateDpAsState(
+			targetValue = itemWidth * selectedIndex,
+			animationSpec = tween(durationMillis = 200, easing = LinearEasing),
+			label = "NovelTabIndicatorOffset",
+		)
+		Box(Modifier.offset(x = indicatorOffset).width(itemWidth).height(44.dp).clip(RoundedCornerShape(15.dp)).background(MiuixTheme.colorScheme.primary.copy(alpha = 0.11f)))
+		Row(Modifier.fillMaxWidth()) {
+			tabs.forEachIndexed { index, label ->
+				val selected = index == selectedIndex
+				Box(
+					Modifier.width(itemWidth).clip(RoundedCornerShape(15.dp))
+						.clickable { onSelected(index) }.padding(vertical = 12.dp),
+					contentAlignment = Alignment.Center,
+				) {
+					Text(label, color = if (selected) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurfaceVariantSummary, fontSize = 15.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
+				}
 			}
 		}
 	}

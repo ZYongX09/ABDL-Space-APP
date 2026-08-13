@@ -35,6 +35,7 @@ data class NovelLibraryState(
 	val refreshing: Boolean = false,
 	val error: String? = null,
 	val reader: NovelReaderState? = null,
+	val openingBookId: String? = null,
 )
 
 data class NovelBookDetails(val chapterCount: Int, val localBytes: Long?)
@@ -104,20 +105,26 @@ class NovelLibraryViewModel(application: Application, val accountId: String) : A
 		}
 	}
 
-	fun openReader(book: NovelBookEntity) = viewModelScope.launch(Dispatchers.IO) {
-		try {
-			val chapters = database.novelChapterDao().getReaderChapters(book.id)
-			if (chapters.isEmpty()) {
-				mutableState.update { it.copy(error = "这本小说尚未保存到本机") }
-				return@launch
+	fun openReader(book: NovelBookEntity) {
+		if (mutableState.value.openingBookId != null) return
+		mutableState.update { it.copy(openingBookId = book.id, error = null) }
+		viewModelScope.launch(Dispatchers.IO) {
+			try {
+				val chapters = database.novelChapterDao().getReaderChapters(book.id)
+				if (chapters.isEmpty()) {
+					mutableState.update { it.copy(error = "这本小说尚未保存到本机") }
+					return@launch
+				}
+				val format = if (book.localFilePath?.endsWith(".epub", true) == true) BookFormat.EPUB else BookFormat.TXT
+				mutableState.update { state -> state.copy(reader = NovelReaderState(
+					ReaderBook(book.id, book.title, book.author, format),
+					chapters.map { ReaderChapter(it.id, it.bookId, it.chapterIndex, it.title, it.content, it.id) },
+				)) }
+			} catch (error: Exception) {
+				mutableState.update { it.copy(error = error.message ?: "无法打开这本小说") }
+			} finally {
+				mutableState.update { it.copy(openingBookId = null) }
 			}
-			val format = if (book.localFilePath?.endsWith(".epub", true) == true) BookFormat.EPUB else BookFormat.TXT
-			mutableState.update { state -> state.copy(reader = NovelReaderState(
-				ReaderBook(book.id, book.title, book.author, format),
-				chapters.map { ReaderChapter(it.id, it.bookId, it.chapterIndex, it.title, it.content, it.id) },
-			)) }
-		} catch (error: Exception) {
-			mutableState.update { it.copy(error = error.message ?: "无法打开这本小说") }
 		}
 	}
 

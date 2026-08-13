@@ -8,10 +8,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.Text
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.TextStyle
@@ -19,6 +22,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.joinmastodon.reader.domain.ReaderChapter
 import org.joinmastodon.reader.domain.ReadingSettings
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Composable
 fun PagedReader(
@@ -29,11 +34,20 @@ fun PagedReader(
 	onToggleControls: () -> Unit,
 	modifier: Modifier = Modifier,
 ) {
-	val pages = remember(chapter.content, settings.fontSize) { paginate(chapter.content, settings.fontSize) }
+	val pages by produceState<List<String>?>(initialValue = null, chapter.content, settings.fontSize) {
+		value = withContext(Dispatchers.Default) { paginate(chapter.content, settings.fontSize) }
+	}
+	if (pages == null) {
+		Box(Modifier.fillMaxSize().background(settings.palette.background), contentAlignment = Alignment.Center) {
+			CircularProgressIndicator(color = settings.palette.secondaryText)
+		}
+		return
+	}
+	val readyPages = pages.orEmpty()
 	key(pagerStateKey(chapter.id)) {
-		val pagerState = rememberPagerState(initialPage = clampPageIndex(initialPage, pages.size), pageCount = { pages.size })
-		LaunchedEffect(pages.size) {
-			val clampedPage = clampPageIndex(pagerState.currentPage, pages.size)
+		val pagerState = rememberPagerState(initialPage = clampPageIndex(initialPage, readyPages.size), pageCount = { readyPages.size })
+		LaunchedEffect(readyPages.size) {
+			val clampedPage = clampPageIndex(pagerState.currentPage, readyPages.size)
 			if (clampedPage != pagerState.currentPage) pagerState.scrollToPage(clampedPage)
 		}
 		LaunchedEffect(pagerState.currentPage) { onPageChanged(pagerState.currentPage) }
@@ -44,9 +58,9 @@ fun PagedReader(
 				.background(settings.palette.background)
 				.pointerInput(chapter.id) { detectTapGestures(onTap = { onToggleControls() }) },
 		) { page ->
-			Box(Modifier.fillMaxSize().padding(horizontal = settings.horizontalPadding.dp, vertical = 52.dp)) {
+			Box(Modifier.fillMaxSize().padding(horizontal = settings.horizontalPadding.dp, vertical = 28.dp)) {
 				Text(
-					text = pages[page],
+				text = readyPages[page],
 					color = settings.palette.text,
 					style = TextStyle(fontSize = settings.fontSize.sp, lineHeight = (settings.fontSize * settings.lineHeight).sp),
 				)
