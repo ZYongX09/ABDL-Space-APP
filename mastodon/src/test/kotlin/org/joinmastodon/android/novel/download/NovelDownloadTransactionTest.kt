@@ -29,6 +29,7 @@ class NovelDownloadTransactionTest {
 		val source = File("src/main/kotlin/org/joinmastodon/android/novel/download/NovelDownloadWorker.kt").readText()
 		assertTrue(source.contains("Log.w(LOG_TAG"))
 		assertTrue(source.contains("safeFailureMessage(error)"))
+		assertTrue(source.contains("safeFailureOrigin(error)"))
 		assertFalse(source.contains("error.stackTraceToString()"))
 	}
 

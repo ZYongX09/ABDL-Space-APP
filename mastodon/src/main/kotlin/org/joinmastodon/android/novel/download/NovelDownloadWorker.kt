@@ -132,11 +132,11 @@ class NovelDownloadWorker(
 			Result.success()
 		} catch (error: IOException) {
 			val retry = !isStopped && isRetryable(error)
-			Log.w(LOG_TAG, "Download $stage ${if (retry) "retry" else "failed"}: ${error.javaClass.simpleName}: ${safeFailureMessage(error)}")
+			Log.w(LOG_TAG, "Download $stage ${if (retry) "retry" else "failed"}: ${error.javaClass.simpleName}: ${safeFailureMessage(error)} origin=${safeFailureOrigin(error)}")
 			updateDownloadState(accountId, bookId, if (retry) "remote" else "failed")
 			if (retry) Result.retry() else Result.failure()
 		} catch (error: Exception) {
-			Log.w(LOG_TAG, "Download $stage failed: ${error.javaClass.simpleName}: ${safeFailureMessage(error)}")
+			Log.w(LOG_TAG, "Download $stage failed: ${error.javaClass.simpleName}: ${safeFailureMessage(error)} origin=${safeFailureOrigin(error)}")
 			updateDownloadState(accountId, bookId, "failed")
 			Result.failure()
 		} finally {
@@ -202,6 +202,12 @@ class NovelDownloadWorker(
 				) -> message
 				else -> "download_failed"
 			}
+		}
+
+		private fun safeFailureOrigin(error: Throwable): String {
+			val frame = error.stackTrace.firstOrNull { it.className.startsWith("org.joinmastodon.android.") }
+				?: return "external"
+			return "${frame.className.substringAfterLast('.')}.${frame.methodName}"
 		}
 
 		internal fun isRetryable(error: IOException): Boolean {
