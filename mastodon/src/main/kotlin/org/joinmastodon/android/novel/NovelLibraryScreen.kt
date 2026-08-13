@@ -86,10 +86,10 @@ fun NovelLibraryScreen(
 
 	LazyColumn(
 		modifier = Modifier.fillMaxSize().padding(horizontal = 18.dp),
-		verticalArrangement = Arrangement.spacedBy(12.dp),
+		verticalArrangement = Arrangement.spacedBy(9.dp),
 	) {
 		item {
-			Row(Modifier.fillMaxWidth().padding(top = 18.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+			Row(Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
 				Column(Modifier.weight(1f)) {
 					Text("私人书库", fontSize = 27.sp, fontWeight = FontWeight.Bold)
 					Text(
@@ -173,14 +173,14 @@ private fun BookRow(book: NovelBookEntity, details: NovelBookDetails?, onOpen: (
 	val cardShape = RoundedCornerShape(18.dp)
 	Box(
 		Modifier.fillMaxWidth()
-			.shadow(3.dp, cardShape, clip = false)
+			.shadow(2.dp, cardShape, clip = false)
 			.background(MiuixTheme.colorScheme.surface, cardShape)
 			.border(1.dp, MiuixTheme.colorScheme.onSurface.copy(alpha = 0.06f), cardShape)
-			.padding(horizontal = 14.dp, vertical = 15.dp),
+			.padding(horizontal = 13.dp, vertical = 13.dp),
 	) {
 		Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-			BookStateTile(ready, book.downloadState == "failed")
-			Spacer(Modifier.width(14.dp))
+			BookStateTile(ready)
+			Spacer(Modifier.width(12.dp))
 			Column(Modifier.weight(1f)) {
 				Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
 					Text(book.title, Modifier.weight(1f), fontSize = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -191,13 +191,14 @@ private fun BookRow(book: NovelBookEntity, details: NovelBookDetails?, onOpen: (
 					}
 				}
 				if (metadata.isNotBlank()) Text(metadata, fontSize = 13.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-				Spacer(Modifier.height(6.dp))
-				StatusBadge(status, ready, book.downloadState == "failed", downloading)
 				Spacer(Modifier.height(7.dp))
 				Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-					Text("更新于 ${DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(book.updatedAt))}", Modifier.weight(1f), fontSize = 11.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary, maxLines = 1)
+					StatusBadge(status, ready, book.downloadState == "failed", downloading)
+					Spacer(Modifier.weight(1f))
 					PrimaryBookAction(ready, downloading) { if (ready) onOpen(book) else onDownload(book) }
 				}
+				Spacer(Modifier.height(6.dp))
+				Text("更新于 ${DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(book.updatedAt))}", fontSize = 11.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary, maxLines = 1)
 			}
 		}
 	}
@@ -213,11 +214,11 @@ private fun HeaderAction(icon: ImageVector, label: String, onClick: () -> Unit) 
 }
 
 @Composable
-private fun BookStateTile(ready: Boolean, failed: Boolean) {
-	val tint = when { failed -> MiuixTheme.colorScheme.error; else -> MiuixTheme.colorScheme.primary }
+private fun BookStateTile(ready: Boolean) {
+	val tint = MiuixTheme.colorScheme.primary
 	val background = tint.copy(alpha = 0.10f)
-	Box(Modifier.size(54.dp).clip(RoundedCornerShape(14.dp)).background(background), contentAlignment = Alignment.Center) {
-		MiuixIcon(if (ready) MiuixIcons.ContactsBook else MiuixIcons.Download, 28.dp, tint)
+	Box(Modifier.size(46.dp).clip(RoundedCornerShape(12.dp)).background(background), contentAlignment = Alignment.Center) {
+		MiuixIcon(if (ready) MiuixIcons.ContactsBook else MiuixIcons.CloudFill, 24.dp, tint)
 	}
 }
 
