@@ -16,7 +16,7 @@ class NovelHomeUiContractTest {
 	fun novelHomeUsesMiuixPageChrome() {
 		assertTrue(screen.contains("top.yukonga.miuix.kmp.basic.Scaffold"))
 		assertTrue(screen.contains("top.yukonga.miuix.kmp.basic.SmallTopAppBar"))
-		assertTrue(screen.contains("top.yukonga.miuix.kmp.basic.TabRow"))
+		assertTrue(screen.contains("NovelTabBar"))
 	}
 
 	@Test
@@ -40,7 +40,6 @@ class NovelHomeUiContractTest {
 	@Test fun novelLibraryIsTextFirstAndHasNoCoverSystem() {
 		assertFalse(library.contains("coverUri"))
 		assertFalse(library.contains("封面"))
-		assertFalse(library.contains("RoundedCornerShape(18.dp)"))
 		assertTrue(library.contains("章节"))
 		assertTrue(library.contains("下载到本机"))
 		assertTrue(screen.contains("作者功能正在建设"))

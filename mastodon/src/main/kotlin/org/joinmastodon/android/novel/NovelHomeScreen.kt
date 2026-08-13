@@ -1,6 +1,9 @@
 package org.joinmastodon.android.novel
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -20,6 +24,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -33,7 +38,6 @@ import org.joinmastodon.reader.domain.ReaderPosition
 import org.joinmastodon.reader.ui.ReaderScreen
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SmallTopAppBar
-import top.yukonga.miuix.kmp.basic.TabRow
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextField
@@ -73,11 +77,7 @@ fun NovelHomeScreen(accountId: String, libraryViewModel: NovelLibraryViewModel, 
 					title = stringResource(R.string.novel),
 					navigationIcon = { BackNavigationIcon(onClick = onBack) },
 				)
-				TabRow(
-					tabs = tabs.map { stringResource(it.first) },
-					selectedTabIndex = selectedTab,
-					onTabSelected = { selectedTab = it },
-				)
+				NovelTabBar(tabs.map { stringResource(it.first) }, selectedTab) { selectedTab = it }
 			}
 		},
 	) { padding ->
@@ -106,6 +106,30 @@ fun NovelHomeScreen(accountId: String, libraryViewModel: NovelLibraryViewModel, 
 					color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
 					fontSize = 15.sp,
 				)
+			}
+		}
+	}
+}
+
+@Composable
+private fun NovelTabBar(tabs: List<String>, selectedIndex: Int, onSelected: (Int) -> Unit) {
+	val shape = RoundedCornerShape(18.dp)
+	Row(
+		Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)
+			.clip(shape)
+			.border(1.dp, MiuixTheme.colorScheme.onSurface.copy(alpha = 0.10f), shape)
+			.background(MiuixTheme.colorScheme.surface.copy(alpha = 0.72f))
+			.padding(3.dp),
+	) {
+		tabs.forEachIndexed { index, label ->
+			val selected = index == selectedIndex
+			Box(
+				Modifier.weight(1f).clip(RoundedCornerShape(15.dp))
+					.background(if (selected) MiuixTheme.colorScheme.primary.copy(alpha = 0.11f) else androidx.compose.ui.graphics.Color.Transparent)
+					.clickable { onSelected(index) }.padding(vertical = 12.dp),
+				contentAlignment = Alignment.Center,
+			) {
+				Text(label, color = if (selected) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurfaceVariantSummary, fontSize = 15.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
 			}
 		}
 	}

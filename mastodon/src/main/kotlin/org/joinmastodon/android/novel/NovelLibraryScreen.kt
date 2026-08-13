@@ -6,7 +6,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.Image
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,10 +30,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -41,7 +42,6 @@ import androidx.compose.ui.unit.sp
 import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
-import org.joinmastodon.android.R
 import org.joinmastodon.reader.data.NovelBookEntity
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Text
@@ -98,9 +98,9 @@ fun NovelLibraryScreen(
 					Modifier.clip(RoundedCornerShape(14.dp)).border(1.dp, MiuixTheme.colorScheme.onSurface.copy(alpha = 0.12f), RoundedCornerShape(14.dp)),
 					verticalAlignment = Alignment.CenterVertically,
 				) {
-					HeaderAction(R.drawable.ic_fluent_arrow_sync_24_regular, if (state.refreshing) "同步中" else "同步", onRefresh)
+					HeaderAction(NovelIconType.Sync, if (state.refreshing) "同步中" else "同步", onRefresh)
 					Box(Modifier.width(1.dp).height(24.dp).background(MiuixTheme.colorScheme.onSurface.copy(alpha = 0.12f)))
-					HeaderAction(R.drawable.ic_fluent_document_arrow_up_20_regular, "导入小说") { importVisible = true }
+					HeaderAction(NovelIconType.Upload, "导入小说") { importVisible = true }
 				}
 			}
 		}
@@ -162,7 +162,14 @@ private fun BookRow(book: NovelBookEntity, details: NovelBookDetails?, onOpen: (
 		book.downloadState == "failed" -> "下载失败，点按重试"
 		else -> "仅在云端"
 	}
-	Card(Modifier.fillMaxWidth()) {
+	val cardShape = RoundedCornerShape(18.dp)
+	Box(
+		Modifier.fillMaxWidth()
+			.shadow(8.dp, cardShape, clip = false)
+			.background(MiuixTheme.colorScheme.surface, cardShape)
+			.border(1.dp, MiuixTheme.colorScheme.onSurface.copy(alpha = 0.06f), cardShape)
+			.padding(horizontal = 14.dp, vertical = 15.dp),
+	) {
 		Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
 			BookStateTile(ready, book.downloadState == "failed")
 			Spacer(Modifier.width(14.dp))
@@ -170,7 +177,7 @@ private fun BookRow(book: NovelBookEntity, details: NovelBookDetails?, onOpen: (
 				Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
 					Text(book.title, Modifier.weight(1f), fontSize = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
 					Row(Modifier.clip(RoundedCornerShape(10.dp)).clickable(onClick = onManage).padding(start = 8.dp, end = 2.dp, top = 2.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-						ResourceIcon(R.drawable.ic_fluent_settings_20_regular, 18.dp, MiuixTheme.colorScheme.onSurfaceVariantSummary)
+						NovelLineIcon(NovelIconType.Settings, 18.dp, MiuixTheme.colorScheme.onSurfaceVariantSummary)
 						Spacer(Modifier.width(4.dp))
 						Text("管理", color = MiuixTheme.colorScheme.onSurfaceVariantSummary, fontSize = 13.sp)
 					}
@@ -189,9 +196,9 @@ private fun BookRow(book: NovelBookEntity, details: NovelBookDetails?, onOpen: (
 }
 
 @Composable
-private fun HeaderAction(icon: Int, label: String, onClick: () -> Unit) {
+private fun HeaderAction(icon: NovelIconType, label: String, onClick: () -> Unit) {
 	Row(Modifier.clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) {
-		ResourceIcon(icon, 20.dp, MiuixTheme.colorScheme.primary)
+		NovelLineIcon(icon, 20.dp, MiuixTheme.colorScheme.primary)
 		Spacer(Modifier.width(6.dp))
 		Text(label, color = MiuixTheme.colorScheme.primary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
 	}
@@ -202,7 +209,7 @@ private fun BookStateTile(ready: Boolean, failed: Boolean) {
 	val tint = when { failed -> MiuixTheme.colorScheme.error; else -> MiuixTheme.colorScheme.primary }
 	val background = tint.copy(alpha = 0.10f)
 	Box(Modifier.size(54.dp).clip(RoundedCornerShape(14.dp)).background(background), contentAlignment = Alignment.Center) {
-		ResourceIcon(if (ready) R.drawable.ic_fluent_book_open_24_regular else R.drawable.ic_fluent_arrow_download_24_regular, 28.dp, tint)
+		NovelLineIcon(if (ready) NovelIconType.Book else NovelIconType.Download, 28.dp, tint)
 	}
 }
 
@@ -210,7 +217,7 @@ private fun BookStateTile(ready: Boolean, failed: Boolean) {
 private fun StatusBadge(label: String, ready: Boolean, failed: Boolean, downloading: Boolean) {
 	val tint = when { failed -> MiuixTheme.colorScheme.error; ready -> Color(0xFF168A5B); else -> MiuixTheme.colorScheme.primary }
 	Row(Modifier.clip(RoundedCornerShape(8.dp)).background(tint.copy(alpha = 0.10f)).padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-		ResourceIcon(when { failed -> R.drawable.ic_fluent_error_circle_20_regular; ready -> R.drawable.ic_fluent_checkmark_circle_20_regular; downloading -> R.drawable.ic_fluent_arrow_sync_20_regular; else -> R.drawable.ic_fluent_cloud_20_regular }, 16.dp, tint)
+		NovelLineIcon(when { failed -> NovelIconType.Error; ready -> NovelIconType.Check; downloading -> NovelIconType.Sync; else -> NovelIconType.Cloud }, 16.dp, tint)
 		Spacer(Modifier.width(5.dp))
 		Text(label, fontSize = 12.sp, color = tint, fontWeight = FontWeight.Medium)
 	}
@@ -225,15 +232,67 @@ private fun PrimaryBookAction(ready: Boolean, downloading: Boolean, onClick: () 
 		.clickable(enabled = enabled, onClick = onClick)
 		.padding(horizontal = 13.dp, vertical = 9.dp)
 	Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-		ResourceIcon(if (ready) R.drawable.ic_fluent_book_open_20_regular else R.drawable.ic_fluent_arrow_download_20_regular, 19.dp, if (ready) Color.White else tint)
+		NovelLineIcon(if (ready) NovelIconType.Book else NovelIconType.Download, 19.dp, if (ready) Color.White else tint)
 		Spacer(Modifier.width(6.dp))
 		Text(if (ready) "继续阅读" else if (downloading) "请稍候" else "下载到本机", fontSize = 13.sp, color = if (ready) Color.White else tint, fontWeight = FontWeight.Medium)
 	}
 }
 
+private enum class NovelIconType { Book, Download, Upload, Sync, Settings, Error, Check, Cloud }
+
 @Composable
-private fun ResourceIcon(icon: Int, size: androidx.compose.ui.unit.Dp, tint: Color) {
-	Image(painterResource(icon), contentDescription = null, modifier = Modifier.size(size), colorFilter = ColorFilter.tint(tint))
+private fun NovelLineIcon(type: NovelIconType, size: androidx.compose.ui.unit.Dp, tint: Color) {
+	Canvas(Modifier.size(size)) {
+		val stroke = Stroke(width = 1.8.dp.toPx())
+		val w = this.size.width
+		val h = this.size.height
+		when (type) {
+			NovelIconType.Book -> {
+				val left = Path().apply { moveTo(w * .12f, h * .22f); quadraticTo(w * .31f, h * .12f, w * .48f, h * .27f); lineTo(w * .48f, h * .82f); quadraticTo(w * .30f, h * .68f, w * .12f, h * .78f); close() }
+				val right = Path().apply { moveTo(w * .88f, h * .22f); quadraticTo(w * .69f, h * .12f, w * .52f, h * .27f); lineTo(w * .52f, h * .82f); quadraticTo(w * .70f, h * .68f, w * .88f, h * .78f); close() }
+				drawPath(left, tint, style = stroke); drawPath(right, tint, style = stroke)
+			}
+			NovelIconType.Download, NovelIconType.Upload -> {
+				val upload = type == NovelIconType.Upload
+				val fromY = if (upload) h * .68f else h * .20f
+				val toY = if (upload) h * .22f else h * .68f
+				drawLine(tint, androidx.compose.ui.geometry.Offset(w * .5f, fromY), androidx.compose.ui.geometry.Offset(w * .5f, toY), stroke.width)
+				val arrowY = toY
+				val wingY = if (upload) arrowY + h * .16f else arrowY - h * .16f
+				drawLine(tint, androidx.compose.ui.geometry.Offset(w * .5f, arrowY), androidx.compose.ui.geometry.Offset(w * .34f, wingY), stroke.width)
+				drawLine(tint, androidx.compose.ui.geometry.Offset(w * .5f, arrowY), androidx.compose.ui.geometry.Offset(w * .66f, wingY), stroke.width)
+				drawLine(tint, androidx.compose.ui.geometry.Offset(w * .18f, h * .82f), androidx.compose.ui.geometry.Offset(w * .82f, h * .82f), stroke.width)
+			}
+			NovelIconType.Sync -> {
+				drawArc(tint, 205f, 220f, false, style = stroke)
+				drawArc(tint, 25f, 220f, false, style = stroke)
+				drawLine(tint, androidx.compose.ui.geometry.Offset(w * .12f, h * .30f), androidx.compose.ui.geometry.Offset(w * .31f, h * .29f), stroke.width)
+				drawLine(tint, androidx.compose.ui.geometry.Offset(w * .88f, h * .70f), androidx.compose.ui.geometry.Offset(w * .69f, h * .71f), stroke.width)
+			}
+			NovelIconType.Settings -> {
+				drawCircle(tint, w * .20f, style = stroke)
+				drawCircle(tint, w * .08f, style = stroke)
+				for (i in 0 until 8) {
+					val angle = Math.toRadians((i * 45).toDouble())
+					drawLine(tint, androidx.compose.ui.geometry.Offset(w * .5f + kotlin.math.cos(angle).toFloat() * w * .25f, h * .5f + kotlin.math.sin(angle).toFloat() * h * .25f), androidx.compose.ui.geometry.Offset(w * .5f + kotlin.math.cos(angle).toFloat() * w * .40f, h * .5f + kotlin.math.sin(angle).toFloat() * h * .40f), stroke.width)
+				}
+			}
+			NovelIconType.Error, NovelIconType.Check -> {
+				drawCircle(tint, w * .42f, style = stroke)
+				if (type == NovelIconType.Error) {
+					drawLine(tint, androidx.compose.ui.geometry.Offset(w * .5f, h * .27f), androidx.compose.ui.geometry.Offset(w * .5f, h * .56f), stroke.width)
+					drawCircle(tint, w * .045f, androidx.compose.ui.geometry.Offset(w * .5f, h * .72f))
+				} else {
+					drawLine(tint, androidx.compose.ui.geometry.Offset(w * .27f, h * .52f), androidx.compose.ui.geometry.Offset(w * .44f, h * .68f), stroke.width)
+					drawLine(tint, androidx.compose.ui.geometry.Offset(w * .44f, h * .68f), androidx.compose.ui.geometry.Offset(w * .74f, h * .35f), stroke.width)
+				}
+			}
+			NovelIconType.Cloud -> {
+				val cloud = Path().apply { moveTo(w * .20f, h * .68f); cubicTo(w * .08f, h * .54f, w * .18f, h * .38f, w * .34f, h * .40f); cubicTo(w * .42f, h * .18f, w * .72f, h * .22f, w * .74f, h * .45f); cubicTo(w * .92f, h * .47f, w * .92f, h * .70f, w * .74f, h * .72f); lineTo(w * .28f, h * .72f) }
+				drawPath(cloud, tint, style = stroke)
+			}
+		}
+	}
 }
 
 @Composable
