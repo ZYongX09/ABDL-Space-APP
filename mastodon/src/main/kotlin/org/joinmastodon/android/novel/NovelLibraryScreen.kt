@@ -50,13 +50,13 @@ import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.CloudFill
-import top.yukonga.miuix.kmp.icon.extended.ContactsBook
-import top.yukonga.miuix.kmp.icon.extended.Download
+import top.yukonga.miuix.kmp.icon.extended.FileDownloads
 import top.yukonga.miuix.kmp.icon.extended.Import
+import top.yukonga.miuix.kmp.icon.extended.MoreCircle
+import top.yukonga.miuix.kmp.icon.extended.Notes
 import top.yukonga.miuix.kmp.icon.extended.Ok
 import top.yukonga.miuix.kmp.icon.extended.Refresh
 import top.yukonga.miuix.kmp.icon.extended.Report
-import top.yukonga.miuix.kmp.icon.extended.Settings
 
 @Composable
 fun NovelLibraryScreen(
@@ -178,27 +178,27 @@ private fun BookRow(book: NovelBookEntity, details: NovelBookDetails?, onOpen: (
 			.border(1.dp, MiuixTheme.colorScheme.onSurface.copy(alpha = 0.06f), cardShape)
 			.padding(horizontal = 13.dp, vertical = 13.dp),
 	) {
-		Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+		Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
 			BookStateTile(ready)
 			Spacer(Modifier.width(12.dp))
 			Column(Modifier.weight(1f)) {
 				Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
 					Text(book.title, Modifier.weight(1f), fontSize = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
 					Row(Modifier.clip(RoundedCornerShape(10.dp)).clickable(onClick = onManage).padding(start = 8.dp, end = 2.dp, top = 2.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-						MiuixIcon(MiuixIcons.Settings, 18.dp, MiuixTheme.colorScheme.onSurfaceVariantSummary)
+						MiuixIcon(MiuixIcons.MoreCircle, 18.dp, MiuixTheme.colorScheme.onSurfaceVariantSummary)
 						Spacer(Modifier.width(4.dp))
 						Text("管理", color = MiuixTheme.colorScheme.onSurfaceVariantSummary, fontSize = 13.sp)
 					}
 				}
 				if (metadata.isNotBlank()) Text(metadata, fontSize = 13.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary, maxLines = 1, overflow = TextOverflow.Ellipsis)
 				Spacer(Modifier.height(7.dp))
+				StatusBadge(status, ready, book.downloadState == "failed", downloading)
+				Spacer(Modifier.height(7.dp))
 				Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-					StatusBadge(status, ready, book.downloadState == "failed", downloading)
-					Spacer(Modifier.weight(1f))
+					Text("更新于 ${DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(book.updatedAt))}", Modifier.weight(1f), fontSize = 11.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary, maxLines = 1)
+					Spacer(Modifier.width(8.dp))
 					PrimaryBookAction(ready, downloading) { if (ready) onOpen(book) else onDownload(book) }
 				}
-				Spacer(Modifier.height(6.dp))
-				Text("更新于 ${DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(book.updatedAt))}", fontSize = 11.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary, maxLines = 1)
 			}
 		}
 	}
@@ -218,7 +218,7 @@ private fun BookStateTile(ready: Boolean) {
 	val tint = MiuixTheme.colorScheme.primary
 	val background = tint.copy(alpha = 0.10f)
 	Box(Modifier.size(46.dp).clip(RoundedCornerShape(12.dp)).background(background), contentAlignment = Alignment.Center) {
-		MiuixIcon(if (ready) MiuixIcons.ContactsBook else MiuixIcons.CloudFill, 24.dp, tint)
+		MiuixIcon(if (ready) MiuixIcons.Notes else MiuixIcons.CloudFill, 24.dp, tint)
 	}
 }
 
@@ -239,11 +239,11 @@ private fun PrimaryBookAction(ready: Boolean, downloading: Boolean, onClick: () 
 	val modifier = Modifier.clip(RoundedCornerShape(12.dp))
 		.then(if (ready) Modifier.background(tint) else Modifier.border(1.dp, tint, RoundedCornerShape(12.dp)))
 		.clickable(enabled = enabled, onClick = onClick)
-		.padding(horizontal = 11.dp, vertical = 8.dp)
+		.padding(horizontal = 10.dp, vertical = 8.dp)
 	Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-		MiuixIcon(if (ready) MiuixIcons.ContactsBook else MiuixIcons.Download, 18.dp, if (ready) Color.White else tint)
-		Spacer(Modifier.width(6.dp))
-		Text(if (ready) "继续阅读" else if (downloading) "请稍候" else "下载到本机", fontSize = 13.sp, color = if (ready) Color.White else tint, fontWeight = FontWeight.Medium)
+		MiuixIcon(if (ready) MiuixIcons.Notes else MiuixIcons.FileDownloads, 17.dp, if (ready) Color.White else tint)
+		Spacer(Modifier.width(5.dp))
+		Text(if (ready) "继续阅读" else if (downloading) "请稍候" else "下载到本机", fontSize = 12.sp, color = if (ready) Color.White else tint, fontWeight = FontWeight.Medium, maxLines = 1)
 	}
 }
 
