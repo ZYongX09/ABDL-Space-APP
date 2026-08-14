@@ -104,7 +104,7 @@ fun NovelHomeScreen(accountId: String, libraryViewModel: NovelLibraryViewModel, 
 				return@Box
 			}
 			if (selectedTab == 2) {
-				AuthoringScreen(authoringState, authoringViewModel::refresh, authoringViewModel::createWork, authoringViewModel::dismissError, authoringViewModel::consumeCreatedWork)
+				AuthoringScreen(authoringState, authoringViewModel)
 				return@Box
 			}
 			Column(

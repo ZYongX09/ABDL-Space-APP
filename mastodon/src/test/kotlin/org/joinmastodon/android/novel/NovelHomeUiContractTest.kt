@@ -70,6 +70,20 @@ class NovelHomeUiContractTest {
 		assertTrue(authoringApi.contains("/api/v1/novels/authoring"))
 		assertTrue(authoringApi.contains("cache(null)"))
 		assertTrue(authoringApi.contains("Idempotency-Key"))
+		assertTrue(authoringApi.contains("/structure"))
+		assertTrue(authoringApi.contains("/volumes/"))
+		assertTrue(authoringViewModel.contains("openWork("))
+		assertTrue(authoringViewModel.contains("createVolume("))
+		assertTrue(authoringViewModel.contains("createChapter("))
+		assertTrue(authoringViewModel.contains("renameVolume("))
+		assertTrue(authoringViewModel.contains("renameChapter("))
+		assertTrue(authoringViewModel.contains("deleteVolume("))
+		assertTrue(authoringViewModel.contains("deleteChapter("))
+		assertTrue(authoring.contains("作品目录"))
+		assertTrue(authoring.contains("新建分卷"))
+		assertTrue(authoring.contains("新建章节"))
+		assertTrue(authoring.contains("正文编辑将在下一阶段开放"))
+		assertTrue(authoring.contains("BackHandler"))
 	}
 
 	@Test

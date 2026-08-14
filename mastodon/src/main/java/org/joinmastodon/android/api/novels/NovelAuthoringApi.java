@@ -10,6 +10,8 @@ import org.joinmastodon.android.api.session.AccountSession;
 
 import java.io.IOException;
 import java.util.List;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 
 import okhttp3.Call;
 import okhttp3.MediaType;
@@ -54,6 +56,42 @@ public class NovelAuthoringApi{
 				.post(RequestBody.create(JSON, GSON.toJson(input)))
 				.build();
 		return callFactory.newCall(request);
+	}
+
+	public Call newStructureCall(String workId){
+		return callFactory.newCall(authorizedRequest(baseUrl+"/works/"+encode(workId)+"/structure").get().build());
+	}
+
+	public Call newCreateVolumeCall(String workId, TitleRequest input, String idempotencyKey){
+		return jsonCall("POST", "/works/"+encode(workId)+"/volumes", input, idempotencyKey);
+	}
+
+	public Call newCreateChapterCall(String workId, String volumeId, TitleRequest input, String idempotencyKey){
+		return jsonCall("POST", "/works/"+encode(workId)+"/volumes/"+encode(volumeId)+"/chapters", input, idempotencyKey);
+	}
+
+	public Call newRenameVolumeCall(String workId, String volumeId, TitleRequest input){
+		return jsonCall("PATCH", "/works/"+encode(workId)+"/volumes/"+encode(volumeId), input, null);
+	}
+
+	public Call newRenameChapterCall(String workId, String volumeId, String chapterId, TitleRequest input){
+		return jsonCall("PATCH", "/works/"+encode(workId)+"/volumes/"+encode(volumeId)+"/chapters/"+encode(chapterId), input, null);
+	}
+
+	public Call newDeleteVolumeCall(String workId, String volumeId){
+		return callFactory.newCall(authorizedRequest(baseUrl+"/works/"+encode(workId)+"/volumes/"+encode(volumeId)).delete().build());
+	}
+
+	public Call newDeleteChapterCall(String workId, String volumeId, String chapterId){
+		return callFactory.newCall(authorizedRequest(baseUrl+"/works/"+encode(workId)+"/volumes/"+encode(volumeId)+"/chapters/"+encode(chapterId)).delete().build());
+	}
+
+	private Call jsonCall(String method, String path, Object input, String idempotencyKey){
+		Request.Builder builder=authorizedRequest(baseUrl+path);
+		if(idempotencyKey!=null) builder.header("Idempotency-Key", idempotencyKey);
+		RequestBody body=RequestBody.create(JSON, GSON.toJson(input));
+		builder.method(method, body);
+		return callFactory.newCall(builder.build());
 	}
 
 	public <T> T executeJson(Call call, Class<T> type) throws IOException{
@@ -112,8 +150,45 @@ public class NovelAuthoringApi{
 		}
 	}
 
+	public static class TitleRequest{
+		public final String title;
+		public TitleRequest(String title){ this.title=title; }
+	}
+
+	public static class StructureDto{
+		public WorkDto work;
+		public List<VolumeDto> volumes;
+	}
+
+	public static class VolumeDto{
+		public String id;
+		public String title;
+		public long sortOrder;
+		public long createdAt;
+		public long updatedAt;
+		public List<ChapterDto> chapters;
+	}
+
+	public static class ChapterDto{
+		public String id;
+		public String volumeId;
+		public String title;
+		public long sortOrder;
+		public long createdAt;
+		public long updatedAt;
+	}
+
+	public static class DeleteDto{
+		public String id;
+		public boolean deleted;
+	}
+
 	private static class ErrorEnvelope{
 		String code;
+	}
+
+	private static String encode(String value){
+		return URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20");
 	}
 
 	public static class ApiException extends IOException{
