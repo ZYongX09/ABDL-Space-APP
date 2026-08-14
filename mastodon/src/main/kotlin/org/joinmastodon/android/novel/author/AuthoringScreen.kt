@@ -12,6 +12,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -41,10 +44,9 @@ import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
-fun AuthoringScreen(state: AuthoringState, viewModel: AuthoringViewModel) {
+fun AuthoringScreen(state: AuthoringState, viewModel: AuthoringViewModel, onOpenChapter: (String, NovelAuthoringApi.ChapterDto) -> Unit) {
 	var createVisible by rememberSaveable { mutableStateOf(false) }
 	BackHandler(enabled = state.selectedWorkId != null) { viewModel.closeWork() }
-	BackHandler(enabled = state.editingChapter != null) { viewModel.closeChapter() }
 	LaunchedEffect(state.createdWorkId) {
 		if (state.createdWorkId != null) {
 			createVisible = false
@@ -52,12 +54,7 @@ fun AuthoringScreen(state: AuthoringState, viewModel: AuthoringViewModel) {
 		}
 	}
 	if (state.selectedWorkId != null) {
-		if (state.editingChapter != null) {
-			ChapterEditorScreen(state, viewModel)
-			state.error?.let { ErrorDialog(it, viewModel::dismissError) { viewModel.refreshEditorConflict() } }
-			return
-		}
-		WorkStructureScreen(state, viewModel)
+		WorkStructureScreen(state, viewModel, onOpenChapter)
 		state.error?.let { ErrorDialog(it, viewModel::dismissError) { viewModel.loadStructure() } }
 		return
 	}
@@ -129,7 +126,7 @@ private fun WorkCard(work: NovelAuthoringApi.WorkDto, onClick: () -> Unit) {
 }
 
 @Composable
-private fun WorkStructureScreen(state: AuthoringState, viewModel: AuthoringViewModel) {
+private fun WorkStructureScreen(state: AuthoringState, viewModel: AuthoringViewModel, onOpenChapter: (String, NovelAuthoringApi.ChapterDto) -> Unit) {
 	var titleDialog by rememberSaveable { mutableStateOf<String?>(null) }
 	var targetVolumeId by rememberSaveable { mutableStateOf<String?>(null) }
 	var targetChapterId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -142,7 +139,7 @@ private fun WorkStructureScreen(state: AuthoringState, viewModel: AuthoringViewM
 				Text("返回", Modifier.clickable { viewModel.closeWork() }.padding(start = 0.dp, top = 10.dp, end = 14.dp, bottom = 10.dp), color = MiuixTheme.colorScheme.primary)
 				Column(Modifier.weight(1f)) {
 					Text(structure?.work?.title ?: "作品目录", fontSize = 21.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-					Text("作品目录 · 正文编辑将在下一阶段开放", fontSize = 13.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
+					Text("作品目录 · 点击章节进入独立编辑页", fontSize = 13.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
 				}
 				TextButton("新建分卷", enabled = !state.structureOperating, onClick = { titleDialog = "新建分卷"; targetVolumeId = null; targetChapterId = null; initialTitle = "" })
 			}
@@ -151,7 +148,7 @@ private fun WorkStructureScreen(state: AuthoringState, viewModel: AuthoringViewM
 		if (!state.structureLoading && structure?.volumes.orEmpty().isEmpty()) item {
 			Column(Modifier.fillMaxWidth().padding(vertical = 46.dp), horizontalAlignment = Alignment.CenterHorizontally) {
 				Text("还没有分卷", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-				Text("先建立目录，再进入正文编辑阶段", Modifier.padding(top = 8.dp), color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
+				Text("先建立分卷和章节，再进入独立正文编辑页", Modifier.padding(top = 8.dp), color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
 			}
 		}
 		structure?.volumes.orEmpty().forEach { volume ->
@@ -160,7 +157,7 @@ private fun WorkStructureScreen(state: AuthoringState, viewModel: AuthoringViewM
 					onAddChapter = { titleDialog = "新建章节"; targetVolumeId = volume.id; targetChapterId = null; initialTitle = "" },
 					onRename = { titleDialog = "修改分卷名称"; targetVolumeId = volume.id; targetChapterId = null; initialTitle = volume.title },
 					onDelete = { deleteTarget = "volume:${volume.id}" },
-					onOpenChapter = viewModel::openChapter,
+					onOpenChapter = { chapter -> onOpenChapter(requireNotNull(state.selectedWorkId), chapter) },
 					onRenameChapter = { chapter -> titleDialog = "修改章节名称"; targetVolumeId = volume.id; targetChapterId = chapter.id; initialTitle = chapter.title },
 					onDeleteChapter = { chapter -> deleteTarget = "chapter:${volume.id}:${chapter.id}" },
 				)
@@ -214,12 +211,12 @@ private fun VolumeCard(volume: NovelAuthoringApi.VolumeDto, operating: Boolean, 
 }
 
 @Composable
-private fun ChapterEditorScreen(state: AuthoringState, viewModel: AuthoringViewModel) {
+fun NovelChapterEditorScreen(state: AuthoringState, viewModel: AuthoringViewModel, onClose: () -> Unit) {
 	val chapter = requireNotNull(state.editingChapter)
 	val clipboard = LocalClipboardManager.current
-	Column(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp)) {
+	Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(horizontal = 16.dp, vertical = 8.dp)) {
 		Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-			Text("返回", Modifier.clickable { viewModel.closeChapter() }.padding(end = 14.dp, top = 10.dp, bottom = 10.dp), color = MiuixTheme.colorScheme.primary)
+			Text("取消", Modifier.clickable(onClick = onClose).padding(end = 14.dp, top = 10.dp, bottom = 10.dp), color = MiuixTheme.colorScheme.primary)
 			Column(Modifier.weight(1f)) {
 				Text(chapter.title, fontSize = 20.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
 				Text(editorStatus(state.editorSyncState), fontSize = 12.sp, color = if (state.editorSyncState == "conflict") MiuixTheme.colorScheme.error else MiuixTheme.colorScheme.onSurfaceVariantSummary)
@@ -245,6 +242,7 @@ private fun ChapterEditorScreen(state: AuthoringState, viewModel: AuthoringViewM
 			}
 		}
 	}
+	state.error?.let { ErrorDialog(it, viewModel::dismissError) { viewModel.refreshEditorConflict() } }
 }
 
 private fun editorStatus(state: String) = when (state) {

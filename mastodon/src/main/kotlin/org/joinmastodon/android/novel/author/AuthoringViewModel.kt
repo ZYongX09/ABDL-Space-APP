@@ -62,7 +62,6 @@ class AuthoringViewModel(application: Application, val accountId: String) : Andr
 	private var editorObserveJob: Job? = null
 	private val localSaveParent: CompletableJob = SupervisorJob()
 	private val localSaveScope = CoroutineScope(localSaveParent + Dispatchers.IO)
-	private val localSaveMutex = Mutex()
 	private val conflictResolutionMutex = Mutex()
 
 	init {
@@ -148,20 +147,25 @@ class AuthoringViewModel(application: Application, val accountId: String) : Andr
 		mutableState.update { it.copy(selectedWorkId = null, structure = null, structureLoading = false, structureOperating = false, error = null) }
 	}
 
-	fun openChapter(chapter: NovelAuthoringApi.ChapterDto) {
+	fun openChapter(workId: String, chapter: NovelAuthoringApi.ChapterDto) {
+		if (mutableState.value.editingChapter?.id == chapter.id && !mutableState.value.editorLoading) return
 		editorLoadJob?.cancel()
 		editorObserveJob?.cancel()
-		mutableState.update { it.copy(editingChapter = chapter, editorLoading = true, error = null) }
+		mutableState.update { it.copy(selectedWorkId = workId, editingChapter = chapter, editorLoading = true, error = null) }
 		editorLoadJob = viewModelScope.launch(Dispatchers.IO) {
 			try {
-				guard()
-				var draft = draftDao.getDraft(accountId, chapter.id)
-				if (draft == null) {
-					val now = System.currentTimeMillis()
-					draft = NovelAuthorRevisionDraftEntity(UUID.randomUUID().toString(), accountId, mutableState.value.selectedWorkId ?: error("作品已关闭"), chapter.volumeId, chapter.id, null, 0, 0, "", "draft", "pending", true, now, now, null)
-					val outbox = NovelAuthorRevisionOutboxEntity("create:${draft.localId}", accountId, draft.localId, draft.workId, draft.chapterId, null, "create_revision", "chapter:${chapter.id}:initial", 0, 0, "", "pending", 0, now, now)
-					draftDao.saveLocalDraft(draft, outbox)
-					AuthorDraftSyncWorker.enqueue(getApplication(), accountId)
+				val inputKey = "$accountId\u0000${chapter.id}"
+				val draft = chapterMutex(inputKey).withLock {
+					guard()
+					var stored = draftDao.getDraft(accountId, chapter.id)
+					if (stored == null) {
+						val now = System.currentTimeMillis()
+						stored = NovelAuthorRevisionDraftEntity(UUID.randomUUID().toString(), accountId, workId, chapter.volumeId, chapter.id, null, 0, 0, "", "draft", "pending", true, now, now, null)
+						val outbox = NovelAuthorRevisionOutboxEntity("create:${stored.localId}", accountId, stored.localId, stored.workId, stored.chapterId, null, "create_revision", "chapter:${chapter.id}:initial", 0, 0, "", "pending", 0, now, now)
+						draftDao.saveLocalDraft(stored, outbox)
+						AuthorDraftSyncWorker.enqueue(getApplication(), accountId)
+					}
+					stored
 				}
 				if (mutableState.value.editingChapter?.id != chapter.id) return@launch
 				val conflict = draftDao.conflict(accountId, chapter.id)
@@ -194,7 +198,7 @@ class AuthoringViewModel(application: Application, val accountId: String) : Andr
 		localSaveScope.launch {
 			val lease = NovelAccountDataCleaner.enterOperation(accountId, generation) ?: return@launch
 			try {
-				val shouldEnqueue = localSaveMutex.withLock {
+				val shouldEnqueue = chapterMutex(inputKey).withLock {
 					if (inputVersion != inputVersions[inputKey]?.get()) return@withLock false
 					guard()
 					val current = draftDao.getDraft(accountId, chapter.id) ?: return@withLock false
@@ -349,5 +353,7 @@ class AuthoringViewModel(application: Application, val accountId: String) : Andr
 
 	companion object {
 		private val inputVersions = ConcurrentHashMap<String, AtomicLong>()
+		private val chapterMutexes = ConcurrentHashMap<String, Mutex>()
+		private fun chapterMutex(key: String) = chapterMutexes.computeIfAbsent(key) { Mutex() }
 	}
 }

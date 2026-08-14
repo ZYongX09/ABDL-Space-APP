@@ -35,6 +35,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -42,6 +43,7 @@ import android.net.Uri
 import org.joinmastodon.android.R
 import org.joinmastodon.android.novel.author.AuthoringScreen
 import org.joinmastodon.android.novel.author.AuthoringViewModel
+import org.joinmastodon.android.novel.author.NovelChapterEditorActivity
 import org.joinmastodon.android.ui.compose.component.BackNavigationIcon
 import org.joinmastodon.android.ui.compose.ui.isInDarkTheme
 import org.joinmastodon.reader.domain.ReaderPalette
@@ -57,6 +59,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
 fun NovelHomeScreen(accountId: String, libraryViewModel: NovelLibraryViewModel, authoringViewModel: AuthoringViewModel, externalDocument: Uri? = null, onBack: () -> Unit) {
+	val context = LocalContext.current
 	val libraryState by libraryViewModel.state.collectAsState()
 	val authoringState by authoringViewModel.state.collectAsState()
 	var pendingNote by remember { mutableStateOf<Triple<String, String, ReaderPosition>?>(null) }
@@ -104,7 +107,9 @@ fun NovelHomeScreen(accountId: String, libraryViewModel: NovelLibraryViewModel, 
 				return@Box
 			}
 			if (selectedTab == 2) {
-				AuthoringScreen(authoringState, authoringViewModel)
+				AuthoringScreen(authoringState, authoringViewModel) { workId, chapter ->
+					context.startActivity(NovelChapterEditorActivity.intent(context, accountId, workId, chapter))
+				}
 				return@Box
 			}
 			Column(
