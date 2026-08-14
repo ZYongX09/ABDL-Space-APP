@@ -28,6 +28,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import java.text.DateFormat
 import java.util.Date
 import org.joinmastodon.android.api.novels.NovelAuthoringApi
@@ -42,6 +44,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 fun AuthoringScreen(state: AuthoringState, viewModel: AuthoringViewModel) {
 	var createVisible by rememberSaveable { mutableStateOf(false) }
 	BackHandler(enabled = state.selectedWorkId != null) { viewModel.closeWork() }
+	BackHandler(enabled = state.editingChapter != null) { viewModel.closeChapter() }
 	LaunchedEffect(state.createdWorkId) {
 		if (state.createdWorkId != null) {
 			createVisible = false
@@ -49,6 +52,11 @@ fun AuthoringScreen(state: AuthoringState, viewModel: AuthoringViewModel) {
 		}
 	}
 	if (state.selectedWorkId != null) {
+		if (state.editingChapter != null) {
+			ChapterEditorScreen(state, viewModel)
+			state.error?.let { ErrorDialog(it, viewModel::dismissError) { viewModel.refreshEditorConflict() } }
+			return
+		}
 		WorkStructureScreen(state, viewModel)
 		state.error?.let { ErrorDialog(it, viewModel::dismissError) { viewModel.loadStructure() } }
 		return
@@ -152,6 +160,7 @@ private fun WorkStructureScreen(state: AuthoringState, viewModel: AuthoringViewM
 					onAddChapter = { titleDialog = "新建章节"; targetVolumeId = volume.id; targetChapterId = null; initialTitle = "" },
 					onRename = { titleDialog = "修改分卷名称"; targetVolumeId = volume.id; targetChapterId = null; initialTitle = volume.title },
 					onDelete = { deleteTarget = "volume:${volume.id}" },
+					onOpenChapter = viewModel::openChapter,
 					onRenameChapter = { chapter -> titleDialog = "修改章节名称"; targetVolumeId = volume.id; targetChapterId = chapter.id; initialTitle = chapter.title },
 					onDeleteChapter = { chapter -> deleteTarget = "chapter:${volume.id}:${chapter.id}" },
 				)
@@ -185,7 +194,7 @@ private fun WorkStructureScreen(state: AuthoringState, viewModel: AuthoringViewM
 }
 
 @Composable
-private fun VolumeCard(volume: NovelAuthoringApi.VolumeDto, operating: Boolean, onAddChapter: () -> Unit, onRename: () -> Unit, onDelete: () -> Unit, onRenameChapter: (NovelAuthoringApi.ChapterDto) -> Unit, onDeleteChapter: (NovelAuthoringApi.ChapterDto) -> Unit) {
+private fun VolumeCard(volume: NovelAuthoringApi.VolumeDto, operating: Boolean, onAddChapter: () -> Unit, onRename: () -> Unit, onDelete: () -> Unit, onOpenChapter: (NovelAuthoringApi.ChapterDto) -> Unit, onRenameChapter: (NovelAuthoringApi.ChapterDto) -> Unit, onDeleteChapter: (NovelAuthoringApi.ChapterDto) -> Unit) {
 	val shape = RoundedCornerShape(16.dp)
 	Column(Modifier.fillMaxWidth().background(MiuixTheme.colorScheme.surface, shape).border(1.dp, MiuixTheme.colorScheme.onSurface.copy(alpha = 0.06f), shape).padding(14.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
 		Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -195,13 +204,54 @@ private fun VolumeCard(volume: NovelAuthoringApi.VolumeDto, operating: Boolean, 
 		}
 		volume.chapters.orEmpty().forEach { chapter ->
 			Row(Modifier.fillMaxWidth().padding(start = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-				Text(chapter.title, Modifier.weight(1f).padding(vertical = 8.dp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+				Text(chapter.title, Modifier.weight(1f).clickable(enabled = !operating) { onOpenChapter(chapter) }.padding(vertical = 12.dp), maxLines = 1, overflow = TextOverflow.Ellipsis)
 				Text("改名", Modifier.clickable(enabled = !operating) { onRenameChapter(chapter) }.padding(8.dp), color = MiuixTheme.colorScheme.primary, fontSize = 12.sp)
 				Text("删除", Modifier.clickable(enabled = !operating) { onDeleteChapter(chapter) }.padding(8.dp), color = MiuixTheme.colorScheme.error, fontSize = 12.sp)
 			}
 		}
 		TextButton("新建章节", enabled = !operating, onClick = onAddChapter)
 	}
+}
+
+@Composable
+private fun ChapterEditorScreen(state: AuthoringState, viewModel: AuthoringViewModel) {
+	val chapter = requireNotNull(state.editingChapter)
+	val clipboard = LocalClipboardManager.current
+	Column(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp)) {
+		Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+			Text("返回", Modifier.clickable { viewModel.closeChapter() }.padding(end = 14.dp, top = 10.dp, bottom = 10.dp), color = MiuixTheme.colorScheme.primary)
+			Column(Modifier.weight(1f)) {
+				Text(chapter.title, fontSize = 20.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+				Text(editorStatus(state.editorSyncState), fontSize = 12.sp, color = if (state.editorSyncState == "conflict") MiuixTheme.colorScheme.error else MiuixTheme.colorScheme.onSurfaceVariantSummary)
+			}
+			Text("${state.editorContent.length} 字", color = MiuixTheme.colorScheme.onSurfaceVariantSummary, fontSize = 12.sp)
+		}
+		if (state.editorLoading) Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) { CircularProgressIndicator() }
+		else TextField(state.editorContent, viewModel::saveChapterContent, modifier = Modifier.fillMaxWidth().weight(1f), label = "章节正文", enabled = state.editorConflict == null && !state.editorResolving)
+		Text("纯文本自动保存到本机，联网后同步云草稿", Modifier.padding(vertical = 10.dp), color = MiuixTheme.colorScheme.onSurfaceVariantSummary, fontSize = 12.sp)
+	}
+	state.editorConflict?.let { conflict ->
+		OverlayDialog(show = true, title = "发现云端冲突", summary = "另一台设备已修改此章节。不会自动覆盖任何版本。", onDismissRequest = {}) {
+			Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+				Text("本地版本", fontWeight = FontWeight.SemiBold)
+				Text(conflict.localContent.take(240), color = MiuixTheme.colorScheme.onSurfaceVariantSummary, maxLines = 5, overflow = TextOverflow.Ellipsis)
+				Text("云端版本", fontWeight = FontWeight.SemiBold)
+				Text(conflict.serverContent.take(240), color = MiuixTheme.colorScheme.onSurfaceVariantSummary, maxLines = 5, overflow = TextOverflow.Ellipsis)
+				Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+					TextButton("复制文本", enabled = !state.editorResolving, onClick = { clipboard.setText(AnnotatedString(conflict.localContent)) })
+					TextButton("采用云端", enabled = !state.editorResolving, onClick = viewModel::useServerConflict)
+					TextButton("保留本地副本", enabled = !state.editorResolving, onClick = viewModel::keepLocalConflict)
+				}
+			}
+		}
+	}
+}
+
+private fun editorStatus(state: String) = when (state) {
+	"pending" -> "已保存到本机，等待同步"
+	"conflict" -> "存在冲突，自动同步已暂停"
+	"clean" -> "已同步"
+	else -> "仅保存在本机"
 }
 
 @Composable

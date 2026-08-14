@@ -206,8 +206,15 @@ class NovelDatabaseTest {
 		assertEquals("请求期间继续输入", dao.getDraft(accountId, draft.chapterId)?.content)
 		assertEquals("conflict", dao.getDraft(accountId, draft.chapterId)?.syncState)
 		assertEquals("云端正文", dao.conflict(accountId, draft.chapterId)?.serverContent)
+		dao.acknowledgePush(accountId, draft.localId, sentLocalVersion = 1, serverVersion = 2, syncedAt = 4)
+		assertEquals("conflict", dao.getDraft(accountId, draft.chapterId)?.syncState)
+		assertEquals("云端正文", dao.conflict(accountId, draft.chapterId)?.serverContent)
+		val afterConflict = requireNotNull(dao.getDraft(accountId, draft.chapterId)).copy(localVersion = 3, content = "冲突前已接受的输入", updatedAt = 5)
+		dao.saveLocalDraft(afterConflict, newerOutbox.copy(baseVersion = afterConflict.baseVersion, localVersion = 3, content = afterConflict.content, state = "blocked_conflict", updatedAt = 5))
+		assertEquals(3L, dao.conflict(accountId, draft.chapterId)?.localVersion)
+		assertEquals("冲突前已接受的输入", dao.conflict(accountId, draft.chapterId)?.localContent)
 
-		dao.resolveUsingServer(accountId, draft.localId, conflict.conflictId, "云端正文", 3, 5)
+		dao.resolveUsingServer(accountId, draft.localId, conflict.conflictId, 3, "云端正文", 3, 6)
 		val resolved = dao.getDraft(accountId, draft.chapterId)
 		assertEquals("云端正文", resolved?.content)
 		assertEquals(3L, resolved?.baseVersion)
@@ -215,6 +222,26 @@ class NovelDatabaseTest {
 		assertEquals("clean", resolved?.syncState)
 		assertTrue(dao.pending(accountId).isEmpty())
 		assertNull(dao.conflict(accountId, draft.chapterId))
+	}
+
+	@Test
+	fun offlineCreateOutboxBindsRevisionAndPreservesNewerInput() = runBlocking {
+		val accountId = "create.example_1"
+		val dao = open(accountId).authorDraftDao()
+		val draft = NovelAuthorRevisionDraftEntity("local", accountId, "work", "volume", "chapter", null, 0, 1, "first", "draft", "pending", true, 1, 1, null)
+		val create = NovelAuthorRevisionOutboxEntity("create:local", accountId, "local", "work", "chapter", null, "create_revision", "create-1", 0, 1, "first", "pending", 0, 1, 1)
+		dao.saveLocalDraft(draft, create)
+		dao.upsertDraft(draft.copy(localVersion = 2, content = "newer", updatedAt = 2))
+		assertEquals(create, dao.pending(accountId).single())
+		dao.acknowledgeCreate(accountId, "local", 1, "revision", 1, "put-1", 3)
+		val current = requireNotNull(dao.getDraft(accountId, "chapter"))
+		assertEquals("revision", current.remoteRevisionId)
+		assertEquals("newer", current.content)
+		assertTrue(current.dirty)
+		assertEquals("put_draft", dao.pending(accountId).single().operation)
+		assertEquals(1L, dao.pending(accountId).single().baseVersion)
+		dao.saveLocalDraft(current.copy(localVersion = 3, content = "latest", updatedAt = 4), dao.pending(accountId).single().copy(localVersion = 3, content = "latest", idempotencyKey = "put-2", updatedAt = 4))
+		assertEquals("latest", dao.getDraft(accountId, "chapter")?.content)
 	}
 
 	@Test

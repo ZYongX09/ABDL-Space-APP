@@ -11,6 +11,7 @@ import org.joinmastodon.android.novel.download.NovelDownloadWorker
 import org.joinmastodon.android.novel.importer.NovelImportCoordinator
 import org.joinmastodon.android.novel.upload.NovelUploadWorker
 import org.joinmastodon.android.novel.sync.NovelSyncWorker
+import org.joinmastodon.android.novel.author.AuthorDraftSyncWorker
 import org.joinmastodon.reader.data.NovelDatabase
 
 object NovelAccountDataCleaner {
@@ -92,6 +93,7 @@ object NovelAccountDataCleaner {
 		NovelDownloadWorker.cancelAccount(context, accountId)
 		NovelUploadWorker.cancelAccount(context, accountId)
 		NovelSyncWorker.cancelAccount(context, accountId)
+		AuthorDraftSyncWorker.cancelAccount(context, accountId)
 		markCleanupPending(context, accountId)
 		NovelAccountCleanupWorker.enqueue(context, accountId)
 	}

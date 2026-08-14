@@ -84,6 +84,14 @@ class NovelHomeUiContractTest {
 		assertTrue(authoring.contains("新建章节"))
 		assertTrue(authoring.contains("正文编辑将在下一阶段开放"))
 		assertTrue(authoring.contains("BackHandler"))
+		assertTrue(authoring.contains("ChapterEditorScreen"))
+		assertTrue(authoring.contains("保留本地副本"))
+		assertTrue(authoring.contains("采用云端"))
+		assertTrue(authoring.contains("复制文本"))
+		assertTrue(authoringViewModel.contains("saveChapterContent("))
+		assertTrue(authoringViewModel.contains("AuthorDraftSyncWorker.enqueue"))
+		assertTrue(authoringApi.contains("base_version"))
+		assertTrue(authoringApi.contains("DraftConflictException"))
 	}
 
 	@Test

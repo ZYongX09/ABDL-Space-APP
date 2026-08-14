@@ -4,6 +4,7 @@ import com.google.gson.FieldNamingPolicy;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonParseException;
+import com.google.gson.annotations.SerializedName;
 
 import org.joinmastodon.android.api.MastodonAPIController;
 import org.joinmastodon.android.api.session.AccountSession;
@@ -84,6 +85,42 @@ public class NovelAuthoringApi{
 
 	public Call newDeleteChapterCall(String workId, String volumeId, String chapterId){
 		return callFactory.newCall(authorizedRequest(baseUrl+"/works/"+encode(workId)+"/volumes/"+encode(volumeId)+"/chapters/"+encode(chapterId)).delete().build());
+	}
+
+	public Call newCreateRevisionCall(String chapterId, RevisionBodyRequest input, String idempotencyKey){
+		return jsonCall("POST", "/chapters/"+encode(chapterId)+"/revisions", input, idempotencyKey);
+	}
+
+	public Call newDraftCall(String revisionId, DraftRequest input, String idempotencyKey){
+		return jsonCall("PUT", "/revisions/"+encode(revisionId)+"/draft", input, idempotencyKey);
+	}
+
+	public RevisionDto executeDraft(Call call) throws IOException{
+		try(Response response=call.execute()){
+			if(response.priorResponse()!=null) throw new IOException("Redirects are not allowed");
+			ResponseBody body=response.body();
+			String json=body==null ? "" : body.string();
+			try{
+				if(response.code()==409){
+					ConflictEnvelope conflict=json.isEmpty() ? null : GSON.fromJson(json, ConflictEnvelope.class);
+					if(conflict!=null && "revision_conflict".equals(conflict.code) && isValidRevision(conflict.serverRevision))
+						throw new DraftConflictException(conflict.serverRevision);
+					throw new ApiException(response.code(), conflict==null ? null : conflict.code);
+				}
+				if(!response.isSuccessful()){
+					ErrorEnvelope error=json.isEmpty() ? null : GSON.fromJson(json, ErrorEnvelope.class);
+					throw new ApiException(response.code(), error==null ? null : error.code);
+				}
+				if(json.isEmpty()) throw new IOException("Empty response body");
+				RevisionDto revision=GSON.fromJson(json, RevisionDto.class);
+				if(!isValidRevision(revision)) throw new IOException("Invalid revision response");
+				return revision;
+			}catch(JsonParseException | IllegalStateException e){ throw new IOException("Invalid JSON response", e); }
+		}
+	}
+
+	private static boolean isValidRevision(RevisionDto revision){
+		return revision!=null && revision.id!=null && revision.chapterId!=null && revision.body!=null && revision.status!=null && revision.version>=1;
 	}
 
 	private Call jsonCall(String method, String path, Object input, String idempotencyKey){
@@ -183,6 +220,31 @@ public class NovelAuthoringApi{
 		public boolean deleted;
 	}
 
+	public static class RevisionDto{
+		public String id;
+		public String chapterId;
+		public String body;
+		public String status;
+		public long version;
+		public long createdAt;
+		public long updatedAt;
+	}
+
+	public static class RevisionBodyRequest{
+		public final String body;
+		public RevisionBodyRequest(String body){ this.body=body; }
+	}
+
+	public static class DraftRequest{
+		public final String body;
+		@SerializedName("base_version") public final long baseVersion;
+		public DraftRequest(String body, long baseVersion){ this.body=body; this.baseVersion=baseVersion; }
+	}
+
+	private static class ConflictEnvelope extends ErrorEnvelope{
+		@SerializedName("server_revision") RevisionDto serverRevision;
+	}
+
 	private static class ErrorEnvelope{
 		String code;
 	}
@@ -200,5 +262,10 @@ public class NovelAuthoringApi{
 			this.status=status;
 			this.code=code;
 		}
+	}
+
+	public static class DraftConflictException extends IOException{
+		public final RevisionDto serverRevision;
+		DraftConflictException(RevisionDto serverRevision){ super("Novel draft conflict"); this.serverRevision=serverRevision; }
 	}
 }
