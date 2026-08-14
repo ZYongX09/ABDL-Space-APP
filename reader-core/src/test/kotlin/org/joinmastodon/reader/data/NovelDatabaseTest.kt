@@ -130,10 +130,10 @@ class NovelDatabaseTest {
 	}
 
 	@Test
-	fun versionSixExportsSchemaAndMigratesRealVersionOneData() = runBlocking {
-		val schema = File("schemas/org.joinmastodon.reader.data.NovelDatabase/6.json")
+	fun versionSevenExportsSchemaAndMigratesRealVersionOneData() = runBlocking {
+		val schema = File("schemas/org.joinmastodon.reader.data.NovelDatabase/7.json")
 		assertTrue(schema.isFile)
-		assertTrue(schema.readText().contains("\"version\": 6"))
+		assertTrue(schema.readText().contains("\"version\": 7"))
 		val accountId = "migration.example_1"
 		createVersionOneDatabase(accountId)
 
@@ -164,6 +164,57 @@ class NovelDatabaseTest {
 				while (cursor.moveToNext()) add(cursor.getString(cursor.getColumnIndexOrThrow("table")))
 			}
 		})
+	}
+
+	@Test
+	fun authorDraftWritesAndConflictsAreAtomicAndAccountScoped() = runBlocking {
+		val accountId = "author.example_1"
+		val database = open(accountId)
+		val dao = database.authorDraftDao()
+		val draft = NovelAuthorRevisionDraftEntity(
+			localId = "local-1", accountId = accountId, workId = "work-1", volumeId = "volume-1", chapterId = "chapter-1",
+			remoteRevisionId = "revision-1", baseVersion = 1, localVersion = 1, content = "本地正文", revisionState = "draft",
+			syncState = "pending", dirty = true, createdAt = 1, updatedAt = 1, lastSyncedAt = null,
+		)
+		val outbox = NovelAuthorRevisionOutboxEntity(
+			identity = "put:local-1", accountId = accountId, localDraftId = draft.localId, workId = draft.workId,
+			chapterId = draft.chapterId, remoteRevisionId = draft.remoteRevisionId, operation = "put_draft", idempotencyKey = "key-1",
+			baseVersion = 1, localVersion = 1, content = draft.content, state = "pending", attempts = 0, createdAt = 1, updatedAt = 1,
+		)
+
+		dao.saveLocalDraft(draft, outbox)
+
+		assertEquals(draft, dao.getDraft(accountId, draft.chapterId))
+		assertEquals(outbox, dao.pending(accountId).single())
+		assertNull(dao.getDraft("other", draft.chapterId))
+
+		val edited = draft.copy(localVersion = 2, content = "请求期间继续输入", updatedAt = 2)
+		val newerOutbox = outbox.copy(localVersion = 2, content = edited.content, idempotencyKey = "key-2", updatedAt = 2)
+		dao.saveLocalDraft(edited, newerOutbox)
+		dao.acknowledgePush(accountId, draft.localId, sentLocalVersion = 1, serverVersion = 2, syncedAt = 3)
+		assertEquals("请求期间继续输入", dao.getDraft(accountId, draft.chapterId)?.content)
+		assertEquals(2L, dao.getDraft(accountId, draft.chapterId)?.baseVersion)
+		assertTrue(dao.getDraft(accountId, draft.chapterId)?.dirty == true)
+		assertEquals(2L, dao.pending(accountId).single().baseVersion)
+
+		val conflict = NovelAuthorRevisionConflictEntity(
+			conflictId = "conflict-1", accountId = accountId, localDraftId = draft.localId, chapterId = draft.chapterId,
+			localBaseVersion = 2, localVersion = 2, localContent = edited.content, serverVersion = 3, serverContent = "云端正文",
+			detectedAt = 4, resolvedAt = null, resolution = null,
+		)
+		dao.recordConflict(conflict, newerOutbox.identity, expectedLocalVersion = 2)
+		assertEquals("请求期间继续输入", dao.getDraft(accountId, draft.chapterId)?.content)
+		assertEquals("conflict", dao.getDraft(accountId, draft.chapterId)?.syncState)
+		assertEquals("云端正文", dao.conflict(accountId, draft.chapterId)?.serverContent)
+
+		dao.resolveUsingServer(accountId, draft.localId, conflict.conflictId, "云端正文", 3, 5)
+		val resolved = dao.getDraft(accountId, draft.chapterId)
+		assertEquals("云端正文", resolved?.content)
+		assertEquals(3L, resolved?.baseVersion)
+		assertFalse(resolved?.dirty == true)
+		assertEquals("clean", resolved?.syncState)
+		assertTrue(dao.pending(accountId).isEmpty())
+		assertNull(dao.conflict(accountId, draft.chapterId))
 	}
 
 	@Test

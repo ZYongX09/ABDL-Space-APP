@@ -20,8 +20,11 @@ import java.util.WeakHashMap
 		NovelSyncCheckpointEntity::class,
 		NovelSyncOutboxEntity::class,
 		NovelProgressEntity::class,
+		NovelAuthorRevisionDraftEntity::class,
+		NovelAuthorRevisionOutboxEntity::class,
+		NovelAuthorRevisionConflictEntity::class,
 	],
-	version = 6,
+	version = 7,
 	exportSchema = true,
 )
 abstract class NovelDatabase : RoomDatabase() {
@@ -32,6 +35,7 @@ abstract class NovelDatabase : RoomDatabase() {
 	abstract fun annotationDao(): AnnotationDao
 	abstract fun transferDao(): NovelTransferDao
 	abstract fun syncDao(): NovelSyncDao
+	abstract fun authorDraftDao(): NovelAuthorDraftDao
 
 	companion object {
 		private val openDatabases = mutableMapOf<String, MutableSet<NovelDatabase>>()
@@ -41,7 +45,7 @@ abstract class NovelDatabase : RoomDatabase() {
 				context.applicationContext,
 				NovelDatabase::class.java,
 				databaseName(accountId),
-			).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6).build().also { database ->
+			).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7).build().also { database ->
 				synchronized(openDatabases) {
 					openDatabases.getOrPut(accountId) { Collections.newSetFromMap(WeakHashMap()) }.add(database)
 				}
@@ -88,6 +92,21 @@ abstract class NovelDatabase : RoomDatabase() {
 				db.execSQL("CREATE INDEX IF NOT EXISTS index_novel_sync_outbox_accountId_state ON novel_sync_outbox(accountId, state)")
 				db.execSQL("CREATE TABLE IF NOT EXISTS novel_progress (itemId TEXT NOT NULL, accountId TEXT NOT NULL, bookId TEXT NOT NULL, payload TEXT NOT NULL, updatedAt INTEGER NOT NULL, deletedAt INTEGER, PRIMARY KEY(itemId))")
 				db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_novel_progress_accountId_bookId ON novel_progress(accountId, bookId)")
+			}
+		}
+
+		val MIGRATION_6_7 = object : Migration(6, 7) {
+			override fun migrate(db: SupportSQLiteDatabase) {
+				db.execSQL("CREATE TABLE IF NOT EXISTS novel_author_revision_drafts (localId TEXT NOT NULL, accountId TEXT NOT NULL, workId TEXT NOT NULL, volumeId TEXT NOT NULL, chapterId TEXT NOT NULL, remoteRevisionId TEXT, baseVersion INTEGER NOT NULL, localVersion INTEGER NOT NULL, content TEXT NOT NULL, revisionState TEXT NOT NULL, syncState TEXT NOT NULL, dirty INTEGER NOT NULL, createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL, lastSyncedAt INTEGER, PRIMARY KEY(localId))")
+				db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_novel_author_revision_drafts_accountId_chapterId ON novel_author_revision_drafts(accountId, chapterId)")
+				db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_novel_author_revision_drafts_accountId_localId ON novel_author_revision_drafts(accountId, localId)")
+				db.execSQL("CREATE INDEX IF NOT EXISTS index_novel_author_revision_drafts_accountId_syncState ON novel_author_revision_drafts(accountId, syncState)")
+				db.execSQL("CREATE TABLE IF NOT EXISTS novel_author_revision_outbox (identity TEXT NOT NULL, accountId TEXT NOT NULL, localDraftId TEXT NOT NULL, workId TEXT NOT NULL, chapterId TEXT NOT NULL, remoteRevisionId TEXT, operation TEXT NOT NULL, idempotencyKey TEXT NOT NULL, baseVersion INTEGER NOT NULL, localVersion INTEGER NOT NULL, content TEXT NOT NULL, state TEXT NOT NULL, attempts INTEGER NOT NULL, createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL, PRIMARY KEY(identity), FOREIGN KEY(accountId, localDraftId) REFERENCES novel_author_revision_drafts(accountId, localId) ON UPDATE NO ACTION ON DELETE CASCADE)")
+				db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_novel_author_revision_outbox_accountId_localDraftId_operation ON novel_author_revision_outbox(accountId, localDraftId, operation)")
+				db.execSQL("CREATE INDEX IF NOT EXISTS index_novel_author_revision_outbox_accountId_state ON novel_author_revision_outbox(accountId, state)")
+				db.execSQL("CREATE TABLE IF NOT EXISTS novel_author_revision_conflicts (conflictId TEXT NOT NULL, accountId TEXT NOT NULL, localDraftId TEXT NOT NULL, chapterId TEXT NOT NULL, localBaseVersion INTEGER NOT NULL, localVersion INTEGER NOT NULL, localContent TEXT NOT NULL, serverVersion INTEGER NOT NULL, serverContent TEXT NOT NULL, detectedAt INTEGER NOT NULL, resolvedAt INTEGER, resolution TEXT, PRIMARY KEY(conflictId), FOREIGN KEY(accountId, localDraftId) REFERENCES novel_author_revision_drafts(accountId, localId) ON UPDATE NO ACTION ON DELETE CASCADE)")
+				db.execSQL("CREATE INDEX IF NOT EXISTS index_novel_author_revision_conflicts_accountId_chapterId_resolvedAt ON novel_author_revision_conflicts(accountId, chapterId, resolvedAt)")
+				db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_novel_author_revision_conflicts_accountId_localDraftId ON novel_author_revision_conflicts(accountId, localDraftId)")
 			}
 		}
 
