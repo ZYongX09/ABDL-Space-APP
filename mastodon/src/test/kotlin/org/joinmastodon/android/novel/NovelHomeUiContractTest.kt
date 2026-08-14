@@ -11,6 +11,9 @@ class NovelHomeUiContractTest {
 	private val library = File(projectDir, "src/main/kotlin/org/joinmastodon/android/novel/NovelLibraryScreen.kt").readText()
 	private val viewModel = File(projectDir, "src/main/kotlin/org/joinmastodon/android/novel/NovelLibraryViewModel.kt").readText()
 	private val activity = File(projectDir, "src/main/kotlin/org/joinmastodon/android/novel/NovelActivity.kt").readText()
+	private val authoring = File(projectDir, "src/main/kotlin/org/joinmastodon/android/novel/author/AuthoringScreen.kt").readText()
+	private val authoringViewModel = File(projectDir, "src/main/kotlin/org/joinmastodon/android/novel/author/AuthoringViewModel.kt").readText()
+	private val authoringApi = File(projectDir, "src/main/java/org/joinmastodon/android/api/novels/NovelAuthoringApi.java").readText()
 
 	@Test
 	fun novelHomeUsesMiuixPageChrome() {
@@ -42,12 +45,31 @@ class NovelHomeUiContractTest {
 		assertFalse(library.contains("封面"))
 		assertTrue(library.contains("章节"))
 		assertTrue(library.contains("下载到本机"))
-		assertTrue(screen.contains("作者功能正在建设"))
-		assertTrue(screen.contains("注册满 72 小时"))
+		assertFalse(screen.contains("作者功能正在建设"))
+		assertTrue(screen.contains("AuthoringScreen"))
 		assertTrue(library.contains("BookStateTile"))
 		assertTrue(library.contains("StatusBadge"))
 		assertTrue(library.contains("PrimaryBookAction"))
 		assertTrue(library.contains("clickable(enabled = enabled"))
+	}
+
+	@Test fun creationTabUsesRealEligibilityAndDraftWorks() {
+		assertTrue(screen.contains("authoringViewModel: AuthoringViewModel"))
+		assertTrue(activity.contains("AuthoringViewModel(application, accountID)"))
+		assertTrue(authoringViewModel.contains("loadEligibility"))
+		assertTrue(authoringViewModel.contains("loadWorks"))
+		assertTrue(authoringViewModel.contains("creating = true"))
+		assertTrue(authoring.contains("创作中心"))
+		assertTrue(authoring.contains("注册已满 72 小时"))
+		assertTrue(authoring.contains("至少发布 1 条当前存在的帖子"))
+		assertTrue(authoring.contains("新建作品"))
+		assertTrue(authoring.contains("当前只创建私有草稿，不会立即公开"))
+		assertTrue(authoring.contains("OverlayDialog"))
+		assertFalse(authoring.contains("封面"))
+		assertFalse(authoring.contains("提交审核"))
+		assertTrue(authoringApi.contains("/api/v1/novels/authoring"))
+		assertTrue(authoringApi.contains("cache(null)"))
+		assertTrue(authoringApi.contains("Idempotency-Key"))
 	}
 
 	@Test

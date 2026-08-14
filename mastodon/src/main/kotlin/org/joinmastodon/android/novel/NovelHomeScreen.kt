@@ -40,6 +40,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import android.net.Uri
 import org.joinmastodon.android.R
+import org.joinmastodon.android.novel.author.AuthoringScreen
+import org.joinmastodon.android.novel.author.AuthoringViewModel
 import org.joinmastodon.android.ui.compose.component.BackNavigationIcon
 import org.joinmastodon.android.ui.compose.ui.isInDarkTheme
 import org.joinmastodon.reader.domain.ReaderPalette
@@ -54,8 +56,9 @@ import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
-fun NovelHomeScreen(accountId: String, libraryViewModel: NovelLibraryViewModel, externalDocument: Uri? = null, onBack: () -> Unit) {
+fun NovelHomeScreen(accountId: String, libraryViewModel: NovelLibraryViewModel, authoringViewModel: AuthoringViewModel, externalDocument: Uri? = null, onBack: () -> Unit) {
 	val libraryState by libraryViewModel.state.collectAsState()
+	val authoringState by authoringViewModel.state.collectAsState()
 	var pendingNote by remember { mutableStateOf<Triple<String, String, ReaderPosition>?>(null) }
 	BackHandler(enabled = libraryState.reader != null) { libraryViewModel.closeReader() }
 	libraryState.reader?.let { reader ->
@@ -100,20 +103,24 @@ fun NovelHomeScreen(accountId: String, libraryViewModel: NovelLibraryViewModel, 
 				NovelLibraryScreen(libraryState, externalDocument, libraryViewModel::refresh, libraryViewModel::upload, libraryViewModel::paste, libraryViewModel::delete, libraryViewModel::download, libraryViewModel::openReader, libraryViewModel::reportError, libraryViewModel::dismissError)
 				return@Box
 			}
+			if (selectedTab == 2) {
+				AuthoringScreen(authoringState, authoringViewModel::refresh, authoringViewModel::createWork, authoringViewModel::dismissError, authoringViewModel::consumeCreatedWork)
+				return@Box
+			}
 			Column(
 				modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp),
 				horizontalAlignment = Alignment.CenterHorizontally,
 				verticalArrangement = Arrangement.Center,
 			) {
 				Text(
-					text = if (selectedTab == 0) "公开书城将在创作功能完成后开放" else "作者功能正在建设",
+					text = "公开书城将在创作功能完成后开放",
 					color = MiuixTheme.colorScheme.onSurface,
 					fontSize = 20.sp,
 					fontWeight = FontWeight.SemiBold,
 				)
 				Spacer(Modifier.height(10.dp))
 				Text(
-					text = if (selectedTab == 0) "当前先确保私人书库、离线阅读和云同步稳定。" else "注册满 72 小时且至少发布过 1 条未删除帖子即可成为作者。后续将提供作品、分卷、章节、云草稿、MiMo 审核、评级、发布与申诉。",
+					text = "当前先确保私人书库、离线阅读和云同步稳定。",
 					color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
 					fontSize = 15.sp,
 				)

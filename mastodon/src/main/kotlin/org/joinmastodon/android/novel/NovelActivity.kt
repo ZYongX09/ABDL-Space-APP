@@ -15,6 +15,7 @@ import androidx.navigationevent.NavigationEventDispatcher
 import androidx.navigationevent.NavigationEventDispatcherOwner
 import androidx.navigationevent.compose.LocalNavigationEventDispatcherOwner
 import org.joinmastodon.android.api.session.AccountSessionManager
+import org.joinmastodon.android.novel.author.AuthoringViewModel
 import org.joinmastodon.android.ui.compose.MiuixAppTheme
 import org.joinmastodon.android.ui.utils.UiUtils
 
@@ -39,6 +40,12 @@ class NovelActivity : ComponentActivity(), NavigationEventDispatcherOwner {
 				return NovelLibraryViewModel(application, accountID) as T
 			}
 		})[NovelLibraryViewModel::class.java]
+		val authoringViewModel = ViewModelProvider(this, object : ViewModelProvider.Factory {
+			override fun <T : ViewModel> create(modelClass: Class<T>): T {
+				@Suppress("UNCHECKED_CAST")
+				return AuthoringViewModel(application, accountID) as T
+			}
+		})[AuthoringViewModel::class.java]
 
 		val darkTheme = UiUtils.isDarkTheme()
 		enableEdgeToEdge(
@@ -48,7 +55,7 @@ class NovelActivity : ComponentActivity(), NavigationEventDispatcherOwner {
 		setContent {
 			CompositionLocalProvider(LocalNavigationEventDispatcherOwner provides this) {
 				MiuixAppTheme {
-					NovelHomeScreen(accountId = accountID, libraryViewModel = libraryViewModel, externalDocument = externalDocument, onBack = ::finish)
+					NovelHomeScreen(accountId = accountID, libraryViewModel = libraryViewModel, authoringViewModel = authoringViewModel, externalDocument = externalDocument, onBack = ::finish)
 				}
 			}
 		}
