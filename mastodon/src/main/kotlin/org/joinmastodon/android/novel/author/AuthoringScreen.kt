@@ -4,17 +4,25 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -27,7 +35,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -37,11 +52,20 @@ import java.text.DateFormat
 import java.util.Date
 import org.joinmastodon.android.api.novels.NovelAuthoringApi
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
+import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Add
+import top.yukonga.miuix.kmp.icon.extended.AddCircle
+import top.yukonga.miuix.kmp.icon.extended.CloudFill
+import top.yukonga.miuix.kmp.icon.extended.FolderFill
+import top.yukonga.miuix.kmp.icon.extended.More
+import top.yukonga.miuix.kmp.icon.extended.Notes
+import top.yukonga.miuix.kmp.icon.extended.Ok
 
 @Composable
 fun AuthoringScreen(state: AuthoringState, viewModel: AuthoringViewModel, onOpenChapter: (String, NovelAuthoringApi.ChapterDto) -> Unit) {
@@ -58,15 +82,17 @@ fun AuthoringScreen(state: AuthoringState, viewModel: AuthoringViewModel, onOpen
 		state.error?.let { ErrorDialog(it, viewModel::dismissError) { viewModel.loadStructure() } }
 		return
 	}
-	LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+	LazyColumn(Modifier.fillMaxSize().padding(horizontal = 18.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
 		item {
-			Spacer(Modifier.height(6.dp))
-			Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-				Column(Modifier.weight(1f)) {
-					Text("创作中心", fontSize = 22.sp, fontWeight = FontWeight.Bold)
-					Text("作品草稿仅自己可见", fontSize = 13.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
+			Spacer(Modifier.height(10.dp))
+			BoxWithConstraints(Modifier.fillMaxWidth()) {
+				if (maxWidth < 360.dp) Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+					HeaderTitle("创作中心", "作品草稿仅自己可见")
+					if (state.eligibility?.eligible == true) PrimaryAction("新建作品", MiuixIcons.AddCircle) { createVisible = true }
+				} else Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+					Column(Modifier.weight(1f)) { HeaderTitle("创作中心", "作品草稿仅自己可见") }
+					if (state.eligibility?.eligible == true) PrimaryAction("新建作品", MiuixIcons.AddCircle) { createVisible = true }
 				}
-				if (state.eligibility?.eligible == true) TextButton("新建作品", onClick = { createVisible = true })
 			}
 		}
 		if (state.loading) {
@@ -82,7 +108,7 @@ fun AuthoringScreen(state: AuthoringState, viewModel: AuthoringViewModel, onOpen
 					}
 				}
 			} else {
-				item { Text("我的作品", fontSize = 17.sp, fontWeight = FontWeight.SemiBold) }
+				item { Text("我的作品", fontSize = 22.sp, fontWeight = FontWeight.Bold) }
 				items(state.works, key = { it.id }) { WorkCard(it) { viewModel.openWork(it.id) } }
 			}
 		}
@@ -96,32 +122,40 @@ fun AuthoringScreen(state: AuthoringState, viewModel: AuthoringViewModel, onOpen
 
 @Composable
 private fun EligibilityCard(eligibility: NovelAuthoringApi.EligibilityDto) {
-	val shape = RoundedCornerShape(18.dp)
-	Column(Modifier.fillMaxWidth().background(MiuixTheme.colorScheme.surface, shape).border(1.dp, MiuixTheme.colorScheme.onSurface.copy(alpha = 0.07f), shape).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-		Text(if (eligibility.eligible) "已获得创作资格" else "创作资格", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+	val shape = RoundedCornerShape(22.dp)
+	Column(Modifier.fillMaxWidth().background(MiuixTheme.colorScheme.surfaceContainer, shape).border(1.dp, MiuixTheme.colorScheme.primary.copy(alpha = 0.18f), shape).padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+		Row(verticalAlignment = Alignment.CenterVertically) {
+			IconTile(MiuixIcons.Ok, 46.dp)
+			Text(if (eligibility.eligible) "已获得创作资格" else "创作资格", Modifier.padding(start = 13.dp), fontSize = 19.sp, fontWeight = FontWeight.SemiBold)
+		}
 		EligibilityRow("注册已满 72 小时", eligibility.accountAgeEligible)
+		DividerLine()
 		EligibilityRow("至少发布 1 条当前存在的帖子", eligibility.postEligible)
 	}
 }
 
 @Composable
 private fun EligibilityRow(label: String, met: Boolean) {
-	Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-		Text(label, fontSize = 14.sp)
-		Text(if (met) "已满足" else "未满足", color = if (met) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.error, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+	Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+		Icon(MiuixIcons.Ok, null, Modifier.size(22.dp), if (met) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurfaceVariantSummary)
+		Text(label, Modifier.weight(1f).padding(start = 12.dp), fontSize = 15.sp)
+		Text(if (met) "已满足" else "未满足", color = if (met) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.error, fontSize = 14.sp, fontWeight = FontWeight.Medium)
 	}
 }
 
 @Composable
 private fun WorkCard(work: NovelAuthoringApi.WorkDto, onClick: () -> Unit) {
-	val shape = RoundedCornerShape(16.dp)
-	Column(Modifier.fillMaxWidth().background(MiuixTheme.colorScheme.surface, shape).border(1.dp, MiuixTheme.colorScheme.onSurface.copy(alpha = 0.06f), shape).clickable(onClick = onClick).padding(15.dp)) {
-		Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-			Text(work.title, Modifier.weight(1f), fontSize = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-			Text("草稿", Modifier.clip(RoundedCornerShape(8.dp)).background(MiuixTheme.colorScheme.primary.copy(alpha = 0.10f)).padding(horizontal = 8.dp, vertical = 4.dp), color = MiuixTheme.colorScheme.primary, fontSize = 12.sp)
+	val shape = RoundedCornerShape(22.dp)
+	Row(Modifier.fillMaxWidth().background(MiuixTheme.colorScheme.surfaceContainer, shape).border(1.dp, MiuixTheme.colorScheme.primary.copy(alpha = 0.15f), shape).clickable(onClick = onClick).padding(17.dp), verticalAlignment = Alignment.CenterVertically) {
+		IconTile(MiuixIcons.Notes, 58.dp)
+		Column(Modifier.weight(1f).padding(start = 15.dp)) {
+			Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+				Text(work.title, Modifier.weight(1f), fontSize = 19.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+				Text("草稿", Modifier.clip(RoundedCornerShape(10.dp)).background(MiuixTheme.colorScheme.primary.copy(alpha = 0.12f)).padding(horizontal = 10.dp, vertical = 5.dp), color = MiuixTheme.colorScheme.primary, fontSize = 12.sp)
+			}
+			if (work.description.isNotBlank()) Text(work.description, Modifier.padding(top = 5.dp), color = MiuixTheme.colorScheme.onSurfaceVariantSummary, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+			Text("${categoryName(work.category)} · 更新于 ${DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(work.updatedAt * 1000))}", Modifier.padding(top = 10.dp), color = MiuixTheme.colorScheme.onSurfaceVariantSummary, fontSize = 12.sp)
 		}
-		if (work.description.isNotBlank()) Text(work.description, Modifier.padding(top = 8.dp), color = MiuixTheme.colorScheme.onSurfaceVariantSummary, fontSize = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-		Text("${categoryName(work.category)} · 更新于 ${DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(work.updatedAt * 1000))}", Modifier.padding(top = 10.dp), color = MiuixTheme.colorScheme.onSurfaceVariantSummary, fontSize = 12.sp)
 	}
 }
 
@@ -133,15 +167,19 @@ private fun WorkStructureScreen(state: AuthoringState, viewModel: AuthoringViewM
 	var initialTitle by rememberSaveable { mutableStateOf("") }
 	var deleteTarget by rememberSaveable { mutableStateOf<String?>(null) }
 	val structure = state.structure
-	LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+	LazyColumn(Modifier.fillMaxSize().padding(horizontal = 18.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
 		item {
-			Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-				Text("返回", Modifier.clickable { viewModel.closeWork() }.padding(start = 0.dp, top = 10.dp, end = 14.dp, bottom = 10.dp), color = MiuixTheme.colorScheme.primary)
-				Column(Modifier.weight(1f)) {
-					Text(structure?.work?.title ?: "作品目录", fontSize = 21.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-					Text("作品目录 · 点击章节进入独立编辑页", fontSize = 13.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
+			BoxWithConstraints(Modifier.fillMaxWidth().padding(top = 12.dp)) {
+				val createVolume = { titleDialog = "新建分卷"; targetVolumeId = null; targetChapterId = null; initialTitle = "" }
+				if (maxWidth < 380.dp) Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+					Text("‹ 返回", Modifier.defaultMinSize(minHeight = 48.dp).clickable { viewModel.closeWork() }.padding(vertical = 12.dp), color = MiuixTheme.colorScheme.primary, fontSize = 16.sp)
+					HeaderTitle(structure?.work?.title ?: "作品目录", "作品目录 · 点击章节进入独立编辑页")
+					PrimaryAction("新建分卷", MiuixIcons.Add, enabled = !state.structureOperating, onClick = createVolume)
+				} else Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+					Text("‹ 返回", Modifier.defaultMinSize(minHeight = 48.dp).clickable { viewModel.closeWork() }.padding(end = 16.dp, top = 12.dp, bottom = 12.dp), color = MiuixTheme.colorScheme.primary, fontSize = 16.sp)
+					Column(Modifier.weight(1f)) { HeaderTitle(structure?.work?.title ?: "作品目录", "作品目录 · 点击章节进入独立编辑页") }
+					PrimaryAction("新建分卷", MiuixIcons.Add, enabled = !state.structureOperating, onClick = createVolume)
 				}
-				TextButton("新建分卷", enabled = !state.structureOperating, onClick = { titleDialog = "新建分卷"; targetVolumeId = null; targetChapterId = null; initialTitle = "" })
 			}
 		}
 		if (state.structureLoading && structure == null) item { Row(Modifier.fillMaxWidth().padding(vertical = 50.dp), horizontalArrangement = Arrangement.Center) { CircularProgressIndicator() } }
@@ -192,21 +230,29 @@ private fun WorkStructureScreen(state: AuthoringState, viewModel: AuthoringViewM
 
 @Composable
 private fun VolumeCard(volume: NovelAuthoringApi.VolumeDto, operating: Boolean, onAddChapter: () -> Unit, onRename: () -> Unit, onDelete: () -> Unit, onOpenChapter: (NovelAuthoringApi.ChapterDto) -> Unit, onRenameChapter: (NovelAuthoringApi.ChapterDto) -> Unit, onDeleteChapter: (NovelAuthoringApi.ChapterDto) -> Unit) {
-	val shape = RoundedCornerShape(16.dp)
-	Column(Modifier.fillMaxWidth().background(MiuixTheme.colorScheme.surface, shape).border(1.dp, MiuixTheme.colorScheme.onSurface.copy(alpha = 0.06f), shape).padding(14.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+	val shape = RoundedCornerShape(22.dp)
+	Column(Modifier.fillMaxWidth().background(MiuixTheme.colorScheme.surfaceContainer, shape).border(1.dp, MiuixTheme.colorScheme.primary.copy(alpha = 0.16f), shape).padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
 		Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-			Text(volume.title, Modifier.weight(1f), fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
-			Text("改名", Modifier.clickable(enabled = !operating, onClick = onRename).padding(8.dp), color = MiuixTheme.colorScheme.primary, fontSize = 13.sp)
-			Text("删除", Modifier.clickable(enabled = !operating, onClick = onDelete).padding(8.dp), color = MiuixTheme.colorScheme.error, fontSize = 13.sp)
+			Icon(MiuixIcons.FolderFill, null, Modifier.size(28.dp), MiuixTheme.colorScheme.primary)
+			Text(volume.title, Modifier.weight(1f).padding(start = 12.dp), fontSize = 19.sp, fontWeight = FontWeight.SemiBold)
+			InlineAction("改名", MiuixTheme.colorScheme.primary, operating, onRename)
+			InlineAction("删除", MiuixTheme.colorScheme.error, operating, onDelete)
 		}
+		DividerLine()
 		volume.chapters.orEmpty().forEach { chapter ->
-			Row(Modifier.fillMaxWidth().padding(start = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-				Text(chapter.title, Modifier.weight(1f).clickable(enabled = !operating) { onOpenChapter(chapter) }.padding(vertical = 12.dp), maxLines = 1, overflow = TextOverflow.Ellipsis)
-				Text("改名", Modifier.clickable(enabled = !operating) { onRenameChapter(chapter) }.padding(8.dp), color = MiuixTheme.colorScheme.primary, fontSize = 12.sp)
-				Text("删除", Modifier.clickable(enabled = !operating) { onDeleteChapter(chapter) }.padding(8.dp), color = MiuixTheme.colorScheme.error, fontSize = 12.sp)
+			Row(Modifier.fillMaxWidth().padding(start = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+				Box(Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)).background(MiuixTheme.colorScheme.onSurface.copy(alpha = 0.07f)), contentAlignment = Alignment.Center) {
+					Icon(MiuixIcons.Notes, null, Modifier.size(19.dp), MiuixTheme.colorScheme.onSurfaceVariantSummary)
+				}
+				Text(chapter.title, Modifier.weight(1f).clickable(enabled = !operating) { onOpenChapter(chapter) }.padding(start = 12.dp, top = 14.dp, bottom = 14.dp), fontSize = 17.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+				InlineAction("改名", MiuixTheme.colorScheme.primary, operating) { onRenameChapter(chapter) }
+				InlineAction("删除", MiuixTheme.colorScheme.error, operating) { onDeleteChapter(chapter) }
 			}
 		}
-		TextButton("新建章节", enabled = !operating, onClick = onAddChapter)
+		Row(Modifier.defaultMinSize(minHeight = 48.dp).clip(RoundedCornerShape(14.dp)).border(1.dp, MiuixTheme.colorScheme.primary.copy(alpha = 0.65f), RoundedCornerShape(14.dp)).clickable(enabled = !operating, onClick = onAddChapter).padding(horizontal = 15.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) {
+			Icon(MiuixIcons.Add, null, Modifier.size(20.dp), MiuixTheme.colorScheme.primary)
+			Text("新建章节", Modifier.padding(start = 8.dp), color = MiuixTheme.colorScheme.primary, fontWeight = FontWeight.Medium)
+		}
 	}
 }
 
@@ -214,18 +260,43 @@ private fun VolumeCard(volume: NovelAuthoringApi.VolumeDto, operating: Boolean, 
 fun NovelChapterEditorScreen(state: AuthoringState, viewModel: AuthoringViewModel, onClose: () -> Unit) {
 	val chapter = requireNotNull(state.editingChapter)
 	val clipboard = LocalClipboardManager.current
-	Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(horizontal = 16.dp, vertical = 8.dp)) {
-		Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-			Text("取消", Modifier.clickable(onClick = onClose).padding(end = 14.dp, top = 10.dp, bottom = 10.dp), color = MiuixTheme.colorScheme.primary)
+	Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).imePadding().padding(horizontal = 20.dp)) {
+		Row(Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 18.dp), verticalAlignment = Alignment.CenterVertically) {
+			Text("‹", Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp).clickable(onClick = onClose).padding(end = 18.dp, top = 5.dp, bottom = 5.dp), color = MiuixTheme.colorScheme.onSurface, fontSize = 36.sp, fontWeight = FontWeight.Light)
 			Column(Modifier.weight(1f)) {
-				Text(chapter.title, fontSize = 20.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-				Text(editorStatus(state.editorSyncState), fontSize = 12.sp, color = if (state.editorSyncState == "conflict") MiuixTheme.colorScheme.error else MiuixTheme.colorScheme.onSurfaceVariantSummary)
+				Row(verticalAlignment = Alignment.CenterVertically) {
+					Text(chapter.title, fontSize = 25.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+				}
+				Row(Modifier.padding(top = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+					Icon(if (state.editorSyncState == "clean") MiuixIcons.Ok else MiuixIcons.CloudFill, null, Modifier.size(15.dp), editorStatusColor(state.editorSyncState))
+					Text(editorStatus(state.editorSyncState), Modifier.padding(start = 6.dp), fontSize = 12.sp, color = editorStatusColor(state.editorSyncState))
+				}
 			}
-			Text("${state.editorContent.length} 字", color = MiuixTheme.colorScheme.onSurfaceVariantSummary, fontSize = 12.sp)
 		}
 		if (state.editorLoading) Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) { CircularProgressIndicator() }
-		else TextField(state.editorContent, viewModel::saveChapterContent, modifier = Modifier.fillMaxWidth().weight(1f), label = "章节正文", enabled = state.editorConflict == null && !state.editorResolving)
-		Text("纯文本自动保存到本机，联网后同步云草稿", Modifier.padding(vertical = 10.dp), color = MiuixTheme.colorScheme.onSurfaceVariantSummary, fontSize = 12.sp)
+		else BasicTextField(
+			value = state.editorContent,
+			onValueChange = viewModel::saveChapterContent,
+			modifier = Modifier.fillMaxWidth().weight(1f).padding(vertical = 18.dp).semantics { contentDescription = "章节正文" },
+			enabled = state.editorConflict == null && !state.editorResolving,
+			textStyle = TextStyle(color = MiuixTheme.colorScheme.onSurface, fontSize = 20.sp, lineHeight = 32.sp),
+			cursorBrush = SolidColor(MiuixTheme.colorScheme.primary),
+			decorationBox = { inner ->
+				Box {
+					if (state.editorContent.isEmpty()) Text("开始写作…", color = MiuixTheme.colorScheme.onSurfaceVariantSummary, fontSize = 20.sp)
+					inner()
+				}
+			},
+		)
+		DividerLine()
+		Row(Modifier.fillMaxWidth().padding(vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+			Icon(MiuixIcons.CloudFill, null, Modifier.size(25.dp), editorStatusColor(state.editorSyncState))
+			Column(Modifier.weight(1f).padding(start = 11.dp)) {
+				Text(editorFooterTitle(state.editorSyncState), fontSize = 14.sp, fontWeight = FontWeight.Medium)
+				Text(editorFooterSummary(state.editorSyncState), fontSize = 12.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
+			}
+			Text("${state.editorContent.length} 字", color = MiuixTheme.colorScheme.onSurfaceVariantSummary, fontSize = 14.sp)
+		}
 	}
 	state.editorConflict?.let { conflict ->
 		OverlayDialog(show = true, title = "发现云端冲突", summary = "另一台设备已修改此章节。不会自动覆盖任何版本。", onDismissRequest = {}) {
@@ -250,6 +321,67 @@ private fun editorStatus(state: String) = when (state) {
 	"conflict" -> "存在冲突，自动同步已暂停"
 	"clean" -> "已同步"
 	else -> "仅保存在本机"
+}
+
+private fun editorFooterTitle(state: String) = when (state) {
+	"conflict" -> "同步冲突"
+	"clean" -> "自动保存"
+	else -> "正在保存"
+}
+
+private fun editorFooterSummary(state: String) = when (state) {
+	"conflict" -> "自动同步已暂停，请处理冲突"
+	"clean" -> "云草稿已同步"
+	else -> "本地草稿已保存"
+}
+
+@Composable
+private fun editorStatusColor(state: String) = when (state) {
+	"conflict" -> MiuixTheme.colorScheme.error
+	"clean" -> MiuixTheme.colorScheme.primary
+	else -> MiuixTheme.colorScheme.primary
+}
+
+@Composable
+private fun HeaderTitle(title: String, summary: String) {
+	Column {
+		Text(title, fontSize = 27.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+		Text(summary, Modifier.padding(top = 4.dp), fontSize = 13.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
+	}
+}
+
+@Composable
+private fun PrimaryAction(label: String, icon: ImageVector, enabled: Boolean = true, onClick: () -> Unit) {
+	val shape = RoundedCornerShape(18.dp)
+	val start = if (enabled) MiuixTheme.colorScheme.primary.copy(alpha = 0.72f) else MiuixTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+	val end = if (enabled) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+	Row(
+		Modifier.clip(shape).background(Brush.linearGradient(listOf(start, end))).clickable(enabled = enabled, onClick = onClick).padding(horizontal = 18.dp, vertical = 14.dp),
+		verticalAlignment = Alignment.CenterVertically,
+	) {
+		Icon(icon, null, Modifier.size(22.dp), MiuixTheme.colorScheme.onPrimary)
+		Text(label, Modifier.padding(start = 8.dp), color = MiuixTheme.colorScheme.onPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+	}
+}
+
+@Composable
+private fun IconTile(icon: ImageVector, size: androidx.compose.ui.unit.Dp) {
+	Box(
+		Modifier.size(size).clip(RoundedCornerShape(size / 3)).background(Brush.linearGradient(listOf(MiuixTheme.colorScheme.primary.copy(alpha = 0.30f), MiuixTheme.colorScheme.primary.copy(alpha = 0.08f)))).border(1.dp, MiuixTheme.colorScheme.primary.copy(alpha = 0.30f), RoundedCornerShape(size / 3)),
+		contentAlignment = Alignment.Center,
+	) {
+		Icon(icon, null, Modifier.size(size * 0.48f), MiuixTheme.colorScheme.primary)
+	}
+}
+
+@Composable
+private fun DividerLine() {
+	Box(Modifier.fillMaxWidth().height(1.dp).background(MiuixTheme.colorScheme.onSurface.copy(alpha = 0.07f)))
+}
+
+@Composable
+private fun InlineAction(label: String, color: Color, disabled: Boolean, onClick: () -> Unit) {
+	Text(label, Modifier.defaultMinSize(minHeight = 48.dp).clickable(enabled = !disabled, onClick = onClick).padding(horizontal = 9.dp, vertical = 14.dp), color = color, fontSize = 13.sp)
 }
 
 @Composable
