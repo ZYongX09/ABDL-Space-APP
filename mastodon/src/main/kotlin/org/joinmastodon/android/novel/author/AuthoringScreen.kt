@@ -49,6 +49,7 @@ import androidx.compose.ui.text.AnnotatedString
 import java.text.DateFormat
 import java.util.Date
 import org.joinmastodon.android.api.novels.NovelAuthoringApi
+import org.joinmastodon.android.ui.compose.component.BackNavigationIcon
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
@@ -76,7 +77,6 @@ fun AuthoringScreen(state: AuthoringState, viewModel: AuthoringViewModel, onOpen
 	}
 	LazyColumn(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(horizontal = 18.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
 		item {
-			Spacer(Modifier.height(10.dp))
 			BoxWithConstraints(Modifier.fillMaxWidth()) {
 				if (maxWidth < 360.dp) Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
 					HeaderTitle("创作中心", "作品草稿仅自己可见")
@@ -164,13 +164,13 @@ fun NovelWorkStructureScreen(state: AuthoringState, viewModel: AuthoringViewMode
 		item {
 			BoxWithConstraints(Modifier.fillMaxWidth().padding(top = 12.dp)) {
 				val createVolume = { titleDialog = "新建分卷"; targetVolumeId = null; targetChapterId = null; initialTitle = "" }
-				if (maxWidth < 380.dp) Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-					Text("‹ 返回", Modifier.defaultMinSize(minHeight = 48.dp).clickable(onClick = onClose).padding(vertical = 12.dp), color = MiuixTheme.colorScheme.primary, fontSize = 16.sp)
+				if (maxWidth < 380.dp) Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+					BackNavigationIcon(onClick = onClose)
 					HeaderTitle(structure?.work?.title ?: "作品目录", "作品目录 · 点击章节进入独立编辑页")
 					PrimaryAction("新建分卷", MiuixIcons.Add, enabled = !state.structureOperating, onClick = createVolume)
 				} else Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-					Text("‹ 返回", Modifier.defaultMinSize(minHeight = 48.dp).clickable(onClick = onClose).padding(end = 16.dp, top = 12.dp, bottom = 12.dp), color = MiuixTheme.colorScheme.primary, fontSize = 16.sp)
-					Column(Modifier.weight(1f)) { HeaderTitle(structure?.work?.title ?: "作品目录", "作品目录 · 点击章节进入独立编辑页") }
+					BackNavigationIcon(onClick = onClose)
+					Column(Modifier.weight(1f).padding(start = 4.dp)) { HeaderTitle(structure?.work?.title ?: "作品目录", "作品目录 · 点击章节进入独立编辑页") }
 					PrimaryAction("新建分卷", MiuixIcons.Add, enabled = !state.structureOperating, onClick = createVolume)
 				}
 			}
@@ -322,13 +322,15 @@ private fun editorStatus(state: String) = when (state) {
 
 private fun editorFooterTitle(state: String) = when (state) {
 	"conflict" -> "同步冲突"
-	"clean" -> "自动保存"
-	else -> "正在保存"
+	"clean" -> "已同步"
+	"pending" -> "等待云端同步"
+	else -> "仅本机保存"
 }
 
 private fun editorFooterSummary(state: String) = when (state) {
 	"conflict" -> "自动同步已暂停，请处理冲突"
-	"clean" -> "云草稿已同步"
+	"clean" -> "云草稿已是最新"
+	"pending" -> "本地草稿已保存，等待上传"
 	else -> "本地草稿已保存"
 }
 

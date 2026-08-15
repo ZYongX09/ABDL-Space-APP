@@ -100,7 +100,7 @@ class NovelHomeUiContractTest {
 		assertTrue(authoring.contains("AndroidView"))
 		assertTrue(authoring.contains("PrimaryAction(\"新建作品\""))
 		assertTrue(authoring.contains("MiuixIcons.FolderFill"))
-		assertTrue(authoring.contains("自动保存"))
+		assertTrue(authoring.contains("已同步"))
 		assertFalse(authoring.contains("label = \"章节正文\""))
 		assertTrue(authoring.contains("NovelLineNumberEditor"))
 		assertTrue(lineNumberEditor.contains("class NovelLineNumberEditor"))

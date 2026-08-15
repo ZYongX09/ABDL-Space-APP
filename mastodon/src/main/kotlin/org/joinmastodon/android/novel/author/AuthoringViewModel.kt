@@ -205,13 +205,18 @@ class AuthoringViewModel(application: Application, val accountId: String) : Andr
 					val localVersion = current.localVersion + 1
 					val now = System.currentTimeMillis()
 					val draft = current.copy(localVersion = localVersion, content = content, syncState = if (current.syncState == "conflict") "conflict" else "pending", dirty = true, updatedAt = now)
-					val existingOutbox = draftDao.outbox(accountId, current.localId)
-					if (existingOutbox?.operation == "create_revision") draftDao.upsertDraft(draft)
-					else {
-						val outbox = NovelAuthorRevisionOutboxEntity("draft:${current.localId}", accountId, current.localId, current.workId, current.chapterId, current.remoteRevisionId, "put_draft", UUID.randomUUID().toString(), current.baseVersion, localVersion, content, if (current.syncState == "conflict") "blocked_conflict" else "pending", 0, now, now)
-						draftDao.saveLocalDraft(draft, outbox)
-					}
-					current.syncState != "conflict"
+				val existingOutbox = draftDao.outbox(accountId, current.localId)
+				val outboxState = if (current.syncState == "conflict") "blocked_conflict" else "pending"
+				if (existingOutbox != null) {
+					draftDao.saveLocalDraft(draft, existingOutbox.copy(content = draft.content, localVersion = draft.localVersion, baseVersion = draft.baseVersion, state = outboxState, updatedAt = now))
+				} else {
+					val op = if (current.remoteRevisionId == null) "create_revision" else "put_draft"
+					val identity = if (op == "create_revision") "create:${current.localId}" else "draft:${current.localId}"
+					val idempotencyKey = if (op == "create_revision") "chapter:${chapter.id}:initial" else UUID.randomUUID().toString()
+					val outbox = NovelAuthorRevisionOutboxEntity(identity, accountId, current.localId, current.workId, current.chapterId, current.remoteRevisionId, op, idempotencyKey, current.baseVersion, localVersion, content, outboxState, 0, now, now)
+					draftDao.saveLocalDraft(draft, outbox)
+				}
+				current.syncState != "conflict"
 				}
 					if (shouldEnqueue) {
 						AuthorDraftSyncWorker.enqueue(getApplication(), accountId)

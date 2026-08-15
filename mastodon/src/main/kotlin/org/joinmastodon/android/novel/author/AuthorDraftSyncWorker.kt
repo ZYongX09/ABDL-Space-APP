@@ -28,9 +28,10 @@ class AuthorDraftSyncWorker(context: Context, params: WorkerParameters) : Corout
 		return try {
 			val api = NovelAuthoringApi(session)
 			val dao = database.authorDraftDao()
-			for (item in dao.pending(accountId)) {
-				check(NovelAccountDataCleaner.isSessionValid(accountId, session, generation)) { "账号已退出" }
-				try {
+		for (item in dao.pending(accountId)) {
+			check(NovelAccountDataCleaner.isSessionValid(accountId, session, generation)) { "账号已退出" }
+			if (item.operation == "create_revision" && item.content.isBlank()) continue
+			try {
 					if (item.operation == "create_revision") {
 						val response = api.executeDraft(api.newCreateRevisionCall(item.chapterId, NovelAuthoringApi.RevisionBodyRequest(item.content), item.idempotencyKey))
 						check(response.chapterId == item.chapterId)

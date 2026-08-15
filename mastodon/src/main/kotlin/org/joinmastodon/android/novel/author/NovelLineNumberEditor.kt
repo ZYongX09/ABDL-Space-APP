@@ -24,12 +24,12 @@ class NovelLineNumberEditor(context: Context) : LinearLayout(context) {
 	init {
 		orientation = HORIZONTAL
 		gravity = Gravity.TOP
-		addView(gutter, LayoutParams(dp(46), LayoutParams.MATCH_PARENT))
+		addView(gutter, LayoutParams(dp(34), LayoutParams.MATCH_PARENT))
 		addView(divider, LayoutParams(dp(1), LayoutParams.MATCH_PARENT))
 		addView(editor, LayoutParams(0, LayoutParams.MATCH_PARENT, 1f))
 		editor.background = null
 		editor.gravity = Gravity.TOP or Gravity.START
-		editor.setPadding(dp(14), 0, dp(8), 0)
+		editor.setPadding(dp(10), 0, dp(8), 0)
 		editor.setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f)
 		editor.setLineSpacing(sp(8f), 1f)
 		editor.setHorizontallyScrolling(true)
@@ -85,7 +85,7 @@ class NovelLineNumberEditor(context: Context) : LinearLayout(context) {
 			val lastLine = layout.getLineForVertical(bottom.coerceAtMost(layout.height))
 			for (line in firstLine..lastLine) {
 				val baseline = layout.getLineBaseline(line) - editor.scrollY
-				canvas.drawText((line + 1).toString(), width - dp(10).toFloat(), baseline.toFloat(), paint)
+				canvas.drawText((line + 1).toString(), width - dp(6).toFloat(), baseline.toFloat(), paint)
 			}
 		}
 	}

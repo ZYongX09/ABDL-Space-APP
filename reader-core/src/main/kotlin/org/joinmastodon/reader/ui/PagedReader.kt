@@ -58,7 +58,7 @@ fun PagedReader(
 				.background(settings.palette.background)
 				.pointerInput(chapter.id) { detectTapGestures(onTap = { onToggleControls() }) },
 		) { page ->
-			Box(Modifier.fillMaxSize().padding(horizontal = settings.horizontalPadding.dp, vertical = 28.dp)) {
+			Box(Modifier.fillMaxSize().padding(horizontal = settings.horizontalPadding.dp, vertical = 18.dp)) {
 				Text(
 				text = readyPages[page],
 					color = settings.palette.text,
@@ -77,7 +77,7 @@ internal fun pageIndexAfterChapterChange(currentChapterId: String, nextChapterId
 	if (currentChapterId == nextChapterId) currentPageIndex else 0
 
 private fun paginate(content: String, fontSize: Float): List<String> {
-	val target = (1400f * 19f / fontSize).toInt().coerceAtLeast(400)
+	val target = (820f * 19f / fontSize).toInt().coerceAtLeast(360)
 	val pages = mutableListOf<String>()
 	var remaining = content.trim()
 	while (remaining.length > target) {
