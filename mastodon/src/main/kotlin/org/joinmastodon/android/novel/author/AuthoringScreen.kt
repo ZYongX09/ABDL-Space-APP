@@ -4,7 +4,6 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -21,7 +20,6 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -37,16 +35,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.text.AnnotatedString
 import java.text.DateFormat
 import java.util.Date
@@ -68,21 +66,15 @@ import top.yukonga.miuix.kmp.icon.extended.Notes
 import top.yukonga.miuix.kmp.icon.extended.Ok
 
 @Composable
-fun AuthoringScreen(state: AuthoringState, viewModel: AuthoringViewModel, onOpenChapter: (String, NovelAuthoringApi.ChapterDto) -> Unit) {
+fun AuthoringScreen(state: AuthoringState, viewModel: AuthoringViewModel, onOpenWork: (NovelAuthoringApi.WorkDto) -> Unit) {
 	var createVisible by rememberSaveable { mutableStateOf(false) }
-	BackHandler(enabled = state.selectedWorkId != null) { viewModel.closeWork() }
 	LaunchedEffect(state.createdWorkId) {
 		if (state.createdWorkId != null) {
 			createVisible = false
 			viewModel.consumeCreatedWork()
 		}
 	}
-	if (state.selectedWorkId != null) {
-		WorkStructureScreen(state, viewModel, onOpenChapter)
-		state.error?.let { ErrorDialog(it, viewModel::dismissError) { viewModel.loadStructure() } }
-		return
-	}
-	LazyColumn(Modifier.fillMaxSize().padding(horizontal = 18.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+	LazyColumn(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(horizontal = 18.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
 		item {
 			Spacer(Modifier.height(10.dp))
 			BoxWithConstraints(Modifier.fillMaxWidth()) {
@@ -109,7 +101,7 @@ fun AuthoringScreen(state: AuthoringState, viewModel: AuthoringViewModel, onOpen
 				}
 			} else {
 				item { Text("我的作品", fontSize = 22.sp, fontWeight = FontWeight.Bold) }
-				items(state.works, key = { it.id }) { WorkCard(it) { viewModel.openWork(it.id) } }
+				items(state.works, key = { it.id }) { work -> WorkCard(work) { onOpenWork(work) } }
 			}
 		}
 		item { Spacer(Modifier.height(24.dp)) }
@@ -160,23 +152,24 @@ private fun WorkCard(work: NovelAuthoringApi.WorkDto, onClick: () -> Unit) {
 }
 
 @Composable
-private fun WorkStructureScreen(state: AuthoringState, viewModel: AuthoringViewModel, onOpenChapter: (String, NovelAuthoringApi.ChapterDto) -> Unit) {
+fun NovelWorkStructureScreen(state: AuthoringState, viewModel: AuthoringViewModel, onClose: () -> Unit, onOpenChapter: (String, NovelAuthoringApi.ChapterDto) -> Unit) {
+	BackHandler(onBack = onClose)
 	var titleDialog by rememberSaveable { mutableStateOf<String?>(null) }
 	var targetVolumeId by rememberSaveable { mutableStateOf<String?>(null) }
 	var targetChapterId by rememberSaveable { mutableStateOf<String?>(null) }
 	var initialTitle by rememberSaveable { mutableStateOf("") }
 	var deleteTarget by rememberSaveable { mutableStateOf<String?>(null) }
 	val structure = state.structure
-	LazyColumn(Modifier.fillMaxSize().padding(horizontal = 18.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+	LazyColumn(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(horizontal = 18.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
 		item {
 			BoxWithConstraints(Modifier.fillMaxWidth().padding(top = 12.dp)) {
 				val createVolume = { titleDialog = "新建分卷"; targetVolumeId = null; targetChapterId = null; initialTitle = "" }
 				if (maxWidth < 380.dp) Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-					Text("‹ 返回", Modifier.defaultMinSize(minHeight = 48.dp).clickable { viewModel.closeWork() }.padding(vertical = 12.dp), color = MiuixTheme.colorScheme.primary, fontSize = 16.sp)
+					Text("‹ 返回", Modifier.defaultMinSize(minHeight = 48.dp).clickable(onClick = onClose).padding(vertical = 12.dp), color = MiuixTheme.colorScheme.primary, fontSize = 16.sp)
 					HeaderTitle(structure?.work?.title ?: "作品目录", "作品目录 · 点击章节进入独立编辑页")
 					PrimaryAction("新建分卷", MiuixIcons.Add, enabled = !state.structureOperating, onClick = createVolume)
 				} else Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-					Text("‹ 返回", Modifier.defaultMinSize(minHeight = 48.dp).clickable { viewModel.closeWork() }.padding(end = 16.dp, top = 12.dp, bottom = 12.dp), color = MiuixTheme.colorScheme.primary, fontSize = 16.sp)
+					Text("‹ 返回", Modifier.defaultMinSize(minHeight = 48.dp).clickable(onClick = onClose).padding(end = 16.dp, top = 12.dp, bottom = 12.dp), color = MiuixTheme.colorScheme.primary, fontSize = 16.sp)
 					Column(Modifier.weight(1f)) { HeaderTitle(structure?.work?.title ?: "作品目录", "作品目录 · 点击章节进入独立编辑页") }
 					PrimaryAction("新建分卷", MiuixIcons.Add, enabled = !state.structureOperating, onClick = createVolume)
 				}
@@ -226,6 +219,7 @@ private fun WorkStructureScreen(state: AuthoringState, viewModel: AuthoringViewM
 			}
 		}
 	}
+	state.error?.let { ErrorDialog(it, viewModel::dismissError) { viewModel.loadStructure() } }
 }
 
 @Composable
@@ -260,6 +254,10 @@ private fun VolumeCard(volume: NovelAuthoringApi.VolumeDto, operating: Boolean, 
 fun NovelChapterEditorScreen(state: AuthoringState, viewModel: AuthoringViewModel, onClose: () -> Unit) {
 	val chapter = requireNotNull(state.editingChapter)
 	val clipboard = LocalClipboardManager.current
+	val editorForeground = MiuixTheme.colorScheme.onSurface.toArgb()
+	val editorSecondary = MiuixTheme.colorScheme.onSurfaceVariantSummary.toArgb()
+	val editorAccent = MiuixTheme.colorScheme.primary.toArgb()
+	val editorDivider = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.10f).toArgb()
 	Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).imePadding().padding(horizontal = 20.dp)) {
 		Row(Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 18.dp), verticalAlignment = Alignment.CenterVertically) {
 			Text("‹", Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp).clickable(onClick = onClose).padding(end = 18.dp, top = 5.dp, bottom = 5.dp), color = MiuixTheme.colorScheme.onSurface, fontSize = 36.sp, fontWeight = FontWeight.Light)
@@ -274,19 +272,18 @@ fun NovelChapterEditorScreen(state: AuthoringState, viewModel: AuthoringViewMode
 			}
 		}
 		if (state.editorLoading) Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) { CircularProgressIndicator() }
-		else BasicTextField(
-			value = state.editorContent,
-			onValueChange = viewModel::saveChapterContent,
+		else AndroidView(
+			factory = { NovelLineNumberEditor(it) },
 			modifier = Modifier.fillMaxWidth().weight(1f).padding(vertical = 18.dp).semantics { contentDescription = "章节正文" },
-			enabled = state.editorConflict == null && !state.editorResolving,
-			textStyle = TextStyle(color = MiuixTheme.colorScheme.onSurface, fontSize = 20.sp, lineHeight = 32.sp),
-			cursorBrush = SolidColor(MiuixTheme.colorScheme.primary),
-			decorationBox = { inner ->
-				Box {
-					if (state.editorContent.isEmpty()) Text("开始写作…", color = MiuixTheme.colorScheme.onSurfaceVariantSummary, fontSize = 20.sp)
-					inner()
-				}
-			},
+			update = { editor -> editor.bind(
+				text = state.editorContent,
+				enabled = state.editorConflict == null && !state.editorResolving,
+				foreground = editorForeground,
+				secondary = editorSecondary,
+				accent = editorAccent,
+				dividerColor = editorDivider,
+				onTextChanged = viewModel::saveChapterContent,
+			) },
 		)
 		DividerLine()
 		Row(Modifier.fillMaxWidth().padding(vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {

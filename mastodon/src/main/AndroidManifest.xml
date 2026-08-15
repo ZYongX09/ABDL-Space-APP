@@ -75,7 +75,8 @@
 				<data android:mimeType="application/epub+zip" />
 			</intent-filter>
 		</activity>
-		<activity android:name=".novel.author.NovelChapterEditorActivity" android:exported="false" android:launchMode="singleTop" android:windowSoftInputMode="adjustResize" />
+		<activity android:name=".novel.author.NovelChapterEditorActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
+		<activity android:name=".novel.author.NovelWorkStructureActivity" android:exported="false" />
 
 		<activity android:name=".MainActivity" android:exported="false" android:configChanges="orientation|screenSize" android:windowSoftInputMode="adjustResize" android:launchMode="singleTask">
 			<intent-filter android:autoVerify="true">

@@ -43,7 +43,7 @@ import android.net.Uri
 import org.joinmastodon.android.R
 import org.joinmastodon.android.novel.author.AuthoringScreen
 import org.joinmastodon.android.novel.author.AuthoringViewModel
-import org.joinmastodon.android.novel.author.NovelChapterEditorActivity
+import org.joinmastodon.android.novel.author.NovelWorkStructureActivity
 import org.joinmastodon.android.ui.compose.component.BackNavigationIcon
 import org.joinmastodon.android.ui.compose.ui.isInDarkTheme
 import org.joinmastodon.reader.domain.ReaderPalette
@@ -107,8 +107,8 @@ fun NovelHomeScreen(accountId: String, libraryViewModel: NovelLibraryViewModel, 
 				return@Box
 			}
 			if (selectedTab == 2) {
-				AuthoringScreen(authoringState, authoringViewModel) { workId, chapter ->
-					context.startActivity(NovelChapterEditorActivity.intent(context, accountId, workId, chapter))
+				AuthoringScreen(authoringState, authoringViewModel) { work ->
+					context.startActivity(NovelWorkStructureActivity.intent(context, accountId, work))
 				}
 				return@Box
 			}
