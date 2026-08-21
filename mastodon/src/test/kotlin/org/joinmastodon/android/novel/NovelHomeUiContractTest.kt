@@ -17,6 +17,9 @@ class NovelHomeUiContractTest {
 	private val structureActivity = File(projectDir, "src/main/kotlin/org/joinmastodon/android/novel/author/NovelWorkStructureActivity.kt").readText()
 	private val lineNumberEditor = File(projectDir, "src/main/kotlin/org/joinmastodon/android/novel/author/NovelLineNumberEditor.kt").readText()
 	private val authoringApi = File(projectDir, "src/main/java/org/joinmastodon/android/api/novels/NovelAuthoringApi.java").readText()
+	private val store = File(projectDir, "src/main/kotlin/org/joinmastodon/android/novel/NovelStoreScreen.kt").readText()
+	private val storeViewModel = File(projectDir, "src/main/kotlin/org/joinmastodon/android/novel/NovelStoreViewModel.kt").readText()
+	private val storeApi = File(projectDir, "src/main/java/org/joinmastodon/android/api/novels/PublicNovelStoreApi.java").readText()
 
 	@Test
 	fun novelHomeUsesMiuixPageChrome() {
@@ -54,6 +57,27 @@ class NovelHomeUiContractTest {
 		assertTrue(library.contains("StatusBadge"))
 		assertTrue(library.contains("PrimaryBookAction"))
 		assertTrue(library.contains("clickable(enabled = enabled"))
+	}
+
+	@Test fun publicStoreUsesAnonymousReviewedContentWithoutPrivateSync() {
+		assertTrue(screen.contains("NovelStoreScreen"))
+		assertTrue(activity.contains("NovelStoreViewModel::class.java"))
+		assertTrue(store.contains("公开书城"))
+		assertTrue(store.contains("已审核发布"))
+		assertFalse(store.contains("封面"))
+		assertTrue(storeApi.contains("/api/v1/novels/store"))
+		assertFalse(storeApi.contains("Authorization"))
+		assertTrue(storeApi.contains("cache(null)"))
+		assertTrue(storeViewModel.contains("public:"))
+		assertTrue(storeViewModel.contains("loadNextPage"))
+		assertTrue(storeViewModel.contains("publishedRevisionId"))
+		assertTrue(storeViewModel.contains("previousChapter"))
+		assertTrue(storeViewModel.contains("nextChapter"))
+		assertTrue(screen.contains("BackHandler(enabled = storeState.selectedWork != null)"))
+		assertTrue(screen.contains("externalChapterCount = publicReader?.chapters?.size"))
+		assertTrue(screen.contains("showAnnotations = false"))
+		assertFalse(storeViewModel.contains("NovelDatabase"))
+		assertFalse(storeViewModel.contains("NovelSync"))
 	}
 
 	@Test fun creationTabUsesRealEligibilityAndDraftWorks() {

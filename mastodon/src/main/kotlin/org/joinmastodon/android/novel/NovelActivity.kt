@@ -46,6 +46,7 @@ class NovelActivity : ComponentActivity(), NavigationEventDispatcherOwner {
 				return AuthoringViewModel(application, accountID) as T
 			}
 		})[AuthoringViewModel::class.java]
+		val storeViewModel = ViewModelProvider(this)[NovelStoreViewModel::class.java]
 
 		val darkTheme = UiUtils.isDarkTheme()
 		enableEdgeToEdge(
@@ -55,7 +56,7 @@ class NovelActivity : ComponentActivity(), NavigationEventDispatcherOwner {
 		setContent {
 			CompositionLocalProvider(LocalNavigationEventDispatcherOwner provides this) {
 				MiuixAppTheme {
-					NovelHomeScreen(accountId = accountID, libraryViewModel = libraryViewModel, authoringViewModel = authoringViewModel, externalDocument = externalDocument, onBack = ::finish)
+					NovelHomeScreen(accountId = accountID, libraryViewModel = libraryViewModel, authoringViewModel = authoringViewModel, storeViewModel = storeViewModel, externalDocument = externalDocument, onBack = ::finish)
 				}
 			}
 		}

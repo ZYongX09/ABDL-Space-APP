@@ -37,6 +37,11 @@ fun ReaderScreen(
 	onPositionChanged: (ReaderPosition) -> Unit = {},
 	onBookmark: (ReaderPosition) -> Unit = {},
 	onNote: (ReaderPosition) -> Unit = {},
+	onPreviousChapter: (() -> Unit)? = null,
+	onNextChapter: (() -> Unit)? = null,
+	externalChapterIndex: Int? = null,
+	externalChapterCount: Int? = null,
+	showAnnotations: Boolean = true,
 	initialPalette: ReaderPalette = ReaderPalette.PAPER,
 	onBack: () -> Unit,
 ) {
@@ -70,8 +75,8 @@ fun ReaderScreen(
 			ReaderControls(
 				bookTitle = book.title,
 				chapterTitle = chapter.title,
-				chapterIndex = chapterIndex,
-				chapterCount = chapters.size,
+				chapterIndex = externalChapterIndex ?: chapterIndex,
+				chapterCount = externalChapterCount ?: chapters.size,
 				palette = settings.palette,
 				onBack = onBack,
 				onSettings = { settingsVisible = true },
@@ -83,6 +88,10 @@ fun ReaderScreen(
 					pageIndex = nextPageIndex
 					onPositionChanged(ReaderPosition(it, nextPageIndex))
 				},
+				onPreviousChapter = onPreviousChapter,
+				onNextChapter = onNextChapter,
+				showChapterSlider = externalChapterCount == null,
+				showAnnotations = showAnnotations,
 				modifier = Modifier.align(Alignment.TopCenter),
 			)
 		}

@@ -58,11 +58,19 @@ import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
-fun NovelHomeScreen(accountId: String, libraryViewModel: NovelLibraryViewModel, authoringViewModel: AuthoringViewModel, externalDocument: Uri? = null, onBack: () -> Unit) {
+fun NovelHomeScreen(accountId: String, libraryViewModel: NovelLibraryViewModel, authoringViewModel: AuthoringViewModel, storeViewModel: NovelStoreViewModel, externalDocument: Uri? = null, onBack: () -> Unit) {
 	val context = LocalContext.current
 	val libraryState by libraryViewModel.state.collectAsState()
 	val authoringState by authoringViewModel.state.collectAsState()
+	val storeState by storeViewModel.state.collectAsState()
 	var pendingNote by remember { mutableStateOf<Triple<String, String, ReaderPosition>?>(null) }
+	BackHandler(enabled = storeState.reader != null) { storeViewModel.closeReader() }
+	storeState.reader?.let { reader ->
+		val publicReader = storeState.publicReader
+		ReaderScreen(reader.book, reader.chapters, onPositionChanged = {}, onBookmark = {}, onNote = {}, onPreviousChapter = publicReader?.takeIf { it.chapterIndex > 0 }?.let { storeViewModel::previousChapter }, onNextChapter = publicReader?.takeIf { it.chapterIndex < it.chapters.lastIndex }?.let { storeViewModel::nextChapter }, externalChapterIndex = publicReader?.chapterIndex, externalChapterCount = publicReader?.chapters?.size, showAnnotations = false, initialPalette = if (isInDarkTheme()) ReaderPalette.NIGHT else ReaderPalette.PAPER, onBack = storeViewModel::closeReader)
+		return
+	}
+	BackHandler(enabled = storeState.selectedWork != null) { storeViewModel.closeWork() }
 	BackHandler(enabled = libraryState.reader != null) { libraryViewModel.closeReader() }
 	libraryState.reader?.let { reader ->
 		ReaderScreen(
@@ -94,7 +102,7 @@ fun NovelHomeScreen(accountId: String, libraryViewModel: NovelLibraryViewModel, 
 					title = stringResource(R.string.novel),
 					navigationIcon = { BackNavigationIcon(onClick = onBack) },
 				)
-				NovelTabBar(tabs.map { stringResource(it.first) }, selectedTab) { selectedTab = it }
+				NovelTabBar(tabs.map { stringResource(it.first) }, selectedTab) { index -> if (index != 0) storeViewModel.closeWork(); selectedTab = index }
 			}
 		},
 	) { padding ->
@@ -112,24 +120,7 @@ fun NovelHomeScreen(accountId: String, libraryViewModel: NovelLibraryViewModel, 
 				}
 				return@Box
 			}
-			Column(
-				modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp),
-				horizontalAlignment = Alignment.CenterHorizontally,
-				verticalArrangement = Arrangement.Center,
-			) {
-				Text(
-					text = "公开书城将在创作功能完成后开放",
-					color = MiuixTheme.colorScheme.onSurface,
-					fontSize = 20.sp,
-					fontWeight = FontWeight.SemiBold,
-				)
-				Spacer(Modifier.height(10.dp))
-				Text(
-					text = "当前先确保私人书库、离线阅读和云同步稳定。",
-					color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-					fontSize = 15.sp,
-				)
-			}
+			NovelStoreScreen(storeState, storeViewModel::refresh, storeViewModel::loadNextPage, storeViewModel::openWork, storeViewModel::openChapter, storeViewModel::closeWork, storeViewModel::dismissError)
 		}
 	}
 }
