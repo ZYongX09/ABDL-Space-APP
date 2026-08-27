@@ -92,6 +92,13 @@ public class CompactHeaderStatusDisplayItem extends StatusDisplayItem{
 		@Override
 		public void onBind(CompactHeaderStatusDisplayItem item){
 			name.setText(item.parsedName);
+			if(item.user.verified){
+				android.text.SpannableString ssb=new android.text.SpannableString(name.getText()+" ");
+				Drawable verifiedIcon=itemView.getResources().getDrawable(R.drawable.ic_badge_verified_circle, itemView.getContext().getTheme()).mutate();
+				verifiedIcon.setBounds(0, 0, V.dp(16), V.dp(16));
+				ssb.setSpan(new org.joinmastodon.android.ui.text.ImageSpanThatDoesNotBreakShitForNoGoodReason(verifiedIcon, android.text.style.ImageSpan.ALIGN_BOTTOM), ssb.length()-1, ssb.length(), android.text.SpannableString.SPAN_EXCLUSIVE_EXCLUSIVE);
+				name.setText(ssb);
+			}
 			String time;
 			if(item.status==null || item.status.editedAt==null)
 				time=UiUtils.formatRelativeTimestamp(itemView.getContext(), item.createdAt);

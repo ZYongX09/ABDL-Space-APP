@@ -95,6 +95,26 @@ public class NovelAuthoringApi{
 		return jsonCall("PUT", "/revisions/"+encode(revisionId)+"/draft", input, idempotencyKey);
 	}
 
+	public Call newGetRevisionCall(String revisionId){
+		return callFactory.newCall(authorizedRequest(baseUrl+"/revisions/"+encode(revisionId)).get().build());
+	}
+
+	public Call newSubmitCall(String chapterId, String revisionId, String idempotencyKey){
+		Request request=authorizedRequest(baseUrl+"/chapters/"+encode(chapterId)+"/revisions/"+encode(revisionId)+"/submit")
+				.header("Idempotency-Key", idempotencyKey)
+				.post(RequestBody.create(JSON, "{}"))
+				.build();
+		return callFactory.newCall(request);
+	}
+
+	public Call newPublishCall(String revisionId, String idempotencyKey){
+		Request request=authorizedRequest(baseUrl+"/revisions/"+encode(revisionId)+"/publish")
+				.header("Idempotency-Key", idempotencyKey)
+				.post(RequestBody.create(JSON, "{}"))
+				.build();
+		return callFactory.newCall(request);
+	}
+
 	public RevisionDto executeDraft(Call call) throws IOException{
 		try(Response response=call.execute()){
 			if(response.priorResponse()!=null) throw new IOException("Redirects are not allowed");

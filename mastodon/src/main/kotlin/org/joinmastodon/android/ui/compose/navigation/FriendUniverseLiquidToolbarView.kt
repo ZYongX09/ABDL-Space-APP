@@ -130,7 +130,9 @@ class FriendUniverseLiquidToolbarController(
 		val topInset = with(density) { statusBarInsetState.toDp() }
 		val progress = friendUniverseCollapseProgress(scrollYState, density.density)
 		val titleSize = friendUniverseTitleSizeSp(progress)
-		val titleOffset = 58f * (1f-progress)
+		val titleGlassWidth = friendUniverseTitleGlassWidthDp(progress)
+		val titleGlassHeight = friendUniverseTitleGlassHeightDp(progress)
+		val titleOffset = 54f * (1f-progress)
 		val focusRequester = remember { FocusRequester() }
 
 		LaunchedEffect(searchExpandedState) {
@@ -151,19 +153,26 @@ class FriendUniverseLiquidToolbarController(
 				.onGloballyPositioned { backdrop.updateOriginInWindow(it.positionInWindow()) },
 		) {
 			val availableSearchWidth = (this.maxWidth-80.dp).coerceIn(160.dp, 244.dp)
-			Text(
-				text = "交友宇宙",
+			GlassSurface(
 				modifier = Modifier
 					.align(Alignment.TopStart)
-					.padding(start = 20.dp, top = topInset + 16.dp)
+					.padding(start = 12.dp, top = topInset + 8.dp)
+					.width(titleGlassWidth.dp)
+					.height(titleGlassHeight.dp)
 					.graphicsLayer {
 						translationY = with(density) { titleOffset.dp.toPx() }
 						alpha = if(searchExpandedState) 0f else 1f
 					},
-				fontSize = titleSize.sp,
-				fontWeight = FontWeight.Bold,
-				color = MiuixTheme.colorScheme.onSurface,
-			)
+				onClick = null,
+				horizontalPaddingDp = 16,
+			) {
+				Text(
+					text = "交友宇宙",
+					fontSize = titleSize.sp,
+					fontWeight = FontWeight.Bold,
+					color = MiuixTheme.colorScheme.onSurface,
+				)
+			}
 
 			Row(
 				modifier = Modifier.align(Alignment.TopEnd).padding(top = topInset + 8.dp, end = 12.dp),
@@ -216,7 +225,7 @@ class FriendUniverseLiquidToolbarController(
 	}
 
 	@Composable
-	private fun GlassSurface(modifier: Modifier, onClick: Runnable, horizontalPaddingDp: Int = 0, content: @Composable () -> Unit) {
+	private fun GlassSurface(modifier: Modifier, onClick: Runnable?, horizontalPaddingDp: Int = 0, content: @Composable () -> Unit) {
 		val interactionSource = remember { MutableInteractionSource() }
 		val pressed by interactionSource.collectIsPressedAsState()
 		val scale by animateFloatAsState(if(pressed) 0.96f else 1f, spring(0.72f, 520f), label = "friendGlassScale")
@@ -229,13 +238,13 @@ class FriendUniverseLiquidToolbarController(
 					if(isRuntimeShaderSupported()) Modifier.drawBackdrop(
 						backdrop = backdrop,
 						shape = { RoundedCornerShape(24.dp) },
-						effects = { vibrancy(); blur(8.dp.toPx(), 8.dp.toPx()); lens(12.dp.toPx(), 16.dp.toPx()) },
+						effects = { vibrancy(); blur(18.dp.toPx(), 18.dp.toPx()); lens(12.dp.toPx(), 16.dp.toPx()) },
 						highlight = { highlight.value.copy(alpha = 0.75f) },
 						onDrawSurface = { drawRect(surface) },
 					) else Modifier.background(surface, RoundedCornerShape(24.dp)),
 				)
 				.clip(RoundedCornerShape(24.dp))
-				.clickable(interactionSource = interactionSource, indication = null) { onClick.run() }
+				.then(if(onClick!=null) Modifier.clickable(interactionSource = interactionSource, indication = null) { onClick.run() } else Modifier)
 				.padding(horizontal = horizontalPaddingDp.dp),
 			verticalAlignment = Alignment.CenterVertically,
 			content = { content() },

@@ -493,7 +493,8 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		root.add(new HomeToolbarMenuItem(R.id.settings, getString(R.string.settings), R.drawable.ic_fluent_settings_24_regular));
 		root.add(new HomeToolbarMenuItem(R.id.announcements, getString(R.string.sk_announcements), R.drawable.ic_fluent_megaphone_24_regular));
 		root.add(new HomeToolbarMenuItem(R.id.edit_timelines, getString(R.string.sk_edit_timelines), R.drawable.ic_fluent_edit_24_regular));
-		root.add(new HomeToolbarMenuItem(R.id.novel, getString(R.string.novel), R.drawable.ic_fluent_book_24_regular));
+		// 小说入口暂时隐藏
+		// root.add(new HomeToolbarMenuItem(R.id.novel, getString(R.string.novel), R.drawable.ic_fluent_book_24_regular));
 		if(!listItems.isEmpty())
 			root.add(new HomeToolbarMenuItem(R.id.lists, getString(R.string.sk_your_lists), R.drawable.ic_fluent_people_24_regular));
 		if(!hashtagsItems.isEmpty())

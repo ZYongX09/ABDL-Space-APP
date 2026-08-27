@@ -81,9 +81,12 @@ public class OAuthActivity extends Activity{
 				intent.putExtra("nbw_token", nbwToken);
 			}
 			intent.putExtra("nbw_user", nbwUser);
-			AccountSession session=AccountSessionManager.getInstance().getLastActiveAccount();
-			if(session!=null)
-				intent.putExtra("account", session.getID());
+			intent.putExtra("nbw_token", nbwToken);
+			if(!AccountSessionManager.getInstance().getLoggedInAccounts().isEmpty()){
+				AccountSession session=AccountSessionManager.getInstance().getLastActiveAccount();
+				if(session!=null)
+					intent.putExtra("account", session.getID());
+			}
 			intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
 			startActivity(intent);
 			finish();

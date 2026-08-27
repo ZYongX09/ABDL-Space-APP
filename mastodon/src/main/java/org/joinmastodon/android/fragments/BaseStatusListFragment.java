@@ -99,7 +99,9 @@ public abstract class BaseStatusListFragment<T extends DisplayItemsParent> exten
 	protected HashMap<String, Status> knownStatuses=new HashMap<>();
 	protected HashSet<APIRequest<?>> requestsToCancelWhenListClears=new HashSet<>();
 	private SpringAnimation listShakeAnimation;
+	private boolean retryFailedImagesScheduled;
 	private final Runnable retryFailedImagesRunnable=()->{
+		retryFailedImagesScheduled=false;
 		if(imgLoader!=null)
 			imgLoader.retryFailedRequests();
 	};
@@ -1088,16 +1090,18 @@ public abstract class BaseStatusListFragment<T extends DisplayItemsParent> exten
 
 	@Override
 	public void scheduleRetryFailedImages(){
-		if(list==null)
+		if(list==null || retryFailedImagesScheduled)
 			return;
-		list.removeCallbacks(retryFailedImagesRunnable);
+		retryFailedImagesScheduled=true;
 		list.postDelayed(retryFailedImagesRunnable, 1500);
 	}
 
 	@Override
 	public void onDestroyView(){
-		if(list!=null)
+		if(list!=null){
 			list.removeCallbacks(retryFailedImagesRunnable);
+			retryFailedImagesScheduled=false;
+		}
 		super.onDestroyView();
 	}
 

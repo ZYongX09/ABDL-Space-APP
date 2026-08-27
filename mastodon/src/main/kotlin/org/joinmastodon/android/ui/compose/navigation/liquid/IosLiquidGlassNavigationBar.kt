@@ -438,8 +438,8 @@ internal fun IosLiquidGlassNavigationBar(
                                         padding = maxOf(padding, 40.dp.toPx())
                                         vibrancy()
                                         blur(
-                                            4.dp.toPx(),
-                                            4.dp.toPx(),
+                                            14.dp.toPx(),
+                                            14.dp.toPx(),
                                         )
                                         lens(
                                             refractionHeight = 24.dp.toPx(),
@@ -484,7 +484,7 @@ internal fun IosLiquidGlassNavigationBar(
                                 shape = { pillShape },
                                 effects = {
                                     vibrancy()
-                                    blur(4.dp.toPx(), 4.dp.toPx())
+                                    blur(14.dp.toPx(), 14.dp.toPx())
                                     lens(
                                         refractionHeight = 24.dp.toPx(),
                                         refractionAmount = 24.dp.toPx(),

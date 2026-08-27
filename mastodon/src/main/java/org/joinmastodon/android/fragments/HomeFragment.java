@@ -191,12 +191,6 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 
 		fragmentContainer=new BackdropCaptureFrameLayout(getActivity());
 		fragmentContainer.setId(me.grishka.appkit.R.id.fragment_wrap);
-		android.animation.LayoutTransition layoutTransition=new android.animation.LayoutTransition();
-		layoutTransition.enableTransitionType(android.animation.LayoutTransition.CHANGE_APPEARING);
-		layoutTransition.enableTransitionType(android.animation.LayoutTransition.CHANGE_DISAPPEARING);
-		layoutTransition.setDuration(android.animation.LayoutTransition.CHANGE_APPEARING, 200);
-		layoutTransition.setDuration(android.animation.LayoutTransition.CHANGE_DISAPPEARING, 200);
-		fragmentContainer.setLayoutTransition(layoutTransition);
 		homeLayout.addView(fragmentContainer, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
 		toolbarHost=new FrameLayout(getActivity());
@@ -343,7 +337,7 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 			.beginTransaction()
 			.hide(fragmentForTab(currentTab))
 			.show(newFragment)
-			.commit();
+			.commitNow();
 		maybeTriggerLoading(newFragment);
 		currentTab=tab;
 		updateLiquidToolbarVisibility();

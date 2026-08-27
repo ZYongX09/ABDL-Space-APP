@@ -629,6 +629,20 @@ public class ComposeMediaViewController{
 		return attachments.stream().filter(a->a.serverAttachment!=null).map(a->a.serverAttachment.id).collect(Collectors.toList());
 	}
 
+	public String getUploadedAttachmentDebugInfo(){
+		StringBuilder sb=new StringBuilder();
+		for(DraftMediaAttachment att:attachments){
+			if(att.serverAttachment==null)
+				continue;
+			if(sb.length()>0)
+				sb.append('\n');
+			sb.append("id: ").append(att.serverAttachment.id==null ? "" : att.serverAttachment.id);
+			sb.append('\n').append("url: ").append(att.serverAttachment.url==null ? "" : att.serverAttachment.url);
+			sb.append('\n').append("preview_url: ").append(att.serverAttachment.previewUrl==null ? "" : att.serverAttachment.previewUrl);
+		}
+		return sb.toString();
+	}
+
 	public List<CreateStatus.Request.MediaAttribute> getAttachmentAttributes(){
 		List<CreateStatus.Request.MediaAttribute> mediaAttributes = new ArrayList<>();
 		for (DraftMediaAttachment att:attachments){

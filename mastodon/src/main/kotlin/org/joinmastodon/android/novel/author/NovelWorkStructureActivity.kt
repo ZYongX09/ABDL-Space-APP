@@ -8,9 +8,14 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.navigationevent.NavigationEventDispatcher
@@ -20,6 +25,8 @@ import org.joinmastodon.android.api.novels.NovelAuthoringApi
 import org.joinmastodon.android.api.session.AccountSessionManager
 import org.joinmastodon.android.ui.compose.MiuixAppTheme
 import org.joinmastodon.android.ui.utils.UiUtils
+import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 class NovelWorkStructureActivity : ComponentActivity(), NavigationEventDispatcherOwner {
 	override val navigationEventDispatcher = NavigationEventDispatcher { finish() }
@@ -50,12 +57,16 @@ class NovelWorkStructureActivity : ComponentActivity(), NavigationEventDispatche
 			CompositionLocalProvider(LocalNavigationEventDispatcherOwner provides this) {
 				MiuixAppTheme {
 					val state by viewModel.state.collectAsState()
-					NovelWorkStructureScreen(
-						state = state,
-						viewModel = viewModel,
-						onClose = ::finish,
-						onOpenChapter = { selectedWorkId, chapter -> startActivity(NovelChapterEditorActivity.intent(this, accountId, selectedWorkId, chapter)) },
-					)
+					Scaffold(containerColor = MiuixTheme.colorScheme.background, contentWindowInsets = WindowInsets(0, 0, 0, 0)) { padding ->
+						Box(Modifier.fillMaxSize().padding(padding)) {
+							NovelWorkStructureScreen(
+								state = state,
+								viewModel = viewModel,
+								onClose = ::finish,
+								onOpenChapter = { selectedWorkId, chapter -> startActivity(NovelChapterEditorActivity.intent(this@NovelWorkStructureActivity, accountId, selectedWorkId, chapter)) },
+							)
+						}
+					}
 				}
 			}
 		}

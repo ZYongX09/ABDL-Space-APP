@@ -80,6 +80,10 @@ public class Account extends BaseModel implements Searchable{
 	 */
 	public String nbwUsername;
 	/**
+	 * Whether the account has verified badge
+	 */
+	public boolean verified;
+	/**
 	 * Custom emoji entities to be used when rendering the profile. If none, an empty array will be returned.
 	 */
 	public List<Emoji> emojis;

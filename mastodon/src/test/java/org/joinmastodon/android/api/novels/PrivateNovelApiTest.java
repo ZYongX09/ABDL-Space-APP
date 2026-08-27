@@ -12,6 +12,7 @@ import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 public class PrivateNovelApiTest{
 	private MockWebServer server;
@@ -48,6 +49,18 @@ public class PrivateNovelApiTest{
 
 		server.enqueue(new MockResponse().setResponseCode(204)); api.executeEmpty(api.newDeleteBookCall("b"));
 		assertEquals("DELETE", server.takeRequest().getMethod());
+	}
+
+	@Test public void bookErrorsPreserveSafeHttpStatusAndCode() throws Exception{
+		server.enqueue(new MockResponse().setResponseCode(409).setHeader("Content-Type", "application/json").setBody("{\"error\":{\"code\":\"book_not_ready\"}}"));
+		try{
+			api.executeJson(api.newBookCall("book-1"), PrivateNovelApi.BookDto.class);
+			fail("Expected API error");
+		}catch(PrivateNovelApi.ApiException error){
+			assertEquals(409, error.status);
+			assertEquals("book_not_ready", error.code);
+			assertEquals("HTTP 409 (book_not_ready)", error.getMessage());
+		}
 	}
 
 	private MockResponse json(String body){ return new MockResponse().setResponseCode(200).setHeader("Content-Type", "application/json").setBody(body); }

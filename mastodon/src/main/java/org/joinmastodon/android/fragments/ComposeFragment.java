@@ -496,6 +496,9 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	}
 
 	private void refreshNewBabyWorldBinding(){
+		// 回复帖不涉及宝宝新天地同步，不做绑定状态检测
+		if(replyTo!=null)
+			return;
 		final int requestGeneration=++newBabyWorldBindingRequestGeneration;
 		newBabyWorldBindingState=BINDING_CHECKING;
 		updateNewBabyWorldCard();
@@ -530,6 +533,11 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	private void updateNewBabyWorldCard(){
 		if(newBabyWorldCard==null)
 			return;
+		// 回复帖不显示宝宝新天地绑定板块
+		if(replyTo!=null){
+			newBabyWorldCard.setVisibility(View.GONE);
+			return;
+		}
 		if(crisisWarningController!=null && crisisWarningController.isVisible()){
 			newBabyWorldCard.setVisibility(View.GONE);
 			return;
@@ -948,8 +956,20 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	}
 
 	private void publish(){
-		if(newBabyWorldBindingState!=BINDING_BOUND){
+		// 回复帖禁用宝宝新天地同步：不检测绑定、不调用 AI 推荐板块
+		if(replyTo!=null){
+			publishResolved();
+			return;
+		}
+		// 禁止同步宝宝新天地时跳过绑定检查
+		if(selectedNBWForumId!=-1 && newBabyWorldBindingState!=BINDING_BOUND){
 			refreshNewBabyWorldBinding();
+			return;
+		}
+		if(selectedNBWForumId==-1){
+			// 禁止同步宝宝新天地
+			resolvedNBWForumId=-1;
+			publishResolved();
 			return;
 		}
 		if(selectedNBWForumId!=0){
@@ -1014,7 +1034,8 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	private void publishResolved(){
 		if(getActivity()==null)
 			return;
-		if(newBabyWorldBindingState!=BINDING_BOUND){
+		// 禁止同步宝宝新天地时跳过绑定检查（回复帖已禁用全部宝宝新天地功能）
+		if(replyTo==null && resolvedNBWForumId!=-1 && newBabyWorldBindingState!=BINDING_BOUND){
 			refreshNewBabyWorldBinding();
 			return;
 		}
@@ -1059,7 +1080,8 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		req.status=text;
 		req.mentalCrisis=containsCrisisKeyword(text);
 		req.visibility=StatusPrivacy.PUBLIC;
-		req.nbwFid=resolvedNBWForumId;
+		// 回复帖不同步宝宝新天地，不携带版块字段
+		req.nbwFid=(replyTo!=null || resolvedNBWForumId==-1) ? null : resolvedNBWForumId;
 		if(!mediaViewController.isEmpty()){
 			req.mediaIds=mediaViewController.getAttachmentIDs();
 			req.mediaAttributes=mediaViewController.getAttachmentAttributes();
@@ -1141,9 +1163,13 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		V.setVisibilityAnimated(sendProgress, View.GONE);
 		publishButton.setEnabled(true);
 		if(error instanceof MastodonErrorResponse me){
+			String message=me.error;
+			String mediaDebugInfo=mediaViewController.getUploadedAttachmentDebugInfo();
+			if(!TextUtils.isEmpty(mediaDebugInfo))
+				message+="\n\n上传图片返回 URL：\n"+mediaDebugInfo;
 			new M3AlertDialogBuilder(getActivity())
 					.setTitle(R.string.post_failed)
-					.setMessage(me.error)
+					.setMessage(message)
 					.setPositiveButton(R.string.retry, (dlg, btn)->publish())
 					.setNegativeButton(R.string.cancel, null)
 					.show();
@@ -1379,12 +1405,19 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		items.add(new ListItem<>(R.string.nbw_forum_share, 0, R.drawable.ic_fluent_share_24_regular, 27, onClick));
 		items.add(new ListItem<>(R.string.nbw_forum_novel, 0, R.drawable.ic_fluent_book_24_regular, 26, onClick));
 		items.add(new ListItem<>(R.string.nbw_forum_friends, 0, R.drawable.ic_fluent_group_24_regular, 3, onClick));
+		items.add(new ListItem<>(R.string.nbw_forum_none, R.string.nbw_forum_none_subtitle, R.drawable.ic_nbw, -1, onClick));
 		menu.showAsDropDown(v);
 	}
 
 	private void updateNBWForumButton(boolean animated){
 		if(getActivity()==null)
 			return;
+		// 回复帖不显示宝宝新天地板块选择器
+		if(replyTo!=null){
+			visibilityBtn.setVisibility(View.GONE);
+			return;
+		}
+		visibilityBtn.setVisibility(View.VISIBLE);
 		TextView visibilityText;
 		if(!animated){
 			visibilityText=visibilityCurrentText;
@@ -1408,6 +1441,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 				case 27 -> R.string.nbw_forum_share;
 				case 26 -> R.string.nbw_forum_novel;
 				case 3 -> R.string.nbw_forum_friends;
+				case -1 -> R.string.nbw_forum_none;
 				default -> R.string.nbw_forum_ai;
 			});
 		Drawable icon=getResources().getDrawable(switch(selectedNBWForumId){
@@ -1415,6 +1449,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 			case 27 -> R.drawable.ic_fluent_share_24_regular;
 			case 26 -> R.drawable.ic_fluent_book_24_regular;
 			case 3 -> R.drawable.ic_fluent_group_24_regular;
+			case -1 -> R.drawable.ic_nbw;
 			default -> R.drawable.ic_fluent_wand_24_regular;
 		}, getActivity().getTheme()).mutate();
 		icon.setBounds(0, 0, V.dp(18), V.dp(18));

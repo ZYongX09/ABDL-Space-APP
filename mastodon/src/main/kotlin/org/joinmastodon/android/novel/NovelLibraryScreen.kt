@@ -71,6 +71,7 @@ fun NovelLibraryScreen(
 	onDelete: (NovelBookEntity) -> Unit,
 	onDownload: (NovelBookEntity) -> Unit,
 	onOpen: (NovelBookEntity) -> Unit,
+	onConvertToWork: (NovelBookEntity) -> Unit,
 	onError: (String) -> Unit,
 	onDismissError: () -> Unit,
 ) {
@@ -99,7 +100,7 @@ fun NovelLibraryScreen(
 					Text(
 						when {
 							state.refreshing -> "正在同步书库"
-							state.books.isEmpty() -> "TXT、EPUB 与粘贴文本"
+							state.books.isEmpty() -> "TXT、EPUB、DOCX 与粘贴文本"
 							else -> "${state.books.size} 本小说"
 						},
 						fontSize = 15.sp,
@@ -138,17 +139,24 @@ fun NovelLibraryScreen(
 		onDismiss = { importVisible = false },
 		onTxt = { importVisible = false; picker.launch("text/plain") },
 		onEpub = { importVisible = false; picker.launch("application/epub+zip") },
+		onDocx = { importVisible = false; picker.launch("application/vnd.openxmlformats-officedocument.wordprocessingml.document") },
 		onPaste = { importVisible = false; pasteVisible = true },
 	)
 	if (pasteVisible) NovelPasteDialog({ pasteVisible = false }) { title, author, text -> pasteVisible = false; onPaste(title, author, text) }
 	upload?.let { (uri, document) -> NovelUploadMetadataDialog(document, { upload = null }) { title, author -> upload = null; onUpload(uri, title, author, document.format, document.mimeType) } }
-	selectedBook?.let { book -> BookActionsDialog(book, { selectedBook = null }, {
-		selectedBook = null
-		if (book.downloadState == "ready") onOpen(book) else onDownload(book)
-	}, {
-		selectedBook = null
-		pendingDelete = book
-	}) }
+	selectedBook?.let { book ->
+		val chapterCount = state.bookDetails[book.id]?.chapterCount ?: 0
+		BookActionsDialog(book, chapterCount, { selectedBook = null }, {
+			selectedBook = null
+			if (book.downloadState == "ready") onOpen(book) else onDownload(book)
+		}, {
+			selectedBook = null
+			onConvertToWork(book)
+		}, {
+			selectedBook = null
+			pendingDelete = book
+		})
+	}
 	pendingDelete?.let { book ->
 		NovelDialog("从书库移除？", { pendingDelete = null }, { pendingDelete = null; onDelete(book) }) {
 			Text("《${book.title}》将从本机和私人云端移除，此操作无法撤销。")
@@ -260,11 +268,12 @@ private fun MiuixIcon(icon: ImageVector, size: androidx.compose.ui.unit.Dp, tint
 }
 
 @Composable
-private fun ImportDialog(onDismiss: () -> Unit, onTxt: () -> Unit, onEpub: () -> Unit, onPaste: () -> Unit) {
+private fun ImportDialog(onDismiss: () -> Unit, onTxt: () -> Unit, onEpub: () -> Unit, onDocx: () -> Unit, onPaste: () -> Unit) {
 	OverlayBottomSheet(show = true, title = "导入小说", onDismissRequest = onDismiss) {
 		Card(Modifier.fillMaxWidth()) {
 			SheetAction("选择 TXT 文件", "支持 UTF-8 与 GB18030", MiuixIcons.Import, onTxt)
 			SheetAction("选择 EPUB 文件", "按书籍目录导入章节", MiuixIcons.Notes, onEpub)
+			SheetAction("选择 DOCX 文件", "按 Word 标题识别章节", MiuixIcons.Notes, onDocx)
 			SheetAction("粘贴文本", "适合短篇、草稿或临时保存", MiuixIcons.Notes, onPaste)
 		}
 		Text("也可从文件管理器“打开方式”或“分享”到 ABDL Space。", Modifier.padding(horizontal = 16.dp, vertical = 12.dp), fontSize = 13.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
@@ -277,10 +286,11 @@ private fun SheetAction(title: String, summary: String, icon: ImageVector, onCli
 }
 
 @Composable
-private fun BookActionsDialog(book: NovelBookEntity, onDismiss: () -> Unit, onPrimary: () -> Unit, onDelete: () -> Unit) {
+private fun BookActionsDialog(book: NovelBookEntity, chapterCount: Int, onDismiss: () -> Unit, onPrimary: () -> Unit, onConvert: () -> Unit, onDelete: () -> Unit) {
 	OverlayBottomSheet(show = true, title = book.title, onDismissRequest = onDismiss) {
 		Card(Modifier.fillMaxWidth()) {
 			SheetAction(if (book.downloadState == "ready") "继续阅读" else "下载到本机", if (book.downloadState == "ready") "从上次位置继续" else "保存到本机后离线阅读", if (book.downloadState == "ready") MiuixIcons.Notes else MiuixIcons.FileDownloads, onPrimary)
+			if (chapterCount > 0) SheetAction("转为我的作品", "复制章节到创作中心成为草稿作品", MiuixIcons.Import, onConvert)
 			SheetAction("从书库移除", "同时从本机和私人云端移除", MiuixIcons.Report, onDelete)
 		}
 	}

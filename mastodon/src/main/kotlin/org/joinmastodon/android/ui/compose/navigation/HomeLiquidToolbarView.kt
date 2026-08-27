@@ -353,9 +353,13 @@ class HomeLiquidToolbarController(
 			HomeToolbarMenuPage.NONE -> emptyList()
 		}
 		val menuVisible = isMenuVisible()
+		val menuAnimSpec = homeLiquidToolbarMenuAnimationSpec()
 		val scrimAlpha by animateFloatAsState(
 			targetValue = if(menuVisible) 0.30f else 0f,
-			animationSpec = spring(dampingRatio = 0.92f, stiffness = 500f),
+			animationSpec = androidx.compose.animation.core.tween(
+				durationMillis = if(menuVisible) menuAnimSpec.dimEnterDurationMs else menuAnimSpec.dimExitDurationMs,
+				easing = top.yukonga.miuix.kmp.anim.SinOutEasing,
+			),
 			label = "toolbarMenuScrim",
 		)
 		Box(
@@ -482,13 +486,12 @@ class HomeLiquidToolbarController(
 			HomeToolbarMenuPage.ROOT -> rootMenuState
 			HomeToolbarMenuPage.NONE -> emptyList()
 		}
-			Column(
-				Modifier
-					.heightIn(max = 420.dp)
-					.verticalScroll(rememberScrollState())
-					.padding(top = 14.dp, bottom = 6.dp)
-					.graphicsLayer { alpha = progress },
-			) {
+		Column(
+			Modifier
+				.heightIn(max = 420.dp)
+				.verticalScroll(rememberScrollState())
+				.padding(top = 14.dp, bottom = 6.dp),
+		) {
 				if(animatedPage==HomeToolbarMenuPage.LISTS || animatedPage==HomeToolbarMenuPage.HASHTAGS) {
 					MenuRow(R.drawable.ic_fluent_chevron_left_24_regular, view.context.getString(R.string.back), false, highlightedIndex==0) { menuPageState = HomeToolbarMenuPage.ROOT }
 				}

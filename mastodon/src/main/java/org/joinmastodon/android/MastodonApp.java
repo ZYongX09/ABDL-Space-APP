@@ -53,8 +53,14 @@ public class MastodonApp extends Application{
 		try{
 			android.app.NotificationManager nm=getSystemService(android.app.NotificationManager.class);
 			if(nm!=null && android.os.Build.VERSION.SDK_INT>=android.os.Build.VERSION_CODES.O){
-				android.app.NotificationChannel ch=new android.app.NotificationChannel("jpush_high", "推送通知", android.app.NotificationManager.IMPORTANCE_HIGH);
+				// v2 渠道：NotificationChannel 的 importance/声音/震动一经创建不可修改，
+				// 旧 jpush_high 在部分设备上被系统初始限制后无法恢复，换新 ID 以重置为 HIGH 默认（横幅+声音+震动+锁屏）
+				nm.deleteNotificationChannel("jpush_high");
+				android.app.NotificationChannel ch=new android.app.NotificationChannel("jpush_high_v2", "推送通知", android.app.NotificationManager.IMPORTANCE_HIGH);
 				ch.setDescription("接收推送通知时显示横幅");
+				ch.enableVibration(true);
+				ch.enableLights(true);
+				ch.setLockscreenVisibility(android.app.Notification.VISIBILITY_PUBLIC);
 				nm.createNotificationChannel(ch);
 			}
 		}catch(Exception e){

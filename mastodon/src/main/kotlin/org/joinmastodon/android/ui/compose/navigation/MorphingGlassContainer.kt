@@ -3,6 +3,7 @@ package org.joinmastodon.android.ui.compose.navigation
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -23,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
@@ -39,6 +41,10 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
 import androidx.compose.runtime.withFrameNanos
+import kotlinx.coroutines.launch
+import top.yukonga.miuix.kmp.anim.SinOutEasing
+import top.yukonga.miuix.kmp.anim.folmeSpring
+import top.yukonga.miuix.kmp.squircle.isSquircleEnabled
 import org.joinmastodon.android.ui.compose.navigation.liquid.iosIndicatorSpecular
 import org.joinmastodon.android.ui.compose.navigation.liquid.lens
 import org.joinmastodon.android.ui.compose.navigation.liquid.rememberGravityRotatedHighlight
@@ -75,13 +81,16 @@ internal fun MorphingGlassContainer(
 	closedContent: @Composable BoxScope.() -> Unit,
 	expandedContent: @Composable BoxScope.(progress: Float) -> Unit,
 ) {
-	val progress = remember { Animatable(if(expanded) 1f else 0f) }
+	val containerMorph = remember { Animatable(if(expanded) 1f else 0f) }
+	val containerScale = remember { Animatable(if(expanded) 1f else 1f) }
+	val enterFraction = remember { Animatable(if(expanded) 1f else 0f) }
+	val enterAlpha = remember { Animatable(if(expanded) 1f else 0f) }
 	val animatedExpandedHeight by animateDpAsState(
 		targetValue = expandedHeight,
 		animationSpec = spring(dampingRatio = 0.88f, stiffness = 560f),
 		label = "expandedGlassHeight",
 	)
-	val motion = homeLiquidToolbarMotionSpec()
+	val menuSpec = homeLiquidToolbarMenuAnimationSpec()
 	val interactionSource = remember { MutableInteractionSource() }
 	val pressed by interactionSource.collectIsPressedAsState()
 	val pressScale = remember { Animatable(1f) }
@@ -103,29 +112,63 @@ internal fun MorphingGlassContainer(
 	LaunchedEffect(expanded) {
 		onExpansionStarted()
 		if(expanded) withFrameNanos { }
-		progress.animateTo(
-			targetValue = if(expanded) 1f else 0f,
-			animationSpec = spring(
-				dampingRatio = if(expanded) motion.dampingRatio else 0.9f,
-				stiffness = if(expanded) motion.stiffness else 620f,
-			),
+		val target = if(expanded) 1f else 0f
+		// Container outline morph: bouncy spring so the glass resize overshoots visibly.
+		val containerSpring = folmeSpring<Float>(
+			damping = menuSpec.containerSpringDamping,
+			response = menuSpec.containerSpringResponseSec,
 		)
+		// Container整体 scale 弹性：展开时从 containerMorphScaleFrom 弹到 1.0 带明显过冲，
+		// 让玻璃本身有"弹出"的弹性感（不只是内部文字）。
+		val containerScaleSpring = folmeSpring<Float>(
+			damping = menuSpec.containerMorphScaleDamping,
+			response = menuSpec.containerMorphScaleResponseSec,
+		)
+		// Inner content reveal: miuix-style spring with visible overshoot.
+		val fractionSpring = folmeSpring<Float>(
+			damping = menuSpec.fractionSpringDamping,
+			response = menuSpec.fractionSpringResponseSec,
+			visibilityThreshold = menuSpec.fractionVisibilityThreshold,
+		)
+		// Inner content alpha: miuix-identical tweens.
+		val alphaSpec = tween<Float>(
+			durationMillis = if(expanded) menuSpec.alphaEnterDurationMs else menuSpec.alphaExitDurationMs,
+			easing = SinOutEasing,
+		)
+		launch { containerMorph.animateTo(target, containerSpring) }
+		launch {
+			if(expanded) {
+				containerScale.snapTo(menuSpec.containerMorphScaleFrom)
+			}
+			containerScale.animateTo(1f, containerScaleSpring)
+		}
+		launch { enterFraction.animateTo(target, fractionSpring) }
+		enterAlpha.animateTo(target, alphaSpec)
+		// Matches miuix ListPopupLayout: snap residual tracks to a clean baseline after exit so
+		// the next enter starts from zero without drifting on the spring's residual velocity.
+		if(!expanded) {
+			containerMorph.snapTo(0f)
+			enterFraction.snapTo(0f)
+			enterAlpha.snapTo(0f)
+		}
 		onExpansionFinished(expanded)
 	}
 
-	val p = progress.value.coerceIn(0f, 1f)
-	val width = lerp(closedWidth.value, expandedWidth.value, p).dp
-	val height = lerp(closedHeight.value, animatedExpandedHeight.value, p).dp
-	val radius = lerp(closedHeight.value / 2f, 28f, p).dp
+	val cp = containerMorph.value.coerceIn(0f, 1f)
+	val width = lerp(closedWidth.value, expandedWidth.value, cp).dp
+	val height = lerp(closedHeight.value, animatedExpandedHeight.value, cp).dp
+	val radius = lerp(closedHeight.value / 2f, 28f, cp).dp
 	val shape = RoundedCornerShape(radius)
+	val contentScale = menuSpec.enterScaleFrom + (1f - menuSpec.enterScaleFrom) * enterFraction.value.coerceIn(0f, 1f)
+	val squircleEnabled = isSquircleEnabled()
 	Box(
 		modifier = modifier
 			.width(width)
 			.height(height)
 			.onGloballyPositioned { onBoundsChanged(it.positionInRoot(), it.size) }
 			.graphicsLayer {
-				scaleX = pressScale.value
-				scaleY = pressScale.value
+				scaleX = pressScale.value * containerScale.value
+				scaleY = pressScale.value * containerScale.value
 				transformOrigin = androidx.compose.ui.graphics.TransformOrigin(
 					pivotFractionX = anchorFractionX,
 					pivotFractionY = 0f,
@@ -139,12 +182,12 @@ internal fun MorphingGlassContainer(
 						vibrancy()
 						val blurRadius = homeLiquidToolbarVisualSpec().blurRadiusDp.dp.toPx()
 						blur(blurRadius, blurRadius)
-						lens(
-							refractionHeight = lerp(18.dp.toPx(), 10.dp.toPx(), p),
-							refractionAmount = lerp(20.dp.toPx(), 12.dp.toPx(), p),
-						)
-					},
-					highlight = { outlineHighlight.value.copy(alpha = lerp(0.82f, 0.68f, p)) },
+					lens(
+						refractionHeight = lerp(18.dp.toPx(), 10.dp.toPx(), cp),
+						refractionAmount = lerp(20.dp.toPx(), 12.dp.toPx(), cp),
+					)
+				},
+				highlight = { outlineHighlight.value.copy(alpha = lerp(0.82f, 0.68f, cp)) },
 					onDrawSurface = { drawRect(surface) },
 				) else Modifier.background(surface, shape),
 			)
@@ -197,17 +240,28 @@ internal fun MorphingGlassContainer(
 	) {
 		Box(
 			modifier = Modifier.graphicsLayer {
-				alpha = (1f - p * 1.8f).coerceIn(0f, 1f)
-				translationY = -6.dp.toPx() * p
+				alpha = (1f - cp * 1.8f).coerceIn(0f, 1f)
+				translationY = -6.dp.toPx() * cp
 			},
 			content = closedContent,
 		)
 		Box(
-			modifier = Modifier.graphicsLayer {
-				alpha = ((p - 0.18f) / 0.82f).coerceIn(0f, 1f)
-				translationY = 8.dp.toPx() * (1f - p)
-			},
-			content = { expandedContent(p) },
+			modifier = Modifier
+				.graphicsLayer {
+					alpha = enterAlpha.value.coerceIn(0f, 1f)
+					scaleX = contentScale
+					scaleY = contentScale
+					transformOrigin = TransformOrigin(
+						pivotFractionX = anchorFractionX,
+						pivotFractionY = 0f,
+					)
+				}
+				.menuClipRevealFromTop(
+					fractionProgress = { enterFraction.value },
+					cornerRadius = menuSpec.cornerRadiusDp.dp,
+					squircleEnabled = squircleEnabled,
+				),
+			content = { expandedContent(enterFraction.value.coerceIn(0f, 1f)) },
 		)
 	}
 }

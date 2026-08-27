@@ -92,6 +92,7 @@
 						android:textColor="?colorM3OnSurface"
 						android:maxLines="2"
 						android:ellipsize="end"
+						android:drawablePadding="6dp"
 						tools:text="Eugen" />
 
 					<org.joinmastodon.android.ui.views.WrappingLinearLayout
@@ -180,6 +181,17 @@
 					android:textColor="?colorM3OnSurface"
 					android:textSize="16sp"
 					tools:text="Founder, CEO and lead developer @Mastodon, Germany." />
+
+				<LinearLayout
+					android:id="@+id/badge_container"
+					android:layout_width="match_parent"
+					android:layout_height="wrap_content"
+					android:layout_marginLeft="16dp"
+					android:layout_marginTop="8dp"
+					android:layout_marginRight="16dp"
+					android:orientation="horizontal"
+					android:visibility="gone"
+					tools:visibility="visible"/>
 
 				<LinearLayout
 					android:id="@+id/profile_counters"

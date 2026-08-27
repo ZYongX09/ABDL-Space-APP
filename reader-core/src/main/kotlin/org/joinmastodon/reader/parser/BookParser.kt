@@ -18,6 +18,7 @@ class BookParser {
 	fun parse(file: File): ParsedBook = when (file.extension.lowercase(Locale.ROOT)) {
 		"txt" -> parseTxt(file)
 		"epub" -> parseEpub(file)
+		"docx" -> parseDocx(file)
 		else -> throw IllegalArgumentException("不支持的文件格式: ${file.extension}")
 	}
 
@@ -63,8 +64,66 @@ class BookParser {
 		buildParsedBook(title, author, BookFormat.EPUB, drafts)
 	}
 
-	private fun parseXhtml(markup: String): ChapterDraft? {
-		val document = Jsoup.parse(markup, "", Parser.xmlParser())
+	private fun parseDocx(file: File): ParsedBook = ZipFile(file).use { zip ->
+		val documentEntry = zip.getEntry("word/document.xml")
+			?: throw IllegalArgumentException("DOCX 缺少 word/document.xml")
+		val document = Jsoup.parse(zip.getInputStream(documentEntry).bufferedReader(Charsets.UTF_8).use { it.readText() }, "", Parser.xmlParser())
+		val coreProps = readDocxCoreProps(zip)
+		val title = coreProps?.first?.takeIf { it.isNotBlank() } ?: file.nameWithoutExtension
+		val author = coreProps?.second?.takeIf { it.isNotBlank() }
+		val paragraphs = document.getElementsByTag("w:p").map { paragraph ->
+			val style = paragraph.getElementsByTag("w:pStyle").firstOrNull()?.attr("w:val").orEmpty()
+			val text = paragraph.getElementsByTag("w:t").joinToString("") { it.text() }.trim()
+			SourceParagraph(isDocxHeading(style), text)
+		}
+		val drafts = splitDocxChapters(paragraphs)
+		if (drafts.isEmpty()) throw IllegalArgumentException("DOCX 没有可读取的正文")
+		buildParsedBook(title, author, BookFormat.DOCX, drafts)
+	}
+
+	private fun readDocxCoreProps(zip: ZipFile): Pair<String, String>? {
+		val entry = zip.getEntry("docProps/core.xml") ?: return null
+		val xml = Jsoup.parse(zip.getInputStream(entry).bufferedReader(Charsets.UTF_8).use { it.readText() }, "", Parser.xmlParser())
+		val title = xml.getElementsByTag("dc:title").firstOrNull()?.text()?.trim().orEmpty()
+		val author = xml.getElementsByTag("dc:creator").firstOrNull()?.text()?.trim().orEmpty()
+		return title to author
+	}
+
+	private fun isDocxHeading(styleId: String): Boolean {
+		val normalized = styleId.substringAfter(':').lowercase(Locale.ROOT)
+		return normalized.startsWith("heading") || normalized == "title"
+	}
+
+	private fun splitDocxChapters(paragraphs: List<SourceParagraph>): List<ChapterDraft> {
+		val chapters = mutableListOf<ChapterDraft>()
+		var title = "前言"
+		val body = StringBuilder()
+		fun flush() {
+			val content = body.toString().normalizeText()
+			if (content.isNotBlank()) chapters += ChapterDraft(title, content)
+			body.clear()
+		}
+		paragraphs.forEach { (explicitHeading, text) ->
+			if (text.isBlank()) return@forEach
+			val trimmed = text.trim()
+			val isChapterStart = explicitHeading || (trimmed.length in 1..100 && isChapterHeading(trimmed))
+			if (isChapterStart) {
+				flush()
+				title = trimmed
+			} else {
+				body.append(trimmed).append('\n')
+			}
+		}
+		flush()
+		return chapters.ifEmpty {
+			val allText = paragraphs.joinToString("\n") { it.text }.normalizeText()
+			if (allText.isBlank()) emptyList() else listOf(ChapterDraft("全部内容", allText))
+		}.flatMap(::splitOversizedChapter)
+	}
+
+	private data class SourceParagraph(val heading: Boolean, val text: String)
+
+	private fun parseXhtml(markup: String): ChapterDraft? {		val document = Jsoup.parse(markup, "", Parser.xmlParser())
 		document.select("script, style, nav").remove()
 		val heading = document.selectFirst("body h1, body h2, body h3")
 		val title = document.selectFirst("head > title")?.text()?.trim().orEmpty()

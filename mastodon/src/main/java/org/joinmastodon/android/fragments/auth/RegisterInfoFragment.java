@@ -3,7 +3,6 @@ package org.joinmastodon.android.fragments.auth;
 import android.app.ProgressDialog;
 import android.content.Intent;
 import android.os.Bundle;
-import android.text.InputType;
 import android.text.TextUtils;
 import android.text.method.HideReturnsTransformationMethod;
 import android.text.method.PasswordTransformationMethod;
@@ -13,7 +12,6 @@ import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import com.google.gson.Gson;
@@ -52,8 +50,9 @@ public class RegisterInfoFragment extends AppKitFragment {
 
     private static final OkHttpClient httpClient = new OkHttpClient();
 
-    private String email, code;
-    private EditText usernameEdit, passwordEdit, confirmEdit;
+    private String email, code, prefillUsername, nbwToken, nbwUid, nbwUsername;
+    private boolean fromNBWOAuthRegister;
+    private EditText emailEdit, usernameEdit, passwordEdit, confirmEdit;
     private Button btnRegister;
     private boolean passwordVisible = false;
     private boolean confirmVisible = false;
@@ -63,6 +62,11 @@ public class RegisterInfoFragment extends AppKitFragment {
         super.onCreate(savedInstanceState);
         email = getArguments() != null ? getArguments().getString("email", "") : "";
         code = getArguments() != null ? getArguments().getString("code", "") : "";
+        prefillUsername = getArguments() != null ? getArguments().getString("prefill_username", "") : "";
+        nbwToken = getArguments() != null ? getArguments().getString("nbw_token", "") : "";
+        nbwUid = getArguments() != null ? getArguments().getString("nbw_uid", "") : "";
+        nbwUsername = getArguments() != null ? getArguments().getString("nbw_username", "") : "";
+        fromNBWOAuthRegister = getArguments() != null && getArguments().getBoolean("from_nbw_oauth_register", false);
     }
 
     @Nullable
@@ -93,18 +97,23 @@ public class RegisterInfoFragment extends AppKitFragment {
         }
 
         ImageView btnBack = view.findViewById(R.id.btn_back);
-        TextView tvEmail = view.findViewById(R.id.tv_email);
+        emailEdit = view.findViewById(R.id.tv_email);
         usernameEdit = view.findViewById(R.id.username_edit);
         passwordEdit = view.findViewById(R.id.password_edit);
         confirmEdit = view.findViewById(R.id.confirm_edit);
         btnRegister = view.findViewById(R.id.btn_register);
 
-        tvEmail.setText(email);
+        emailEdit.setText(email);
+        emailEdit.setEnabled(fromNBWOAuthRegister);
+        if(!TextUtils.isEmpty(prefillUsername))
+            usernameEdit.setText(prefillUsername);
 
         // 深浅色输入框适配（与 LoginEmail/LoginPassword 一致）
         if (isDark) {
             usernameEdit.setBackgroundResource(R.drawable.bg_input_dark);
             usernameEdit.setTextColor(android.graphics.Color.WHITE);
+            emailEdit.setBackgroundResource(R.drawable.bg_input_dark);
+            emailEdit.setTextColor(android.graphics.Color.WHITE);
             passwordEdit.setBackgroundResource(R.drawable.bg_input_dark);
             passwordEdit.setTextColor(android.graphics.Color.WHITE);
             confirmEdit.setBackgroundResource(R.drawable.bg_input_dark);
@@ -112,6 +121,8 @@ public class RegisterInfoFragment extends AppKitFragment {
         } else {
             usernameEdit.setBackgroundResource(R.drawable.bg_input_light);
             usernameEdit.setTextColor(android.graphics.Color.BLACK);
+            emailEdit.setBackgroundResource(R.drawable.bg_input_light);
+            emailEdit.setTextColor(android.graphics.Color.BLACK);
             passwordEdit.setBackgroundResource(R.drawable.bg_input_light);
             passwordEdit.setTextColor(android.graphics.Color.BLACK);
             confirmEdit.setBackgroundResource(R.drawable.bg_input_light);
@@ -130,6 +141,7 @@ public class RegisterInfoFragment extends AppKitFragment {
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
             @Override public void afterTextChanged(android.text.Editable s) { updateButtonState(); }
         };
+        emailEdit.addTextChangedListener(watcher);
         usernameEdit.addTextChangedListener(watcher);
         passwordEdit.addTextChangedListener(watcher);
         confirmEdit.addTextChangedListener(watcher);
@@ -160,10 +172,12 @@ public class RegisterInfoFragment extends AppKitFragment {
     private void updateButtonState() {
         if (btnRegister != null) {
             String username = usernameEdit.getText().toString().trim();
+            String emailValue = emailEdit.getText().toString().trim();
             String password = passwordEdit.getText().toString();
             String confirm = confirmEdit.getText().toString();
             btnRegister.setEnabled(
-                username.length() >= 3 && username.length() <= 30
+                emailValue.length() > 0
+                && username.length() >= 3 && username.length() <= 30
                 && password.length() >= 8
                 && password.equals(confirm));
         }
@@ -171,10 +185,15 @@ public class RegisterInfoFragment extends AppKitFragment {
 
     private void attemptRegister() {
         String username = usernameEdit.getText().toString().trim();
+        String emailValue = emailEdit.getText().toString().trim();
         String password = passwordEdit.getText().toString();
         String confirm = confirmEdit.getText().toString();
 
-        if (TextUtils.isEmpty(username) || TextUtils.isEmpty(password)) return;
+        if (TextUtils.isEmpty(emailValue) || TextUtils.isEmpty(username) || TextUtils.isEmpty(password)) return;
+        if (fromNBWOAuthRegister && TextUtils.isEmpty(nbwToken)) {
+            Toast.makeText(getActivity(), "宝宝新天地授权信息缺失，请重新授权", Toast.LENGTH_SHORT).show();
+            return;
+        }
         if (!password.equals(confirm)) {
             Toast.makeText(getActivity(), "两次密码不一致", Toast.LENGTH_SHORT).show();
             return;
@@ -194,7 +213,7 @@ public class RegisterInfoFragment extends AppKitFragment {
         progress.setCancelable(false);
         progress.show();
 
-        RegisterBody regBody = new RegisterBody(username, email, password, code);
+        RegisterBody regBody = new RegisterBody(username, emailValue, password, code, fromNBWOAuthRegister ? nbwToken : null);
         String json = new Gson().toJson(regBody);
         RequestBody body = RequestBody.create(MediaType.parse("application/json"), json);
 
@@ -246,17 +265,23 @@ public class RegisterInfoFragment extends AppKitFragment {
 
                                 // 存储 email 到 SharedPreferences
                                 getActivity().getSharedPreferences("login_prefs", android.content.Context.MODE_PRIVATE)
-                                    .edit().putString("email", email).apply();
+                                    .edit().putString("email", emailValue).apply();
 
-                                            // 跳转 NBW 绑定引导页
                                             getActivity().runOnUiThread(() -> {
-                                                Intent intent = new Intent(getActivity(), NBWPostRegisterActivity.class);
-                                                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-                                                intent.putExtra("nbw_username", username);
-                                                intent.putExtra("nbw_password", password);
-                                                startActivity(intent);
-                                                if (getActivity() instanceof MainActivity mainActivity) {
-                                                    mainActivity.finish();
+                                                if(fromNBWOAuthRegister){
+                                                    Toast.makeText(getActivity(), "宝宝新天地账号已绑定", Toast.LENGTH_LONG).show();
+                                                    if (getActivity() instanceof MainActivity mainActivity) {
+                                                        mainActivity.restartHomeFragment();
+                                                    }
+                                                }else{
+                                                    Intent intent = new Intent(getActivity(), NBWPostRegisterActivity.class);
+                                                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                                                    intent.putExtra("nbw_username", username);
+                                                    intent.putExtra("nbw_password", password);
+                                                    startActivity(intent);
+                                                    if (getActivity() instanceof MainActivity mainActivity) {
+                                                        mainActivity.finish();
+                                                    }
                                                 }
                                             });
                                         }
@@ -282,12 +307,13 @@ public class RegisterInfoFragment extends AppKitFragment {
     }
 
     private static class RegisterBody {
-        public String username, email, password, code;
-        public RegisterBody(String username, String email, String password, String code) {
+        public String username, email, password, code, nbw_token;
+        public RegisterBody(String username, String email, String password, String code, String nbwToken) {
             this.username = username;
             this.email = email;
             this.password = password;
             this.code = code;
+            this.nbw_token = nbwToken;
         }
     }
 

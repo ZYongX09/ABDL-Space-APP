@@ -44,7 +44,7 @@ public class AvatarSpan extends CustomEmojiSpan{
 		canvas.clipPath(clipPath);
 		canvas.translate(x, top);
 		canvas.scale(size/(float)dw, size/(float)dh, 0f, 0f);
-		drawable.draw(canvas);
+		drawableForCanvas(canvas).draw(canvas);
 		canvas.restore();
 	}
 

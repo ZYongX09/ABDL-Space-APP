@@ -1,5 +1,6 @@
 package org.joinmastodon.android.novel.author
 
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -28,6 +29,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -37,6 +39,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -65,26 +68,31 @@ import top.yukonga.miuix.kmp.icon.extended.FolderFill
 import top.yukonga.miuix.kmp.icon.extended.More
 import top.yukonga.miuix.kmp.icon.extended.Notes
 import top.yukonga.miuix.kmp.icon.extended.Ok
+import top.yukonga.miuix.kmp.icon.extended.UploadCloud
 
 @Composable
 fun AuthoringScreen(state: AuthoringState, viewModel: AuthoringViewModel, onOpenWork: (NovelAuthoringApi.WorkDto) -> Unit) {
 	var createVisible by rememberSaveable { mutableStateOf(false) }
+	val context = LocalContext.current
+	val importResolver = remember { org.joinmastodon.android.novel.NovelDocumentResolver(context.contentResolver) }
+	val importPicker = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.GetContent()) { uri ->
+		uri?.let { selected ->
+			runCatching { importResolver.resolve(selected) }.onSuccess { doc -> viewModel.importFileAsWork(selected, doc.displayName, doc.format) }
+				.onFailure { viewModel.reportImportError(it.message ?: "无法读取所选文件") }
+		}
+	}
+	val eligible = state.eligibility?.eligible == true
 	LaunchedEffect(state.createdWorkId) {
 		if (state.createdWorkId != null) {
 			createVisible = false
 			viewModel.consumeCreatedWork()
 		}
 	}
-	LazyColumn(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(horizontal = 18.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+	LazyColumn(Modifier.fillMaxSize().padding(horizontal = 18.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
 		item {
-			BoxWithConstraints(Modifier.fillMaxWidth()) {
-				if (maxWidth < 360.dp) Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-					HeaderTitle("创作中心", "作品草稿仅自己可见")
-					if (state.eligibility?.eligible == true) PrimaryAction("新建作品", MiuixIcons.AddCircle) { createVisible = true }
-				} else Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-					Column(Modifier.weight(1f)) { HeaderTitle("创作中心", "作品草稿仅自己可见") }
-					if (state.eligibility?.eligible == true) PrimaryAction("新建作品", MiuixIcons.AddCircle) { createVisible = true }
-				}
+			Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+				Column(Modifier.weight(1f)) { HeaderTitle("创作中心", "作品草稿仅自己可见") }
+				if (eligible) PrimaryAction("新建作品", MiuixIcons.AddCircle) { createVisible = true }
 			}
 		}
 		if (state.loading) {
@@ -94,13 +102,22 @@ fun AuthoringScreen(state: AuthoringState, viewModel: AuthoringViewModel, onOpen
 			if (state.works.isEmpty()) {
 				item {
 					Column(Modifier.fillMaxWidth().padding(vertical = 36.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-						Text(if (state.eligibility?.eligible == true) "还没有作品" else "满足全部条件后即可创建作品", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+						Text(if (eligible) "还没有作品" else "满足全部条件后即可创建作品", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
 						Spacer(Modifier.height(8.dp))
 						Text("当前只创建私有草稿，不会立即公开", color = MiuixTheme.colorScheme.onSurfaceVariantSummary, fontSize = 14.sp)
+						if (eligible) {
+							Spacer(Modifier.height(14.dp))
+							TextButton("从文件导入", enabled = !state.creating, onClick = { importPicker.launch("*/*") })
+						}
 					}
 				}
 			} else {
-				item { Text("我的作品", fontSize = 22.sp, fontWeight = FontWeight.Bold) }
+				item {
+					Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+						Text("我的作品", Modifier.weight(1f), fontSize = 22.sp, fontWeight = FontWeight.Bold)
+						if (eligible) TextButton("从文件导入", enabled = !state.creating, onClick = { importPicker.launch("*/*") })
+					}
+				}
 				items(state.works, key = { it.id }) { work -> WorkCard(work) { onOpenWork(work) } }
 			}
 		}
@@ -251,13 +268,19 @@ private fun VolumeCard(volume: NovelAuthoringApi.VolumeDto, operating: Boolean, 
 }
 
 @Composable
-fun NovelChapterEditorScreen(state: AuthoringState, viewModel: AuthoringViewModel, onClose: () -> Unit) {
+fun NovelChapterEditorScreen(state: AuthoringState, viewModel: AuthoringViewModel, onClose: () -> Unit, onOpenPublish: () -> Unit) {
 	val chapter = requireNotNull(state.editingChapter)
 	val clipboard = LocalClipboardManager.current
+	val context = LocalContext.current
+	val editorRef = remember { mutableStateOf<NovelLineNumberEditor?>(null) }
 	val editorForeground = MiuixTheme.colorScheme.onSurface.toArgb()
 	val editorSecondary = MiuixTheme.colorScheme.onSurfaceVariantSummary.toArgb()
 	val editorAccent = MiuixTheme.colorScheme.primary.toArgb()
 	val editorDivider = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.10f).toArgb()
+	val canSave = state.editorConflict == null && !state.editorResolving && !state.editorLoading && !state.editorSaving
+	LaunchedEffect(state.editorSaveToast) {
+		if (state.editorSaveToast > 0) Toast.makeText(context, "已保存到本机，云端草稿同步成功", Toast.LENGTH_SHORT).show()
+	}
 	Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).imePadding().padding(horizontal = 20.dp)) {
 		Row(Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 18.dp), verticalAlignment = Alignment.CenterVertically) {
 			Text("‹", Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp).clickable(onClick = onClose).padding(end = 18.dp, top = 5.dp, bottom = 5.dp), color = MiuixTheme.colorScheme.onSurface, fontSize = 36.sp, fontWeight = FontWeight.Light)
@@ -270,10 +293,21 @@ fun NovelChapterEditorScreen(state: AuthoringState, viewModel: AuthoringViewMode
 					Text(editorStatus(state.editorSyncState), Modifier.padding(start = 6.dp), fontSize = 12.sp, color = editorStatusColor(state.editorSyncState))
 				}
 			}
+			Text("发布", Modifier.defaultMinSize(minWidth = 40.dp, minHeight = 48.dp).clickable(enabled = state.editorRevisionId != null || state.editorSyncState == "clean", onClick = onOpenPublish).padding(horizontal = 6.dp, vertical = 12.dp), color = MiuixTheme.colorScheme.primary, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+			Box(
+				Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp).clip(RoundedCornerShape(14.dp)).background(MiuixTheme.colorScheme.primary.copy(alpha = if (canSave) 0.14f else 0.06f)).clickable(enabled = canSave) {
+					val text = editorRef.value?.currentText() ?: state.editorContent
+					viewModel.saveChapterContentNow(text)
+				}.padding(horizontal = 12.dp, vertical = 10.dp),
+				contentAlignment = Alignment.Center,
+			) {
+				if (state.editorSaving) CircularProgressIndicator(size = 22.dp, strokeWidth = 2.dp)
+				else Icon(MiuixIcons.UploadCloud, "保存", Modifier.size(24.dp), if (canSave) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurfaceVariantSummary)
+			}
 		}
 		if (state.editorLoading) Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) { CircularProgressIndicator() }
 		else AndroidView(
-			factory = { NovelLineNumberEditor(it) },
+			factory = { NovelLineNumberEditor(it).also { editorRef.value = it } },
 			modifier = Modifier.fillMaxWidth().weight(1f).padding(vertical = 18.dp).semantics { contentDescription = "章节正文" },
 			update = { editor -> editor.bind(
 				text = state.editorContent,

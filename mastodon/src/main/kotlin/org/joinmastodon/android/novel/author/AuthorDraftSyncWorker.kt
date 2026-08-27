@@ -77,6 +77,14 @@ class AuthorDraftSyncWorker(context: Context, params: WorkerParameters) : Corout
 				.addTag(tag(accountId)).build()
 			WorkManager.getInstance(context).enqueueUniqueWork(name(accountId), ExistingWorkPolicy.APPEND_OR_REPLACE, request)
 		}
+		suspend fun enqueueSyncNow(context: Context, accountId: String) {
+			val request = OneTimeWorkRequestBuilder<AuthorDraftSyncWorker>()
+				.setInputData(Data.Builder().putString(KEY_ACCOUNT_ID, accountId).build())
+				.setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
+				.setInitialDelay(0, TimeUnit.MILLISECONDS)
+				.addTag(tag(accountId)).build()
+			WorkManager.getInstance(context).enqueueUniqueWork(name(accountId), ExistingWorkPolicy.REPLACE, request)
+		}
 		fun cancelAccount(context: Context, accountId: String) = WorkManager.getInstance(context).cancelAllWorkByTag(tag(accountId))
 	}
 }

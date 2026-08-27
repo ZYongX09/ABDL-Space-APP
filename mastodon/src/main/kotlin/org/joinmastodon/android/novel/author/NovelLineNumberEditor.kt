@@ -48,7 +48,6 @@ class NovelLineNumberEditor(context: Context) : LinearLayout(context) {
 		})
 		editor.viewTreeObserver.addOnScrollChangedListener { gutter.invalidate() }
 	}
-
 	fun bind(text: String, enabled: Boolean, foreground: Int, secondary: Int, accent: Int, dividerColor: Int, onTextChanged: (String) -> Unit) {
 		this.onTextChanged = onTextChanged
 		editor.isEnabled = enabled
@@ -57,7 +56,7 @@ class NovelLineNumberEditor(context: Context) : LinearLayout(context) {
 		editor.highlightColor = ColorUtils.setAlphaComponent(accent, 72)
 		gutter.setColor(secondary)
 		divider.setBackgroundColor(dividerColor)
-		if (boundText !== text) {
+		if (boundText != text) {
 			val selection = editor.selectionStart.coerceIn(0, text.length)
 			changingText = true
 			editor.setText(text)
@@ -67,6 +66,8 @@ class NovelLineNumberEditor(context: Context) : LinearLayout(context) {
 		}
 		editor.hint = "开始写作…"
 	}
+
+	fun currentText(): String = editor.text.toString()
 
 	private inner class GutterView(context: Context) : View(context) {
 		private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {

@@ -1,12 +1,15 @@
 package org.joinmastodon.android.ui.text;
 
+import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Rect;
+import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.text.style.ReplacementSpan;
 
 import org.joinmastodon.android.GlobalUserPreferences;
+import org.joinmastodon.android.MastodonApp;
 import org.joinmastodon.android.model.Emoji;
 
 import androidx.annotation.NonNull;
@@ -18,6 +21,13 @@ public class CustomEmojiSpan extends ReplacementSpan{
 	public final Emoji emoji;
 	// MOSHIDON: we changed this to protected cuz AvatarSpan uses it :D
 	protected Drawable drawable;
+	// Cached software copy of the last hardware bitmap drawn into a software canvas.
+	// Hardware bitmaps cannot be drawn by software-rendered canvases (e.g. backdrop capture,
+	// screenshot, or text drawn into a software layer) — see IllegalArgumentException
+	// "Software rendering doesn't support hardware bitmaps". Cache one entry per span to avoid
+	// re-copying every frame during scroll without unbounded memory growth.
+	private Bitmap cachedSoftwareBitmap;
+	private Bitmap cachedSoftwareBitmapSource;
 
 	public CustomEmojiSpan(Emoji emoji){
 		this.emoji=emoji;
@@ -47,17 +57,50 @@ public class CustomEmojiSpan extends ReplacementSpan{
 			canvas.save();
 			canvas.translate(x, top);
 			canvas.scale(size/(float)dw, size/(float)dh, 0f, 0f);
-			drawable.draw(canvas);
+			drawableForCanvas(canvas).draw(canvas);
 			canvas.restore();
 		}
 	}
 
 	public void setDrawable(Drawable drawable){
 		this.drawable=drawable;
+		if(cachedSoftwareBitmapSource!=null && cachedSoftwareBitmapSource!=sourceBitmapOf(drawable)){
+			cachedSoftwareBitmap=null;
+			cachedSoftwareBitmapSource=null;
+		}
 	}
 
 	public UrlImageLoaderRequest createImageLoaderRequest(){
 		int size=V.dp(20);
 		return new UrlImageLoaderRequest(GlobalUserPreferences.playGifs ? emoji.url : emoji.staticUrl, size, size);
 	}
+
+	/**
+	 * Returns either the original drawable or a software-bitmap copy, depending on whether the
+	 * canvas can accept hardware bitmaps. Mirrors the proven pattern from
+	 * {@code BackdropCaptureFrameLayout#getSoftwareDrawable}.
+	 */
+	protected Drawable drawableForCanvas(Canvas canvas){
+		Drawable d=drawable;
+		if(canvas.isHardwareAccelerated())
+			return d;
+		if(!(d instanceof BitmapDrawable bitmapDrawable))
+			return d;
+		Bitmap bitmap=bitmapDrawable.getBitmap();
+		if(bitmap==null || bitmap.getConfig()!=Bitmap.Config.HARDWARE)
+			return d;
+		if(cachedSoftwareBitmap==null || cachedSoftwareBitmap.isRecycled() || cachedSoftwareBitmapSource!=bitmap){
+			cachedSoftwareBitmap=bitmap.copy(Bitmap.Config.ARGB_8888, false);
+			cachedSoftwareBitmapSource=bitmap;
+		}
+		// Reuse the original bounds (the caller has already set them to 0,0,dw,dh).
+		BitmapDrawable copy=new BitmapDrawable(MastodonApp.context.getResources(), cachedSoftwareBitmap);
+		copy.setBounds(bitmapDrawable.getBounds());
+		return copy;
+	}
+
+	private static Bitmap sourceBitmapOf(Drawable drawable){
+		return (drawable instanceof BitmapDrawable bd) ? bd.getBitmap() : null;
+	}
 }
+

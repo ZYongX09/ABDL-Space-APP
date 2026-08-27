@@ -3,6 +3,7 @@ package org.joinmastodon.reader.parser
 import org.joinmastodon.reader.domain.BookFormat
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -105,6 +106,53 @@ class BookParserTest {
 		assertTrue(parsed.chapters.size > 1)
 		assertEquals(content.filterNot(Char::isWhitespace), parsed.chapters.joinToString("") { it.content }.filterNot(Char::isWhitespace))
 		assertTrue(parsed.chapters.all { it.content.length <= 240_000 })
+	}
+
+	@Test
+	fun parsesDocxHeadingsAndCoreProps() {
+		val fixture = createDocxFixture("sample.docx")
+
+		val parsed = parser.parse(fixture)
+
+		assertEquals(BookFormat.DOCX, parsed.book.format)
+		assertEquals("DOCX 小书", parsed.book.title)
+		assertEquals("文档作者", parsed.book.author)
+		assertEquals(listOf("第一章 启程", "第二章 抵达"), parsed.chapters.map { it.title })
+		assertTrue(parsed.chapters[0].content.contains("启程的正文"))
+		assertTrue(parsed.chapters[1].content.contains("抵达的正文"))
+	}
+
+	@Test
+	fun parsesDocxFilenameFallbackWhenCorePropsMissing() {
+		val fixture = createDocxFixture("plain.docx", includeCoreProps = false)
+
+		val parsed = parser.parse(fixture)
+
+		assertEquals(BookFormat.DOCX, parsed.book.format)
+		assertEquals("plain", parsed.book.title)
+		assertNull(parsed.book.author)
+		assertEquals(listOf("第一章 启程", "第二章 抵达"), parsed.chapters.map { it.title })
+	}
+
+	private fun createDocxFixture(name: String, includeCoreProps: Boolean = true): File = temporaryFolder.newFile(name).also { file ->
+		ZipOutputStream(file.outputStream()).use { zip ->
+			zip.writeEntry(
+				"word/document.xml",
+				"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+				<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>
+					<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>第一章 启程</w:t></w:r></w:p>
+					<w:p><w:r><w:t>启程的正文。</w:t></w:r></w:p>
+					<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>第二章 抵达</w:t></w:r></w:p>
+					<w:p><w:r><w:t>抵达的正文。</w:t></w:r></w:p>
+				</w:body></w:document>""".trimIndent(),
+			)
+			if (includeCoreProps) {
+				zip.writeEntry(
+					"docProps/core.xml",
+					"""<?xml version="1.0"?><coreProperties xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>DOCX 小书</dc:title><dc:creator>文档作者</dc:creator></coreProperties>""",
+				)
+			}
+		}
 	}
 
 	private fun createEpubFixture(name: String): File = temporaryFolder.newFile(name).also { file ->

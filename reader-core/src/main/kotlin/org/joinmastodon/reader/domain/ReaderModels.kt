@@ -5,6 +5,7 @@ import androidx.compose.ui.graphics.Color
 enum class BookFormat {
 	TXT,
 	EPUB,
+	DOCX,
 }
 
 data class ReaderBook(

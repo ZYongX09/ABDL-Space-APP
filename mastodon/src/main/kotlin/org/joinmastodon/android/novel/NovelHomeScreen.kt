@@ -111,7 +111,10 @@ fun NovelHomeScreen(accountId: String, libraryViewModel: NovelLibraryViewModel, 
 			contentAlignment = Alignment.Center,
 		) {
 			if (selectedTab == 1) {
-				NovelLibraryScreen(libraryState, externalDocument, libraryViewModel::refresh, libraryViewModel::upload, libraryViewModel::paste, libraryViewModel::delete, libraryViewModel::download, libraryViewModel::openReader, libraryViewModel::reportError, libraryViewModel::dismissError)
+				NovelLibraryScreen(libraryState, externalDocument, libraryViewModel::refresh, libraryViewModel::upload, libraryViewModel::paste, libraryViewModel::delete, libraryViewModel::download, libraryViewModel::openReader, { book ->
+					authoringViewModel.convertPrivateBookToWork(book)
+					android.widget.Toast.makeText(context, "正在转入创作中心，完成后可在创作中心查看", android.widget.Toast.LENGTH_SHORT).show()
+				}, libraryViewModel::reportError, libraryViewModel::dismissError)
 				return@Box
 			}
 			if (selectedTab == 2) {

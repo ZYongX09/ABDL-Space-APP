@@ -321,7 +321,7 @@ private fun AboutContent(
 							} else Modifier,
 						) {
 							ArrowPreference(title = "官方网站", endActions = { ValueText("abdl-space.top") }, onClick = { uriHandler.openUri("https://abdl-space.top") })
-							ArrowPreference(title = "GitHub", endActions = { ValueText("Source") }, onClick = { uriHandler.openUri("https://github.com/ZYongX09/ABDL-Space-APP") })
+							ArrowPreference(title = "源代码", endActions = { ValueText("GitHub") }, onClick = { uriHandler.openUri("https://github.com/ZYongX09/ABDL-Space-APP") })
 							ArrowPreference(title = "博客", onClick = { uriHandler.openUri("https://zhx-blog.top") })
 						}
 						AboutCard(
@@ -343,23 +343,6 @@ private fun AboutContent(
 							ArrowPreference(title = "用户协议", onClick = { uriHandler.openUri("https://abdl-space.top/terms") })
 							ArrowPreference(title = "隐私政策", onClick = { uriHandler.openUri("https://abdl-space.top/privacy") })
 							ArrowPreference(title = "Cookie 政策", onClick = { uriHandler.openUri("https://abdl-space.top/cookies") })
-						}
-						AboutCard(
-							backdropAvailable = backdrop != null,
-							modifier = Modifier.padding(horizontal = 12.dp).padding(top = 12.dp),
-							blurModifier = if (backdrop != null) Modifier.textureBlur(
-								backdrop = backdrop,
-								shape = RoundedCornerShape(16.dp),
-								blurRadius = blurRadius,
-								noiseCoefficient = noiseCoefficient,
-								colors = BlurDefaults.blurColors(
-									blendColors = cardBlend,
-									brightness = brightness,
-									contrast = contrast,
-									saturation = saturation,
-								),
-							) else Modifier,
-						) {
 							ArrowPreference(title = "支持我们", onClick = { uriHandler.openUri("https://ifdian.net/a/ZYongX") })
 							ArrowPreference(title = "开源许可", endActions = { ValueText("GPL-3.0") }, onClick = { uriHandler.openUri("https://www.gnu.org/licenses/gpl-3.0.html") })
 							ArrowPreference(

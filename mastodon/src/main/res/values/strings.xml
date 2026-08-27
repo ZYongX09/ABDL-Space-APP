@@ -595,6 +595,8 @@
 	<string name="novel_bookshelf_empty">Your bookshelf is empty</string>
 	<string name="novel_creation_empty">No works created yet</string>
 	<string name="nbw_forum_friends">Friends</string>
+	<string name="nbw_forum_none">No NBW Sync</string>
+	<string name="nbw_forum_none_subtitle">You strongly oppose syncing your posts to NewBabyWorld</string>
 	<string name="nbw_unbind_title">解绑宝宝新天地</string>
 	<string name="nbw_unbind_message">确定解绑 %s？</string>
 	<string name="nbw_unbind">解绑</string>
