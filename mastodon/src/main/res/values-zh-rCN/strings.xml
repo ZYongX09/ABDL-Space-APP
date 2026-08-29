@@ -961,4 +961,23 @@
 	<string name="friend_request_update_success">更新成功</string>
 	<string name="friend_request_delete_confirm">确定要删除这条交友请求吗？</string>
 	<string name="friend_request_report_evidence">上传证据图片（可选，最多3张）</string>
+	<string name="location_permission_title">同城交友与位置展示</string>
+	<string name="location_permission_description">允许 ABDL Space 获取您的位置信息，用于同城交友、地理位置展示等功能。位置信息仅在发帖时记录，您可以选择展示精度（省、市或区）。</string>
+	<string name="location_permission_skip">暂不开启</string>
+	<string name="location_permission_allow">允许获取</string>
+	<string name="location_province">展示所在省（%s）</string>
+	<string name="location_city">展示所在市（%s）</string>
+	<string name="location_district">展示所在区（%s）</string>
+	<string name="location_none">不展示位置</string>
+	<string name="location_province_desc">其他人将看到你来自这个省</string>
+	<string name="location_city_desc">其他人将看到你的城市</string>
+	<string name="location_district_desc">其他人将看到你的区县</string>
+	<string name="location_none_desc">此帖子不会附带位置信息</string>
+	<string name="location_disabled_no_permission">APP 未获得位置权限，点击获取位置权限</string>
+	<string name="location_unknown">未知</string>
+	<string name="geo_ip_hint_title">位置为推测结果</string>
+	<string name="geo_ip_hint_text">根据您的 IP 地址，我们推测您的位置在「%s」。建议您开启定位权限或打开手机的位置信息开关，以便我们获取您的准确位置。</string>
+	<string name="geo_ip_hint_dismiss">关闭提示</string>
+	<string name="geo_ip_hint_grant">打开定位权限</string>
+	<string name="geo_ip_hint_open_settings_toast">请在系统设置中开启定位权限</string>
 </resources>

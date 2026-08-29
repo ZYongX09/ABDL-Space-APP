@@ -40,6 +40,9 @@ import org.joinmastodon.android.model.Instance;
 import org.joinmastodon.android.model.Notification;
 import org.joinmastodon.android.model.NotificationType;
 import org.joinmastodon.android.ui.M3AlertDialogBuilder;
+import org.joinmastodon.android.ui.sheets.LocationPermissionSheet;
+import org.joinmastodon.android.ui.utils.LocationUtils;
+import org.joinmastodon.android.ui.utils.OemUtils;
 import org.joinmastodon.android.ui.OutlineProviders;
 import org.joinmastodon.android.ui.compose.navigation.HomeLiquidNavigationController;
 import org.joinmastodon.android.ui.compose.navigation.HomeLiquidToolbarController;
@@ -418,8 +421,56 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 	protected void onShown(){
 		super.onShown();
 		showFeatureDialogIfNeeded();
-		showAutoStartGuideIfNeeded();
+		// 引导序列：位置权限 → 关闭后 2s → 开启实时通知
+		// 同一版本只完整引导一次；用版本键控制升级用户也会重新触发
+		showSetupGuideSequence();
 		reloadNotificationsForUnreadCount();
+	}
+
+	/**
+	 * 引导序列编排（版本相关）：
+	 * 1. 若本版本引导已完成则跳过
+	 * 2. 若未授权位置权限 → 立即展示位置权限 sheet，dismiss 后 postDelayed(2s) 触发实时通知引导
+	 * 3. 若已授权 → 2s 后直接进入实时通知引导
+	 */
+	private void showSetupGuideSequence(){
+		if(getActivity()==null) return;
+		String version=BuildConfig.VERSION_NAME;
+		String setupDoneKey="setupGuideDone_"+version;
+		if(GlobalUserPreferences.getPrefs().getBoolean(setupDoneKey, false)) return;
+		boolean hasLocation=LocationUtils.hasLocationPermission(getActivity());
+		if(!hasLocation){
+			// 立即展示位置权限 sheet，dismiss 后 2s 触发实时通知
+			try{
+				new LocationPermissionSheet(getActivity(), getActivity(), ()->{
+					if(getActivity()==null || getActivity().isFinishing()) return;
+					getActivity().getWindow().getDecorView().postDelayed(()->{
+						showAutoStartGuideIfNeeded();
+						markSetupGuideDoneIfPossible(version, setupDoneKey);
+					}, 2000);
+				}).show();
+				LocationUtils.fetchProvinceFromIP(getActivity(), null);
+				return;
+			}catch(Exception ignored){}
+		}
+		// 已授权或位置 sheet 弹出失败 → 2s 后弹实时通知引导
+		getActivity().getWindow().getDecorView().postDelayed(()->{
+			showAutoStartGuideIfNeeded();
+			markSetupGuideDoneIfPossible(version, setupDoneKey);
+		}, 2000);
+	}
+
+	/**
+	 * 当 autoStart guide 不需要展示（OTHER 厂商或已展示过）时，标记本版本引导完成
+	 */
+	private void markSetupGuideDoneIfPossible(String version, String setupDoneKey){
+		org.joinmastodon.android.ui.utils.OemUtils.Vendor vendor=org.joinmastodon.android.ui.utils.OemUtils.detectVendor();
+		boolean autoStartShown=GlobalUserPreferences.getPrefs().getBoolean("autoStartGuideShown_"+version, false);
+		// OTHER vendor 永远不会展示 autoStart guide → 直接标记完成
+		// 非 OTHER 且尚未展示：等真正 dismiss 后再标记（见 showAutoStartGuideIfNeeded 内部逻辑）
+		if(vendor==org.joinmastodon.android.ui.utils.OemUtils.Vendor.OTHER || autoStartShown){
+			GlobalUserPreferences.getPrefs().edit().putBoolean(setupDoneKey, true).apply();
+		}
 	}
 
 	private void showFeatureDialogIfNeeded(){
@@ -462,7 +513,13 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 						GlobalUserPreferences.getPrefs().edit().putBoolean("autoStartGuideShown_"+BuildConfig.VERSION_NAME, true).apply())
 				.setCancelable(false)
 				.create();
-		autoStartGuideDialog.setOnDismissListener(dialog->autoStartGuideDialog=null);
+		autoStartGuideDialog.setOnDismissListener(dialog->{
+			autoStartGuideDialog=null;
+			// 引导序列完成标记（autoStart guide 已 dismiss）
+			GlobalUserPreferences.getPrefs().edit()
+					.putBoolean("setupGuideDone_"+BuildConfig.VERSION_NAME, true)
+					.apply();
+		});
 		autoStartGuideDialog.show();
 	}
 

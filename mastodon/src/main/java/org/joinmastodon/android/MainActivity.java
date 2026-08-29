@@ -61,6 +61,8 @@ import me.grishka.appkit.api.Callback;
 import me.grishka.appkit.api.ErrorResponse;
 import me.grishka.appkit.utils.V;
 import org.joinmastodon.android.ui.compose.ComposeLifecycleHelperKt;
+import org.joinmastodon.android.ui.utils.LocationUtils;
+import androidx.core.app.ActivityCompat;
 
 public class MainActivity extends FragmentStackActivity implements LifecycleOwner, ViewModelStoreOwner, SavedStateRegistryOwner {
 	private static final String TAG="MainActivity";
@@ -75,6 +77,22 @@ public class MainActivity extends FragmentStackActivity implements LifecycleOwne
 
 	private ChatRealtimeClient chatWsClient;
 	private GestureDetector backGestureDetector;
+	private static final int LOCATION_PERMISSION_REQUEST=7001;
+
+	@Override
+	public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults){
+		super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+		if(requestCode==7001){
+			if(grantResults.length>0 && grantResults[0]==PackageManager.PERMISSION_GRANTED){
+				LocationUtils.fetchAndResolve(this, loc->{
+					// 定位失败时用 IP 属地兜底
+					if(loc==null) LocationUtils.fetchProvinceFromIP(this, null);
+				});
+			}else{
+				LocationUtils.fetchProvinceFromIP(this, null);
+			}
+		}
+	}
 
 	@Override
 	public void onBackPressed(){
@@ -121,6 +139,12 @@ public class MainActivity extends FragmentStackActivity implements LifecycleOwne
 		}
 		if(getIntent().getBooleanExtra(EXTRA_OPEN_SOURCE_LICENSES, false)){
 			getWindow().getDecorView().post(()->openSourceLicenses(getIntent()));
+		}
+
+		// 位置权限引导序列已迁移到 HomeFragment.onShown 的 showSetupGuideSequence
+		// 此处仅保留无权限时的 IP 属地兜底（不阻塞 UI，不弹 sheet）
+		if(savedInstanceState==null && !LocationUtils.hasLocationPermission(this)){
+			LocationUtils.fetchProvinceFromIP(this, null);
 		}
 
 		if(BuildConfig.BUILD_TYPE.startsWith("appcenter")){

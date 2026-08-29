@@ -1058,4 +1058,23 @@
 	<string name="diaper_sizes">尺码</string>
 	<string name="diaper_reviews">用户评价</string>
 
+	<string name="location_permission_title">Location for Nearby Posts</string>
+	<string name="location_permission_description">Allow ABDL Space to access your location for features like nearby community posts and displaying your area on your posts. Your location is only stored when you post, and you can control what level of detail is shown (province, city, or district).</string>
+	<string name="location_permission_skip">Not now</string>
+	<string name="location_permission_allow">Allow</string>
+	<string name="location_province">Show province (%s)</string>
+	<string name="location_city">Show city (%s)</string>
+	<string name="location_district">Show district (%s)</string>
+	<string name="location_none">Don\'t show location</string>
+	<string name="location_province_desc">Others will see you\'re from this province</string>
+	<string name="location_city_desc">Others will see your city</string>
+	<string name="location_district_desc">Others will see your district</string>
+	<string name="location_none_desc">Your location won\'t be attached to this post</string>
+	<string name="location_disabled_no_permission">App doesn\'t have location permission, tap to grant</string>
+	<string name="location_unknown">Unknown</string>
+	<string name="geo_ip_hint_title">Approximate location</string>
+	<string name="geo_ip_hint_text">Based on your IP address, we estimate your location is \"%s\". Enable location permission or turn on your device location for a more accurate location.</string>
+	<string name="geo_ip_hint_dismiss">Dismiss</string>
+	<string name="geo_ip_hint_grant">Grant location permission</string>
+	<string name="geo_ip_hint_open_settings_toast">Please enable location permission in system settings</string>
 </resources>

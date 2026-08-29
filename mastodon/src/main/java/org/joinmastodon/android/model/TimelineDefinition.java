@@ -44,6 +44,7 @@ public class TimelineDefinition {
 	private @Nullable List<String> hashtagAll;
 	private @Nullable List<String> hashtagNone;
 	private boolean hashtagLocalOnly;
+	private @Nullable String province;
 
 	public static TimelineDefinition ofList(String listId, String listTitle, boolean listIsExclusive) {
 		TimelineDefinition def = new TimelineDefinition(TimelineType.LIST);
@@ -66,6 +67,13 @@ public class TimelineDefinition {
 	public static TimelineDefinition ofCustomLocalTimeline(String domain) {
 		TimelineDefinition def = new TimelineDefinition(TimelineType.CUSTOM_LOCAL_TIMELINE);
 		def.domain = domain;
+		return def;
+	}
+
+	public static TimelineDefinition ofGeo(String province) {
+		TimelineDefinition def = new TimelineDefinition(TimelineType.GEO);
+		def.province = province;
+		def.title = province;
 		return def;
 	}
 
@@ -151,9 +159,10 @@ public class TimelineDefinition {
 			case BUBBLE -> ctx.getString(R.string.sk_timeline_bubble);
 			case BOOKMARKS -> ctx.getString(R.string.bookmarks);
 			case FAVORITES -> ctx.getString(R.string.your_favorites);
-		case CUSTOM_LOCAL_TIMELINE -> domain;
-		case NBW -> ctx.getString(R.string.sk_timeline_nbw);
-	};
+			case CUSTOM_LOCAL_TIMELINE -> domain;
+			case NBW -> ctx.getString(R.string.sk_timeline_nbw);
+			case GEO -> province;
+		};
 	}
 
 	public Icon getDefaultIcon() {
@@ -164,11 +173,12 @@ public class TimelineDefinition {
 			case POST_NOTIFICATIONS -> Icon.POST_NOTIFICATIONS;
 			case LIST -> listIsExclusive ? Icon.EXCLUSIVE_LIST : Icon.LIST;
 			case HASHTAG -> Icon.HASHTAG;
-		case CUSTOM_LOCAL_TIMELINE -> Icon.CUSTOM_LOCAL_TIMELINE;
-		case NBW -> Icon.NBW;
-		case BUBBLE -> Icon.BUBBLE;
+			case CUSTOM_LOCAL_TIMELINE -> Icon.CUSTOM_LOCAL_TIMELINE;
+			case NBW -> Icon.NBW;
+			case BUBBLE -> Icon.BUBBLE;
 			case BOOKMARKS -> Icon.BOOKMARKS;
 			case FAVORITES -> Icon.FAVORITES;
+			case GEO -> Icon.LOCATION;
 		};
 	}
 
@@ -181,10 +191,11 @@ public class TimelineDefinition {
 			case HASHTAG -> new HashtagTimelineFragment();
 			case POST_NOTIFICATIONS -> new NotificationsListFragment();
 			case BUBBLE -> new BubbleTimelineFragment();
-		case CUSTOM_LOCAL_TIMELINE -> new CustomLocalTimelineFragment();
-		case NBW -> new NBWTimelineFragment();
-		case BOOKMARKS -> new BookmarkedStatusListFragment();
+			case CUSTOM_LOCAL_TIMELINE -> new CustomLocalTimelineFragment();
+			case NBW -> new NBWTimelineFragment();
+			case BOOKMARKS -> new BookmarkedStatusListFragment();
 			case FAVORITES -> new FavoritedStatusListFragment();
+			case GEO -> org.joinmastodon.android.fragments.discover.GeoTimelineFragment.newInstance(province);
 		};
 	}
 
@@ -231,6 +242,7 @@ public class TimelineDefinition {
 		def.listIsExclusive = listIsExclusive;
 		def.hashtagName = hashtagName;
 		def.domain = domain;
+		def.province = province;
 		def.hashtagAny = hashtagAny;
 		def.hashtagAll = hashtagAll;
 		def.hashtagNone = hashtagNone;
@@ -251,6 +263,8 @@ public class TimelineDefinition {
 			args.putStringArrayList("none", hashtagNone == null ? new ArrayList<>() : new ArrayList<>(hashtagNone));
 		} else if (type == TimelineType.CUSTOM_LOCAL_TIMELINE) {
 			args.putString("domain", domain);
+		} else if (type == TimelineType.GEO) {
+			args.putString("province", province);
 		}
 		return args;
 	}
@@ -264,7 +278,7 @@ public class TimelineDefinition {
 		HASHTAG,
 		BUBBLE,
 		CUSTOM_LOCAL_TIMELINE,
-
+		GEO,
 		NBW,
 
 		// not really timelines, but some people want it, so,,
@@ -354,6 +368,7 @@ public class TimelineDefinition {
 		CUSTOM_LOCAL_TIMELINE(R.drawable.ic_fluent_people_community_24_regular, R.string.sk_timeline_local, true),
 		NBW(R.drawable.ic_nbw_logo, R.string.sk_timeline_nbw, true),
 		BUBBLE(R.drawable.ic_fluent_circle_24_regular, R.string.sk_timeline_bubble, true),
+		GEO(R.drawable.ic_fluent_location_24_regular, R.string.sk_icon_location, true),
 		BOOKMARKS(R.drawable.ic_fluent_bookmark_multiple_24_regular, R.string.bookmarks, true),
 		FAVORITES(R.drawable.ic_fluent_star_24_regular, R.string.your_favorites, true);
 

@@ -65,6 +65,7 @@ import org.joinmastodon.android.ui.SimpleViewHolder;
 import org.joinmastodon.android.ui.compose.navigation.HomeLiquidToolbarController;
 import org.joinmastodon.android.ui.compose.navigation.HomeToolbarMenuItem;
 import org.joinmastodon.android.ui.compose.navigation.HomeToolbarTimeline;
+import org.joinmastodon.android.ui.utils.LocationUtils;
 import org.joinmastodon.android.ui.utils.UiUtils;
 import org.joinmastodon.android.updater.GithubSelfUpdater;
 import org.joinmastodon.android.utils.ElevationOnScrollListener;
@@ -132,8 +133,38 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		E.register(this);
 		accountID = getArguments().getString("account");
 		timelinesList=AccountSessionManager.get(accountID).getLocalPreferences().timelines;
-		assert timelinesList!=null;
-		if(timelinesList.isEmpty()) timelinesList=List.of(TimelineDefinition.HOME_TIMELINE);
+		if(timelinesList==null || timelinesList.isEmpty()) timelinesList=new java.util.ArrayList<>(List.of(TimelineDefinition.HOME_TIMELINE));
+		// 同城时间线：注入省份时间线（当用户省份已知时）
+		try{
+			String cachedProvince=LocationUtils.getCachedProvince(getActivity());
+			if(cachedProvince!=null && timelinesList.stream().noneMatch(t->t.getType()==TimelineDefinition.TimelineType.GEO)){
+				java.util.ArrayList<TimelineDefinition> newList=new java.util.ArrayList<>(timelinesList);
+				// GEO 时间线排在第二位（HOME 之后）
+				TimelineDefinition geoTl=TimelineDefinition.ofGeo(cachedProvince);
+				int insertIdx=Math.min(1, newList.size());
+				newList.add(insertIdx, geoTl);
+				timelinesList=newList;
+				AccountSessionManager.get(accountID).getLocalPreferences().timelines=newList;
+				AccountSessionManager.get(accountID).getLocalPreferences().save();
+			}
+			// 省份未知时双保险：GPS 定位 + IP 属地同时触发（先到先用，下次启动生效）
+			if(cachedProvince==null){
+				if(LocationUtils.hasLocationPermission(getActivity())){
+					LocationUtils.fetchAndResolve(getActivity(), null);
+				}
+				// 无论是否有定位权限，都额外尝试 IP 属地兜底（GPS 失败/室内无信号时仍有保障）
+				LocationUtils.fetchProvinceFromIP(getActivity(), province->{
+					if(province!=null){
+						// 省份刚缓存，重建 Activity 以加载同城时间线
+						new android.os.Handler(android.os.Looper.getMainLooper()).post(()->{
+							if(getActivity()!=null) getActivity().recreate();
+						});
+					}
+				});
+			}
+		}catch(Exception e){
+			// 旧版本升级时 preferences 可能不完整，忽略
+		}
 		count=timelinesList.size();
 		fragments=new Fragment[count];
 		tabViews=new FrameLayout[count];
@@ -177,11 +208,18 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		for (int i = 0; i < count; i++) {
 			int containerId=i + 1;
 			timelines[i]=timelinesList.get(i);
+			Fragment expectedFragment=timelines[i].getFragment();
+			Class<?> expectedClass=expectedFragment.getClass();
 			Fragment restoredFragment=getChildFragmentManager().findFragmentById(containerId);
-			if(restoredFragment!=null){
+			if(restoredFragment!=null && expectedClass.isInstance(restoredFragment)){
 				fragments[i]=restoredFragment;
-			}else if(fragments[i]==null){
-				fragments[i]=timelines[i].getFragment();
+			}else{
+				if(restoredFragment!=null){
+					if(transaction==null)
+						transaction=getChildFragmentManager().beginTransaction();
+					transaction.remove(restoredFragment);
+				}
+				fragments[i]=expectedFragment;
 				fragments[i].setArguments(timelines[i].populateArguments(new Bundle(args)));
 				if(transaction==null)
 					transaction=getChildFragmentManager().beginTransaction();

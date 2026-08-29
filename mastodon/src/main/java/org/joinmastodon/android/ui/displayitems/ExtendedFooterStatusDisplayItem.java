@@ -109,7 +109,12 @@ public class ExtendedFooterStatusDisplayItem extends StatusDisplayItem{
 			if(item.status.application!=null && !TextUtils.isEmpty(item.status.application.name)){
 				app.setVisibility(View.VISIBLE);
 				dateAppSeparator.setVisibility(View.VISIBLE);
-				app.setText(item.status.application.name);
+				// 如果有地理位置信息，替换实例名称显示
+				if(!TextUtils.isEmpty(item.status.geoLocation)){
+					app.setText(item.status.geoLocation);
+				}else{
+					app.setText(item.status.application.name);
+				}
 				app.setEnabled(!TextUtils.isEmpty(item.status.application.website));
 			}else{
 				app.setVisibility(View.GONE);

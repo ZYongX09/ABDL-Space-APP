@@ -44,11 +44,17 @@
 
 						<include layout="@layout/include_compose_newbabyworld_card" />
 
+					<LinearLayout
+						android:layout_width="match_parent"
+						android:layout_height="wrap_content"
+						android:orientation="horizontal"
+						android:gravity="center_vertical">
+
 						<LinearLayout
 						android:id="@+id/btn_visibility"
 						android:layout_width="wrap_content"
 						android:layout_height="32dp"
-						android:layout_marginHorizontal="16dp"
+						android:layout_marginStart="16dp"
 						android:layout_marginVertical="12dp"
 						android:background="@drawable/bg_composer_visibility"
 						android:paddingHorizontal="12dp"
@@ -76,6 +82,33 @@
 							android:gravity="center"
 							android:visibility="gone"
 							tools:text="@string/visibility_public"/>
+
+					</LinearLayout>
+
+						<LinearLayout
+						android:id="@+id/btn_location"
+						android:layout_width="wrap_content"
+						android:layout_height="32dp"
+						android:layout_marginStart="8dp"
+						android:layout_marginVertical="12dp"
+						android:background="@drawable/bg_composer_visibility"
+						android:paddingHorizontal="12dp"
+						android:orientation="horizontal"
+						android:visibility="gone">
+
+						<TextView
+							android:id="@+id/location_text"
+							android:layout_width="wrap_content"
+							android:layout_height="match_parent"
+							android:textAppearance="@style/m3_label_large"
+							android:textColor="?colorM3OnSurfaceVariant"
+							android:drawablePadding="4dp"
+							android:singleLine="true"
+							android:gravity="center"
+							android:drawableStart="@drawable/ic_fluent_location_12_filled"
+							tools:text="@string/location_province"/>
+
+					</LinearLayout>
 
 					</LinearLayout>
 

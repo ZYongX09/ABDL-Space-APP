@@ -95,6 +95,8 @@ import org.joinmastodon.android.ui.text.ComposeHashtagOrMentionSpan;
 import org.joinmastodon.android.ui.text.HtmlParser;
 import org.joinmastodon.android.ui.utils.SimpleTextWatcher;
 import org.joinmastodon.android.ui.views.CrisisWarningViewController;
+import org.joinmastodon.android.ui.utils.LocationUtils;
+import org.joinmastodon.android.ui.sheets.LocationPermissionSheet;
 import org.joinmastodon.android.ui.utils.UiUtils;
 import org.joinmastodon.android.ui.viewcontrollers.ComposeAutocompleteViewController;
 import org.joinmastodon.android.ui.viewcontrollers.ComposeLanguageAlertViewController;
@@ -208,6 +210,16 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	private ComposeAutocompleteSpan currentAutocompleteSpan;
 	private FrameLayout mainEditTextWrap;
 	private ComposeLanguageAlertViewController.SelectedOption postLang;
+
+	// 位置选择
+	private static final int LOCATION_PROVINCE=0;
+	private static final int LOCATION_CITY=1;
+	private static final int LOCATION_DISTRICT=2;
+	private static final int LOCATION_NONE=3;
+	private int selectedLocationLevel=LOCATION_PROVINCE; // 默认展示省
+	private LinearLayout locationBtn;
+	private TextView locationText;
+	private LocationUtils.ResolvedLocation currentLocation;
 
 	private ComposeAutocompleteViewController autocompleteViewController;
 	private ComposePollViewController pollViewController=new ComposePollViewController(this);
@@ -355,6 +367,26 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		replyWrap=view.findViewById(R.id.reply_wrap);
 		quotedPostWrap=view.findViewById(R.id.quoted_post_wrap);
 
+		// 位置选择器初始化
+		locationBtn=view.findViewById(R.id.btn_location);
+		locationText=view.findViewById(R.id.location_text);
+		currentLocation=LocationUtils.getCachedLocation(getActivity());
+		if(replyTo==null){
+			// 非回复帖才显示位置选择器
+			locationBtn.setVisibility(View.VISIBLE);
+			updateLocationButton();
+			locationBtn.setOnClickListener(this::onLocationClick);
+			// 进入发帖页时若缓存为空但有定位权限，主动触发一次解析（异步，结果回调后刷新按钮）
+			if(currentLocation==null && LocationUtils.hasLocationPermission(getActivity())){
+				LocationUtils.fetchAndResolve(getActivity(), loc->{
+					if(loc!=null){
+						currentLocation=loc;
+						new android.os.Handler(android.os.Looper.getMainLooper()).post(()->updateLocationButton());
+					}
+				});
+			}
+		}
+
 		mediaBtn.setOnClickListener(v->openLocalMediaPicker());
 		if(UiUtils.isPhotoPickerAvailable()){
 			mediaBtn.setOnLongClickListener(v->{
@@ -493,6 +525,24 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		super.onResume();
 		if(!creatingView)
 			refreshNewBabyWorldBinding();
+		// 位置权限刚授予后回到本页：刷新成 GPS 精确定位（替代 IP 属地缓存）
+		if(locationBtn!=null && locationBtn.getVisibility()==View.VISIBLE
+				&& LocationUtils.hasLocationPermission(getActivity())){
+			boolean needsGpsRefresh=currentLocation==null
+					|| currentLocation.district()==null; // IP 属地无 district
+			LocationUtils.ResolvedLocation cached=LocationUtils.getCachedLocation(getActivity());
+			if(needsGpsRefresh && (cached==null || cached.district()==null)){
+				LocationUtils.fetchAndResolve(getActivity(), loc->{
+					if(loc!=null){
+						currentLocation=loc;
+						new android.os.Handler(android.os.Looper.getMainLooper()).post(()->updateLocationButton());
+					}
+				});
+			}else if(cached!=null && (currentLocation==null || currentLocation.district()==null)){
+				currentLocation=cached;
+				updateLocationButton();
+			}
+		}
 	}
 
 	private void refreshNewBabyWorldBinding(){
@@ -1082,6 +1132,15 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		req.visibility=StatusPrivacy.PUBLIC;
 		// 回复帖不同步宝宝新天地，不携带版块字段
 		req.nbwFid=(replyTo!=null || resolvedNBWForumId==-1) ? null : resolvedNBWForumId;
+		// 位置信息（回复帖不携带）
+		if(replyTo==null){
+			LocationUtils.ResolvedLocation geo=getGeoForPost();
+			if(geo!=null){
+				req.geoProvince=geo.province();
+				req.geoCity=geo.city();
+				req.geoDistrict=geo.district();
+			}
+		}
 		if(!mediaViewController.isEmpty()){
 			req.mediaIds=mediaViewController.getAttachmentIDs();
 			req.mediaAttributes=mediaViewController.getAttachmentAttributes();
@@ -1389,6 +1448,75 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 			mainEditText.requestFocus();
 			updateCharCounter();
 		}
+	}
+
+	private void updateLocationButton(){
+		if(locationText==null) return;
+		String province=currentLocation!=null ? currentLocation.province() : getString(R.string.location_unknown);
+		switch(selectedLocationLevel){
+			case LOCATION_PROVINCE -> locationText.setText(getString(R.string.location_province, province));
+			case LOCATION_CITY -> {
+				String city=currentLocation!=null ? currentLocation.city() : null;
+				locationText.setText(getString(R.string.location_city, city!=null ? city : getString(R.string.location_unknown)));
+			}
+			case LOCATION_DISTRICT -> {
+				String district=currentLocation!=null ? currentLocation.district() : null;
+				locationText.setText(getString(R.string.location_district, district!=null ? district : getString(R.string.location_unknown)));
+			}
+			case LOCATION_NONE -> locationText.setText(R.string.location_none);
+		}
+	}
+
+	private void onLocationClick(View v){
+		ArrayList<ListItem<Integer>> items=new ArrayList<>();
+		ExtendedPopupMenu menu=new ExtendedPopupMenu(getActivity(), items);
+		String province=currentLocation!=null ? currentLocation.province() : getString(R.string.location_unknown);
+		String city=(currentLocation!=null && currentLocation.city()!=null) ? currentLocation.city() : getString(R.string.location_unknown);
+		String district=(currentLocation!=null && currentLocation.district()!=null) ? currentLocation.district() : getString(R.string.location_unknown);
+		boolean hasPermission=LocationUtils.hasLocationPermission(getActivity());
+		Consumer<ListItem<Integer>> onClick=item->{
+			selectedLocationLevel=item.parentObject;
+			menu.dismiss();
+			// 点击市/区但没有定位权限 → 弹出位置权限引导（同首次登录），用户同意后申请系统权限
+			if(selectedLocationLevel!=LOCATION_NONE && selectedLocationLevel!=LOCATION_PROVINCE && !hasPermission){
+				selectedLocationLevel=LOCATION_PROVINCE;
+				updateLocationButton();
+				new LocationPermissionSheet(getActivity(), getActivity(), null).show();
+				return;
+			}
+			updateLocationButton();
+			// 选择非省时如果没有位置数据，尝试获取
+			if(selectedLocationLevel!=LOCATION_NONE && selectedLocationLevel!=LOCATION_PROVINCE && currentLocation==null){
+				LocationUtils.fetchAndResolve(getActivity(), loc->{
+					if(loc!=null){
+						currentLocation=loc;
+						updateLocationButton();
+					}
+				});
+			}
+		};
+		// 用 String 构造器避免 %s 未格式化
+		items.add(new ListItem<>(getString(R.string.location_province, province), getString(R.string.location_province_desc), R.drawable.ic_fluent_location_12_filled, onClick, LOCATION_PROVINCE));
+		ListItem<Integer> cityItem=new ListItem<>(getString(R.string.location_city, city), hasPermission ? getString(R.string.location_city_desc) : getString(R.string.location_disabled_no_permission), R.drawable.ic_fluent_location_12_filled, onClick, LOCATION_CITY);
+		cityItem.isEnabled=hasPermission || (currentLocation!=null && currentLocation.city()!=null);
+		items.add(cityItem);
+		ListItem<Integer> districtItem=new ListItem<>(getString(R.string.location_district, district), hasPermission ? getString(R.string.location_district_desc) : getString(R.string.location_disabled_no_permission), R.drawable.ic_fluent_location_12_filled, onClick, LOCATION_DISTRICT);
+		districtItem.isEnabled=hasPermission || (currentLocation!=null && currentLocation.district()!=null);
+		items.add(districtItem);
+		items.add(new ListItem<>(getString(R.string.location_none), getString(R.string.location_none_desc), R.drawable.ic_fluent_location_12_regular, onClick, LOCATION_NONE));
+		menu.showAsDropDown(v);
+	}
+
+	/** 获取发帖时要发送的位置数据（根据用户选择级别） */
+	private LocationUtils.ResolvedLocation getGeoForPost(){
+		if(selectedLocationLevel==LOCATION_NONE) return null;
+		if(currentLocation==null) return null;
+		return switch(selectedLocationLevel){
+			case LOCATION_PROVINCE -> new LocationUtils.ResolvedLocation(currentLocation.province(), null, null);
+			case LOCATION_CITY -> new LocationUtils.ResolvedLocation(currentLocation.province(), currentLocation.city(), null);
+			case LOCATION_DISTRICT -> currentLocation;
+			default -> null;
+		};
 	}
 
 	private void onVisibilityClick(View v){

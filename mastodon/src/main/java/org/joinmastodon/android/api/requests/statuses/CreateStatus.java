@@ -35,6 +35,12 @@ public class CreateStatus extends MastodonAPIRequest<Status>{
 		public String quotedStatusId;
 		@SerializedName("nbw_fid")
 		public Integer nbwFid;
+		@SerializedName("geo_province")
+		public String geoProvince;
+		@SerializedName("geo_city")
+		public String geoCity;
+		@SerializedName("geo_district")
+		public String geoDistrict;
 
 		public static class Poll{
 			public ArrayList<String> options=new ArrayList<>();

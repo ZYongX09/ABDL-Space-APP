@@ -45,6 +45,9 @@ public class Status extends BaseModel implements DisplayItemsParent, Searchable 
 	public boolean sensitive;
 	@SerializedName("mental_crisis")
 	public boolean mentalCrisis;
+
+	@SerializedName("geo_location")
+	public String geoLocation;
 //	@RequiredField
 	public String spoilerText="";
 //	@RequiredField

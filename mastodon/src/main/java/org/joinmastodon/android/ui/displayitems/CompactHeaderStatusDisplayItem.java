@@ -7,6 +7,7 @@ import android.graphics.drawable.Animatable;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.text.SpannableStringBuilder;
+import android.text.TextUtils;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
@@ -105,7 +106,9 @@ public class CompactHeaderStatusDisplayItem extends StatusDisplayItem{
 			else
 				time=item.context.getString(R.string.edited_timestamp, UiUtils.formatRelativeTimestamp(itemView.getContext(), item.status.editedAt));
 
-			timeAndUsername.setText(time+" · @"+item.user.acct);
+			Status s=item.status;
+			String geo=s!=null ? s.geoLocation : null;
+			timeAndUsername.setText(time+" · "+(!TextUtils.isEmpty(geo) ? geo : "@"+item.user.acct));
 //			itemView.setPadding(itemView.getPaddingLeft(), itemView.getPaddingTop(), itemView.getPaddingRight(), item.needBottomPadding ? V.dp(6) : V.dp(4));
 			if(clickableThing!=null){
 				clickableThing.setContentDescription(item.context.getString(R.string.avatar_description, item.user.acct));
