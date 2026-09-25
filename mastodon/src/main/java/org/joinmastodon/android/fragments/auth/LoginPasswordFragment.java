@@ -298,7 +298,7 @@ public class LoginPasswordFragment extends AppKitFragment {
         if (activity == null) return;
         View sheetView = LayoutInflater.from(activity).inflate(R.layout.sheet_qr_login, null);
         ImageView iconView = sheetView.findViewById(R.id.icon);
-        iconView.setImageResource(iconRes);
+        if (iconView != null) iconView.setImageResource(iconRes);
         me.grishka.appkit.views.BottomSheet sheet = new me.grishka.appkit.views.BottomSheet(activity) {{
             setContentView(sheetView);
             setNavigationBarBackground(new android.graphics.drawable.ColorDrawable(
@@ -321,7 +321,7 @@ public class LoginPasswordFragment extends AppKitFragment {
             sheetView.findViewById(R.id.btn_cancel).setOnClickListener(v -> dismiss());
             sheetView.findViewById(R.id.btn_authorize).setOnClickListener(v -> {
                 dismiss();
-                onConfirm.run();
+                if (isAdded() && !activity.isFinishing() && !activity.isDestroyed()) onConfirm.run();
             });
         }};
         sheet.show();
