@@ -11,7 +11,7 @@
 - 赞助中心、购买流程、颜色与权益模型。
 - 宝宝认证申请、私有照片上传、证书和验真入口。
 - 徽章模型、新徽章提示与展示组件。
-- 小说编辑核心模块和相关构建配置。
+- 小说编辑核心模块和相关构建配置；源码保留，但主页普通菜单与液态菜单入口暂时隐藏。
 
 证据与验证：
 
@@ -19,7 +19,8 @@
 - 官方 QQ SDK JAR SHA-256：`9d57fe61ff9026d34ac84bc63dc719f61da6aa40533a299cc6f73d4ce9df7af8`。
 - Java/Kotlin 编译成功。
 - Debug APK 构建成功，包名 `top.abdl_space.app.debug`，versionCode 23，minSdk 26。
-- 功能契约测试已恢复；后续在 recovery 分支继续消除剩余集成测试差异。
+- Debug APK：`mastodon/build/outputs/apk/debug/mastodon-debug.apk`，SHA-256 `413d6d47198d07127f6b1f5c1f0f1df8b673031b03092102932cd80fad5870a6`。
+- 3.0.0 功能契约测试：60/60 通过，覆盖 QQ、宝宝认证、赞助者和 Android 8 兼容。
 
 安全处理：
 
