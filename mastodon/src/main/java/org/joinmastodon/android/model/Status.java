@@ -65,6 +65,10 @@ public class Status extends BaseModel implements DisplayItemsParent, Searchable 
 	public long quotesCount;
 	public long bookmarksCount;
 	public long sharesCount;
+	public long viewsCount;		// 浏览量（12h 去重）
+	public double heat;			// 热度（后端计算下发，App 不重算）
+	@SerializedName("friend_request")
+	public FriendRequest friendRequest;	// 交友宇宙卡片载荷（非标准字段，仅在跨站时间线内存在）
 	public Instant editedAt;
 
 	public String url;
@@ -210,6 +214,11 @@ public class Status extends BaseModel implements DisplayItemsParent, Searchable 
 			}
 			case REPLIES -> repliesCount=ev.replies;
 			case BOOKMARKS -> bookmarked=ev.bookmarked;
+			case HEAT -> { /* 仅同步浏览量/热度，见下 */ }
+		}
+		if(ev.type==StatusCountersUpdatedEvent.CounterType.HEAT || ev.views>0 || ev.heat>0){
+			viewsCount=ev.views;
+			heat=ev.heat;
 		}
 	}
 

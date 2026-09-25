@@ -74,6 +74,8 @@ import static org.joinmastodon.android.ui.compose.navigation.FriendUniverseToolb
 	private boolean fabHidden = false;
 	private FriendUniverseLiquidToolbarController liquidToolbarController;
 	private int searchGeneration;
+	private int overlayTopPadding;
+	private int overlayBottomPadding;
 	// 顶部状态栏 inset：tab/时间线/搜索页三种宿主的分发方式不同，统一走显式调用
 	private int pendingTopInset = -1;
 	private int baseToolbarHeight;
