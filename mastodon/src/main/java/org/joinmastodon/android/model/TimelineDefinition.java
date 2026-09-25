@@ -460,8 +460,7 @@ public class TimelineDefinition {
 			FOLLOWING_TIMELINE,
 			LOCAL_TIMELINE,
 			NBW_TIMELINE,
-			BUBBLE_TIMELINE,
-			FRIEND_UNIVERSE_TIMELINE
+			BUBBLE_TIMELINE
 	);
 
 	private static final List<TimelineDefinition> ALL_TIMELINES = List.of(
@@ -471,7 +470,6 @@ public class TimelineDefinition {
 			NBW_TIMELINE,
 			POSTS_TIMELINE,
 			BUBBLE_TIMELINE,
-			FRIEND_UNIVERSE_TIMELINE,
 			BOOKMARKS_TIMELINE,
 			FAVORITES_TIMELINE
 	);

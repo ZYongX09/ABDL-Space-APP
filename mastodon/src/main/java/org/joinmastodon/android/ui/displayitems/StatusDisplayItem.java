@@ -111,10 +111,11 @@ public abstract class StatusDisplayItem{
 			case FOLLOW_REQUEST_ACTIONS -> new FollowRequestActionsDisplayItem.Holder(activity, parent);
 			case QUOTE_ERROR -> new QuoteErrorStatusDisplayItem.Holder(activity, parent);
 			case NESTED_QUOTE -> new NestedQuoteStatusDisplayItem.Holder(activity, parent);
-			// MOSHIDON:
-			case DUMMY -> new DummyStatusDisplayItem.Holder(activity);
-			case EMOJI_REACTIONS -> new EmojiReactionsStatusDisplayItem.Holder(activity, parent);
-		};
+				// MOSHIDON:
+				case DUMMY -> new DummyStatusDisplayItem.Holder(activity);
+				case EMOJI_REACTIONS -> new EmojiReactionsStatusDisplayItem.Holder(activity, parent);
+				case FRIEND_REQUEST_ITEM -> new FriendRequestStatusDisplayItem.Holder(activity, parent);
+			};
 	}
 
 	public static ArrayList<StatusDisplayItem> buildItems(BaseStatusListFragment<?> fragment, Status status, String accountID, DisplayItemsParent parentObject, Map<String, Account> knownAccounts, boolean addFooter){
@@ -133,8 +134,16 @@ public abstract class StatusDisplayItem{
 		if(callbacks==null)
 			callbacks=new NoOpCallbacks(context);
 		String parentID=parentObject.getID();
-		ArrayList<StatusDisplayItem> items=new ArrayList<>();
 		Status statusForContent=status.getContentStatus();
+		if(statusForContent.friendRequest!=null){
+			ArrayList<StatusDisplayItem> result=new ArrayList<>();
+			FriendRequestStatusDisplayItem friendRequestItem=new FriendRequestStatusDisplayItem(parentID, callbacks, context, statusForContent, accountID);
+			friendRequestItem.index=1;
+			friendRequestItem.fullWidth=(flags & FLAG_FULL_WIDTH)!=0;
+			result.add(friendRequestItem);
+			return result;
+		}
+		ArrayList<StatusDisplayItem> items=new ArrayList<>();
 		StatusDisplayItem header=null;
 		boolean hideCounts=!GlobalUserPreferences.showInteractionCounts;
 		if((flags & FLAG_NO_HEADER)==0){
@@ -300,11 +309,12 @@ public abstract class StatusDisplayItem{
 		FOLLOW_REQUEST_ACTIONS,
 		HEADER_COMPACT,
 		QUOTE_ERROR,
-		NESTED_QUOTE,
-		// MOSHIDON:
-		DUMMY,
-		EMOJI_REACTIONS
-	}
+			NESTED_QUOTE,
+			// MOSHIDON:
+			DUMMY,
+			EMOJI_REACTIONS,
+			FRIEND_REQUEST_ITEM
+		}
 
 	public static abstract class Holder<T> extends BindableViewHolder<T> implements UsableRecyclerView.DisableableClickable{
 		public Holder(View itemView){

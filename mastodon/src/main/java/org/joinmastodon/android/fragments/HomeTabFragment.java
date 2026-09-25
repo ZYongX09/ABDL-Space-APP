@@ -203,14 +203,6 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 				AccountSessionManager.get(accountID).getLocalPreferences().timelines=newList;
 				AccountSessionManager.get(accountID).getLocalPreferences().save();
 			}
-			// 交友宇宙时间线固定最后一位
-			if(timelinesList.stream().noneMatch(t->t.getType()==TimelineDefinition.TimelineType.FRIEND_UNIVERSE)){
-				java.util.ArrayList<TimelineDefinition> newList=new java.util.ArrayList<>(timelinesList);
-				newList.add(TimelineDefinition.FRIEND_UNIVERSE_TIMELINE.copy());
-				timelinesList=newList;
-				AccountSessionManager.get(accountID).getLocalPreferences().timelines=newList;
-				AccountSessionManager.get(accountID).getLocalPreferences().save();
-			}
 			// 热门时间线固定排在第三位（HOME、同城之后）；没有同城时仍占第三位。
 			if(timelinesList.stream().noneMatch(t->t.getType()==TimelineDefinition.TimelineType.POPULAR)){
 				java.util.ArrayList<TimelineDefinition> newList=new java.util.ArrayList<>(timelinesList);
@@ -219,14 +211,18 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 				AccountSessionManager.get(accountID).getLocalPreferences().timelines=newList;
 				AccountSessionManager.get(accountID).getLocalPreferences().save();
 			}
-			// “跨站”时间线已并入主页（/api/v1/timelines/all）：老用户持久化数据里若有 FEDERATED，过滤掉并重存
-			boolean hadFederated=timelinesList.stream().anyMatch(t->t.getType()==TimelineDefinition.TimelineType.FEDERATED);
-			if(hadFederated){
+			// 跨站与交友内容已并入主页（/api/v1/timelines/all）：移除旧版独立时间线并重存。
+			boolean hasAggregatedTimeline=timelinesList.stream().anyMatch(t->
+				t.getType()==TimelineDefinition.TimelineType.FEDERATED ||
+				t.getType()==TimelineDefinition.TimelineType.FRIEND_UNIVERSE);
+			if(hasAggregatedTimeline){
 				java.util.ArrayList<TimelineDefinition> newList=new java.util.ArrayList<>();
 				for(TimelineDefinition t:timelinesList){
-					if(t.getType()!=TimelineDefinition.TimelineType.FEDERATED)
+					if(t.getType()!=TimelineDefinition.TimelineType.FEDERATED &&
+						t.getType()!=TimelineDefinition.TimelineType.FRIEND_UNIVERSE)
 						newList.add(t);
 				}
+				if(newList.isEmpty()) newList.add(TimelineDefinition.HOME_TIMELINE.copy());
 				timelinesList=newList;
 				AccountSessionManager.get(accountID).getLocalPreferences().timelines=newList;
 				AccountSessionManager.get(accountID).getLocalPreferences().save();
@@ -1037,8 +1033,9 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 	@Override
 	public void onViewStateRestored(Bundle savedInstanceState) {
 		super.onViewStateRestored(savedInstanceState);
-		if (savedInstanceState == null) return;
-		navigateTo(savedInstanceState.getInt("selectedTab"), false);
+		if (savedInstanceState == null || count==0) return;
+		int selectedTab=Math.max(0, Math.min(savedInstanceState.getInt("selectedTab"), count-1));
+		navigateTo(selectedTab, false);
 	}
 
 	@Override
