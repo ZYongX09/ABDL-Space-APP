@@ -22,6 +22,11 @@
 		android:visible="false"
 		android:showAsAction="never" />
 	<item
+		android:id="@+id/search_action"
+		android:icon="@drawable/ic_fluent_search_24_regular"
+		android:title="@string/search_hint"
+		android:showAsAction="always" />
+	<item
 		android:id="@+id/overflow"
 		android:title="@string/more_options"
 		android:icon="@drawable/ic_fluent_more_vertical_24_regular"

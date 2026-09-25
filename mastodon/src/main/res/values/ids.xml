@@ -47,4 +47,18 @@
 	<item name="tab_diaper" type="id" />
 	<!-- Messages tab -->
 	<item name="tab_messages" type="id" />
+	<!-- 已废弃的探索 tab；仅保留 id 以兼容旧版本 savedInstanceState 里的 selectedTab 值 -->
+	<item name="tab_search" type="id" />
+
+	<!-- 首页搜索按钮（非液态工具栏 + 液态玻璃工具栏共用锚点） -->
+	<item name="home_search_btn" type="id" />
+	<!-- 首页菜单：扫一扫 -->
+	<item name="scan_qr" type="id" />
+
+	<!-- 液态玻璃发帖菜单 -->
+	<item name="compose_post" type="id" />
+	<item name="compose_friend_request" type="id" />
+
+	<!-- 小说 v2 -->
+	<item name="novel_square_pad" type="id" />
 </resources>

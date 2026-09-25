@@ -115,6 +115,26 @@ public class NovelAuthoringApi{
 		return callFactory.newCall(request);
 	}
 
+	/** 公开书城作品举报（先发布后人工审核模式的读者入口） */
+	public Call newReportWorkCall(String workId, String reason, String idempotencyKey){
+		Request request=authorizedRequest(baseUrl+"/works/"+encode(workId)+"/report")
+				.header("Idempotency-Key", idempotencyKey)
+				.post(RequestBody.create(JSON, GSON.toJson(new ReportWorkRequest(reason))))
+				.build();
+		return callFactory.newCall(request);
+	}
+
+	public static class ReportWorkRequest{
+		public String reason;
+		public ReportWorkRequest(String reason){ this.reason=reason; }
+	}
+
+	public static class ReportResultDto{
+		public String id;
+		public String workId;
+		public String status;
+	}
+
 	public RevisionDto executeDraft(Call call) throws IOException{
 		try(Response response=call.execute()){
 			if(response.priorResponse()!=null) throw new IOException("Redirects are not allowed");
@@ -270,7 +290,11 @@ public class NovelAuthoringApi{
 	}
 
 	private static String encode(String value){
-		return URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20");
+		try{
+			return URLEncoder.encode(value, "UTF-8").replace("+", "%20");
+		}catch(java.io.UnsupportedEncodingException e){
+			throw new AssertionError(e); // UTF-8 总是可用
+		}
 	}
 
 	public static class ApiException extends IOException{

@@ -5,6 +5,7 @@ import static org.joinmastodon.android.api.session.AccountLocalPreferences.Color
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.os.Build;
 
 import com.google.gson.JsonSyntaxException;
 
@@ -135,7 +136,11 @@ public class GlobalUserPreferences{
 		showPostsWithoutAlt=prefs.getBoolean("showPostsWithoutAlt", true);
 		showMediaPreview=prefs.getBoolean("showMediaPreview", true);
 		removeTrackingParams=prefs.getBoolean("removeTrackingParams", true);
-		useIosLiquidNavigation=prefs.getBoolean("useIosLiquidNavigation", true);
+		boolean hasIosLiquidNavigationPreference=prefs.contains("useIosLiquidNavigation");
+		boolean storedIosLiquidNavigationPreference=prefs.getBoolean("useIosLiquidNavigation", true);
+		useIosLiquidNavigation=resolveIosLiquidNavigationEnabled(Build.VERSION.SDK_INT, hasIosLiquidNavigationPreference, storedIosLiquidNavigationPreference);
+		if(Build.VERSION.SDK_INT<Build.VERSION_CODES.TIRAMISU && (!hasIosLiquidNavigationPreference || storedIosLiquidNavigationPreference))
+			prefs.edit().putBoolean("useIosLiquidNavigation", false).apply();
 //		enhanceTextSize=prefs.getBoolean("enhanceTextSize", false);
 
 
@@ -152,6 +157,20 @@ public class GlobalUserPreferences{
 			// Also applies to new app installs
 			prefs.edit().putBoolean("perAccountMigrationDone", true).apply();
 		}
+	}
+
+	static boolean resolveIosLiquidNavigationEnabled(int sdkInt, boolean hasExplicitPreference, boolean storedPreference){
+		if(sdkInt<Build.VERSION_CODES.TIRAMISU)
+			return false;
+		return hasExplicitPreference ? storedPreference : true;
+	}
+
+	public static boolean isIosLiquidNavigationSupported(){
+		return Build.VERSION.SDK_INT>=Build.VERSION_CODES.TIRAMISU;
+	}
+
+	public static boolean isIosLiquidNavigationEnabled(){
+		return isIosLiquidNavigationSupported() && useIosLiquidNavigation;
 	}
 
 	public static void save(){
@@ -211,8 +230,9 @@ public class GlobalUserPreferences{
 				.putBoolean("enableDeleteNotifications", enableDeleteNotifications)
 				.putBoolean("showPostsWithoutAlt", showPostsWithoutAlt)
 				.putBoolean("showMediaPreview", showMediaPreview)
-				.putBoolean("removeTrackingParams", removeTrackingParams)
-				.putBoolean("useIosLiquidNavigation", useIosLiquidNavigation)
+					.putBoolean("removeTrackingParams", removeTrackingParams)
+					.putBoolean("useIosLiquidNavigation", isIosLiquidNavigationEnabled())
+
 //				.putBoolean("enhanceTextSize", enhanceTextSize)
 
 				.apply();

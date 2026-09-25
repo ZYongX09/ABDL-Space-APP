@@ -14,6 +14,7 @@ import android.app.assist.AssistContent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.Configuration;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.LayoutInflater;
@@ -21,6 +22,7 @@ import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.SubMenu;
+import android.view.WindowInsets;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewParent;
@@ -31,6 +33,7 @@ import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.PopupMenu;
 import android.widget.TextView;
+import android.widget.Toast;
 import android.widget.Toolbar;
 
 import androidx.annotation.NonNull;
@@ -41,6 +44,7 @@ import com.squareup.otto.Subscribe;
 
 import org.joinmastodon.android.E;
 import org.joinmastodon.android.GlobalUserPreferences;
+import org.joinmastodon.android.MainActivity;
 import org.joinmastodon.android.R;
 import org.joinmastodon.android.api.requests.announcements.GetAnnouncements;
 import org.joinmastodon.android.api.requests.lists.GetLists;
@@ -51,7 +55,10 @@ import org.joinmastodon.android.events.ListCreatedEvent;
 import org.joinmastodon.android.events.ListDeletedEvent;
 import org.joinmastodon.android.events.ListUpdatedEvent;
 import org.joinmastodon.android.events.SelfUpdateStateChangedEvent;
+import org.joinmastodon.android.fragments.discover.SearchQueryFragment;
 import org.joinmastodon.android.fragments.settings.SettingsMainFragment;
+import org.joinmastodon.android.googleservices.barcodescanner.Barcode;
+import org.joinmastodon.android.googleservices.barcodescanner.BarcodeScanner;
 import org.joinmastodon.android.model.Announcement;
 import org.joinmastodon.android.model.Hashtag;
 import org.joinmastodon.android.model.HeaderPaginationList;
@@ -59,7 +66,7 @@ import org.joinmastodon.android.model.FollowList;
 import org.joinmastodon.android.model.StatusPrivacy;
 import org.joinmastodon.android.model.TimelineDefinition;
 import org.joinmastodon.android.model.viewmodel.ListItem;
-import org.joinmastodon.android.novel.NovelActivity;
+import org.joinmastodon.android.novel.editor.NovelEditorActivity;
 import org.joinmastodon.android.ui.ExtendedPopupMenu;
 import org.joinmastodon.android.ui.SimpleViewHolder;
 import org.joinmastodon.android.ui.compose.navigation.HomeLiquidToolbarController;
@@ -94,6 +101,7 @@ import static org.joinmastodon.android.ui.compose.navigation.HomeLiquidToolbarMo
 
 public class HomeTabFragment extends MastodonToolbarFragment implements ScrollableToTop, HasFab, ProvidesAssistContent, HasElevationOnScrollListener {
 	private static final int ANNOUNCEMENTS_RESULT = 654;
+	private static final int SCAN_RESULT = 456;
 
 	private String accountID;
 	private MenuItem announcements, announcementsAction, settings, settingsAction;
@@ -104,6 +112,8 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 	private ViewPager2 pager;
 	private View switcher;
 	private FrameLayout toolbarFrame;
+	private int lastTopInset;
+	private int liquidNavBottomInset;
 	private ImageView timelineIcon;
 	private ImageView collapsedChevron;
 	private TextView timelineTitle;
@@ -119,8 +129,11 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 	private SubMenu hashtagsMenu, listsMenu;
 	private PopupMenu overflowPopup;
 	private View overflowActionView = null;
+	private ImageButton searchActionView = null;
 	private boolean announcementsBadged, settingsBadged;
 	private ImageButton fab;
+	private int fabBottomInset;
+	private Intent scannerIntent;
 	private ElevationOnScrollListener elevationOnScrollListener;
 	private HomeLiquidToolbarController liquidToolbarController;
 
@@ -134,18 +147,35 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		accountID = getArguments().getString("account");
 		timelinesList=AccountSessionManager.get(accountID).getLocalPreferences().timelines;
 		if(timelinesList==null || timelinesList.isEmpty()) timelinesList=new java.util.ArrayList<>(List.of(TimelineDefinition.HOME_TIMELINE));
-		// 同城时间线：注入省份时间线（当用户省份已知时）
+		// 同城时间线：注入或更新省份时间线（当用户省份已知时）
 		try{
 			String cachedProvince=LocationUtils.getCachedProvince(getActivity());
-			if(cachedProvince!=null && timelinesList.stream().noneMatch(t->t.getType()==TimelineDefinition.TimelineType.GEO)){
+			if(cachedProvince!=null){
+				boolean needPersist=false;
 				java.util.ArrayList<TimelineDefinition> newList=new java.util.ArrayList<>(timelinesList);
-				// GEO 时间线排在第二位（HOME 之后）
-				TimelineDefinition geoTl=TimelineDefinition.ofGeo(cachedProvince);
-				int insertIdx=Math.min(1, newList.size());
-				newList.add(insertIdx, geoTl);
-				timelinesList=newList;
-				AccountSessionManager.get(accountID).getLocalPreferences().timelines=newList;
-				AccountSessionManager.get(accountID).getLocalPreferences().save();
+				// 已有 GEO 时间线 → 校准省份（位置漂移后让持久化定义与 tab 标题同步）
+				for(int i=0;i<newList.size();i++){
+					TimelineDefinition t=newList.get(i);
+					if(t.getType()==TimelineDefinition.TimelineType.GEO){
+						String oldProvince=t.getProvince();
+						if(oldProvince==null || !oldProvince.equals(cachedProvince)){
+							newList.set(i, TimelineDefinition.ofGeo(cachedProvince));
+							needPersist=true;
+						}
+					}
+				}
+				// 尚无 GEO 时间线 → 注入并排在第二位（HOME 之后）
+				if(newList.stream().noneMatch(t->t.getType()==TimelineDefinition.TimelineType.GEO)){
+					TimelineDefinition geoTl=TimelineDefinition.ofGeo(cachedProvince);
+					int insertIdx=Math.min(1, newList.size());
+					newList.add(insertIdx, geoTl);
+					needPersist=true;
+				}
+				if(needPersist){
+					timelinesList=newList;
+					AccountSessionManager.get(accountID).getLocalPreferences().timelines=newList;
+					AccountSessionManager.get(accountID).getLocalPreferences().save();
+				}
 			}
 			// 省份未知时双保险：GPS 定位 + IP 属地同时触发（先到先用，下次启动生效）
 			if(cachedProvince==null){
@@ -162,10 +192,46 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 					}
 				});
 			}
-		}catch(Exception e){
-			// 旧版本升级时 preferences 可能不完整，忽略
-		}
-		count=timelinesList.size();
+			}catch(Exception e){
+				// 旧版本升级时 preferences 可能不完整，忽略
+			}
+			// 「关注」时间线固定第二位（HOME 之后）
+			if(timelinesList.stream().noneMatch(t->t.getType()==TimelineDefinition.TimelineType.FOLLOWING)){
+				java.util.ArrayList<TimelineDefinition> newList=new java.util.ArrayList<>(timelinesList);
+				newList.add(Math.min(1, newList.size()), TimelineDefinition.FOLLOWING_TIMELINE.copy());
+				timelinesList=newList;
+				AccountSessionManager.get(accountID).getLocalPreferences().timelines=newList;
+				AccountSessionManager.get(accountID).getLocalPreferences().save();
+			}
+			// 交友宇宙时间线固定最后一位
+			if(timelinesList.stream().noneMatch(t->t.getType()==TimelineDefinition.TimelineType.FRIEND_UNIVERSE)){
+				java.util.ArrayList<TimelineDefinition> newList=new java.util.ArrayList<>(timelinesList);
+				newList.add(TimelineDefinition.FRIEND_UNIVERSE_TIMELINE.copy());
+				timelinesList=newList;
+				AccountSessionManager.get(accountID).getLocalPreferences().timelines=newList;
+				AccountSessionManager.get(accountID).getLocalPreferences().save();
+			}
+			// 热门时间线固定排在第三位（HOME、同城之后）；没有同城时仍占第三位。
+			if(timelinesList.stream().noneMatch(t->t.getType()==TimelineDefinition.TimelineType.POPULAR)){
+				java.util.ArrayList<TimelineDefinition> newList=new java.util.ArrayList<>(timelinesList);
+				newList.add(Math.min(2, newList.size()), TimelineDefinition.ofPopular());
+				timelinesList=newList;
+				AccountSessionManager.get(accountID).getLocalPreferences().timelines=newList;
+				AccountSessionManager.get(accountID).getLocalPreferences().save();
+			}
+			// “跨站”时间线已并入主页（/api/v1/timelines/all）：老用户持久化数据里若有 FEDERATED，过滤掉并重存
+			boolean hadFederated=timelinesList.stream().anyMatch(t->t.getType()==TimelineDefinition.TimelineType.FEDERATED);
+			if(hadFederated){
+				java.util.ArrayList<TimelineDefinition> newList=new java.util.ArrayList<>();
+				for(TimelineDefinition t:timelinesList){
+					if(t.getType()!=TimelineDefinition.TimelineType.FEDERATED)
+						newList.add(t);
+				}
+				timelinesList=newList;
+				AccountSessionManager.get(accountID).getLocalPreferences().timelines=newList;
+				AccountSessionManager.get(accountID).getLocalPreferences().save();
+			}
+			count=timelinesList.size();
 		fragments=new Fragment[count];
 		tabViews=new FrameLayout[count];
 		timelines=new TimelineDefinition[count];
@@ -177,6 +243,22 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 
 	private void returnToBeginningOfPager() {
 		pager.setCurrentItem(0);
+	}
+
+	@Override
+	public void onApplyWindowInsets(WindowInsets insets){
+		// 时间线内的交友宇宙 fragment 不在 view 树上自动收到 insets，显式转发
+		int top=insets.getSystemWindowInsetTop();
+		lastTopInset=top;
+		if(fragments!=null){
+			for(Fragment f:fragments){
+				if(f instanceof FriendRequestListFragment frf)
+					frf.setTopInset(top);
+			}
+		}
+		// 液态模式下标准 toolbar 隐藏、玻璃悬浮其上，列表顶部安全区需要含状态栏
+		updateLiquidToolbarMode();
+		super.onApplyWindowInsets(insets);
 	}
 
 	@Override
@@ -243,6 +325,10 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		overflowPopup.setOnMenuItemClickListener(this::onOptionsItemSelected);
 		overflowActionView.setOnClickListener(l -> overflowPopup.show());
 		overflowActionView.setOnTouchListener(overflowPopup.getDragToOpenListener());
+
+		// 非液态模式：搜索按钮紧邻更多按钮（液态模式由玻璃工具栏接管）
+		searchActionView = makeSearchActionView();
+		setFabBottomInset(0);
 
 		return rootView;
 	}
@@ -333,7 +419,7 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 
 		elevationOnScrollListener = new ElevationOnScrollListener((FragmentRootLinearLayout) view, getToolbar());
 
-		if(GithubSelfUpdater.needSelfUpdating()){
+		if(GithubSelfUpdater.isSupported()){
 			updateUpdateState(GithubSelfUpdater.getInstance().getState());
 		}
 
@@ -368,9 +454,9 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 				if (result.stream().anyMatch(a -> !a.read)) {
 					announcementsBadged = true;
 					if(announcements!=null)
-						announcements.setVisible(GlobalUserPreferences.useIosLiquidNavigation);
+						announcements.setVisible(GlobalUserPreferences.isIosLiquidNavigationEnabled());
 					if(announcementsAction!=null)
-						announcementsAction.setVisible(!GlobalUserPreferences.useIosLiquidNavigation);
+						announcementsAction.setVisible(!GlobalUserPreferences.isIosLiquidNavigationEnabled());
 					updateLiquidToolbarState();
 				}
 			}
@@ -384,6 +470,73 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 
 	public ElevationOnScrollListener getElevationOnScrollListener() {
 		return elevationOnScrollListener;
+	}
+
+	/**
+	 * 非液态模式：更多按钮左侧的独立搜索按钮，带 {@link R.id#home_search_btn} 锚点
+	 * 供 SearchQueryFragment 展开动画定位。
+	 */
+	private ImageButton makeSearchActionView(){
+		ImageButton searchBtn=new ImageButton(getContext(), null, 0, R.style.Widget_Mastodon_ActionButton_Overflow);
+		searchBtn.setId(R.id.home_search_btn);
+		searchBtn.setImageResource(R.drawable.ic_fluent_search_24_regular);
+		searchBtn.setContentDescription(getString(R.string.search_hint));
+		searchBtn.setOnClickListener(v->openSearch());
+		return searchBtn;
+	}
+
+	public void setFabBottomInset(int insetPx){
+		fabBottomInset=insetPx;
+		if(fab!=null){
+			FrameLayout.LayoutParams lp=(FrameLayout.LayoutParams) fab.getLayoutParams();
+			lp.bottomMargin=V.dp(16)+fabBottomInset;
+			fab.setLayoutParams(lp);
+		}
+	}
+
+	public void openSearch(){
+		// 当前时间线为交友宇宙时，搜索按钮切换为交友宇宙搜索
+		if(timelines!=null && pager!=null){
+			int idx=pager.getCurrentItem();
+			if(idx>=0 && idx<timelines.length && timelines[idx].getType()==TimelineDefinition.TimelineType.FRIEND_UNIVERSE){
+				Bundle args=new Bundle();
+				args.putString("account", accountID);
+				args.putBoolean("searchMode", true);
+				Nav.go(getActivity(), FriendRequestListFragment.class, args);
+				return;
+			}
+		}
+		Bundle args=new Bundle();
+		args.putString("account", accountID);
+		Nav.go(getActivity(), SearchQueryFragment.class, args);
+	}
+
+	private void openQrScanner(){
+		if(getActivity()==null)
+			return;
+		if(scannerIntent==null)
+			scannerIntent=BarcodeScanner.createIntent(Barcode.FORMAT_QR_CODE, false, true);
+		if(scannerIntent.resolveActivity(getActivity().getPackageManager())!=null){
+			startActivityForResult(scannerIntent, SCAN_RESULT);
+		}else{
+			BarcodeScanner.installScannerModule(getActivity(), ()->startActivityForResult(scannerIntent, SCAN_RESULT));
+		}
+	}
+
+	@Override
+	public void onActivityResult(int requestCode, int resultCode, Intent data){
+		if(requestCode==SCAN_RESULT && resultCode==Activity.RESULT_OK && data!=null){
+			if(BarcodeScanner.isValidResult(data)){
+				Barcode code=BarcodeScanner.getResult(data);
+				if(code!=null){
+					if(code.rawValue.startsWith("https:") || code.rawValue.startsWith("http:")){
+						((MainActivity)getActivity()).handleURL(Uri.parse(code.rawValue), accountID);
+					}else{
+						Toast.makeText(getActivity(), R.string.link_not_supported, Toast.LENGTH_SHORT).show();
+					}
+				}
+			}
+		}
 	}
 
 	private void onFabClick(View v){
@@ -470,7 +623,7 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		hashtagsMenu = m.findItem(R.id.hashtags).getSubMenu();
 		listsMenu = m.findItem(R.id.lists).getSubMenu();
 
-		boolean liquid=GlobalUserPreferences.useIosLiquidNavigation && liquidToolbarController!=null;
+		boolean liquid=GlobalUserPreferences.isIosLiquidNavigationEnabled() && liquidToolbarController!=null;
 		announcements.setVisible(liquid || !announcementsBadged);
 		announcementsAction.setVisible(!liquid && announcementsBadged);
 
@@ -496,23 +649,37 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 	}
 
 	private void updateLiquidToolbarMode(){
-		boolean liquid=GlobalUserPreferences.useIosLiquidNavigation && liquidToolbarController!=null;
+		boolean liquid=GlobalUserPreferences.isIosLiquidNavigationEnabled() && liquidToolbarController!=null;
 		Toolbar toolbar=getToolbar();
 		if(toolbar!=null)
 			toolbar.setVisibility(liquid ? View.GONE : View.VISIBLE);
 		if(fab!=null)
 			fab.setVisibility(liquid ? View.GONE : View.VISIBLE);
-		int topPadding=V.dp(homeTimelineTopPaddingDp(liquid));
+		// 液态下标准 toolbar 隐藏、玻璃悬浮其上：列表顶部安全区 = 状态栏 + 玻璃工具栏高度
+		int topPadding=V.dp(homeTimelineTopPaddingDp(liquid)) + (liquid ? lastTopInset : 0);
 		if(fragments!=null){
 			for(Fragment fragment:fragments){
 				if(fragment instanceof BaseStatusListFragment<?> statusListFragment){
 					statusListFragment.setLiquidToolbarTopPadding(topPadding);
 					statusListFragment.setLiquidToolbarFabHidden(liquid);
+					statusListFragment.setLiquidNavBottomPadding(liquid ? liquidNavBottomInset : 0);
+				}
+				if(fragment instanceof FriendRequestListFragment friendRequestListFragment){
+					friendRequestListFragment.setLiquidToolbarTopPadding(topPadding);
+					friendRequestListFragment.setLiquidNavBottomPadding(liquid ? liquidNavBottomInset : 0);
 				}
 				if(fragment instanceof HomeTimelineFragment homeTimelineFragment)
 					homeTimelineFragment.setLiquidToolbarMode(liquid);
 			}
 		}
+	}
+
+	/** 液态底部导航条 overlay 高度（px），由 HomeFragment 在导航布局尺寸变化时转发 */
+	public void setLiquidNavBottomInset(int px){
+		if(liquidNavBottomInset==px)
+			return;
+		liquidNavBottomInset=px;
+		updateLiquidToolbarMode();
 	}
 
 	private void updateLiquidToolbarState(){
@@ -531,8 +698,8 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		root.add(new HomeToolbarMenuItem(R.id.settings, getString(R.string.settings), R.drawable.ic_fluent_settings_24_regular));
 		root.add(new HomeToolbarMenuItem(R.id.announcements, getString(R.string.sk_announcements), R.drawable.ic_fluent_megaphone_24_regular));
 		root.add(new HomeToolbarMenuItem(R.id.edit_timelines, getString(R.string.sk_edit_timelines), R.drawable.ic_fluent_edit_24_regular));
-		// 小说入口暂时隐藏
-		// root.add(new HomeToolbarMenuItem(R.id.novel, getString(R.string.novel), R.drawable.ic_fluent_book_24_regular));
+		root.add(new HomeToolbarMenuItem(R.id.scan_qr, getString(R.string.scan_qr), R.drawable.ic_fluent_scan_24_regular));
+		root.add(new HomeToolbarMenuItem(R.id.novel, getString(R.string.novel), R.drawable.ic_fluent_book_24_regular));
 		if(!listItems.isEmpty())
 			root.add(new HomeToolbarMenuItem(R.id.lists, getString(R.string.sk_your_lists), R.drawable.ic_fluent_people_24_regular));
 		if(!hashtagsItems.isEmpty())
@@ -561,7 +728,21 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 
 	public void onLiquidMenuItem(int id){
 		if(id==R.id.novel){
-			startActivity(new Intent(getActivity(), NovelActivity.class).putExtra("account", accountID));
+			startActivity(new Intent(getActivity(), NovelEditorActivity.class).putExtra(NovelEditorActivity.EXTRA_ACCOUNT_ID, accountID));
+			return;
+		}
+		if(id==R.id.scan_qr){
+			openQrScanner();
+			return;
+		}
+		if(id==R.id.compose_post){
+			onLiquidCompose();
+			return;
+		}
+		if(id==R.id.compose_friend_request){
+			Bundle args=new Bundle();
+			args.putString("account", accountID);
+			Nav.go(getActivity(), FriendRequestCreateFragment.class, args);
 			return;
 		}
 		MenuItem item=overflowPopup==null ? null : overflowPopup.getMenu().findItem(id);
@@ -574,6 +755,7 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		inflater.inflate(R.menu.home_custom, menu);
 
 		menu.findItem(R.id.overflow).setActionView(overflowActionView);
+		menu.findItem(R.id.search_action).setActionView(searchActionView);
 		announcementsAction = menu.findItem(R.id.announcements_action);
 		settingsAction = menu.findItem(R.id.settings_action);
 		updateOverflowMenu();
@@ -680,6 +862,10 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		if (item.getItemId() == R.id.menu_back) {
 			getToolbar().post(() -> overflowPopup.show());
 			return true;
+		} else if (id == R.id.search_action) {
+			openSearch();
+		} else if (id == R.id.scan_qr) {
+			openQrScanner();
 		} else if (id == R.id.settings || id == R.id.settings_action) {
 			Nav.go(getActivity(), SettingsMainFragment.class, args);
 		} else if (id == R.id.announcements || id == R.id.announcements_action) {
@@ -687,7 +873,7 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		} else if (id == R.id.edit_timelines) {
 			Nav.go(getActivity(), EditTimelinesFragment.class, args);
 		} else if (id == R.id.novel) {
-			startActivity(new Intent(getActivity(), NovelActivity.class).putExtra("account", accountID));
+			startActivity(new Intent(getActivity(), NovelEditorActivity.class).putExtra(NovelEditorActivity.EXTRA_ACCOUNT_ID, accountID));
 		} else if ((list = listItems.get(id)) != null) {
 			args.putString("listID", list.id);
 			args.putString("listTitle", list.title);
@@ -804,9 +990,9 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		if(state!=GithubSelfUpdater.UpdateState.NO_UPDATE && state!=GithubSelfUpdater.UpdateState.CHECKING) {
 			settingsBadged = true;
 			if(settingsAction!=null)
-				settingsAction.setVisible(!GlobalUserPreferences.useIosLiquidNavigation);
+				settingsAction.setVisible(!GlobalUserPreferences.isIosLiquidNavigationEnabled());
 			if(settings!=null)
-				settings.setVisible(GlobalUserPreferences.useIosLiquidNavigation);
+				settings.setVisible(GlobalUserPreferences.isIosLiquidNavigationEnabled());
 			updateLiquidToolbarState();
 		}
 	}
@@ -836,7 +1022,7 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 			switcherPopup.dismiss();
 			switcherPopup = null;
 		}
-		if(GithubSelfUpdater.needSelfUpdating()){
+		if(GithubSelfUpdater.isSupported()){
 			E.unregister(this);
 		}
 		super.onDestroyView();

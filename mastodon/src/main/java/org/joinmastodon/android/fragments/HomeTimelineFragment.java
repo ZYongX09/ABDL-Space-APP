@@ -45,7 +45,7 @@ import org.joinmastodon.android.R;
 import org.joinmastodon.android.api.MastodonAPIRequest;
 import org.joinmastodon.android.api.requests.catalog.GetDonationCampaigns;
 import org.joinmastodon.android.api.requests.markers.SaveMarkers;
-import org.joinmastodon.android.api.requests.timelines.GetHomeTimeline;
+import org.joinmastodon.android.api.requests.timelines.GetAllTimeline;
 import org.joinmastodon.android.api.requests.timelines.GetListTimeline;
 import org.joinmastodon.android.api.requests.timelines.GetPublicTimeline;
 import org.joinmastodon.android.api.session.AccountSessionManager;
@@ -53,7 +53,6 @@ import org.joinmastodon.android.GlobalUserPreferences;
 import org.joinmastodon.android.events.DismissDonationCampaignBannerEvent;
 import org.joinmastodon.android.events.SelfUpdateStateChangedEvent;
 import org.joinmastodon.android.fragments.settings.SettingsMainFragment;
-import org.joinmastodon.android.model.CacheablePaginatedResponse;
 import org.joinmastodon.android.model.FilterContext;
 import org.joinmastodon.android.model.FollowList;
 import org.joinmastodon.android.model.Status;
@@ -108,7 +107,7 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 	private ToolbarDropdownMenuController dropdownController;
 	private HomeTimelineMenuController dropdownMainMenuController;
 	private List<FollowList> lists=List.of();
-	private ListMode listMode=ListMode.LOCAL;
+	private ListMode listMode=ListMode.FOLLOWING;
 	private FollowList currentList;
 	private MergeRecyclerAdapter mergeAdapter;
 	private DiscoverInfoBannerHelper localTimelineBannerHelper;
@@ -214,28 +213,21 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 	protected void doLoadData(int offset, int count){
 		switch(listMode){
 			case FOLLOWING -> {
-				AccountSessionManager.getInstance()
-						.getAccount(accountID).getCacheController()
-						.getHomeTimeline(offset>0 ? maxID : null, count, refreshing, new SimpleCallback<>(this){
+				GetAllTimeline req = new GetAllTimeline(offset>0 ? maxID : null, count);
+				currentRequest=req
+						.setCallback(new SimpleCallback<>(this){
 							@Override
-							public void onSuccess(CacheablePaginatedResponse<List<Status>> result){
+							public void onSuccess(List<Status> result){
 								if(getActivity()==null || listMode!=ListMode.FOLLOWING)
 									return;
 								if(refreshing)
 									list.scrollToPosition(0);
-								onDataLoaded(result.items, !result.items.isEmpty());
-								maxID=result.maxID;
-								if(result.isFromCache())
-									loadNewPosts();
+								maxID=req.getNextMaxID();
+								AccountSessionManager.get(accountID).filterStatuses(result, getFilterContext());
+								onDataLoaded(result, maxID!=null);
 							}
-
-							@Override
-							public void onError(ErrorResponse error){
-								if(listMode!=ListMode.FOLLOWING)
-									return;
-								super.onError(error);
-							}
-						});
+						})
+						.exec(accountID);
 			}
 			case LOCAL -> {
 				currentRequest=new GetPublicTimeline(true, false, offset>0 ? maxID : null, null, count, null, /* MOSHIDON */ null)
@@ -340,7 +332,7 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 		});
 		scrollWrapper=scroller;
 
-		if(GithubSelfUpdater.needSelfUpdating()){
+		if(GithubSelfUpdater.isSupported()){
 			updateUpdateState(GithubSelfUpdater.getInstance().getState());
 		}
 		if(currentDonationCampaign!=null)
@@ -447,7 +439,7 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 		// we'll get the currently topmost post as last in the response. This way we know there's no gap
 		// between the existing and newly loaded parts of the timeline.
 		String sinceID=data.size()>1 ? data.get(1).id : "1";
-		boolean needCache=listMode==ListMode.FOLLOWING;
+		boolean needCache=false;
 		loadAdditionalPosts(null, null, 20, sinceID, new Callback<>(){
 					@Override
 					public void onSuccess(List<Status> result){
@@ -467,7 +459,7 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 							toAdd=new ArrayList<>(toAdd);
 						Set<String> existingPostIDs=data.stream().map(s->s.id).collect(Collectors.toSet());
 						toAdd.removeIf(s->existingPostIDs.contains(s.id));
-						if(needCache)
+						if(listMode==ListMode.FOLLOWING)
 							AccountSessionManager.get(accountID).filterStatuses(toAdd, FilterContext.HOME);
 						if(!toAdd.isEmpty()){
 							prependItems(toAdd, true);
@@ -494,7 +486,7 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 		V.setVisibilityAnimated(item.progress, View.VISIBLE);
 		V.setVisibilityAnimated(item.text, View.GONE);
 		dataLoading=true;
-		boolean needCache=listMode==ListMode.FOLLOWING;
+		boolean needCache=false;
 		boolean insertBelowGap=!gap.enteredFromTop;
 		String maxID, minID;
 		if(gap.enteredFromTop){
@@ -560,7 +552,7 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 							}else{
 								result=result.subList(0, endIndex);
 							}
-							if(needCache)
+							if(listMode==ListMode.FOLLOWING)
 								AccountSessionManager.get(accountID).filterStatuses(result, FilterContext.HOME);
 							List<StatusDisplayItem> targetList=displayItems.subList(gapPos, gapPos+1); // Get a sub-list that contains the gap item
 							targetList.clear(); // remove the gap item
@@ -656,7 +648,7 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 
 	private void loadAdditionalPosts(String maxID, String minID, int limit, String sinceID, Callback<List<Status>> callback){
 		MastodonAPIRequest<List<Status>> req=switch(listMode){
-			case FOLLOWING -> new GetHomeTimeline(maxID, minID, limit, sinceID);
+			case FOLLOWING -> new GetAllTimeline(maxID, limit);
 			case LOCAL -> new GetPublicTimeline(true, false, maxID, minID, limit, sinceID, /* MOSHIDON */ null);
 			case LIST -> new GetListTimeline(currentList.id, maxID, minID, limit, sinceID);
 		};
@@ -717,7 +709,7 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 		if(newPostsBtnShown)
 			return;
 		newPostsBtnShown=true;
-		if(GlobalUserPreferences.useIosLiquidNavigation){
+		if(GlobalUserPreferences.isIosLiquidNavigationEnabled()){
 			newPostsBtnWrap.setVisibility(View.GONE);
 			return;
 		}
@@ -952,7 +944,7 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 
 	private String getCurrentListTitle(){
 		return switch(listMode){
-			case FOLLOWING -> getString(R.string.timeline_following);
+			case FOLLOWING -> getString(R.string.timeline_all);
 			case LOCAL -> getString(R.string.local_timeline);
 			case LIST -> currentList.title;
 		};

@@ -14,6 +14,9 @@ import org.joinmastodon.android.fragments.CustomLocalTimelineFragment;
 import org.joinmastodon.android.api.session.AccountSession;
 import org.joinmastodon.android.api.session.AccountSessionManager;
 import org.joinmastodon.android.fragments.BookmarkedStatusListFragment;
+import org.joinmastodon.android.fragments.FollowingTimelineFragment;
+import org.joinmastodon.android.fragments.FriendRequestListFragment;
+import org.joinmastodon.android.fragments.HomeTimelineFragment;
 import org.joinmastodon.android.fragments.FavoritedStatusListFragment;
 import org.joinmastodon.android.fragments.HashtagTimelineFragment;
 import org.joinmastodon.android.fragments.HomeTimelineFragment;
@@ -23,6 +26,7 @@ import org.joinmastodon.android.fragments.discover.BubbleTimelineFragment;
 import org.joinmastodon.android.fragments.discover.FederatedTimelineFragment;
 import org.joinmastodon.android.fragments.discover.LocalTimelineFragment;
 import org.joinmastodon.android.fragments.discover.NBWTimelineFragment;
+import org.joinmastodon.android.fragments.discover.PopularTimelineFragment;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -77,6 +81,10 @@ public class TimelineDefinition {
 		return def;
 	}
 
+	public static TimelineDefinition ofPopular() {
+		return new TimelineDefinition(TimelineType.POPULAR);
+	}
+
 	public static TimelineDefinition ofHashtag(Hashtag hashtag) {
 		return ofHashtag(hashtag.name);
 	}
@@ -107,6 +115,11 @@ public class TimelineDefinition {
 	@Nullable
 	public String getHashtagName() {
 		return hashtagName;
+	}
+
+	@Nullable
+	public String getProvince() {
+		return province;
 	}
 
 	@Nullable
@@ -151,6 +164,7 @@ public class TimelineDefinition {
 	public String getDefaultTitle(Context ctx) {
 		return switch (type) {
 			case HOME -> ctx.getString(R.string.sk_timeline_home);
+			case FOLLOWING -> ctx.getString(R.string.sk_timeline_following);
 			case LOCAL -> ctx.getString(R.string.sk_timeline_local);
 			case FEDERATED -> ctx.getString(R.string.sk_timeline_federated);
 			case POST_NOTIFICATIONS -> ctx.getString(R.string.sk_timeline_posts);
@@ -161,13 +175,16 @@ public class TimelineDefinition {
 			case FAVORITES -> ctx.getString(R.string.your_favorites);
 			case CUSTOM_LOCAL_TIMELINE -> domain;
 			case NBW -> ctx.getString(R.string.sk_timeline_nbw);
+			case POPULAR -> ctx.getString(R.string.sk_timeline_popular);
 			case GEO -> province;
+			case FRIEND_UNIVERSE -> ctx.getString(R.string.friend_request);
 		};
 	}
 
 	public Icon getDefaultIcon() {
 		return switch (type) {
 			case HOME -> Icon.HOME;
+			case FOLLOWING -> Icon.PEOPLE;
 			case LOCAL -> Icon.LOCAL;
 			case FEDERATED -> Icon.FEDERATED;
 			case POST_NOTIFICATIONS -> Icon.POST_NOTIFICATIONS;
@@ -175,16 +192,19 @@ public class TimelineDefinition {
 			case HASHTAG -> Icon.HASHTAG;
 			case CUSTOM_LOCAL_TIMELINE -> Icon.CUSTOM_LOCAL_TIMELINE;
 			case NBW -> Icon.NBW;
+			case POPULAR -> Icon.FIRE;
 			case BUBBLE -> Icon.BUBBLE;
 			case BOOKMARKS -> Icon.BOOKMARKS;
 			case FAVORITES -> Icon.FAVORITES;
 			case GEO -> Icon.LOCATION;
+			case FRIEND_UNIVERSE -> Icon.GLOBE;
 		};
 	}
 
 	public Fragment getFragment() {
 		return switch (type) {
 			case HOME -> new HomeTimelineFragment();
+			case FOLLOWING -> new FollowingTimelineFragment();
 			case LOCAL -> new LocalTimelineFragment();
 			case FEDERATED -> new FederatedTimelineFragment();
 			case LIST -> new ListTimelineCustomFragment();
@@ -193,9 +213,11 @@ public class TimelineDefinition {
 			case BUBBLE -> new BubbleTimelineFragment();
 			case CUSTOM_LOCAL_TIMELINE -> new CustomLocalTimelineFragment();
 			case NBW -> new NBWTimelineFragment();
+			case POPULAR -> new PopularTimelineFragment();
 			case BOOKMARKS -> new BookmarkedStatusListFragment();
 			case FAVORITES -> new FavoritedStatusListFragment();
 			case GEO -> org.joinmastodon.android.fragments.discover.GeoTimelineFragment.newInstance(province);
+			case FRIEND_UNIVERSE -> new FriendRequestListFragment();
 		};
 	}
 
@@ -265,12 +287,16 @@ public class TimelineDefinition {
 			args.putString("domain", domain);
 		} else if (type == TimelineType.GEO) {
 			args.putString("province", province);
+		} else if (type == TimelineType.FRIEND_UNIVERSE) {
+			// 作为时间线嵌入首页：隐藏页面自身的发布 FAB 与 options 菜单搜索项
+			args.putBoolean("__is_timeline", true);
 		}
 		return args;
 	}
 
 	public enum TimelineType {
 		HOME,
+		FOLLOWING,
 		LOCAL,
 		FEDERATED,
 		POST_NOTIFICATIONS,
@@ -279,7 +305,9 @@ public class TimelineDefinition {
 		BUBBLE,
 		CUSTOM_LOCAL_TIMELINE,
 		GEO,
+		POPULAR,
 		NBW,
+		FRIEND_UNIVERSE,
 
 		// not really timelines, but some people want it, so,,
 		BOOKMARKS,
@@ -387,12 +415,14 @@ public class TimelineDefinition {
 	}
 
 	public static final TimelineDefinition HOME_TIMELINE = new TimelineDefinition(TimelineType.HOME);
+	public static final TimelineDefinition FOLLOWING_TIMELINE = new TimelineDefinition(TimelineType.FOLLOWING);
 	public static final TimelineDefinition LOCAL_TIMELINE = new TimelineDefinition(TimelineType.LOCAL);
 	public static final TimelineDefinition FEDERATED_TIMELINE = new TimelineDefinition(TimelineType.FEDERATED);
 	public static final TimelineDefinition NBW_TIMELINE = new TimelineDefinition(TimelineType.NBW);
 	public static final TimelineDefinition POSTS_TIMELINE = new TimelineDefinition(TimelineType.POST_NOTIFICATIONS);
 	public static final TimelineDefinition BOOKMARKS_TIMELINE = new TimelineDefinition(TimelineType.BOOKMARKS);
 	public static final TimelineDefinition FAVORITES_TIMELINE = new TimelineDefinition(TimelineType.FAVORITES);
+	public static final TimelineDefinition FRIEND_UNIVERSE_TIMELINE = new TimelineDefinition(TimelineType.FRIEND_UNIVERSE);
 	public static final TimelineDefinition BUBBLE_TIMELINE = new TimelineDefinition(TimelineType.BUBBLE) {
 		@Override
 		public boolean isCompatible(AccountSession session) {
@@ -427,19 +457,21 @@ public class TimelineDefinition {
 
 	private static final List<TimelineDefinition> DEFAULT_TIMELINES = List.of(
 			HOME_TIMELINE,
+			FOLLOWING_TIMELINE,
 			LOCAL_TIMELINE,
 			NBW_TIMELINE,
 			BUBBLE_TIMELINE,
-			FEDERATED_TIMELINE
+			FRIEND_UNIVERSE_TIMELINE
 	);
 
 	private static final List<TimelineDefinition> ALL_TIMELINES = List.of(
 			HOME_TIMELINE,
+			FOLLOWING_TIMELINE,
 			LOCAL_TIMELINE,
 			NBW_TIMELINE,
-			FEDERATED_TIMELINE,
 			POSTS_TIMELINE,
 			BUBBLE_TIMELINE,
+			FRIEND_UNIVERSE_TIMELINE,
 			BOOKMARKS_TIMELINE,
 			FAVORITES_TIMELINE
 	);

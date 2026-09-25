@@ -17,6 +17,10 @@
 			android:id="@+id/novel"
 			android:icon="@drawable/ic_fluent_book_24_regular"
 			android:title="@string/novel" />
+		<item
+			android:id="@+id/scan_qr"
+			android:icon="@drawable/ic_fluent_scan_24_regular"
+			android:title="@string/scan_qr" />
 	</group>
 	<group android:id="@+id/bottom">
 		<item
