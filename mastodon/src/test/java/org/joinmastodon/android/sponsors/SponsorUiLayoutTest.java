@@ -47,10 +47,14 @@ public class SponsorUiLayoutTest{
 		TextView hint=(TextView) card.getChildAt(2);
 
 		assertEquals(V.dp(132), card.getLayoutParams().width);
-		assertEquals(V.dp(116), card.getLayoutParams().height);
-		assertEquals(V.dp(24), name.getLayoutParams().height);
-		assertEquals(V.dp(32), amount.getLayoutParams().height);
-		assertEquals(V.dp(46), hint.getLayoutParams().height);
+		assertEquals(LinearLayout.LayoutParams.WRAP_CONTENT, card.getLayoutParams().height);
+		assertEquals(V.dp(116), card.getMinimumHeight());
+		assertEquals(LinearLayout.LayoutParams.WRAP_CONTENT, name.getLayoutParams().height);
+		assertEquals(LinearLayout.LayoutParams.WRAP_CONTENT, amount.getLayoutParams().height);
+		assertEquals(LinearLayout.LayoutParams.WRAP_CONTENT, hint.getLayoutParams().height);
+		assertEquals(V.dp(24), name.getMinimumHeight());
+		assertEquals(V.dp(32), amount.getMinimumHeight());
+		assertEquals(V.dp(46), hint.getMinimumHeight());
 		assertEquals(1, name.getMaxLines());
 		assertEquals(2, hint.getMaxLines());
 		assertSame(hint, card.getTag(R.id.sponsor_plan_hint));
