@@ -129,7 +129,7 @@ public class SettingsMainFragment extends BaseSettingsFragment<Object>{
 	@Override
 	public void onViewCreated(View view, Bundle savedInstanceState){
 		super.onViewCreated(view, savedInstanceState);
-		if(GithubSelfUpdater.needSelfUpdating()){
+		if(GithubSelfUpdater.isSupported()){
 			updateUpdateBanner();
 		}
 	}

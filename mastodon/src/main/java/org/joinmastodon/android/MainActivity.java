@@ -17,7 +17,9 @@ import android.view.GestureDetector;
 import android.view.MotionEvent;
 import android.view.ViewConfiguration;
 
+import org.joinmastodon.android.api.MastodonAPIController;
 import org.joinmastodon.android.api.ObjectValidationException;
+import org.joinmastodon.android.api.requests.announcements.GetServiceNotice;
 import org.joinmastodon.android.api.requests.search.GetSearchResults;
 import org.joinmastodon.android.api.requests.accounts.GetAccountByID;
 import org.joinmastodon.android.api.session.AccountSession;
@@ -37,8 +39,13 @@ import org.joinmastodon.android.fragments.onboarding.AccountActivationFragment;
 import org.joinmastodon.android.fragments.onboarding.CustomWelcomeFragment;
 import org.joinmastodon.android.fragments.settings.ComposeAboutActivity;
 import org.joinmastodon.android.fragments.settings.OpenSourceLicensesFragment;
+import org.joinmastodon.android.model.Account;
 import org.joinmastodon.android.model.Notification;
+import org.joinmastodon.android.model.ServiceNotice;
 import org.joinmastodon.android.model.SearchResults;
+import org.joinmastodon.android.model.verification.VerificationLink;
+import org.joinmastodon.android.fragments.settings.BabyVerificationResultFragment;
+import org.joinmastodon.android.ui.M3AlertDialogBuilder;
 import org.joinmastodon.android.ui.utils.UiUtils;
 import org.joinmastodon.android.updater.GithubSelfUpdater;
 import org.parceler.Parcels;
@@ -78,6 +85,9 @@ public class MainActivity extends FragmentStackActivity implements LifecycleOwne
 	private ChatRealtimeClient chatWsClient;
 	private GestureDetector backGestureDetector;
 	private static final int LOCATION_PERMISSION_REQUEST=7001;
+	/** 服务公告弹窗引用，防止重复弹出 */
+	private android.app.AlertDialog serviceNoticeDialog;
+	private StartupPromptCoordinator startupPromptCoordinator;
 
 	@Override
 	public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults){
@@ -141,6 +151,12 @@ public class MainActivity extends FragmentStackActivity implements LifecycleOwne
 			getWindow().getDecorView().post(()->openSourceLicenses(getIntent()));
 		}
 
+		// 冷启动提示统一串行：服务公告、认证驳回、新徽章。
+		if(savedInstanceState==null){
+			startupPromptCoordinator=new StartupPromptCoordinator(this);
+			startupPromptCoordinator.start();
+		}
+
 		// 位置权限引导序列已迁移到 HomeFragment.onShown 的 showSetupGuideSequence
 		// 此处仅保留无权限时的 IP 属地兜底（不阻塞 UI，不弹 sheet）
 		if(savedInstanceState==null && !LocationUtils.hasLocationPermission(this)){
@@ -152,7 +168,7 @@ public class MainActivity extends FragmentStackActivity implements LifecycleOwne
 			try{
 				Class.forName("org.joinmastodon.android.AppCenterWrapper").getMethod("init", Application.class).invoke(null, getApplication());
 			}catch(ClassNotFoundException|NoSuchMethodException|IllegalAccessException|InvocationTargetException ignore){}
-		}else if(GithubSelfUpdater.needSelfUpdating()){
+		}else if(GithubSelfUpdater.isSupported()){
 			GithubSelfUpdater.getInstance().maybeCheckForUpdates();
 		}
 
@@ -168,6 +184,12 @@ public class MainActivity extends FragmentStackActivity implements LifecycleOwne
 		// }
 	}
 
+	public void restartStartupPrompts(){
+		if(startupPromptCoordinator!=null) startupPromptCoordinator.stop();
+		startupPromptCoordinator=new StartupPromptCoordinator(this);
+		startupPromptCoordinator.start();
+	}
+
 	private void startLanDiscoveryService(){
 		try{
 			Intent serviceIntent = new Intent(this, LanDiscoveryService.class);
@@ -179,6 +201,136 @@ public class MainActivity extends FragmentStackActivity implements LifecycleOwne
 		}catch(Exception e){
 			Log.w("MainActivity", "Failed to start LAN discovery service", e);
 		}
+	}
+
+	/**
+	 * 服务公告检查：冷启动时拉取后端公告（GET /api/broadcast/notice，零数据库端点）。
+	 * 无公告/请求失败时静默；有公告且本地未看过则弹窗一次（每个公告 ID 只弹一次）。
+	 */
+	// ============ 新徽章通知 ============
+	private java.util.ArrayDeque<Account.Badge> pendingNewBadgeQueue;
+	private String newBadgeAccountId;
+
+	private void checkNewBadges(){
+		AccountSession session=AccountSessionManager.getInstance().getLastActiveAccount();
+		if(session==null || !session.activated)
+			return;
+		newBadgeAccountId=session.getID();
+		String selfId=session.self.id;
+		String url="https://api.abdl-space.top/api/users/"+selfId+"/badges";
+		okhttp3.Request request=new okhttp3.Request.Builder()
+				.url(url)
+				.header("Authorization", "Bearer "+session.token.accessToken)
+				.get()
+				.build();
+		MastodonAPIController.getHttpClient().newCall(request).enqueue(new okhttp3.Callback(){
+			@Override
+			public void onFailure(okhttp3.Call call, java.io.IOException e){}
+
+			@Override
+			public void onResponse(okhttp3.Call call, okhttp3.Response response) throws java.io.IOException{
+				if(!response.isSuccessful()) return;
+				String body=response.body()!=null ? response.body().string() : "";
+				try{
+					com.google.gson.JsonObject json=new com.google.gson.JsonParser().parse(body).getAsJsonObject();
+					com.google.gson.JsonArray badges=json.getAsJsonArray("badges");
+					if(badges==null || badges.size()==0) return;
+					android.content.SharedPreferences prefs=getSharedPreferences("badge_popup", MODE_PRIVATE);
+					java.util.ArrayDeque<Account.Badge> queue=new java.util.ArrayDeque<>();
+					for(int i=badges.size()-1;i>=0;i--){
+						com.google.gson.JsonObject badge=badges.get(i).getAsJsonObject();
+						boolean acknowledged=badge.has("acknowledged") && badge.get("acknowledged").getAsBoolean();
+						if(acknowledged) continue;
+						Account.Badge b=new Account.Badge();
+						b.key=badge.has("key") ? badge.get("key").getAsString() : "";
+						b.name=badge.has("name") ? badge.get("name").getAsString() : "";
+						b.color=badge.has("color") ? badge.get("color").getAsString() : "#7C4DFF";
+						if(b.key.isEmpty()){
+							// 无 key 的徽章无法确认，保持原有行为直接弹
+							queue.add(b);
+							continue;
+						}
+						// 获得徽章后的第二次启动才弹出一次：
+						// 首次启动看到未确认徽章只记录不弹，第二次启动弹出，此后不再重复
+						int launches=prefs.getInt("launches_"+b.key, 0);
+						if(launches==0){
+							prefs.edit().putInt("launches_"+b.key, 1).apply();
+							continue;
+						}
+						if(launches>=2) continue;
+						prefs.edit().putInt("launches_"+b.key, 2).apply();
+						queue.add(b);
+					}
+					if(queue.isEmpty()) return;
+					runOnUiThread(()->showNextNewBadge(queue));
+				}catch(Exception ignored){}
+			}
+		});
+	}
+
+	private void showNextNewBadge(java.util.ArrayDeque<Account.Badge> queue){
+		if(isFinishing() || isDestroyed() || queue.isEmpty())
+			return;
+		Account.Badge badge=queue.poll();
+		new org.joinmastodon.android.ui.sheets.NewBadgeSheet(this, badge.name, null, badge.color, ()->
+				acknowledgeNewBadge(newBadgeAccountId, badge, ()->showNextNewBadge(queue)))
+				.show();
+	}
+
+	private void acknowledgeNewBadge(String accountId, Account.Badge badge, Runnable onDone){
+		AccountSession session=AccountSessionManager.getInstance().getAccount(accountId);
+		if(session==null || badge.key==null || badge.key.isEmpty()){
+			onDone.run();
+			return;
+		}
+		okhttp3.Request request=new okhttp3.Request.Builder()
+				.url("https://api.abdl-space.top/api/users/badge/acknowledge")
+				.header("Authorization", "Bearer "+session.token.accessToken)
+				.post(okhttp3.RequestBody.create(
+						okhttp3.MediaType.parse("application/json; charset=utf-8"),
+						"{\"badge_keys\":[\""+badge.key.replace("\"", "")+"\"]}"))
+				.build();
+		MastodonAPIController.getHttpClient().newCall(request).enqueue(new okhttp3.Callback(){
+			@Override
+			public void onFailure(okhttp3.Call call, java.io.IOException e){ onDone.run(); }
+			@Override
+			public void onResponse(okhttp3.Call call, okhttp3.Response response){ onDone.run(); }
+		});
+	}
+
+	private void maybeShowServiceNotice(){
+		if(getCurrentSession()==null)
+			return;
+		MastodonAPIController.runInBackground(()->{
+			ServiceNotice notice=GetServiceNotice.fetch();
+			if(notice==null)
+				return;
+			final String seenKey="service_notice_"+notice.id;
+			if(GlobalUserPreferences.alertSeen(seenKey))
+				return;
+			runOnUiThread(()->showServiceNoticeDialog(notice));
+		});
+	}
+
+	private void showServiceNoticeDialog(ServiceNotice notice){
+		if(serviceNoticeDialog!=null || isFinishing() || isDestroyed())
+			return;
+		final String seenKey="service_notice_"+notice.id;
+		serviceNoticeDialog=new M3AlertDialogBuilder(this)
+				.setTitle(notice.title!=null && !notice.title.isEmpty() ? notice.title : getString(R.string.service_notice_title))
+				.setMessage(notice.content)
+				.setPositiveButton(R.string.service_notice_ok, (dialog, which)->{
+					GlobalUserPreferences.setAlertSeen(seenKey);
+					dialog.dismiss();
+				})
+				.setCancelable(false)
+				.create();
+		serviceNoticeDialog.setOnDismissListener(dialog->{
+			serviceNoticeDialog=null;
+			GlobalUserPreferences.setAlertSeen(seenKey);
+		});
+		// 直接点击「知道了」时 setPositiveButton 已标记；此处兜底保证任何关闭路径都会记录
+		serviceNoticeDialog.show();
 	}
 
 	@Override
@@ -233,7 +385,7 @@ public class MainActivity extends FragmentStackActivity implements LifecycleOwne
 			handleURL(intent.getData(), null);
 		}else if(intent.getBooleanExtra("explore", false)){
 			restartHomeFragment();
-		}/*else if(intent.hasExtra(PackageInstaller.EXTRA_STATUS) && GithubSelfUpdater.needSelfUpdating()){
+		}/*else if(intent.hasExtra(PackageInstaller.EXTRA_STATUS) && GithubSelfUpdater.isSupported()){
 			GithubSelfUpdater.getInstance().handleIntentFromInstaller(intent, this);
 		}*/
 	}
@@ -252,6 +404,13 @@ public class MainActivity extends FragmentStackActivity implements LifecycleOwne
 			return;
 		if(!"https".equals(uri.getScheme()) && !"http".equals(uri.getScheme()))
 			return;
+
+		String verificationToken=VerificationLink.parseToken(uri);
+		if(verificationToken!=null){
+			Bundle args=new Bundle(); args.putString("token", verificationToken); args.putBoolean("_can_go_back", true);
+			Nav.go(this, BabyVerificationResultFragment.class, args);
+			return;
+		}
 
 		// QR 登录链接处理
 		if("abdl-space.top".equals(uri.getHost()) && uri.getPath().startsWith("/qr-login")){
@@ -428,6 +587,7 @@ public class MainActivity extends FragmentStackActivity implements LifecycleOwne
 			chatWsClient.disconnect();
 			chatWsClient=null;
 		}
+		if(startupPromptCoordinator!=null){ startupPromptCoordinator.stop(); startupPromptCoordinator=null; }
 	}
 
 	private void connectChatWebSocket(){
@@ -488,9 +648,14 @@ public class MainActivity extends FragmentStackActivity implements LifecycleOwne
 
 	public void restartHomeFragment(){
 		if(AccountSessionManager.getInstance().getLoggedInAccounts().isEmpty()){
-			// 无账户时直接进入新的验证码登录页
-			org.joinmastodon.android.fragments.auth.LoginEmailFragment loginEmailFragment = new org.joinmastodon.android.fragments.auth.LoginEmailFragment();
-			showFragmentClearingBackStack(loginEmailFragment);
+			Uri data=getIntent().getData(); String verificationToken=Intent.ACTION_VIEW.equals(getIntent().getAction()) ? VerificationLink.parseToken(data) : null;
+			if(verificationToken!=null){
+				BabyVerificationResultFragment fragment=new BabyVerificationResultFragment(); Bundle args=new Bundle(); args.putString("token", verificationToken); fragment.setArguments(args); showFragmentClearingBackStack(fragment);
+			}else{
+				// 无账户时直接进入新的验证码登录页
+				org.joinmastodon.android.fragments.auth.LoginEmailFragment loginEmailFragment = new org.joinmastodon.android.fragments.auth.LoginEmailFragment();
+				showFragmentClearingBackStack(loginEmailFragment);
+			}
 		}else{
 			AccountSessionManager.getInstance().maybeUpdateLocalInfo();
 			AccountSession session;
@@ -524,7 +689,7 @@ public class MainActivity extends FragmentStackActivity implements LifecycleOwne
 			}else if(intent.getBooleanExtra("compose", false)){
 				showCompose();
 			}else if(intent.getBooleanExtra("explore", false) && fragment instanceof HomeFragment hf){
-				getWindow().getDecorView().post(()->hf.setCurrentTab(R.id.tab_search));
+				getWindow().getDecorView().post(()->hf.setCurrentTab(R.id.tab_messages));
 			}else if(Intent.ACTION_VIEW.equals(intent.getAction())){
 				handleURL(intent.getData(), null);
 			}else{

@@ -17,10 +17,13 @@ android {
 	defaultConfig {
 		manifestPlaceholders = [oAuthScheme:"abdl-space"]
 		applicationId "top.abdl_space.app"
-		minSdk 33
+		minSdk 26
 		targetSdk 35
-		versionCode 22
+		versionCode 23
 		versionName "3.0.0-preview"
+		buildConfigField "String", "BABY_VERIFICATION_COS_HOST", "\"${System.getenv('BABY_VERIFICATION_COS_HOST') ?: 'abdl-1339643562.cos.ap-shanghai.myqcloud.com'}\""
+		buildConfigField "String", "QQ_APP_ID", '"1905661071"'
+		buildConfigField "boolean", "QQ_LOGIN_ENABLED", "false"
 		testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 		testBuildType "screenshotsUiTest"
 
@@ -36,84 +39,103 @@ android {
 		nightly{
 			storeFile = file("keystore/nightly_keystore.jks")
 			storePassword System.getenv("SIGNING_STORE_PASSWORD")
-			if (storePassword == null) {
+			if (storePassword == null && project.rootProject.file('local.properties').exists()) {
 				Properties properties = new Properties()
 				properties.load(project.rootProject.file('local.properties').newDataInputStream())
 				storePassword = properties.getProperty('SIGNING_STORE_PASSWORD')
 			}
 			keyAlias System.getenv("SIGNING_KEY_ALIAS")
-			if (keyAlias == null) {
+			if (keyAlias == null && project.rootProject.file('local.properties').exists()) {
 				Properties properties = new Properties()
 				properties.load(project.rootProject.file('local.properties').newDataInputStream())
 				keyAlias = properties.getProperty('SIGNING_KEY_ALIAS')
 			}
 			keyPassword System.getenv("SIGNING_KEY_PASSWORD")
-			if (keyPassword == null) {
+			if (keyPassword == null && project.rootProject.file('local.properties').exists()) {
 				Properties properties = new Properties()
 				properties.load(project.rootProject.file('local.properties').newDataInputStream())
 				keyPassword = properties.getProperty('SIGNING_KEY_PASSWORD')
 			}
 		}
 		release{
-			storeFile file("release.keystore")
-			storePassword "ZhX&ZYongX_0311"
-			keyAlias "abdl-space"
-			keyPassword "ZhX&ZYongX_0311"
+			storeFile file(System.getenv("SIGNING_STORE_FILE") ?: "release.keystore")
+			storePassword System.getenv("SIGNING_STORE_PASSWORD")
+			keyAlias System.getenv("SIGNING_KEY_ALIAS") ?: "abdl-space"
+			keyPassword System.getenv("SIGNING_KEY_PASSWORD")
+			if (project.rootProject.file('local.properties').exists()) {
+				Properties properties = new Properties()
+				properties.load(project.rootProject.file('local.properties').newDataInputStream())
+				storePassword = storePassword ?: properties.getProperty('SIGNING_STORE_PASSWORD')
+				keyAlias = keyAlias ?: properties.getProperty('SIGNING_KEY_ALIAS')
+				keyPassword = keyPassword ?: properties.getProperty('SIGNING_KEY_PASSWORD')
+				def localStoreFile = properties.getProperty('SIGNING_STORE_FILE')
+				if (System.getenv("SIGNING_STORE_FILE") == null && localStoreFile) {
+					storeFile file(localStoreFile)
+				}
+			}
 		}
 	}
 
 	buildTypes {
 		release {
+			buildConfigField "boolean", "QQ_LOGIN_ENABLED", "true"
 			signingConfig signingConfigs.release
 			minifyEnabled false
 			shrinkResources false
 			proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
 		}
-		debug{
+		debug {
+			buildConfigField "boolean", "QQ_LOGIN_ENABLED", "true"
 			debuggable true
 			versionNameSuffix '-debug'
 			applicationIdSuffix '.debug'
 			manifestPlaceholders = [oAuthScheme:"abdl-space"]
 		}
-//		appcenterPrivateBeta{
+//		appcenterPrivateBeta {
 //			initWith release
 //			minifyEnabled false
 //			shrinkResources false
 //			versionNameSuffix "-priv-beta"
 //		}
-//		appcenterPublicBeta{
+//		appcenterPublicBeta {
 //			initWith release
 //			versionNameSuffix "-beta"
 //		}
-		githubRelease{
+		githubRelease {
 			initWith release
+			buildConfigField "boolean", "QQ_LOGIN_ENABLED", "false"
 			versionNameSuffix '-github'
 		}
-		nightly{
+		nightly {
+			buildConfigField "boolean", "QQ_LOGIN_ENABLED", "false"
 			if(System.getenv("CURRENT_DATE") != null){
 				versionNameSuffix '-nightly+@' + System.getenv("CURRENT_DATE")
-			} else {
+			}else if(project.rootProject.file('local.properties').exists()){
 				Properties properties = new Properties()
 				properties.load(project.rootProject.file('local.properties').newDataInputStream())
 				versionNameSuffix '-nightly+@' + properties.getProperty('CURRENT_DATE')
+			}else{
+				versionNameSuffix '-nightly+@local'
 			}
 			applicationIdSuffix '.nightly'
-
 			signingConfig signingConfigs.nightly
 			manifestPlaceholders = [oAuthScheme:"abdl-space"]
 		}
-		githubDebug{
+		githubDebug {
 			initWith debug
+			buildConfigField "boolean", "QQ_LOGIN_ENABLED", "false"
 		}
 		screenshotsUiTest{
 			// Note: if Android Studio complains that "module not specified", select "screenshotsUiTest" in the "build variants" panel
 			// None of this makes sense, I know. Google enjoys making developers suffer for no good reason.
 			initWith debug
+			buildConfigField "boolean", "QQ_LOGIN_ENABLED", "false"
 			matchingFallbacks = ['debug']
 			debuggable false
 		}
 		fdroidRelease {
 			initWith release
+			buildConfigField "boolean", "QQ_LOGIN_ENABLED", "false"
 			// TODO: readd vcsinfo
 			// vcsInfo.include true
 			// The F-droid build system doesn't like this at all for some reason.
@@ -122,6 +144,7 @@ android {
 		}
 	}
 	compileOptions {
+		coreLibraryDesugaringEnabled true
 		sourceCompatibility JavaVersion.VERSION_17
 		targetCompatibility JavaVersion.VERSION_17
 	}
@@ -152,6 +175,10 @@ android {
 		compose true
 	}
 	composeOptions {
+	}
+	secrets {
+		propertiesFileName = "/dev/null"
+		defaultPropertiesFileName = "/dev/null"
 	}
 	packaging {
 		resources {
@@ -186,7 +213,9 @@ configurations.all {
 }
 
 dependencies {
+	implementation files('libs/open_sdk_3.5.19_r9483ffc7_lite.jar')
 	implementation project(':reader-core')
+	implementation project(':novel-editor-core')
 	api 'androidx.annotation:annotation:1.3.0'
 	implementation 'com.squareup.okhttp3:okhttp:3.14.9'
 	implementation 'me.grishka.litex:recyclerview:1.2.1.1'
@@ -202,6 +231,7 @@ dependencies {
 	implementation 'me.grishka.appkit:appkit:1.4.8'
 	implementation 'com.google.code.gson:gson:2.8.9'
 	implementation 'androidx.core:core:1.12.0'
+	implementation 'androidx.exifinterface:exifinterface:1.3.7'
 	implementation 'org.jsoup:jsoup:1.14.3'
 	implementation 'com.squareup:otto:1.3.8'
 	implementation 'de.psdev:async-otto:1.0.3'
@@ -262,10 +292,4 @@ dependencies {
 
 	// JPush SDK
 	implementation project(':jiguang-sdk:jiguang_sdk:jiguang')
-}
-
-android {
-    lint {
-        abortOnError false
-    }
 }

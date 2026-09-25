@@ -52,6 +52,7 @@ public abstract class MastodonAPIRequest<T> extends APIRequest<T>{
 	boolean cacheable;
 	private ProgressDialog progressDialog;
 	protected boolean removeUnsupportedItems;
+	protected boolean skipValidation;
 
 	public MastodonAPIRequest(HttpMethod method, String path, Class<T> respClass){
 		this.path=path;
@@ -127,6 +128,10 @@ public abstract class MastodonAPIRequest<T> extends APIRequest<T>{
 		requestBody=body;
 	}
 
+	protected void setSkipValidation(){
+		skipValidation=true;
+	}
+
 	protected void addQueryParameter(String key, String value){
 		if(queryParams==null)
 			queryParams=new ArrayList<>();
@@ -146,6 +151,12 @@ public abstract class MastodonAPIRequest<T> extends APIRequest<T>{
 	protected void setCacheable(){
 		cacheable=true;
 	}
+
+	/** Sensitive extensions may preserve structured server errors and forbid redirects. */
+	public ErrorResponse deserializeError(com.google.gson.JsonObject body, int status){ return null; }
+	public boolean isSensitiveRequest(){ return false; }
+	/** First-party high-sensitivity flows can additionally exclude user-installed certificate authorities. */
+	public boolean requiresSystemTrust(){ return false; }
 
 	protected String getPathPrefix(){
 		return "/api/v1";
@@ -182,6 +193,8 @@ public abstract class MastodonAPIRequest<T> extends APIRequest<T>{
 
 	@CallSuper
 	public void validateAndPostprocessResponse(T respObj, Response httpResponse) throws IOException{
+		if(skipValidation)
+			return;
 		if(respObj==null && (respTypeToken!=null || respClass!=null)){
 			throw new ObjectValidationException("Server response is empty");
 		}else if(respObj instanceof BaseModel){
@@ -219,7 +232,7 @@ public abstract class MastodonAPIRequest<T> extends APIRequest<T>{
 			invokeErrorCallback(err);
 	}
 
-	void onError(String msg, int httpStatus, Throwable exception){
+	protected void onError(String msg, int httpStatus, Throwable exception){
 		if(!canceled)
 			invokeErrorCallback(new MastodonErrorResponse(msg, httpStatus, exception));
 	}

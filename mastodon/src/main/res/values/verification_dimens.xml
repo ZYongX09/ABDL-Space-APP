@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+	<dimen name="verification_content_max_width">390dp</dimen>
+	<dimen name="verification_page_horizontal_margin">16dp</dimen>
+	<dimen name="verification_page_bottom_padding">30dp</dimen>
+	<dimen name="verification_card_padding_horizontal">20dp</dimen>
+	<dimen name="verification_card_padding_vertical">22dp</dimen>
+</resources>

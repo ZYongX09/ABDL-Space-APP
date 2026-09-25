@@ -47,6 +47,23 @@
 	<attr name="colorRichTextContainer" format="color"/>
 	<attr name="colorRichTextDecorations" format="color"/>
 
+	<!-- Baby verification uses a fixed product palette independent of account accent colors. -->
+	<attr name="colorVerificationBackground" format="color"/>
+	<attr name="colorVerificationTopSurface" format="color"/>
+	<attr name="colorVerificationCardSurface" format="color"/>
+	<attr name="colorVerificationCardOutline" format="color"/>
+	<attr name="colorVerificationFieldSurface" format="color"/>
+	<attr name="colorVerificationFieldOutline" format="color"/>
+	<attr name="colorVerificationPrimary" format="color"/>
+	<attr name="colorVerificationOnPrimary" format="color"/>
+	<attr name="colorVerificationTextPrimary" format="color"/>
+	<attr name="colorVerificationTextSecondary" format="color"/>
+	<attr name="colorVerificationProgressSurface" format="color"/>
+	<attr name="colorVerificationProgressOutline" format="color"/>
+	<attr name="colorVerificationStepInactive" format="color"/>
+	<attr name="colorVerificationStepInactiveOutline" format="color"/>
+	<attr name="colorVerificationSecurityContainer" format="color"/>
+
 	<attr name="composePollStyleInactiveAlpha" format="float"/>
 	<declare-styleable name="ItshoverNavigationIconView">
 		<attr name="iconType" format="enum">
@@ -54,6 +71,8 @@
 			<enum name="magnifier" value="1"/>
 			<enum name="star" value="2"/>
 			<enum name="globe" value="3"/>
+			<enum name="chat" value="4"/>
+			<enum name="envelope" value="5"/>
 		</attr>
 		<attr name="iconTint" format="color"/>
 	</declare-styleable>

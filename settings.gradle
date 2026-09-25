@@ -26,4 +26,5 @@ dependencyResolutionManagement {
 rootProject.name = "Mastodon"
 include ':mastodon'
 include ':reader-core'
+include ':novel-editor-core'
 include ':jiguang-sdk:jiguang_sdk:jiguang'

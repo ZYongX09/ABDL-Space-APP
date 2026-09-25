@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+	<color name="verification_light_background">#F5FAFF</color>
+	<color name="verification_light_top_surface">#FFFFFF</color>
+	<color name="verification_light_card_surface">#FFFFFF</color>
+	<color name="verification_light_card_outline">#D5E4EF</color>
+	<color name="verification_light_field_surface">#FBFDFF</color>
+	<color name="verification_light_field_outline">#6C879C</color>
+	<color name="verification_light_primary">#5B9FE3</color>
+	<color name="verification_light_on_primary">#18324A</color>
+	<color name="verification_light_text_primary">#18324A</color>
+	<color name="verification_light_text_secondary">#49677D</color>
+	<color name="verification_light_progress_surface">#F9FCFF</color>
+	<color name="verification_light_progress_outline">#DCEBF6</color>
+	<color name="verification_light_step_inactive">#EAF5FD</color>
+	<color name="verification_light_step_inactive_outline">#B9D9F2</color>
+	<color name="verification_light_security_container">#E4F2FF</color>
+
+	<color name="verification_dark_background">#0F172A</color>
+	<color name="verification_dark_top_surface">#111D2D</color>
+	<color name="verification_dark_card_surface">#162235</color>
+	<color name="verification_dark_card_outline">#2B4156</color>
+	<color name="verification_dark_field_surface">#122033</color>
+	<color name="verification_dark_field_outline">#55758F</color>
+	<color name="verification_dark_primary">#77B8F2</color>
+	<color name="verification_dark_on_primary">#0F172A</color>
+	<color name="verification_dark_text_primary">#F8FAFC</color>
+	<color name="verification_dark_text_secondary">#A8B8C8</color>
+	<color name="verification_dark_progress_surface">#14283A</color>
+	<color name="verification_dark_progress_outline">#29445B</color>
+	<color name="verification_dark_step_inactive">#1F3448</color>
+	<color name="verification_dark_step_inactive_outline">#35536B</color>
+	<color name="verification_dark_security_container">#18364B</color>
+</resources>

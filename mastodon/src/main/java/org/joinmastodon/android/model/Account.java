@@ -83,6 +83,28 @@ public class Account extends BaseModel implements Searchable{
 	 * Whether the account has verified badge
 	 */
 	public boolean verified;
+	/** Public baby-verification certificate reference. This is distinct from profile field verifiedAt. */
+	public BabyVerification babyVerification;
+	@Parcel public static class BabyVerification{ public boolean verified; public String certificateUrl; }
+	/**
+	 * 用户选择展示的徽章（圆角矩形+文字，颜色由后台指定）；未设置时为 null
+	 */
+	public Badge badge;
+	public PublicSponsor sponsor;
+
+	@Parcel
+	public static class PublicSponsor{
+		public boolean active, permanent;
+		public Long validUntil;
+		public String colorLight, colorDark;
+	}
+
+	@Parcel
+	public static class Badge {
+		public String key;
+		public String name;
+		public String color;
+	}
 	/**
 	 * Custom emoji entities to be used when rendering the profile. If none, an empty array will be returned.
 	 */
@@ -104,6 +126,10 @@ public class Account extends BaseModel implements Searchable{
 	 */
 //	@RequiredField
 	public LocalDate lastStatusAt;
+	/**
+	 * Province recorded on the user's most recent post (for IP属地 display). Null if no post with province.
+	 */
+	public String lastStatusProvince;
 	/**
 	 * How many statuses are attached to this account.
 	 */

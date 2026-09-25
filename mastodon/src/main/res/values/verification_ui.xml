@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+	<string name="verification_hero_title">完成认证，获取专属证书</string>
+	<string name="verification_hero_body">请按拍摄页的本次要求拍摄本人穿裤裤的照片，资料仅用于身份审核，不会公开展示。</string>
+	<string name="verification_step_information">填写信息</string>
+	<string name="verification_step_photo">上传照片</string>
+	<string name="verification_step_review">完成审核</string>
+	<string name="verification_progress_current">步骤 %1$d，共 3 步：%2$s，当前步骤</string>
+	<string name="verification_progress_complete">宝宝认证的三个步骤均已完成</string>
+	<string name="verification_information_kicker">认证信息</string>
+	<string name="verification_quota_title">本月认证额度</string>
+	<string name="verification_quota_remaining">剩余 %1$d 次 / 共 %2$d 次</string>
+	<string name="verification_form_label">审核信息填写</string>
+	<string name="verification_qq_placeholder">请输入您的常用 QQ 号</string>
+	<string name="verification_privacy_note">照片仅用于审核，将通过安全连接上传</string>
+	<string name="verification_security_title">ABDL Space 安全中心 隐私安全保障</string>
+	<string name="verification_security_body">资料仅用于审核，敏感请求与照片传输将受到严格保护</string>
+	<string name="verification_quota_exhausted">本月认证额度已用完，请下月再试。</string>
+	<string name="verification_service_disabled">宝宝认证服务暂未开放。</string>
+	<string name="verification_account_changed">账号会话已变化，请返回后重试。</string>
+	<string name="verification_state_error">无法查询认证状态。</string>
+	<string name="verification_photo_check_unavailable">照片已上传，但服务器校验暂时失败，请安全重试。</string>
+	<string name="verification_processing_photo_title">正在处理认证照片</string>
+	<string name="verification_processing_photo_body">正在校正方向、压缩并校验照片，请稍候。</string>
+	<string name="verification_uploading_body">正在上传并核对照片，请不要关闭页面。</string>
+	<string name="verification_draft_title">待完成提交</string>
+	<string name="verification_draft_body">检测到尚未提交的认证草稿，可继续核对照片并提交，或放弃后重新拍摄。</string>
+	<string name="verification_continue_submit">继续提交</string>
+	<string name="verification_discard_draft">放弃并重新拍摄</string>
+	<string name="verification_discard_draft_title">放弃当前认证草稿？</string>
+	<string name="verification_discard_draft_body">当前草稿和本地认证照片将被删除，之后需要重新拍摄。</string>
+	<string name="verification_discard_draft_confirm">确认放弃</string>
+	<string name="verification_capture_preparing">正在生成本次拍摄要求…</string>
+	<string name="verification_continue_capture">继续拍摄</string>
+	<string name="verification_camera_permission_denied">需要相机权限才能完成认证拍摄。</string>
+	<string name="verification_draft_missing_photo">本地照片已不可用。系统会先核对服务器上的上传结果；如无法恢复，需要放弃草稿并重新拍摄。</string>
+	<string name="verification_submission_checking">正在核对上次提交结果…</string>
+	<string name="verification_photo_retake_required">照片校验未通过，请放弃当前草稿并重新拍摄。</string>
+	<string name="verification_refresh">刷新状态</string>
+	<string name="verification_certificate_unavailable">证书暂时不可用，请刷新后重试。</string>
+	<string name="verification_retry_safe">系统会先核对申请状态并安全重试，不会重复提交。</string>
+</resources>

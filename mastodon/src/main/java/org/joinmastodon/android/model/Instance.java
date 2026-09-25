@@ -39,6 +39,8 @@ public abstract class Instance extends BaseModel{
 
 	public List<Rule> rules;
 	public Configuration configuration;
+	/** Explicit, optional extension advertisement. Missing on ordinary Mastodon servers. */
+	public Map<String, Boolean> capabilities;
 
 	// non-standard field in some Mastodon forks
 	public int maxTootChars;

@@ -14,3 +14,5 @@ local.properties
 /fastlane/report.xml
 .mimocode
 AGENTS.md
+.mimosa
+.zcode

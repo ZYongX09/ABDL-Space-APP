@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+	<string name="verification_camera_capture_rules">可使用前置或后置摄像头拍照；禁止翻拍屏幕、相册导入和任何编辑。</string>
+	<string name="verification_camera_capture_hint">点按快门拍照</string>
+	<string name="verification_camera_obscured">检测到其他应用遮挡相机，请关闭悬浮窗后重试</string>
+	<string name="verification_camera_error_title">认证相机暂时不可用</string>
+	<string name="verification_camera_error_message">相机未能启动或拍摄失败。你可以重试，或退出后重新开始认证。</string>
+	<string name="verification_camera_retry">重试相机</string>
+	<string name="verification_camera_exit">退出认证</string>
+</resources>

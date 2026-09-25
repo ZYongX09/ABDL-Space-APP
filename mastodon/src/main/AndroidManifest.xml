@@ -14,6 +14,8 @@
 	<uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE"/>
 	<uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
 	<uses-permission android:name="android.permission.VIBRATE" />
+	<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
+	<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28"/>
 	<uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
 	<uses-permission android:name="android.permission.READ_MEDIA_VIDEO"/>
 	<uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED"/>
@@ -21,6 +23,7 @@
 	<uses-permission android:name="com.google.android.c2dm.permission.RECEIVE"/>
 	<uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
 	<uses-permission android:name="android.permission.CAMERA"/>
+	<uses-permission android:name="android.permission.HIDE_OVERLAY_WINDOWS"/>
 	<uses-permission android:name="android.permission.RECORD_AUDIO"/>
 	<uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
 	<uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
@@ -61,20 +64,29 @@
 		<activity
 			android:name=".fragments.settings.ComposeAboutActivity"
 			android:exported="false" />
-		<activity android:name=".novel.NovelActivity" android:exported="true">
+		<activity
+			android:name=".QQAuthActivity"
+			android:exported="false"
+			android:theme="@style/Theme.Mastodon.AutoLightDark"
+			android:windowSoftInputMode="adjustResize" />
+		<activity android:name=".novel.editor.NovelEditorActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
+		<activity android:name=".novel.editor.NovelExternalImportActivity" android:exported="true">
 			<intent-filter>
 				<action android:name="android.intent.action.VIEW" />
 				<category android:name="android.intent.category.DEFAULT" />
 				<data android:mimeType="text/plain" />
 				<data android:mimeType="application/epub+zip" />
+				<data android:mimeType="application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
 			</intent-filter>
 			<intent-filter>
 				<action android:name="android.intent.action.SEND" />
 				<category android:name="android.intent.category.DEFAULT" />
 				<data android:mimeType="text/plain" />
 				<data android:mimeType="application/epub+zip" />
+				<data android:mimeType="application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
 			</intent-filter>
 		</activity>
+		<activity android:name=".novel.NovelActivity" android:exported="false" />
 		<activity android:name=".novel.author.NovelChapterEditorActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
 		<activity android:name=".novel.author.NovelWorkStructureActivity" android:exported="false" />
 
@@ -97,6 +109,15 @@
 				<category android:name="android.intent.category.DEFAULT"/>
 				<category android:name="android.intent.category.BROWSABLE"/>
 				<data android:scheme="https" android:host="abdl-space.top" android:pathPrefix="/qr-login"/>
+			</intent-filter>
+		</activity>
+		<!-- Export only a strict App Link gate; MainActivity remains private. -->
+		<activity android:name=".VerificationLinkActivity" android:exported="true" android:noHistory="true" android:theme="@style/Theme.Mastodon.AutoLightDark">
+			<intent-filter android:autoVerify="true">
+				<action android:name="android.intent.action.VIEW"/>
+				<category android:name="android.intent.category.DEFAULT"/>
+				<category android:name="android.intent.category.BROWSABLE"/>
+				<data android:scheme="https" android:host="abdl-space.top" android:pathPrefix="/c/"/>
 			</intent-filter>
 		</activity>
 		<activity android:name=".ui.CrisisHelpActivity" android:exported="false" android:configChanges="orientation|screenSize" android:theme="@style/Theme.Mastodon.AutoLightDark"/>

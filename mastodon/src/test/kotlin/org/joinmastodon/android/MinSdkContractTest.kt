@@ -11,17 +11,20 @@ class MinSdkContractTest {
 	private val manifest = File(projectDir, "src/main/AndroidManifest.xml").readText()
 
 	@Test
-	fun requiresAndroid13OrNewer() {
-		assertTrue(buildGradle.contains(Regex("""\bminSdk\s+33\b""")))
+	fun supportsAndroid80OrNewer() {
+		assertTrue(buildGradle.contains(Regex("""\bminSdk\s+26\b""")))
 	}
 
 	@Test
-	fun doesNotDeclareReadExternalStorage() {
-		assertFalse(manifest.contains("android.permission.READ_EXTERNAL_STORAGE"))
+	fun explicitlyEnablesCoreLibraryDesugaring() {
+		assertTrue(buildGradle.contains(Regex("""coreLibraryDesugaringEnabled\s+true""")))
+		assertTrue(buildGradle.contains("coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:"))
 	}
 
 	@Test
-	fun doesNotDeclareWriteExternalStorage() {
-		assertFalse(manifest.contains("android.permission.WRITE_EXTERNAL_STORAGE"))
+	fun declaresLegacyStoragePermissions() {
+		// Android 12 及以下仍需传统存储权限（分区存储权限模型只覆盖 13+）
+		assertTrue(manifest.contains(Regex("""android.permission.READ_EXTERNAL_STORAGE"[^>]*android:maxSdkVersion="32""")))
+		assertTrue(manifest.contains(Regex("""android.permission.WRITE_EXTERNAL_STORAGE"[^>]*android:maxSdkVersion="28""")))
 	}
 }

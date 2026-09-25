@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+	<style name="TextAppearance.Mastodon.Verification.Toolbar" parent="android:TextAppearance.Material.Widget.ActionBar.Title">
+		<item name="android:fontFamily">sans-serif-medium</item>
+		<item name="android:textSize">18sp</item>
+		<item name="android:textColor">?colorVerificationTextPrimary</item>
+	</style>
+	<style name="TextAppearance.Mastodon.Verification.Hero" parent="">
+		<item name="android:fontFamily">sans-serif-medium</item>
+		<item name="android:textSize">28sp</item>
+		<item name="android:textColor">?colorVerificationTextPrimary</item>
+		<item name="android:lineSpacingExtra">3sp</item>
+	</style>
+	<style name="TextAppearance.Mastodon.Verification.Body" parent="">
+		<item name="android:fontFamily">sans-serif</item>
+		<item name="android:textSize">14sp</item>
+		<item name="android:textColor">?colorVerificationTextSecondary</item>
+		<item name="android:lineSpacingExtra">5sp</item>
+	</style>
+	<style name="TextAppearance.Mastodon.Verification.Kicker" parent="">
+		<item name="android:fontFamily">sans-serif-medium</item>
+		<item name="android:textSize">12sp</item>
+		<item name="android:textColor">?colorVerificationPrimary</item>
+	</style>
+	<style name="TextAppearance.Mastodon.Verification.Title" parent="">
+		<item name="android:fontFamily">sans-serif-medium</item>
+		<item name="android:textSize">22sp</item>
+		<item name="android:textColor">?colorVerificationTextPrimary</item>
+	</style>
+	<style name="TextAppearance.Mastodon.Verification.Supporting" parent="">
+		<item name="android:fontFamily">sans-serif</item>
+		<item name="android:textSize">13sp</item>
+		<item name="android:textColor">?colorVerificationTextSecondary</item>
+	</style>
+	<style name="TextAppearance.Mastodon.Verification.Label" parent="">
+		<item name="android:fontFamily">sans-serif-medium</item>
+		<item name="android:textSize">12sp</item>
+		<item name="android:textColor">?colorVerificationTextSecondary</item>
+	</style>
+	<style name="TextAppearance.Mastodon.Verification.Note" parent="">
+		<item name="android:fontFamily">sans-serif</item>
+		<item name="android:textSize">12sp</item>
+		<item name="android:textColor">?colorVerificationTextSecondary</item>
+	</style>
+	<style name="TextAppearance.Mastodon.Verification.SecurityTitle" parent="">
+		<item name="android:fontFamily">sans-serif-medium</item>
+		<item name="android:textSize">14sp</item>
+		<item name="android:textColor">?colorVerificationTextPrimary</item>
+	</style>
+	<style name="TextAppearance.Mastodon.Verification.SecurityBody" parent="">
+		<item name="android:fontFamily">sans-serif</item>
+		<item name="android:textSize">11sp</item>
+		<item name="android:textColor">?colorVerificationTextSecondary</item>
+	</style>
+	<style name="Widget.Mastodon.Verification.EditText" parent="Widget.Mastodon.M3.EditText">
+		<item name="android:background">@drawable/bg_verification_field</item>
+		<item name="android:textSize">16sp</item>
+		<item name="android:textColor">?colorVerificationTextPrimary</item>
+		<item name="android:textColorHint">?colorVerificationTextSecondary</item>
+		<item name="android:minHeight">56dp</item>
+	</style>
+	<style name="Widget.Mastodon.Verification.PrimaryButton" parent="Widget.Mastodon.M3.Button">
+		<item name="android:background">@drawable/bg_verification_primary_button</item>
+		<item name="android:textColor">@color/verification_primary_button_text</item>
+		<item name="android:textSize">14sp</item>
+		<item name="android:minHeight">48dp</item>
+		<item name="android:singleLine">false</item>
+		<item name="android:maxLines">2</item>
+		<item name="android:paddingLeft">20dp</item>
+		<item name="android:paddingRight">20dp</item>
+	</style>
+	<style name="Widget.Mastodon.Verification.SecondaryButton" parent="Widget.Mastodon.M3.Button">
+		<item name="android:background">@drawable/bg_verification_secondary_button</item>
+		<item name="android:textColor">@color/verification_secondary_button_text</item>
+		<item name="android:textSize">14sp</item>
+		<item name="android:minHeight">48dp</item>
+		<item name="android:singleLine">false</item>
+		<item name="android:maxLines">2</item>
+		<item name="android:paddingLeft">20dp</item>
+		<item name="android:paddingRight">20dp</item>
+	</style>
+</resources>

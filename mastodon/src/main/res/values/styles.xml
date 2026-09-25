@@ -74,6 +74,22 @@
 		<item name="colorRichTextContainer">@color/ext_rich_text_container_light</item>
 		<item name="colorRichTextDecorations">@color/ext_rich_text_decoration_light</item>
 
+		<item name="colorVerificationBackground">?colorM3Background</item>
+		<item name="colorVerificationTopSurface">?colorM3Surface</item>
+		<item name="colorVerificationCardSurface">?colorM3Surface</item>
+		<item name="colorVerificationCardOutline">?colorM3OutlineVariant</item>
+		<item name="colorVerificationFieldSurface">?colorM3SurfaceVariant</item>
+		<item name="colorVerificationFieldOutline">?colorM3Outline</item>
+		<item name="colorVerificationPrimary">?colorM3Primary</item>
+		<item name="colorVerificationOnPrimary">?colorM3OnPrimary</item>
+		<item name="colorVerificationTextPrimary">?colorM3OnSurface</item>
+		<item name="colorVerificationTextSecondary">?colorM3OnSurfaceVariant</item>
+		<item name="colorVerificationProgressSurface">?colorM3SurfaceVariant</item>
+		<item name="colorVerificationProgressOutline">?colorM3OutlineVariant</item>
+		<item name="colorVerificationStepInactive">?colorM3SurfaceVariant</item>
+		<item name="colorVerificationStepInactiveOutline">?colorM3OutlineVariant</item>
+		<item name="colorVerificationSecurityContainer">?colorM3SecondaryContainer</item>
+
 		<item name="android:statusBarColor">?colorM3Background</item>
 		<item name="android:navigationBarColor">@color/navigation_bar_bg_light</item>
 		<item name="android:colorAccent">?colorM3Primary</item>
@@ -160,6 +176,22 @@
 		<item name="colorRichTextText">@color/ext_rich_text_text_dark</item>
 		<item name="colorRichTextContainer">@color/ext_rich_text_container_dark</item>
 		<item name="colorRichTextDecorations">@color/ext_rich_text_decoration_dark</item>
+
+		<item name="colorVerificationBackground">?colorM3Background</item>
+		<item name="colorVerificationTopSurface">?colorM3Surface</item>
+		<item name="colorVerificationCardSurface">?colorM3Surface</item>
+		<item name="colorVerificationCardOutline">?colorM3OutlineVariant</item>
+		<item name="colorVerificationFieldSurface">?colorM3SurfaceVariant</item>
+		<item name="colorVerificationFieldOutline">?colorM3Outline</item>
+		<item name="colorVerificationPrimary">?colorM3Primary</item>
+		<item name="colorVerificationOnPrimary">?colorM3OnPrimary</item>
+		<item name="colorVerificationTextPrimary">?colorM3OnSurface</item>
+		<item name="colorVerificationTextSecondary">?colorM3OnSurfaceVariant</item>
+		<item name="colorVerificationProgressSurface">?colorM3SurfaceVariant</item>
+		<item name="colorVerificationProgressOutline">?colorM3OutlineVariant</item>
+		<item name="colorVerificationStepInactive">?colorM3SurfaceVariant</item>
+		<item name="colorVerificationStepInactiveOutline">?colorM3OutlineVariant</item>
+		<item name="colorVerificationSecurityContainer">?colorM3SecondaryContainer</item>
 
 		<item name="android:statusBarColor">?colorM3Background</item>
 		<item name="android:navigationBarColor">?colorM3Background</item>
@@ -414,10 +446,6 @@
 		     在此覆盖为 splash_bg 使首窗底色与动画启动页一致 -->
 		<item name="colorM3Surface">@color/splash_bg</item>
 		<!-- 启动首窗仅显示纯图标（无品牌图），图标为 AVD 呼吸动画 -->
-		<item name="android:windowSplashScreenBackground">@color/splash_bg</item>
-		<item name="android:windowSplashScreenAnimatedIcon">@drawable/system_splash</item>
-		<item name="android:windowSplashScreenIconBackgroundColor">@null</item>
-		<item name="android:windowSplashScreenBehavior">icon_preferred</item>
 		<item name="android:statusBarColor">@color/splash_bg</item>
 		<item name="android:navigationBarColor">@color/splash_bg</item>
 	</style>
@@ -686,13 +714,11 @@
 	<style name="m3_body_large">
 		<item name="android:textSize">16dp</item>
 		<item name="android:lineSpacingExtra">5dp</item>
-		<item name="android:lineHeight">24dp</item>
 	</style>
 
 	<style name="m3_body_medium">
 		<item name="android:textSize">14dp</item>
 		<item name="android:lineSpacingExtra">4dp</item>
-		<item name="android:lineHeight">20dp</item>
 	</style>
 
 	<style name="m3_body_small">
@@ -704,7 +730,6 @@
 		<item name="android:fontFamily">sans-serif-medium</item>
 		<item name="android:textSize">16dp</item>
 		<item name="android:lineSpacingExtra">5dp</item>
-		<item name="android:lineHeight">24dp</item>
 	</style>
 
 	<style name="m3_title_small">
@@ -722,7 +747,6 @@
 		<item name="android:fontFamily">sans-serif-medium</item>
 		<item name="android:textSize">12dp</item>
 		<item name="android:lineSpacingMultiplier">1.14</item>
-		<item name="android:lineHeight">16dp</item>
 	</style>
 
 	<style name="m3_label_large">

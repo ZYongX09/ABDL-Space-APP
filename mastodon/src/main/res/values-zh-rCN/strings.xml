@@ -46,6 +46,7 @@
 		<item quantity="other">%,d 条帖子</item>
 	</plurals>
 	<string name="profile_joined">加入于</string>
+	<string name="profile_ip_location">IP属地</string>
 	<string name="done">完成</string>
 	<string name="loading">加载中...</string>
 	<string name="field_label">标签</string>
@@ -93,6 +94,10 @@
 	<string name="log_out">登出</string>
 	<string name="add_account">添加账户</string>
 	<string name="search_hint">搜索</string>
+	<string name="messages">消息</string>
+	<string name="scan_qr">扫一扫</string>
+	<string name="conversations_empty_title">暂无私信</string>
+	<string name="conversations_empty_hint">可从用户主页发起私信</string>
 	<string name="hashtags">标签</string>
 	<string name="news">新闻</string>
 	<string name="for_you">推荐</string>
@@ -166,7 +171,7 @@
 	<string name="novel_bookshelf_empty">书架还是空的</string>
 	<string name="novel_creation_empty">还没有创作作品</string>
 	<string name="nbw_forum_friends">交友</string>
-	<string name="nbw_forum_none">禁止同步宝宝新天地</string>
+	<string name="nbw_forum_none">强烈反对同步</string>
 	<string name="nbw_forum_none_subtitle">您强烈反对把您的帖子同步到宝宝新天地</string>
 	<string name="compose_newbabyworld_title">宝宝新天地</string>
 	<string name="compose_newbabyworld_unbound">发帖前必须绑定宝宝新天地账户。</string>
@@ -290,9 +295,14 @@
 	<plurals name="x_favorites">
 		<item quantity="other">%,d 次喜欢</item>
 	</plurals>
-	<plurals name="x_reblogs">
-		<item quantity="other">%d 次转发</item>
-	</plurals>
+		<plurals name="x_reblogs">
+			<item quantity="other">%d 次转发</item>
+		</plurals>
+		<plurals name="x_views">
+			<item quantity="other">%,d 次浏览</item>
+		</plurals>
+		<string name="heat_x">热度 %s</string>
+		<string name="sk_timeline_popular">热门</string>
 	<string name="time_now">刚刚</string>
 	<string name="edit_history">编辑记录</string>
 	<string name="last_edit_at_x">编辑于 %s</string>
@@ -445,8 +455,8 @@
 	<string name="blocked_user">已屏蔽 %s</string>
 	<string name="mark_all_notifications_read">全部标记为已读</string>
 	<string name="settings_display">显示</string>
-	<string name="settings_ios_liquid_navigation">iOS 风格底部导航栏</string>
-	<string name="settings_ios_liquid_navigation_summary">在主界面使用悬浮液态玻璃导航栏</string>
+	<string name="settings_ios_liquid_navigation">液态玻璃模式</string>
+	<string name="settings_ios_liquid_navigation_summary">在主界面使用悬浮液态玻璃导航栏，支持拖拽展开菜单，毛玻璃效果更沉浸</string>
 	<string name="settings_filters">过滤器</string>
 	<string name="settings_server_explanation">概览、规则与管理员</string>
 	<!-- %s is the app name (ABDL Space, key app_name). I made it a placeholder so everything Just Works™ with forks -->
@@ -929,7 +939,7 @@
 	<string name="remove_quote_confirm">该操作无法撤销。</string>
 	<string name="remove_quote_button">移除帖子</string>
 	<string name="settings_posting_defaults_explanation">这些设置会在你撰写新帖子时作为默认值应用，但发布时你也可以在编辑器内手动调整设置。</string>
-	<string name="open_source_licenses">开源许可证</string>
+	<string name="open_source_licenses">第三方开源许可</string>
 	<string name="support_us">支持我们</string>
 	<string name="support_us_message">如果 ABDL Space 对你有帮助，欢迎鼓励一下！你可以通过爱发电平台进行捐赠。</string>
 	<string name="settings_about_website">官方网站</string>
@@ -980,4 +990,25 @@
 	<string name="geo_ip_hint_dismiss">关闭提示</string>
 	<string name="geo_ip_hint_grant">打开定位权限</string>
 	<string name="geo_ip_hint_open_settings_toast">请在系统设置中开启定位权限</string>
+	<string name="friend_universe_branding">ABDL Space 交友宇宙</string>
+	<string name="timeline_all">全部</string>
+	<string name="friend_request_daily_limit_hint">每天最多发布 1 条交友请求，次日可再发布</string>
+	<string name="friend_request_daily_limit_reached">今日已发布过 1 条交友请求，明天再来吧</string>
+	<string name="friend_request_chat_button">发私信</string>
+	<string name="friend_request_create_me">我也要发</string>
+	<string name="compose_menu_post">发普通帖</string>
+	<string name="compose_menu_friend_request">发交友帖</string>
+	<string name="service_notice_title">服务公告</string>
+	<string name="service_notice_ok">知道了</string>
+	<string name="view_original">查看原图</string>
+	<string name="verifying_original">正在校验…</string>
+	<string name="downloading_original">正在加载原图…</string>
+	<string name="downloading_original_percent">正在加载原图(%1$d%%)</string>
+	<string name="sk_timeline_following">关注</string>
+	<string name="friend_universe_search">搜索交友宇宙</string>
+	<string name="friend_universe_search_hint">搜索交友请求、昵称、简介、城市等</string>
+	<string name="new_badge_title">获得新徽章</string>
+	<string name="new_badge_acknowledge">太好了</string>
+	<string name="new_badge_default_description">你的个人资料新增了一枚徽章。</string>
+	<string name="new_badge_how_to_get">徽章由管理员颁发或达成条件获得，可在个人中心选择展示在用户名旁的徽章。</string>
 </resources>

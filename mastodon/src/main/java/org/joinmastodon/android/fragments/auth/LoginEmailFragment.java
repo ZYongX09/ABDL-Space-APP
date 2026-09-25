@@ -19,7 +19,10 @@ import android.widget.Toast;
 
 import com.google.gson.Gson;
 
+import org.joinmastodon.android.BuildConfig;
+import org.joinmastodon.android.QQAuthActivity;
 import org.joinmastodon.android.R;
+import org.joinmastodon.android.api.MastodonAPIController;
 import org.joinmastodon.android.ui.utils.UiUtils;
 import org.joinmastodon.android.ui.views.SpaceBackgroundView;
 
@@ -33,14 +36,12 @@ import me.grishka.appkit.Nav;
 import me.grishka.appkit.fragments.AppKitFragment;
 import okhttp3.Call;
 import okhttp3.MediaType;
-import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
 
 public class LoginEmailFragment extends AppKitFragment {
 
-    private static final OkHttpClient httpClient = new OkHttpClient();
     private EditText emailEdit;
     private CheckBox cbAgreement;
     private Button btnSendCode;
@@ -89,6 +90,7 @@ public class LoginEmailFragment extends AppKitFragment {
         tvAgreement = view.findViewById(R.id.tv_agreement);
         TextView btnPasswordLogin = view.findViewById(R.id.btn_password_login);
         View btnNBW = view.findViewById(R.id.btn_nbw);
+        View btnQQ = view.findViewById(R.id.btn_qq);
         View btnOAuth = view.findViewById(R.id.btn_oauth);
         logo = view.findViewById(R.id.logo);
 
@@ -111,12 +113,14 @@ public class LoginEmailFragment extends AppKitFragment {
             emailEdit.setBackgroundResource(R.drawable.bg_input_light);
             emailEdit.setTextColor(Color.BLACK);
             btnNBW.setBackgroundResource(R.drawable.bg_social_light);
+            btnQQ.setBackgroundResource(R.drawable.bg_social_light);
             btnOAuth.setBackgroundResource(R.drawable.bg_social_light);
         } else {
             emailEdit.setBackgroundResource(R.drawable.bg_input_dark);
             emailEdit.setTextColor(Color.WHITE);
             tvAgreement.setTextColor(androidx.core.content.ContextCompat.getColor(getActivity(), R.color.m3_sys_dark_on_surface_variant));
             btnNBW.setBackgroundResource(R.drawable.bg_social_dark);
+            btnQQ.setBackgroundResource(R.drawable.bg_social_dark);
             btnOAuth.setBackgroundResource(R.drawable.bg_social_dark);
         }
 
@@ -156,6 +160,9 @@ public class LoginEmailFragment extends AppKitFragment {
             startActivity(intent);
         }));
 
+        btnQQ.setVisibility(BuildConfig.QQ_LOGIN_ENABLED ? View.VISIBLE : View.GONE);
+        btnQQ.setOnClickListener(v -> showQQConsentSheet());
+
         btnOAuth.setOnClickListener(v -> showConsentSheet(() -> UiUtils.launchWebBrowser(getActivity(), "https://abdl-space.top/login")));
 
         return view;
@@ -193,7 +200,7 @@ public class LoginEmailFragment extends AppKitFragment {
         String json = new Gson().toJson(new SendCodeBody(email, "register"));
         RequestBody body = RequestBody.create(MediaType.parse("application/json"), json);
 
-        httpClient.newCall(new Request.Builder()
+        MastodonAPIController.getHttpClient().newCall(new Request.Builder()
                 .url("https://abdl-space.top/api/auth/send-code")
                 .post(body).build())
             .enqueue(new okhttp3.Callback() {
@@ -237,26 +244,31 @@ public class LoginEmailFragment extends AppKitFragment {
         return (int) (dp * getResources().getDisplayMetrics().density + 0.5f);
     }
 
+    private void showQQConsentSheet() {
+        showConsentSheet(
+            getString(R.string.qq_consent_title),
+            getString(R.string.qq_consent_message),
+            R.drawable.ic_qq_login,
+            () -> {
+                android.app.Activity activity = getActivity();
+                if (activity == null) return;
+                Intent intent = new Intent(activity, QQAuthActivity.class);
+                intent.putExtra(QQAuthActivity.EXTRA_MODE, QQAuthActivity.MODE_LOGIN);
+                intent.putExtra(QQAuthActivity.EXTRA_PERMISSION_CONFIRMED, true);
+                startActivity(intent);
+            });
+    }
+
     private void showConsentSheet(Runnable onConfirm) {
+        showConsentSheet(getString(R.string.consent_title), getString(R.string.consent_message), R.drawable.ic_description_24, onConfirm);
+    }
+
+    private void showConsentSheet(String titleText, String messageText, int iconRes, Runnable onConfirm) {
         android.app.Activity activity = getActivity();
         if (activity == null) return;
         View sheetView = LayoutInflater.from(activity).inflate(R.layout.sheet_qr_login, null);
         ImageView iconView = sheetView.findViewById(R.id.icon);
-        if (iconView == null) {
-            View header = sheetView.findViewById(R.id.sheet_title);
-            if (header != null && header.getParent() instanceof ViewGroup) {
-                ViewGroup parent = (ViewGroup) header.getParent();
-                for (int i = 0; i < parent.getChildCount(); i++) {
-                    if (parent.getChildAt(i) instanceof ImageView) {
-                        iconView = (ImageView) parent.getChildAt(i);
-                        break;
-                    }
-                }
-            }
-        }
-        if (iconView != null) {
-            iconView.setImageResource(R.drawable.ic_description_24);
-        }
+        iconView.setImageResource(iconRes);
         me.grishka.appkit.views.BottomSheet sheet = new me.grishka.appkit.views.BottomSheet(activity) {{
             setContentView(sheetView);
             setNavigationBarBackground(new android.graphics.drawable.ColorDrawable(
@@ -267,15 +279,13 @@ public class LoginEmailFragment extends AppKitFragment {
 
             TextView title = sheetView.findViewById(R.id.sheet_title);
             TextView sessionInfo = sheetView.findViewById(R.id.qr_session_info);
-            title.setText("确认同意协议");
-            sessionInfo.setText(android.text.Html.fromHtml(
-                "登录前请仔细阅读<a href=\"https://abdl-space.top/agreement\">《用户协议》</a>" +
-                "和<a href=\"https://abdl-space.top/privacy\">《隐私政策》</a>，若您同意以上协议请点击确认按钮。"));
+            title.setText(titleText);
+            sessionInfo.setText(android.text.Html.fromHtml(messageText));
             sessionInfo.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());
 
             TextView authorizeBtn = sheetView.findViewById(R.id.btn_authorize);
             if (authorizeBtn != null) {
-                authorizeBtn.setText("确认");
+                authorizeBtn.setText(R.string.confirm);
             }
 
             sheetView.findViewById(R.id.btn_cancel).setOnClickListener(v -> dismiss());

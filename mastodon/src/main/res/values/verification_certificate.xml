@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+	<string name="verification_certificate_subtitle">ABDL Space 认证凭证</string>
+	<string name="verification_certificate_status_active">已通过 ABDL Space 宝宝认证</string>
+	<string name="verification_certificate_verify_method">扫描下方二维码在线验证</string>
+	<string name="verification_certificate_record">ABDL Space 宝宝认证审核记录</string>
+	<string name="verification_certificate_qr_prompt">请扫描二维码在线验真</string>
+	<string name="verification_certificate_footer">请使用 ABDL Space 原生验真  ·  证书状态以在线结果为准</string>
+	<string name="verification_certificate_qr_description">宝宝认证证书二维码，可在线验真</string>
+	<string name="verification_certificate_export_failed">证书导出失败，请重试</string>
+	<string name="verification_certificate_note_1">1、 本证书由 ABDL Space 根据宝宝认证审核记录生成，用于证明证书持有人已完成平台规定的认证流程。</string>
+	<string name="verification_certificate_note_2">2、 认证照片仅用于身份审核、完整性校验和认证复核，不会公开发布，并通过安全连接上传至私有存储。</string>
+	<string name="verification_certificate_note_3">3、 本证书包含唯一编号和在线验真凭据，请扫描二维码或访问官方验真地址核验，证书状态以在线结果为准。</string>
+	<string name="verification_certificate_note_4">4、 本证书仅代表持证人通过 ABDL Space 宝宝认证，不等同于身份证、护照或其他法定身份证明；证书被替代、吊销或失效后不再有效。</string>
+	<string name="verification_certificate_note_5">5、 请勿伪造、篡改、复制或转让本证书，证书信息变更、补发和吊销以 ABDL Space 认证系统记录为准。</string>
+</resources>

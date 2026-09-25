@@ -31,12 +31,20 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.FormatStyle;
+import java.security.KeyStore;
+import java.security.SecureRandom;
+import java.security.cert.Certificate;
 import java.util.ArrayList;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManagerFactory;
+import javax.net.ssl.X509TrustManager;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -72,6 +80,8 @@ public class MastodonAPIController{
 			.readTimeout(60, TimeUnit.SECONDS)
 			.cache(new Cache(new File(MastodonApp.context.getCacheDir(), "http"), 10*1024*1024))
 			.build();
+	private static final OkHttpClient sensitiveHttpClient=httpClient.newBuilder().cache(null).followRedirects(false).followSslRedirects(false).retryOnConnectionFailure(false).build();
+	private static final OkHttpClient systemTrustSensitiveHttpClient=createSystemTrustClient(sensitiveHttpClient);
 	private static Handler uiThreadHandler=new Handler(Looper.getMainLooper());
 
 	private static final CacheControl NO_CACHE_WHATSOEVER=new CacheControl.Builder().noCache().noStore().build();
@@ -81,6 +91,33 @@ public class MastodonAPIController{
 
 	static{
 		thread.start();
+	}
+
+	private static OkHttpClient createSystemTrustClient(OkHttpClient base){
+		try{
+			KeyStore androidStore=KeyStore.getInstance("AndroidCAStore");
+			androidStore.load(null);
+			KeyStore systemOnly=KeyStore.getInstance(KeyStore.getDefaultType());
+			systemOnly.load(null);
+			Enumeration<String> aliases=androidStore.aliases();
+			while(aliases.hasMoreElements()){
+				String alias=aliases.nextElement();
+				if(!alias.startsWith("system:")) continue;
+				Certificate certificate=androidStore.getCertificate(alias);
+				if(certificate!=null) systemOnly.setCertificateEntry(alias, certificate);
+			}
+			TrustManagerFactory factory=TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+			factory.init(systemOnly);
+			X509TrustManager trustManager=null;
+			for(javax.net.ssl.TrustManager manager:factory.getTrustManagers()) if(manager instanceof X509TrustManager x509){ trustManager=x509; break; }
+			if(trustManager==null) throw new IllegalStateException("No X509 trust manager");
+			SSLContext context=SSLContext.getInstance("TLS");
+			context.init(null, new javax.net.ssl.TrustManager[]{trustManager}, new SecureRandom());
+			return base.newBuilder().sslSocketFactory(context.getSocketFactory(), trustManager).build();
+		}catch(Exception error){
+			// Fail closed for verification requests if a device cannot construct the system-only store.
+			return base.newBuilder().addInterceptor(chain->{ throw new IOException("无法建立认证专用安全连接"); }).build();
+		}
 	}
 
 	public MastodonAPIController(@Nullable AccountSession session){
@@ -117,7 +154,9 @@ public class MastodonAPIController{
 				}
 
 				Request hreq=builder.build();
-				Call call=httpClient.newCall(hreq);
+					OkHttpClient selectedClient=req.requiresSystemTrust() ? systemTrustSensitiveHttpClient : req.isSensitiveRequest() ? sensitiveHttpClient : httpClient;
+					Call call=selectedClient.newCall(hreq);
+
 				synchronized(req){
 					req.okhttpCall=call;
 				}
@@ -125,7 +164,7 @@ public class MastodonAPIController{
 					call.timeout().timeout(req.timeout, TimeUnit.MILLISECONDS);
 				}
 
-				if(BuildConfig.DEBUG)
+				if(BuildConfig.DEBUG && !req.isSensitiveRequest())
 					Log.d(TAG, logTag(session)+"Sending request: "+hreq);
 
 				call.enqueue(new Callback(){
@@ -133,7 +172,7 @@ public class MastodonAPIController{
 					public void onFailure(@NonNull Call call, @NonNull IOException e){
 						if(req.canceled)
 							return;
-						if(BuildConfig.DEBUG)
+						if(BuildConfig.DEBUG && !req.isSensitiveRequest())
 							Log.w(TAG, logTag(session)+""+hreq+" failed", e);
 						synchronized(req){
 							req.okhttpCall=null;
@@ -147,7 +186,7 @@ public class MastodonAPIController{
 							response.close();
 							return;
 						}
-						if(BuildConfig.DEBUG)
+						if(BuildConfig.DEBUG && !req.isSensitiveRequest())
 							Log.d(TAG, logTag(session)+hreq+" received response: "+response);
 						synchronized(req){
 							req.okhttpCall=null;
@@ -170,11 +209,15 @@ public class MastodonAPIController{
 							}
 						}
 						try(ResponseBody body=response.body()){
+							if(body==null){
+								req.onError("服务器返回空响应", response.code(), null);
+								return;
+							}
 							Reader reader=body.charStream();
 							if(response.isSuccessful()){
 								T respObj;
 								try{
-									if(BuildConfig.DEBUG){
+									if(BuildConfig.DEBUG && !req.isSensitiveRequest()){
 										JsonElement respJson=JsonParser.parseReader(reader);
 										Log.d(TAG, logTag(session)+"response body: "+respJson);
 										if(req.respTypeToken!=null)
@@ -192,30 +235,33 @@ public class MastodonAPIController{
 											respObj=null;
 									}
 								}catch(JsonIOException|JsonSyntaxException x){
-									if(BuildConfig.DEBUG)
+									if(BuildConfig.DEBUG && !req.isSensitiveRequest())
 										Log.w(TAG, logTag(session)+response+" error parsing or reading body", x);
-									req.onError(x.getLocalizedMessage(), response.code(), x);
+									req.onError(req.isSensitiveRequest() ? "服务器响应格式无效，请重试" : x.getLocalizedMessage(), response.code(), req.isSensitiveRequest() ? null : x);
 									return;
 								}
 
 								try{
 									req.validateAndPostprocessResponse(respObj, response);
 								}catch(IOException x){
-									if(BuildConfig.DEBUG)
+									if(BuildConfig.DEBUG && !req.isSensitiveRequest())
 										Log.w(TAG, logTag(session)+response+" error post-processing or validating response", x);
 									req.onError(x.getLocalizedMessage(), response.code(), x);
 									return;
 								}
 
-								if(BuildConfig.DEBUG)
+								if(BuildConfig.DEBUG && !req.isSensitiveRequest())
 									Log.d(TAG, logTag(session)+response+" parsed successfully: "+respObj);
 
 								req.onSuccess(respObj);
 							}else{
 								try{
 									JsonObject error=JsonParser.parseReader(reader).getAsJsonObject();
-									Log.w(TAG, logTag(session)+response+" received error: "+error);
-									if(error.has("details")){
+									if(!req.isSensitiveRequest()) Log.w(TAG, logTag(session)+response+" received error: "+error);
+									ErrorResponse customError=req.deserializeError(error, response.code());
+									if(customError!=null){
+										req.onError(customError);
+									}else if(error.has("details")){
 										MastodonDetailedErrorResponse err=new MastodonDetailedErrorResponse(error.get("error").getAsString(), response.code(), null);
 										HashMap<String, List<MastodonDetailedErrorResponse.FieldError>> details=new HashMap<>();
 										JsonObject errorDetails=error.getAsJsonObject("details");
@@ -261,6 +307,10 @@ public class MastodonAPIController{
 
 	public static OkHttpClient getHttpClient(){
 		return httpClient;
+	}
+
+	public static OkHttpClient getSystemTrustSensitiveHttpClient(){
+		return systemTrustSensitiveHttpClient;
 	}
 
 	private static String logTag(AccountSession session){

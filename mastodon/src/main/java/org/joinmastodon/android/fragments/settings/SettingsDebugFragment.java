@@ -57,7 +57,7 @@ public class SettingsDebugFragment extends BaseSettingsFragment<Void>{
 				new ListItem<>("Delete cached instance info", null, this::onDeleteInstanceInfoClick),
 				new ListItem<>("View dynamic color values", null, this::onViewColorsClick)
 		));
-		if(!GithubSelfUpdater.needSelfUpdating()){
+		if(!GithubSelfUpdater.isSupported()){
 			resetUpdateItem.isEnabled=selfUpdateItem.isEnabled=false;
 			selfUpdateItem.subtitle="Self-updater is unavailable in this build flavor";
 		}
