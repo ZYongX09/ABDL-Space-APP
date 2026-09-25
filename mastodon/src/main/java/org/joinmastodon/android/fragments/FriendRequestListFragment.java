@@ -4,7 +4,6 @@ import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.ValueAnimator;
 import android.app.Activity;
-import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -59,7 +58,7 @@ import static org.joinmastodon.android.ui.compose.navigation.FriendUniverseToolb
 import static org.joinmastodon.android.ui.compose.navigation.FriendUniverseToolbarModelKt.friendUniverseCanLoadMore;
 import static org.joinmastodon.android.ui.compose.navigation.FriendUniverseToolbarModelKt.friendUniverseDataLoadingAfterResponse;
 
-public class FriendRequestListFragment extends LoaderFragment {
+	public class FriendRequestListFragment extends LoaderFragment {
 	private RecyclerView recyclerView;
 	private SwipeRefreshLayout swipeRefreshLayout;
 	private FriendRequestAdapter adapter;
@@ -74,9 +73,20 @@ public class FriendRequestListFragment extends LoaderFragment {
 	private float totalDy = 0;
 	private boolean fabHidden = false;
 	private FriendUniverseLiquidToolbarController liquidToolbarController;
-	private SharedPreferences prefs;
-	private boolean bannerVisible;
 	private int searchGeneration;
+	// 顶部状态栏 inset：tab/时间线/搜索页三种宿主的分发方式不同，统一走显式调用
+	private int pendingTopInset = -1;
+	private int baseToolbarHeight;
+	// 时间线嵌入模式（首页时间线列表中的“交友宇宙”）：隐藏页面自身 FAB 与 options 菜单
+	private boolean timelineMode;
+	// 独立搜索页模式（首页工具栏搜索按钮在交友宇宙时间线下打开）：带搜索框，回车/防抖触发
+	private boolean searchMode;
+	private android.widget.EditText searchInput;
+	private final android.os.Handler searchDebounceHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+	private final Runnable searchDebounceRunnable = () -> {
+		if (searchInput != null)
+			onLiquidSearchChanged(searchInput.getText().toString());
+	};
 
 	// Metadata icon 映射
 	private static final String[][] METADATA_ICONS = {
@@ -95,17 +105,24 @@ public class FriendRequestListFragment extends LoaderFragment {
 	public void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		accountID = getArguments() != null ? getArguments().getString("account") : null;
+		timelineMode = getArguments() != null && getArguments().getBoolean("__is_timeline", false);
+		searchMode = getArguments() != null && getArguments().getBoolean("searchMode", false);
+		if (searchMode)
+			setTitle(R.string.friend_universe_search);
 	}
 
 	@Override
 	public void onAttach(Activity activity) {
 		super.onAttach(activity);
-		setTitle(getString(R.string.friend_request_list));
-		setHasOptionsMenu(true);
+		if (!timelineMode && !searchMode)
+			setTitle(getString(R.string.friend_request_list));
+		setHasOptionsMenu(!timelineMode && !searchMode);
 	}
 
 	@Override
 	public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
+		if (timelineMode || searchMode)
+			return;
 		menu.add(0, 1, 0, getString(R.string.friend_request_search))
 			.setIcon(R.drawable.ic_fluent_search_24_regular)
 			.setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
@@ -128,9 +145,6 @@ public class FriendRequestListFragment extends LoaderFragment {
 		FragmentRootLinearLayout root = new FragmentRootLinearLayout(getContext());
 		root.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 		root.setOrientation(LinearLayout.VERTICAL);
-
-		prefs = getContext().getSharedPreferences("friend_request", 0);
-		bannerVisible = !prefs.getBoolean("banner_dismissed", false);
 
 		// 下拉刷新
 		swipeRefreshLayout = new SwipeRefreshLayout(getContext());
@@ -157,7 +171,7 @@ public class FriendRequestListFragment extends LoaderFragment {
 					liquidToolbarController.setScrollY(Math.max(0, rv.computeVerticalScrollOffset()));
 				// 加载更多
 				LinearLayoutManager lm = (LinearLayoutManager) rv.getLayoutManager();
-				if (lm != null && friendUniverseCanLoadMore(dataLoading, loadingMore, hasMore, data.size(), lm.findLastVisibleItemPosition()-(bannerVisible ? 1 : 0))) {
+				if (lm != null && friendUniverseCanLoadMore(dataLoading, loadingMore, hasMore, data.size(), lm.findLastVisibleItemPosition())) {
 					loadingMore = true;
 					loadMore(currentPage+1);
 				}
@@ -165,7 +179,8 @@ public class FriendRequestListFragment extends LoaderFragment {
 
 			@Override
 			public void onScrollStateChanged(@NonNull RecyclerView rv, int newState) {
-				if (newState == RecyclerView.SCROLL_STATE_IDLE && !fabHidden) {
+				// 时间线嵌入/搜索页模式下没有 FAB，需判空，否则滚动/下拉刷新即 NPE 闪退
+				if (fab != null && newState == RecyclerView.SCROLL_STATE_IDLE && !fabHidden) {
 					fab.animate().scaleX(1f).scaleY(1f).setDuration(200).setInterpolator(new DecelerateInterpolator()).start();
 				}
 			}
@@ -177,30 +192,107 @@ public class FriendRequestListFragment extends LoaderFragment {
 		swipeRefreshLayout.addView(content);
 		root.addView(swipeRefreshLayout, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
 
+		// 搜索页模式：顶部放一个搜索输入框，防抖 350ms 触发整页重载
+		if (searchMode) {
+			LinearLayout searchWrap = new LinearLayout(getContext());
+			searchWrap.setOrientation(LinearLayout.HORIZONTAL);
+			searchWrap.setGravity(android.view.Gravity.CENTER_VERTICAL);
+			searchWrap.setPadding(V.dp(16), V.dp(8), V.dp(16), V.dp(8));
+			searchInput = new android.widget.EditText(getContext());
+			searchInput.setHint(R.string.friend_universe_search_hint);
+			searchInput.setSingleLine(true);
+			searchInput.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH);
+			searchInput.setBackgroundResource(R.drawable.bg_search_rounded);
+			searchInput.setPadding(V.dp(12), V.dp(8), V.dp(12), V.dp(8));
+			searchInput.setTextSize(16);
+			searchInput.setOnEditorActionListener((v, actionId, event) -> {
+				if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH) {
+					searchDebounceHandler.removeCallbacks(searchDebounceRunnable);
+					searchDebounceRunnable.run();
+					android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager) getContext().getSystemService(Activity.INPUT_METHOD_SERVICE);
+					if (imm != null) imm.hideSoftInputFromWindow(searchInput.getWindowToken(), 0);
+					return true;
+				}
+				return false;
+			});
+			searchInput.addTextChangedListener(new android.text.TextWatcher() {
+				@Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+				@Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+				@Override public void afterTextChanged(android.text.Editable s) {
+					searchDebounceHandler.removeCallbacks(searchDebounceRunnable);
+					searchDebounceHandler.postDelayed(searchDebounceRunnable, 350);
+				}
+			});
+			LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+			searchWrap.addView(searchInput, searchParams);
+			root.addView(searchWrap, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+		}
+
 		wrapper.addView(root);
 
-		// FAB
-		fab = new ImageButton(getContext());
-		fab.setImageResource(R.drawable.ic_fluent_add_24_regular);
-		FrameLayout.LayoutParams fabParams = new FrameLayout.LayoutParams(V.dp(56), V.dp(56));
-		fabParams.gravity = android.view.Gravity.BOTTOM | android.view.Gravity.END;
-		fabParams.setMargins(0, 0, V.dp(16), V.dp(16));
-		fab.setLayoutParams(fabParams);
-		fab.setBackgroundResource(R.drawable.bg_fab);
-		fab.setScaleType(ImageView.ScaleType.CENTER);
-		fab.setElevation(V.dp(6));
-		fab.setContentDescription("发布交友请求");
-		fab.setOnClickListener(v -> openCreateRequest());
-		wrapper.addView(fab);
+		// FAB（时间线嵌入/搜索页模式不显示，发交友请求走工具栏菜单或交友 tab）
+		if (!timelineMode && !searchMode) {
+			fab = new ImageButton(getContext());
+			fab.setImageResource(R.drawable.ic_fluent_add_24_regular);
+			FrameLayout.LayoutParams fabParams = new FrameLayout.LayoutParams(V.dp(56), V.dp(56));
+			fabParams.gravity = android.view.Gravity.BOTTOM | android.view.Gravity.END;
+			fabParams.setMargins(0, 0, V.dp(16), V.dp(16));
+			fab.setLayoutParams(fabParams);
+			fab.setBackgroundResource(R.drawable.bg_fab);
+			fab.setScaleType(ImageView.ScaleType.CENTER);
+			fab.setElevation(V.dp(6));
+			fab.setContentDescription("发布交友请求");
+			fab.setOnClickListener(v -> openCreateRequest());
+			wrapper.addView(fab);
+		}
 		updateLiquidMode();
+		if (pendingTopInset >= 0)
+			applyTopInset();
 
 		return wrapper;
+	}
+
+	/**
+	 * 宿主显式下发顶部状态栏 inset（tab 与首页时间线 pager 的分发路径不同，
+	 * 无法依赖 view 树自动传播）。给自带 toolbar 加 padding 与高度补偿。
+	 */
+	public void setTopInset(int top) {
+		pendingTopInset = top;
+		applyTopInset();
+	}
+
+	@Override
+	public void onApplyWindowInsets(android.view.WindowInsets insets) {
+		pendingTopInset = insets.getSystemWindowInsetTop();
+		applyTopInset();
+		// 剥掉 top 再传给内容层级，避免重复偏移
+		super.onApplyWindowInsets(insets.replaceSystemWindowInsets(
+				insets.getSystemWindowInsetLeft(), 0, insets.getSystemWindowInsetRight(), insets.getSystemWindowInsetBottom()));
+	}
+
+	private void applyTopInset() {
+		View toolbar = getToolbar();
+		if (toolbar == null || pendingTopInset < 0)
+			return;
+		if (baseToolbarHeight == 0 && toolbar.getLayoutParams() != null)
+			baseToolbarHeight = toolbar.getLayoutParams().height;
+		toolbar.setPadding(toolbar.getPaddingLeft(), pendingTopInset, toolbar.getPaddingRight(), toolbar.getPaddingBottom());
+		if (baseToolbarHeight > 0) {
+			ViewGroup.LayoutParams lp = toolbar.getLayoutParams();
+			lp.height = baseToolbarHeight + pendingTopInset;
+			toolbar.setLayoutParams(lp);
+		}
 	}
 
 	@Override
 	protected void onShown() {
 		super.onShown();
 		updateLiquidMode();
+		if (searchMode && searchInput != null && searchInput.requestFocus()) {
+			android.view.inputmethod.InputMethodManager imm =
+					(android.view.inputmethod.InputMethodManager) getContext().getSystemService(Activity.INPUT_METHOD_SERVICE);
+			if (imm != null) imm.showSoftInput(searchInput, 0);
+		}
 		if (!loaded && !dataLoading) {
 			loadData();
 		}
@@ -213,7 +305,8 @@ public class FriendRequestListFragment extends LoaderFragment {
 		swipeRefreshLayout=null;
 		adapter=null;
 		fab=null;
-		prefs=null;
+		searchInput=null;
+		searchDebounceHandler.removeCallbacks(searchDebounceRunnable);
 		dataLoading=false;
 		loadingMore=false;
 		super.onDestroyView();
@@ -317,7 +410,7 @@ public class FriendRequestListFragment extends LoaderFragment {
 
 					data.addAll(newItems);
 					currentPage=requestPage;
-					adapter.notifyItemRangeInserted(data.size() - newItems.size() + (bannerVisible ? 1 : 0), newItems.size());
+					adapter.notifyItemRangeInserted(data.size() - newItems.size(), newItems.size());
 
 					Map<String, Object> pagination = (Map<String, Object>) result.get("pagination");
 					if (pagination != null) {
@@ -387,8 +480,32 @@ public class FriendRequestListFragment extends LoaderFragment {
 		View toolbar=getToolbar();
 		if(toolbar!=null) toolbar.setVisibility(liquid ? View.GONE : View.VISIBLE);
 		if(fab!=null) fab.setVisibility(liquid ? View.GONE : View.VISIBLE);
-		if(recyclerView!=null)
-			recyclerView.setPadding(0, V.dp(friendUniverseTopPaddingDp(liquid)), 0, V.dp(72));
+		applyContentPadding();
+	}
+
+	/** 首页液态玻璃 overlay 安全区（时间线嵌入模式由 HomeTabFragment 转发） */
+	public void setLiquidToolbarTopPadding(int padding) {
+		overlayTopPadding = Math.max(0, padding);
+		applyContentPadding();
+	}
+
+	public void setLiquidNavBottomPadding(int padding) {
+		overlayBottomPadding = Math.max(0, padding);
+		applyContentPadding();
+	}
+
+	/**
+	 * 列表内容 padding 统一计算：顶部避开玻璃工具栏（tab 自带玻璃用大标题高度，
+	 * 时间线嵌入用首页玻璃工具栏转发值），底部避开导航条（72dp 基准与液态导航 overlay 取大）。
+	 */
+	private void applyContentPadding() {
+		if (recyclerView == null)
+			return;
+		boolean liquid = liquidToolbarController != null;
+		int top = Math.max(V.dp(friendUniverseTopPaddingDp(liquid)), overlayTopPadding);
+		int bottom = Math.max(V.dp(72), overlayBottomPadding);
+		recyclerView.setClipToPadding(false);
+		recyclerView.setPadding(0, top, 0, bottom);
 	}
 
 	private String formatTime(String createdAt) {
@@ -425,7 +542,6 @@ public class FriendRequestListFragment extends LoaderFragment {
 	private class FriendRequestAdapter extends RecyclerView.Adapter<FriendRequestAdapter.VH> {
 		private static final int TYPE_ITEM = 0;
 		private static final int TYPE_FOOTER = 1;
-		private static final int TYPE_BANNER = 2;
 		private static final int TYPE_EMPTY = 3;
 
 		@NonNull
@@ -433,15 +549,6 @@ public class FriendRequestListFragment extends LoaderFragment {
 		public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
 			if(viewType == TYPE_EMPTY)
 				return new VH(LayoutInflater.from(parent.getContext()).inflate(R.layout.friend_request_empty_state, parent, false));
-			if(viewType == TYPE_BANNER) {
-				View banner=LayoutInflater.from(parent.getContext()).inflate(R.layout.friend_request_fraud_banner, parent, false);
-				banner.setOnClickListener(v -> {
-					prefs.edit().putBoolean("banner_dismissed", true).apply();
-					bannerVisible=false;
-					notifyItemRemoved(0);
-				});
-				return new VH(banner);
-			}
 			if (viewType == TYPE_FOOTER) {
 				View v = new View(getContext());
 				v.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, V.dp(48)));
@@ -454,21 +561,19 @@ public class FriendRequestListFragment extends LoaderFragment {
 		@Override
 		public void onBindViewHolder(@NonNull VH holder, int position) {
 			if (getItemViewType(position) != TYPE_ITEM) return;
-			FriendRequest item = data.get(position-(bannerVisible ? 1 : 0));
+			FriendRequest item = data.get(position);
 			holder.bind(item);
 		}
 
 		@Override
 		public int getItemCount() {
-			return data.size() + 1 + (bannerVisible ? 1 : 0) + (data.isEmpty() ? 1 : 0);
+			return data.size() + 1 + (data.isEmpty() ? 1 : 0);
 		}
 
 		@Override
 		public int getItemViewType(int position) {
-			if(bannerVisible && position==0) return TYPE_BANNER;
-			int contentPosition=position-(bannerVisible ? 1 : 0);
-			if(data.isEmpty() && contentPosition==0) return TYPE_EMPTY;
-			return contentPosition >= data.size()+(data.isEmpty() ? 1 : 0) ? TYPE_FOOTER : TYPE_ITEM;
+			if(data.isEmpty() && position==0) return TYPE_EMPTY;
+			return position >= data.size()+(data.isEmpty() ? 1 : 0) ? TYPE_FOOTER : TYPE_ITEM;
 		}
 
 		class VH extends RecyclerView.ViewHolder {

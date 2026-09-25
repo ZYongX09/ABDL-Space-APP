@@ -16,7 +16,8 @@
 		<item
 			android:id="@+id/novel"
 			android:icon="@drawable/ic_fluent_book_24_regular"
-			android:title="@string/novel" />
+			android:title="@string/novel"
+			android:visible="false" />
 		<item
 			android:id="@+id/scan_qr"
 			android:icon="@drawable/ic_fluent_scan_24_regular"

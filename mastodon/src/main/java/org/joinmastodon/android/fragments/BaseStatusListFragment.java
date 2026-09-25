@@ -25,14 +25,17 @@ import org.joinmastodon.android.api.requests.accounts.GetAccountRelationships;
 import org.joinmastodon.android.api.requests.polls.SubmitPollVote;
 import org.joinmastodon.android.api.requests.statuses.GetStatusByID;
 import org.joinmastodon.android.api.requests.statuses.GetStatusesByIDs;
+import org.joinmastodon.android.api.requests.statuses.RecordStatusView;
 import org.joinmastodon.android.api.requests.statuses.TranslateStatus;
 import org.joinmastodon.android.api.session.AccountSessionManager;
 import org.joinmastodon.android.events.PollUpdatedEvent;
+import org.joinmastodon.android.events.StatusCountersUpdatedEvent;
 import org.joinmastodon.android.model.Account;
 import org.joinmastodon.android.model.DisplayItemsParent;
 import org.joinmastodon.android.model.Poll;
 import org.joinmastodon.android.model.Relationship;
 import org.joinmastodon.android.model.Status;
+import org.joinmastodon.android.model.StatusHeatResponse;
 import org.joinmastodon.android.model.Translation;
 import org.joinmastodon.android.ui.BetterItemAnimator;
 import org.joinmastodon.android.ui.M3AlertDialogBuilder;
@@ -141,7 +144,7 @@ public abstract class BaseStatusListFragment<T extends DisplayItemsParent> exten
 	// MOSHIDON:
 	@Override
 	public void showFab() {
-		if(GlobalUserPreferences.useIosLiquidNavigation && getParentFragment() instanceof HomeTabFragment)
+		if(GlobalUserPreferences.isIosLiquidNavigationEnabled() && getParentFragment() instanceof HomeTabFragment)
 			return;
 		View fab = getFab();
 		if (fab == null || fab.getVisibility() == View.VISIBLE) return;
@@ -370,9 +373,26 @@ public abstract class BaseStatusListFragment<T extends DisplayItemsParent> exten
 		imgLoader.activate();
 	}
 
-	@Override
+@Override
 	public void openPhotoViewer(String parentID, Status _status, int attachmentIndex, MediaGridStatusDisplayItem.Holder gridHolder){
 		final Status status=_status.getContentStatus();
+		new RecordStatusView(status.id)
+				.setCallback(new Callback<>(){
+					@Override
+					public void onSuccess(StatusHeatResponse response){
+						if(response==null)
+							return;
+						status.viewsCount=response.viewsCount;
+						status.heat=response.heat;
+						E.post(new StatusCountersUpdatedEvent(status, StatusCountersUpdatedEvent.CounterType.HEAT));
+					}
+
+					@Override
+					public void onError(ErrorResponse error){
+						// 大图浏览打点失败静默
+					}
+				})
+				.exec(accountID);
 		currentPhotoViewer=new PhotoViewer(getActivity(), this, status.mediaAttachments, attachmentIndex, status, accountID, new PhotoViewer.Listener(){
 			private MediaAttachmentViewController transitioningHolder;
 
@@ -941,13 +961,37 @@ public abstract class BaseStatusListFragment<T extends DisplayItemsParent> exten
 			fab.setVisibility(View.GONE);
 	}
 
+	// 液态导航条为 overlay：列表底部需要在系统 inset 之上再让出导航玻璃高度
+	private int liquidNavBottomPadding;
+	private int systemBottomPadding = -1;
+	private int baseListBottomPadding = -1;
+
+	/** 由 HomeTabFragment 转发的液态底部导航 overlay 高度（px，不含系统 inset） */
+	public void setLiquidNavBottomPadding(int padding){
+		if(liquidNavBottomPadding==padding)
+			return;
+		liquidNavBottomPadding=padding;
+		applyListBottomPadding();
+	}
+
+	private void applyListBottomPadding(){
+		if(list==null)
+			return;
+		if(baseListBottomPadding<0)
+			baseListBottomPadding=list.getPaddingBottom();
+		int bottom=Math.max(baseListBottomPadding, Math.max(systemBottomPadding, liquidNavBottomPadding));
+		list.setPadding(list.getPaddingLeft(), list.getPaddingTop(), list.getPaddingRight(), bottom);
+	}
+
 	@Override
 	public void onApplyWindowInsets(WindowInsets insets){
 		if(Build.VERSION.SDK_INT>=29 && insets.getTappableElementInsets().bottom==0 && wantsOverlaySystemNavigation()){
-			list.setPadding(list.getPaddingLeft(), list.getPaddingTop(), list.getPaddingRight(), insets.getSystemWindowInsetBottom());
+			systemBottomPadding=insets.getSystemWindowInsetBottom();
+			applyListBottomPadding();
 			onSetFabBottomInset(insets.getSystemWindowInsetBottom());
 			insets=insets.inset(0, 0, 0, insets.getSystemWindowInsetBottom());
 		}else{
+			systemBottomPadding=0;
 			onSetFabBottomInset(0);
 		}
 		super.onApplyWindowInsets(insets);
