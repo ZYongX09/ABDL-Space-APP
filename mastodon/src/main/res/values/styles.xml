@@ -441,7 +441,7 @@
 	</style>
 
 	<style name="Theme.Mastodon.SplashScreen" parent="Theme.Mastodon.Dark">
-		<item name="android:windowBackground">@color/splash_bg</item>
+		<item name="android:windowBackground">@drawable/splash_preview_window</item>
 		<!-- HyperOS 忽略 windowDisablePreview，仍渲染自有启动首窗且底色读取 colorM3Surface；
 		     在此覆盖为 splash_bg 使首窗底色与动画启动页一致 -->
 		<item name="colorM3Surface">@color/splash_bg</item>
