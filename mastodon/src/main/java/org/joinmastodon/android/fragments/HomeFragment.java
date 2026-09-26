@@ -32,8 +32,8 @@ import org.joinmastodon.android.api.session.AccountSession;
 import org.joinmastodon.android.api.session.AccountSessionManager;
 import org.joinmastodon.android.events.NotificationsMarkerUpdatedEvent;
 import org.joinmastodon.android.events.StatusDisplaySettingsChangedEvent;
+import org.joinmastodon.android.chat.ui.ConversationsFragment;
 import org.joinmastodon.android.fragments.diapers.DiaperListFragment;
-import org.joinmastodon.android.fragments.discover.DiscoverFragment;
 import org.joinmastodon.android.fragments.onboarding.OnboardingFollowSuggestionsFragment;
 import org.joinmastodon.android.model.Account;
 import org.joinmastodon.android.model.Instance;
@@ -46,7 +46,6 @@ import org.joinmastodon.android.ui.utils.OemUtils;
 import org.joinmastodon.android.ui.OutlineProviders;
 import org.joinmastodon.android.ui.compose.navigation.HomeLiquidNavigationController;
 import org.joinmastodon.android.ui.compose.navigation.HomeLiquidToolbarController;
-import org.joinmastodon.android.ui.compose.navigation.FriendUniverseLiquidToolbarController;
 import org.joinmastodon.android.ui.sheets.AccountSwitcherSheet;
 import org.joinmastodon.android.ui.utils.UiUtils;
 import org.joinmastodon.android.ui.views.BackdropCaptureFrameLayout;
@@ -55,7 +54,6 @@ import org.joinmastodon.android.utils.ObjectIdComparator;
 import org.parceler.Parcels;
 
 import static org.joinmastodon.android.ui.compose.navigation.HomeLiquidToolbarModelKt.homeToolbarCaptureHeightDp;
-import static org.joinmastodon.android.ui.compose.navigation.FriendUniverseToolbarModelKt.friendUniverseCaptureHeightDp;
 
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -80,9 +78,8 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 	private static final String FEATURE_DIALOG_SEEN_KEY="featureDialogSeen_"+DIAPER_FEATURE_VERSION;
 	private FragmentRootLinearLayout content;
 	private HomeTabFragment homeTabFragment;
-	private DiscoverFragment searchFragment;
+	private ConversationsFragment conversationsFragment;
 	private ProfileFragment profileFragment;
-	private FriendRequestListFragment friendRequestFragment;
 	private DiaperListFragment diaperListFragment;
 	private BackdropCaptureFrameLayout fragmentContainer;
 	private FrameLayout navigationHost;
@@ -92,7 +89,6 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 	private ImageView tabBarAvatar;
 	private HomeLiquidNavigationController liquidNavigationController;
 	private HomeLiquidToolbarController liquidToolbarController;
-	private FriendUniverseLiquidToolbarController friendLiquidToolbarController;
 	private int bottomSystemInset;
 	private int topSystemInset;
 	private boolean liquidToolbarMenuOpen;
@@ -123,12 +119,10 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 			homeTabFragment.setArguments(args);
 			args=new Bundle(args);
 			args.putBoolean("noAutoLoad", true);
-			searchFragment=new DiscoverFragment();
-			searchFragment.setArguments(args);
-			friendRequestFragment=new FriendRequestListFragment();
-			friendRequestFragment.setArguments(args);
+			conversationsFragment=new ConversationsFragment();
+			conversationsFragment.setArguments(args);
 			args=new Bundle(args);
-		diaperListFragment=new DiaperListFragment();
+			diaperListFragment=new DiaperListFragment();
 		diaperListFragment.setArguments(args);
 		args=new Bundle(args);
 			args.putParcelable("profileAccount", Parcels.wrap(AccountSessionManager.getInstance().getAccount(accountID).self));
@@ -156,14 +150,8 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 			liquidToolbarController.dispose();
 			liquidToolbarController=null;
 		}
-		if(friendLiquidToolbarController!=null){
-			friendLiquidToolbarController.dispose();
-			friendLiquidToolbarController=null;
-		}
 		if(homeTabFragment!=null)
 			homeTabFragment.setLiquidToolbarController(null);
-		if(friendRequestFragment!=null)
-			friendRequestFragment.setLiquidToolbarController(null);
 		if(featureDialog!=null){
 			featureDialog.dismiss();
 			featureDialog=null;
@@ -214,9 +202,8 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 		if(savedInstanceState==null){
 			getChildFragmentManager().beginTransaction()
 					.add(me.grishka.appkit.R.id.fragment_wrap, homeTabFragment)
-					.add(me.grishka.appkit.R.id.fragment_wrap, searchFragment).hide(searchFragment)
-				.add(me.grishka.appkit.R.id.fragment_wrap, friendRequestFragment).hide(friendRequestFragment)
-				.add(me.grishka.appkit.R.id.fragment_wrap, diaperListFragment).hide(diaperListFragment)
+					.add(me.grishka.appkit.R.id.fragment_wrap, conversationsFragment).hide(conversationsFragment)
+					.add(me.grishka.appkit.R.id.fragment_wrap, diaperListFragment).hide(diaperListFragment)
 					.add(me.grishka.appkit.R.id.fragment_wrap, profileFragment).hide(profileFragment)
 					.commit();
 
@@ -243,27 +230,39 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 	public void onViewStateRestored(Bundle savedInstanceState){
 		super.onViewStateRestored(savedInstanceState);
 
-		// MOSHIDON: we must restore the homeTabFragment
-		if(savedInstanceState==null /*|| homeTabFragment!=null*/)
+		if(savedInstanceState==null)
 			return;
-		homeTabFragment=(HomeTabFragment) getChildFragmentManager().getFragment(savedInstanceState, "homeTabFragment");
-		searchFragment=(DiscoverFragment) getChildFragmentManager().getFragment(savedInstanceState, "searchFragment");
-		friendRequestFragment=(FriendRequestListFragment) getChildFragmentManager().getFragment(savedInstanceState, "friendRequestFragment");
-		diaperListFragment=(DiaperListFragment) getChildFragmentManager().getFragment(savedInstanceState, "diaperListFragment");
-		profileFragment=(ProfileFragment) getChildFragmentManager().getFragment(savedInstanceState, "profileFragment");
-		createLiquidToolbar();
-		currentTab=savedInstanceState.getInt("selectedTab");
-		selectTabInNavigation(currentTab);
-		updateLiquidToolbarVisibility();
+		homeTabFragment=(HomeTabFragment) restoreChildFragment(savedInstanceState, "homeTabFragment");
+		conversationsFragment=(ConversationsFragment) restoreChildFragment(savedInstanceState, "conversationsFragment");
+		diaperListFragment=(DiaperListFragment) restoreChildFragment(savedInstanceState, "diaperListFragment");
+		profileFragment=(ProfileFragment) restoreChildFragment(savedInstanceState, "profileFragment");
+		Fragment legacySearch=restoreChildFragment(savedInstanceState, "searchFragment");
+		Fragment legacyFriend=restoreChildFragment(savedInstanceState, "friendRequestFragment");
+		if(conversationsFragment==null){
+			Bundle args=new Bundle();
+			args.putString("account", accountID);
+			args.putBoolean("noAutoLoad", true);
+			conversationsFragment=new ConversationsFragment();
+			conversationsFragment.setArguments(args);
+		}
+		currentTab=normalizeTab(savedInstanceState.getInt("selectedTab", R.id.tab_home));
+		android.app.FragmentTransaction transaction=getChildFragmentManager().beginTransaction();
+		if(!conversationsFragment.isAdded())
+			transaction.add(me.grishka.appkit.R.id.fragment_wrap, conversationsFragment);
+		if(legacySearch!=null && legacySearch.isAdded())
+			transaction.remove(legacySearch);
+		if(legacyFriend!=null && legacyFriend.isAdded())
+			transaction.remove(legacyFriend);
 		Fragment current=fragmentForTab(currentTab);
-		getChildFragmentManager().beginTransaction()
-				.hide(homeTabFragment)
-				.hide(searchFragment)
-				.hide(friendRequestFragment)
+		transaction.hide(homeTabFragment)
+				.hide(conversationsFragment)
 				.hide(diaperListFragment)
 				.hide(profileFragment)
 				.show(current)
 				.commit();
+		createLiquidToolbar();
+		selectTabInNavigation(currentTab);
+		updateLiquidToolbarVisibility();
 		maybeTriggerLoading(current);
 	}
 
@@ -292,28 +291,44 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 		super.onApplyWindowInsets(insets.replaceSystemWindowInsets(insets.getSystemWindowInsetLeft(), 0, insets.getSystemWindowInsetRight(), 0));
 		WindowInsets topOnlyInsets=insets.replaceSystemWindowInsets(0, insets.getSystemWindowInsetTop(), 0, 0);
 		homeTabFragment.onApplyWindowInsets(topOnlyInsets);
-		searchFragment.onApplyWindowInsets(topOnlyInsets);
-		friendRequestFragment.onApplyWindowInsets(topOnlyInsets);
+		conversationsFragment.onApplyWindowInsets(topOnlyInsets);
 		diaperListFragment.onApplyWindowInsets(topOnlyInsets);
 		profileFragment.onApplyWindowInsets(topOnlyInsets);
 	}
 
+	private static int normalizeTab(@IdRes int tab){
+		if(tab==R.id.tab_search)
+			return R.id.tab_messages;
+		if(tab==R.id.tab_friend_request)
+			return R.id.tab_home;
+		if(tab==R.id.tab_home || tab==R.id.tab_messages || tab==R.id.tab_diaper || tab==R.id.tab_profile)
+			return tab;
+		return R.id.tab_home;
+	}
+
+	private Fragment restoreChildFragment(Bundle state, String key){
+		try{
+			return getChildFragmentManager().getFragment(state, key);
+		}catch(Exception ignored){
+			return null;
+		}
+	}
+
 	private Fragment fragmentForTab(@IdRes int tab){
+		tab=normalizeTab(tab);
 		if(tab==R.id.tab_home){
 			return homeTabFragment;
-		}else if(tab==R.id.tab_search){
-			return searchFragment;
-		}else if(tab==R.id.tab_friend_request){
-			return friendRequestFragment;
+		}else if(tab==R.id.tab_messages){
+			return conversationsFragment;
 		}else if(tab==R.id.tab_diaper){
 			return diaperListFragment;
-		}else if(tab==R.id.tab_profile){
+		}else{
 			return profileFragment;
 		}
-		throw new IllegalArgumentException();
 	}
 
 	public void setCurrentTab(@IdRes int tab){
+		tab=normalizeTab(tab);
 		if(tab==currentTab)
 			return;
 		selectTabInNavigation(tab);
@@ -321,14 +336,10 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 	}
 
 	private void onTabSelected(@IdRes int tab){
+		tab=normalizeTab(tab);
 		Fragment newFragment=fragmentForTab(tab);
 		if(tab==R.id.tab_diaper)
 			markDiaperFeatureSeen();
-
-		// MOSHIDON:
-		if(tab==R.id.tab_search && R.id.tab_search==currentTab){
-			searchFragment.openSearch();
-		}
 
 		if(tab==currentTab){
 			if(newFragment instanceof ScrollableToTop scrollable)
@@ -372,23 +383,13 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 		if(newFragment instanceof LoaderFragment lf){
 			if(!lf.loaded && !lf.dataLoading)
 				lf.loadData();
-		}else if(newFragment instanceof DiscoverFragment){
-			((DiscoverFragment) newFragment).loadData();
+		}else if(newFragment instanceof ConversationsFragment){
+			((ConversationsFragment) newFragment).loadData();
 		}
 	}
 
 	private boolean onTabLongClick(@IdRes int tab){
-		if(tab==R.id.tab_search){
-			if(currentTab!=R.id.tab_search){
-				// MOSHIDON: I don't know why using setCurrentTab leads to visual glitches
-				// when initially loading the fragment. This solves it somehow
-				onTabSelected(R.id.tab_search);
-				selectTabInNavigation(R.id.tab_search);
-			}
-			searchFragment.openSearch();
-			return true;
-		}
-
+		tab=normalizeTab(tab);
 		if(tab==R.id.tab_profile){
 			ArrayList<String> options=new ArrayList<>();
 			for(AccountSession session:AccountSessionManager.getInstance().getLoggedInAccounts()){
@@ -403,14 +404,12 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 	@Override
 	public void onSaveInstanceState(Bundle outState){
 		super.onSaveInstanceState(outState);
-		outState.putInt("selectedTab", currentTab);
+		outState.putInt("selectedTab", normalizeTab(currentTab));
 
 		// MOSHIDON: we use the isAdded because of user themes
 		if (homeTabFragment.isAdded()) getChildFragmentManager().putFragment(outState, "homeTabFragment", homeTabFragment);
 
-		if (searchFragment.isAdded()) getChildFragmentManager().putFragment(outState, "searchFragment", searchFragment);
-
-		if (friendRequestFragment.isAdded()) getChildFragmentManager().putFragment(outState, "friendRequestFragment", friendRequestFragment);
+		if (conversationsFragment.isAdded()) getChildFragmentManager().putFragment(outState, "conversationsFragment", conversationsFragment);
 
 		if (diaperListFragment.isAdded()) getChildFragmentManager().putFragment(outState, "diaperListFragment", diaperListFragment);
 
@@ -639,13 +638,10 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 		if(GlobalUserPreferences.useIosLiquidNavigation){
 			liquidNavigationController=new HomeLiquidNavigationController(getActivity(), currentTab, self.avatar, this::onTabSelected, this::onTabLongClick);
 			fragmentContainer.postOnAnimation(()->fragmentContainer.postOnAnimation(()->
-			fragmentContainer.setCaptureListener((top, bottom)->{
-						if(top!=null){
-							if(currentTab==R.id.tab_home && liquidToolbarController!=null)
+				fragmentContainer.setCaptureListener((top, bottom)->{
+							if(top!=null && currentTab==R.id.tab_home && liquidToolbarController!=null)
 								liquidToolbarController.setBackdropBitmap(top);
-							else if(currentTab==R.id.tab_friend_request && friendLiquidToolbarController!=null)
-								friendLiquidToolbarController.setBackdropBitmap(top);
-						}
+
 						if(liquidNavigationController!=null && bottom!=null)
 							liquidNavigationController.setBackdropBitmap(bottom);
 					})));
@@ -680,14 +676,9 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 			liquidToolbarController.dispose();
 			liquidToolbarController=null;
 		}
-		if(friendLiquidToolbarController!=null){
-			friendLiquidToolbarController.dispose();
-			friendLiquidToolbarController=null;
-		}
 		toolbarHost.removeAllViews();
 		if(!GlobalUserPreferences.useIosLiquidNavigation){
 			homeTabFragment.setLiquidToolbarController(null);
-			friendRequestFragment.setLiquidToolbarController(null);
 			updateCaptureHeights();
 			return;
 		}
@@ -704,15 +695,7 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 		});
 		liquidToolbarController.setContentTouchTarget(fragmentContainer);
 		toolbarHost.addView(liquidToolbarController.getView(), new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-		friendLiquidToolbarController=new FriendUniverseLiquidToolbarController(
-				getActivity(),
-				friendRequestFragment::onLiquidSearchChanged,
-				friendRequestFragment::onLiquidPublish
-		);
-		friendLiquidToolbarController.setSearchOpenListener(open->updateCaptureHeights());
-		toolbarHost.addView(friendLiquidToolbarController.getView(), new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 		homeTabFragment.setLiquidToolbarController(liquidToolbarController);
-		friendRequestFragment.setLiquidToolbarController(friendLiquidToolbarController);
 		applyLiquidToolbarInsets();
 		updateLiquidToolbarVisibility();
 		updateCaptureHeights();
@@ -721,25 +704,17 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 	private void applyLiquidToolbarInsets(){
 		if(liquidToolbarController!=null)
 			liquidToolbarController.setStatusBarInset(topSystemInset);
-		if(friendLiquidToolbarController!=null)
-			friendLiquidToolbarController.setStatusBarInset(topSystemInset);
 		updateCaptureHeights();
 	}
 
 	private void updateLiquidToolbarVisibility(){
-		boolean liquid=GlobalUserPreferences.useIosLiquidNavigation;
-		boolean homeVisible=liquid && currentTab==R.id.tab_home;
-		boolean friendVisible=liquid && currentTab==R.id.tab_friend_request;
+		boolean homeVisible=GlobalUserPreferences.useIosLiquidNavigation && currentTab==R.id.tab_home;
 		if(toolbarHost!=null)
-			toolbarHost.setVisibility(homeVisible || friendVisible ? View.VISIBLE : View.GONE);
+			toolbarHost.setVisibility(homeVisible ? View.VISIBLE : View.GONE);
 		if(liquidToolbarController!=null)
 			liquidToolbarController.getView().setVisibility(homeVisible ? View.VISIBLE : View.GONE);
-		if(friendLiquidToolbarController!=null)
-			friendLiquidToolbarController.getView().setVisibility(friendVisible ? View.VISIBLE : View.GONE);
-		if(currentTab!=R.id.tab_home && liquidToolbarController!=null)
+		if(!homeVisible && liquidToolbarController!=null)
 			liquidToolbarController.closeMenu();
-		if(currentTab!=R.id.tab_friend_request && friendLiquidToolbarController!=null)
-			friendLiquidToolbarController.closeSearch();
 		updateCaptureHeights();
 	}
 
@@ -747,23 +722,20 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 		if(fragmentContainer==null)
 			return;
 		int topHeight=0;
-		if(toolbarHost!=null && toolbarHost.getVisibility()==View.VISIBLE){
-			if(currentTab==R.id.tab_home && liquidToolbarController!=null)
-				topHeight=topSystemInset+V.dp(homeToolbarCaptureHeightDp(liquidToolbarMenuOpen));
-			else if(currentTab==R.id.tab_friend_request && friendLiquidToolbarController!=null)
-				topHeight=topSystemInset+V.dp(friendUniverseCaptureHeightDp(friendLiquidToolbarController.isSearchExpanded()));
-		}
+		if(toolbarHost!=null && toolbarHost.getVisibility()==View.VISIBLE && currentTab==R.id.tab_home && liquidToolbarController!=null)
+			topHeight=topSystemInset+V.dp(homeToolbarCaptureHeightDp(liquidToolbarMenuOpen));
 		int bottomHeight=navigationHost==null ? 0 : navigationHost.getHeight();
 		fragmentContainer.setCaptureHeights(topHeight, bottomHeight);
+		if(homeTabFragment!=null)
+			homeTabFragment.setLiquidNavBottomInset(GlobalUserPreferences.useIosLiquidNavigation ? bottomHeight : 0);
 	}
 
 	public boolean onBackPressed(){
-		if(currentTab==R.id.tab_friend_request && friendLiquidToolbarController!=null && friendLiquidToolbarController.closeSearch())
-			return true;
 		return liquidToolbarController!=null && liquidToolbarController.onBackPressed();
 	}
 
 	private void selectTabInNavigation(@IdRes int tab){
+		tab=normalizeTab(tab);
 		if(liquidNavigationController!=null)
 			liquidNavigationController.setSelectedTab(tab);
 		else if(tabBar!=null)
@@ -775,6 +747,11 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 			liquidNavigationController.setBottomInset(bottomSystemInset);
 		else if(tabBarWrap!=null)
 			tabBarWrap.setPadding(0, 0, 0, bottomSystemInset>0 ? Math.max(bottomSystemInset, V.dp(24)) : 0);
+		int navOverlay=GlobalUserPreferences.useIosLiquidNavigation ? 0 : V.dp(56)+(bottomSystemInset>0 ? bottomSystemInset : 0);
+		if(homeTabFragment!=null)
+			homeTabFragment.setFabBottomInset(navOverlay);
+		if(conversationsFragment!=null)
+			conversationsFragment.setTabBarBottomInset(navOverlay);
 	}
 
 	@Override

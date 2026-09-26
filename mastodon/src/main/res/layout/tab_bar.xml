@@ -35,21 +35,21 @@
 		</FrameLayout>
 
 		<FrameLayout
-			android:id="@+id/tab_search"
+			android:id="@id/tab_messages"
 			android:layout_width="0dp"
 			android:layout_height="match_parent"
 			android:layout_weight="1"
 			android:paddingHorizontal="4dp"
-			android:contentDescription="@string/search_hint">
+			android:contentDescription="@string/messages">
 
-			<org.joinmastodon.android.ui.views.ItshoverNavigationIconView
+			<ImageView
 				android:layout_width="28dp"
 				android:layout_height="28dp"
 				android:layout_gravity="center"
 				android:importantForAccessibility="no"
 				android:duplicateParentState="true"
-				app:iconType="magnifier"
-				app:iconTint="@color/tab_bar_icon"/>
+				android:src="@drawable/ic_tab_messages"
+				android:tint="@color/tab_bar_icon"/>
 		</FrameLayout>
 
 		<FrameLayout
@@ -88,23 +88,6 @@
 				tools:visibility="visible"/>
 		</FrameLayout>
 
-		<FrameLayout
-			android:id="@+id/tab_friend_request"
-			android:layout_width="0dp"
-			android:layout_height="match_parent"
-			android:layout_weight="1"
-			android:paddingHorizontal="4dp"
-			android:contentDescription="@string/friend_request">
-
-			<org.joinmastodon.android.ui.views.ItshoverNavigationIconView
-				android:layout_width="28dp"
-				android:layout_height="28dp"
-				android:layout_gravity="center"
-				android:importantForAccessibility="no"
-				android:duplicateParentState="true"
-				app:iconType="globe"
-				app:iconTint="@color/tab_bar_icon"/>
-		</FrameLayout>
 
 		<FrameLayout
 			android:id="@+id/tab_profile"

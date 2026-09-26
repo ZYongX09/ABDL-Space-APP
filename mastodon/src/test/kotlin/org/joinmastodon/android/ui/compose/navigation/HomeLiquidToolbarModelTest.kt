@@ -48,7 +48,7 @@ class HomeLiquidToolbarModelTest {
 		val spec = homeLiquidToolbarVisualSpec()
 		assertEquals(18, spec.titleTextSp)
 		assertEquals(17, spec.menuTextSp)
-		assertEquals(8, spec.blurRadiusDp)
+		assertEquals(18, spec.blurRadiusDp)
 		assertTrue(spec.surfaceAlpha <= 0.25f)
 	}
 

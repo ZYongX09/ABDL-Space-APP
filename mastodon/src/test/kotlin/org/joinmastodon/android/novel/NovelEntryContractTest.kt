@@ -1,6 +1,7 @@
 package org.joinmastodon.android.novel
 
 import java.io.File
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -18,15 +19,18 @@ class NovelEntryContractTest {
 	}
 
 	@Test
-	fun addsNovelToLiquidHomeRootMenu() {
-		assertTrue(homeTabFragment.contains("new HomeToolbarMenuItem(R.id.novel"))
+	fun novelEntryStaysHiddenWhileSourceIsPreserved() {
+		// 决策：小说源码与处理器保留，但所有主页/菜单入口隐藏
+		assertFalse(homeTabFragment.contains("new HomeToolbarMenuItem(R.id.novel"))
+		assertTrue(homeOverflow.substringAfter("@+id/novel").substringBefore("/>").contains("android:visible=\"false\""))
 	}
 
 	@Test
-	fun liquidNovelSelectionStartsActivityWithCurrentAccount() {
+	fun novelHandlersRemainWiredForFutureReEnable() {
 		assertTrue(homeTabFragment.contains("if(id==R.id.novel)"))
-		assertTrue(homeTabFragment.contains("new Intent(getActivity(), NovelActivity.class)"))
-		assertTrue(homeTabFragment.contains("putExtra(\"account\", accountID)"))
+		assertTrue(homeTabFragment.contains("new Intent(getActivity(), NovelEditorActivity.class)"))
+		assertTrue(homeTabFragment.contains("NovelEditorActivity.EXTRA_ACCOUNT_ID"))
+		assertTrue(homeTabFragment.contains("id == R.id.novel"))
 	}
 
 	@Test

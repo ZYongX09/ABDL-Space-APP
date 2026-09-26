@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
@@ -41,6 +42,7 @@ import org.joinmastodon.android.ui.compose.LocalAppState
 import org.joinmastodon.android.ui.compose.MiuixAppTheme
 import org.joinmastodon.android.ui.compose.navigation.liquid.IosLiquidGlassNavigationBar
 import top.yukonga.miuix.kmp.basic.Badge
+import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.NavigationItem
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.blur.isRuntimeShaderSupported
@@ -51,14 +53,17 @@ object HomeNavigationTabs {
 	@JvmField
 	val ids = intArrayOf(
 		R.id.tab_home,
-		R.id.tab_search,
+		R.id.tab_messages,
 		R.id.tab_diaper,
-		R.id.tab_friend_request,
 		R.id.tab_profile,
 	)
 
 	@JvmStatic
-	fun indexOf(tabId: Int): Int = ids.indexOf(tabId).takeIf { it >= 0 } ?: 0
+	fun indexOf(tabId: Int): Int = when (tabId) {
+		R.id.tab_search -> ids.indexOf(R.id.tab_messages)
+		R.id.tab_friend_request -> ids.indexOf(R.id.tab_home)
+		else -> ids.indexOf(tabId).takeIf { it >= 0 } ?: 0
+	}
 }
 
 internal fun snapNavigationDragTarget(value: Float, tabsCount: Int): Int =
@@ -117,16 +122,13 @@ class HomeLiquidNavigationController(
 		val selectedIndex = HomeNavigationTabs.indexOf(selectedTabState)
 		val items = listOf(
 			NavigationItem("首页", androidx.compose.ui.graphics.vector.ImageVector.vectorResource(R.drawable.ic_tab_rating)),
-			NavigationItem(view.context.getString(R.string.search_hint), androidx.compose.ui.graphics.vector.ImageVector.vectorResource(R.drawable.ic_tab_rating)),
+			NavigationItem(view.context.getString(R.string.messages), androidx.compose.ui.graphics.vector.ImageVector.vectorResource(R.drawable.ic_tab_messages)),
 			NavigationItem(view.context.getString(R.string.diaper), androidx.compose.ui.graphics.vector.ImageVector.vectorResource(R.drawable.ic_tab_rating)),
-			NavigationItem(view.context.getString(R.string.friend_request), androidx.compose.ui.graphics.vector.ImageVector.vectorResource(R.drawable.ic_tab_rating)),
 			NavigationItem(view.context.getString(R.string.my_profile), androidx.compose.ui.graphics.vector.ImageVector.vectorResource(R.drawable.ic_tab_rating)),
 		)
 		val iconTypes = intArrayOf(
 			ItshoverNavigationIconView.ICON_HOME,
-			ItshoverNavigationIconView.ICON_MAGNIFIER,
 			ItshoverNavigationIconView.ICON_STAR,
-			ItshoverNavigationIconView.ICON_GLOBE,
 		)
 		val bottomPadding = with(LocalDensity.current) {
 			if (bottomInsetState > 0) bottomInsetState.toDp() + 8.dp else 36.dp
@@ -147,16 +149,22 @@ class HomeLiquidNavigationController(
 				bottomPaddingOverride = bottomPadding,
 				badge = { index ->
 					when {
-						index == 2 && diaperBadgeVisibleState -> ({ Badge { Text("新功能") } })
-						index == 4 && !unreadBadgeState.isNullOrEmpty() -> ({ Badge { Text(unreadBadgeState.orEmpty()) } })
+						index == HomeNavigationTabs.indexOf(R.id.tab_diaper) && diaperBadgeVisibleState -> ({ Badge { Text("新功能") } })
+						index == HomeNavigationTabs.indexOf(R.id.tab_profile) && !unreadBadgeState.isNullOrEmpty() -> ({ Badge { Text(unreadBadgeState.orEmpty()) } })
 						else -> null
 					}
 				},
 				iconContent = { index, selected, animationToken ->
-					if (index == 4) {
-						AvatarIcon(avatarUrl, animationToken)
-					} else {
-						ItshoverIcon(iconTypes[index], animationToken)
+					when (index) {
+						HomeNavigationTabs.indexOf(R.id.tab_messages) -> Icon(
+							modifier = Modifier.size(22.dp),
+							painter = painterResource(R.drawable.ic_tab_messages),
+							contentDescription = null,
+							tint = LocalContentColor.current,
+						)
+						HomeNavigationTabs.indexOf(R.id.tab_profile) -> AvatarIcon(avatarUrl, animationToken)
+						HomeNavigationTabs.indexOf(R.id.tab_diaper) -> ItshoverIcon(iconTypes[1], animationToken)
+						else -> ItshoverIcon(iconTypes[0], animationToken)
 					}
 				},
 			)

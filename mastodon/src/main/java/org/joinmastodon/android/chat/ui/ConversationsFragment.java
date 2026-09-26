@@ -39,6 +39,8 @@ public class ConversationsFragment extends Fragment implements WindowInsetsAware
 	private View toolbar;
 	private int baseToolbarHeight;
 	private int baseRecyclerBottomPadding;
+	private boolean isTabMode;
+	private int navBarInset;
 
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
@@ -46,6 +48,7 @@ public class ConversationsFragment extends Fragment implements WindowInsetsAware
 		accountId = getArguments()!=null ? getArguments().getString("account") : null;
 		if(accountId==null)
 			accountId = AccountSessionManager.getInstance().getLastActiveAccountID();
+		isTabMode = getArguments()!=null && getArguments().getBoolean("noAutoLoad", false);
 	}
 
 	@Override
@@ -60,14 +63,27 @@ public class ConversationsFragment extends Fragment implements WindowInsetsAware
 		ImageButton backBtn=root.findViewById(R.id.back_btn);
 		backBtn.setImageTintList(ColorStateList.valueOf(UiUtils.getThemeColor(getActivity(), R.attr.colorM3OnSurface)));
 		backBtn.setOnClickListener(v->getActivity().onBackPressed());
+		if(isTabMode)
+			backBtn.setVisibility(View.GONE);
 		recyclerView.setLayoutManager(new LinearLayoutManager(getActivity()));
 		adapter = new ConversationsAdapter();
 		recyclerView.setAdapter(adapter);
 
 		swipeRefreshLayout.setOnRefreshListener(this::loadData);
 
-		loadData();
+		if(!isTabMode)
+			loadData();
 		return root;
+	}
+
+	public void setTabBarBottomInset(int insetPx){
+		navBarInset=insetPx;
+		if(recyclerView!=null)
+			applyBottomPadding();
+	}
+
+	private void applyBottomPadding(){
+		recyclerView.setPadding(recyclerView.getPaddingLeft(), recyclerView.getPaddingTop(), recyclerView.getPaddingRight(), baseRecyclerBottomPadding+navBarInset);
 	}
 
 	public void onApplyWindowInsets(WindowInsets insets) {
@@ -79,7 +95,9 @@ public class ConversationsFragment extends Fragment implements WindowInsetsAware
 		ViewGroup.LayoutParams lp=toolbar.getLayoutParams();
 		lp.height=baseToolbarHeight+top;
 		toolbar.setLayoutParams(lp);
-		recyclerView.setPadding(recyclerView.getPaddingLeft(), recyclerView.getPaddingTop(), recyclerView.getPaddingRight(), baseRecyclerBottomPadding+bottom);
+		if(!isTabMode)
+			navBarInset=bottom;
+		applyBottomPadding();
 	}
 
 	@Override
@@ -104,7 +122,7 @@ public class ConversationsFragment extends Fragment implements WindowInsetsAware
 		E.unregister(this);
 	}
 
-	private void loadData() {
+	public void loadData() {
 		if (accountId == null) return;
 		ChatController controller = ChatController.getInstance(accountId);
 		controller.loadConversations(true, new me.grishka.appkit.api.Callback<List<Conversation>>() {
