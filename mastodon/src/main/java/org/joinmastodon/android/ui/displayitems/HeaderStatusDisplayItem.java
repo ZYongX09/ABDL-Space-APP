@@ -66,6 +66,7 @@ public class HeaderStatusDisplayItem extends StatusDisplayItem{
 	private Account user;
 	private Instant createdAt;
 	private ImageLoaderRequest avaRequest;
+	private boolean hasAvatarUrl;
 	private String accountID;
 	private CustomEmojiHelper emojiHelper=new CustomEmojiHelper();
 	private SpannableStringBuilder parsedName;
@@ -78,7 +79,10 @@ public class HeaderStatusDisplayItem extends StatusDisplayItem{
 		super(parentID, callbacks, context);
 		this.user=user;
 		this.createdAt=createdAt;
-		avaRequest=new UrlImageLoaderRequest(GlobalUserPreferences.playGifs ? user.avatar : user.avatarStatic, V.dp(50), V.dp(50));
+		String avatarUrl=GlobalUserPreferences.playGifs ? user.avatar : user.avatarStatic;
+		if(TextUtils.isEmpty(avatarUrl)) avatarUrl=user.avatar;
+		hasAvatarUrl=!TextUtils.isEmpty(avatarUrl);
+		avaRequest=hasAvatarUrl ? new UrlImageLoaderRequest(avatarUrl, V.dp(50), V.dp(50)) : null;
 		this.accountID=accountID;
 		parsedName=new SpannableStringBuilder(user.displayName);
 		this.status=status;
@@ -303,12 +307,14 @@ public class HeaderStatusDisplayItem extends StatusDisplayItem{
 		@SuppressLint("SetTextI18n")
 		@Override
 		public void onBind(HeaderStatusDisplayItem item){
+			// 无头像账号（宝宝新天地同步等）显示默认头像，而不是灰色占位或空图
+			if(!item.hasAvatarUrl)
+				avatar.setImageResource(R.drawable.default_avatar);
 			name.setText(item.parsedName);
-			if(item.user.verified){
-				android.text.SpannableString ssb=new android.text.SpannableString(name.getText()+" ");
-				Drawable verifiedIcon=itemView.getResources().getDrawable(R.drawable.ic_badge_verified_circle, itemView.getContext().getTheme()).mutate();
-				verifiedIcon.setBounds(0, 0, V.dp(16), V.dp(16));
-				ssb.setSpan(new org.joinmastodon.android.ui.text.ImageSpanThatDoesNotBreakShitForNoGoodReason(verifiedIcon, android.text.style.ImageSpan.ALIGN_BOTTOM), ssb.length()-1, ssb.length(), android.text.SpannableString.SPAN_EXCLUSIVE_EXCLUSIVE);
+			org.joinmastodon.android.sponsors.SponsorUsername.apply(name, item.user, item.accountID);
+			if(item.user.badge!=null && !TextUtils.isEmpty(item.user.badge.name)){
+				android.text.SpannableString ssb=new android.text.SpannableString(name.getText()+" ⦁ ");
+				ssb.setSpan(new org.joinmastodon.android.ui.text.BadgeSpan(item.user.badge), ssb.length()-2, ssb.length(), android.text.SpannableString.SPAN_EXCLUSIVE_EXCLUSIVE);
 				name.setText(ssb);
 			}
 			String time;

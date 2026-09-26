@@ -686,6 +686,8 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 		innerProgress.setVisibility(View.VISIBLE);
 		this.username.setText(username);
 		name.setText(username);
+		org.joinmastodon.android.sponsors.SponsorUsername.apply(name, null, accountID);
+		org.joinmastodon.android.sponsors.SponsorUsername.apply(this.username, null, accountID);
 		usernameDomain.setText(domain);
 		avatar.setImageResource(R.drawable.image_placeholder);
 		cover.setImageResource(R.drawable.image_placeholder);
@@ -717,6 +719,8 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 			HtmlParser.parseCustomEmoji(ssb, account.emojis);
 		name.setText(ssb);
 		setTitle(ssb);
+		org.joinmastodon.android.sponsors.SponsorUsername.apply(name, account, accountID);
+		org.joinmastodon.android.sponsors.SponsorUsername.apply(username, account, accountID);
 
 		boolean isSelf=AccountSessionManager.getInstance().isSelf(accountID, account);
 
@@ -773,7 +777,25 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 		joined.parsedValue=joined.value=DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).format(LocalDateTime.ofInstant(account.createdAt, ZoneId.systemDefault()));
 		fields.add(joined);
 
-		for(AccountField field:account.fields){
+		AccountField ipLocation=new AccountField();
+		ipLocation.parsedName=ipLocation.name=getString(R.string.profile_ip_location);
+		String province=account.lastStatusProvince;
+		ipLocation.parsedValue=ipLocation.value=(province!=null && !province.isEmpty())
+				? province
+				: getString(R.string.location_unknown);
+			fields.add(ipLocation);
+
+			if(account.babyVerification!=null && account.babyVerification.verified && account.babyVerification.certificateUrl!=null){
+				AccountField verification=new AccountField();
+				verification.name=getString(R.string.verification_profile_item); verification.parsedName=verification.name;
+				verification.value=getString(R.string.verification_profile_item_value); verification.parsedValue=verification.value;
+				verification.babyVerification=true;
+				verification.babyVerificationUrl=account.babyVerification.certificateUrl;
+				verification.nameEmojis=new CustomEmojiSpan[0]; verification.valueEmojis=new CustomEmojiSpan[0]; verification.emojiRequests=new ArrayList<>();
+				fields.add(verification);
+			}
+
+			for(AccountField field:account.fields){
 			field.parsedValue=ssb=HtmlParser.parse(field.value, account.emojis, Collections.emptyList(), Collections.emptyList(), accountID, account, getActivity());
 			field.valueEmojis=ssb.getSpans(0, ssb.length(), CustomEmojiSpan.class);
 			ssb=new SpannableStringBuilder(field.name);
@@ -805,8 +827,7 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 		badgeContainer.removeAllViews();
 		badgeContainer.setVisibility(View.GONE);
 
-		String url="https://api.abdl-space.top/api/users/"+userId+"/badges";
-		badgeHttpClient.newCall(new Request.Builder().url(url).get().build())
+		badgeHttpClient.newCall(new Request.Builder().url("https://api.abdl-space.top/api/users/"+userId+"/badges").get().build())
 			.enqueue(new okhttp3.Callback(){
 				@Override
 				public void onFailure(Call call, IOException e){}
@@ -821,50 +842,71 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 						if(badges==null || badges.size()==0) return;
 
 						getActivity().runOnUiThread(()->{
-							boolean hasVerifiedBadge=false;
+							// 现有徽章展示方式（个人中心 pill 列表 & 用户名后圆形图标）已移除；
+							// 本人 profile 改为“展示徽章选择器”：点选一枚作为用户名旁展示的徽章，再点取消。
+							if(!isOwnProfile)
+								return;
+							badgeContainer.removeAllViews();
 							for(int i=0;i<badges.size();i++){
 								com.google.gson.JsonObject badge=badges.get(i).getAsJsonObject();
 								String key=badge.has("key") ? badge.get("key").getAsString() : "";
 								String bName=badge.has("name") ? badge.get("name").getAsString() : "";
-								String description=badge.has("description") ? badge.get("description").getAsString() : "";
+								String color=badge.has("color") ? badge.get("color").getAsString() : "#7C4DFF";
+								boolean displayed=badge.has("displayed") && badge.get("displayed").getAsBoolean();
 
-								if("verified".equals(key)){
-									hasVerifiedBadge=true;
-								}
+								android.widget.TextView pill=new android.widget.TextView(getActivity());
+								pill.setText(bName+(displayed ? " ✓" : ""));
+								int bgColor=parseBadgeColor(color);
+								android.graphics.drawable.GradientDrawable bg=new android.graphics.drawable.GradientDrawable();
+								bg.setCornerRadius(V.dp(8));
+								bg.setColor(bgColor);
+								pill.setBackground(bg);
+								pill.setTextColor(org.joinmastodon.android.ui.text.BadgeSpan.foregroundColorFor(bgColor));
+								pill.setTextSize(11);
+								pill.setTypeface(pill.getTypeface(), android.graphics.Typeface.BOLD);
+								pill.setPadding(V.dp(8), V.dp(3), V.dp(8), V.dp(3));
+								LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+								params.setMargins(0, 0, V.dp(8), V.dp(4));
+								badgeContainer.addView(pill, params);
 
-								View pillView=getActivity().getLayoutInflater().inflate(R.layout.item_profile_badge, badgeContainer, false);
-								TextView pillName=pillView.findViewById(R.id.badge_name);
-
-								pillName.setText(bName);
-
-								pillView.setOnClickListener(v->{
-									BadgeExplainerSheet sheet=new BadgeExplainerSheet(getActivity(), bName, description, R.drawable.ic_badge_verified_pill);
-									sheet.show();
+								boolean currentlyDisplayed=displayed;
+								pill.setOnClickListener(v->{
+									setDisplayedBadge(key, currentlyDisplayed ? null : key);
 								});
-
-								badgeContainer.addView(pillView);
 							}
 							badgeContainer.setVisibility(View.VISIBLE);
-
-							if(hasVerifiedBadge){
-								Drawable verifiedIcon=getResources().getDrawable(R.drawable.ic_badge_verified_circle, getActivity().getTheme()).mutate();
-								verifiedIcon.setBounds(0, 0, V.dp(20), V.dp(20));
-								SpannableString ssb=new SpannableString(name.getText()+" ");
-								ssb.setSpan(new ImageSpanThatDoesNotBreakShitForNoGoodReason(verifiedIcon, ImageSpan.ALIGN_BOTTOM), ssb.length()-1, ssb.length(), SpannableString.SPAN_EXCLUSIVE_EXCLUSIVE);
-								name.setText(ssb);
-							}
 						});
 					}catch(Exception ignored){}
 				}
 			});
 	}
 
-	private int getBadgeIconRes(String iconKey){
-		if(iconKey==null) return 0;
-		switch(iconKey){
-			case "verified": return R.drawable.ic_badge_verified_pill_icon;
-			default: return 0;
-		}
+	private void setDisplayedBadge(String badgeKey, String newKey){
+		String token=AccountSessionManager.getInstance().getAccount(accountID).token.accessToken;
+		okhttp3.RequestBody reqBody=okhttp3.RequestBody.create(
+				okhttp3.MediaType.parse("application/json; charset=utf-8"),
+				"{\"badge_key\":"+(newKey==null ? "null" : ("\""+newKey+"\""))+"}");
+		okhttp3.Request request=new Request.Builder()
+				.url("https://api.abdl-space.top/api/users/"+account.id+"/badges/display")
+				.header("Authorization", "Bearer "+token)
+				.post(reqBody)
+				.build();
+		badgeHttpClient.newCall(request).enqueue(new okhttp3.Callback(){
+			@Override
+			public void onFailure(Call call, IOException e){}
+			@Override
+			public void onResponse(Call call, Response response) throws IOException{
+				if(response.isSuccessful()){
+					getActivity().runOnUiThread(()->loadBadges());
+				}
+			}
+		});
+	}
+
+	private int parseBadgeColor(String color){
+		if(color==null || color.length()!=7 || color.charAt(0)!='#') return 0xFF7C4DFF;
+		try{ return (int)(0xFF000000L | Long.parseLong(color.substring(1), 16)); }
+		catch(NumberFormatException e){ return 0xFF7C4DFF; }
 	}
 
 	private void updateToolbar(){
@@ -1045,6 +1087,18 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 			unread+=Math.max(0, conversation.unreadCount);
 		profileMessagesBadge.setVisibility(unread>0 ? View.VISIBLE : View.GONE);
 		profileMessagesBadge.setText(unread>99 ? "99+" : String.valueOf(unread));
+	}
+
+	@Subscribe
+	public void onSponsorChanged(org.joinmastodon.android.events.SponsorChangedEvent event){
+		if(accountID==null || !accountID.equals(event.accountID) || account==null) return;
+		var session=AccountSessionManager.getInstance().tryGetAccount(accountID);
+		if(session==null || session.self==null || !account.id.equals(session.self.id)) return;
+		account.sponsor=session.self.sponsor;
+		if(getActivity()!=null && name!=null && username!=null){
+			org.joinmastodon.android.sponsors.SponsorUsername.apply(name, account, accountID);
+			org.joinmastodon.android.sponsors.SponsorUsername.apply(username, account, accountID);
+		}
 	}
 
 	@Subscribe
