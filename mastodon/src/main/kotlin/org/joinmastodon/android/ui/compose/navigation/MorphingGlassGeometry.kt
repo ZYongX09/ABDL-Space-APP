@@ -38,10 +38,10 @@ internal fun anchoredMenuBounds(
 internal fun hitTestMenuRow(y: Float, rows: List<ClosedFloatingPointRange<Float>>): Int? =
 	rows.indexOfFirst { y>=it.start && y<it.endInclusive }.takeIf { it>=0 }
 
-internal enum class TrailingToolbarAction { COMPOSE, MORE }
+internal enum class TrailingToolbarAction { SEARCH, MORE }
 
 internal fun trailingToolbarAction(x: Float, width: Float): TrailingToolbarAction =
-	if(x < width / 2f) TrailingToolbarAction.COMPOSE else TrailingToolbarAction.MORE
+	if(x < width / 2f) TrailingToolbarAction.SEARCH else TrailingToolbarAction.MORE
 
 internal fun toolbarMenuHeightDp(itemCount: Int, hasBackRow: Boolean): Int =
 	((itemCount + if(hasBackRow) 1 else 0) * 48 + 12).coerceIn(60, 420)

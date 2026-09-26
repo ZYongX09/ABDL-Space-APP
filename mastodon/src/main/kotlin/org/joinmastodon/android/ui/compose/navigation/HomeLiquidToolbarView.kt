@@ -11,15 +11,13 @@ import android.view.View
 import android.view.ViewConfiguration
 import android.view.VelocityTracker
 import androidx.annotation.DrawableRes
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
@@ -29,6 +27,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -45,6 +44,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -54,6 +54,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -77,6 +78,8 @@ import org.joinmastodon.android.ui.compose.navigation.liquid.iosIndicatorSpecula
 import org.joinmastodon.android.ui.compose.navigation.liquid.rememberGravityRotatedHighlight
 import org.joinmastodon.android.ui.compose.navigation.liquid.vibrancy
 import org.joinmastodon.android.ui.compose.ui.isInDarkTheme
+import kotlinx.coroutines.launch
+import top.yukonga.miuix.kmp.anim.folmeSpring
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.blur.drawBackdrop
@@ -100,12 +103,27 @@ data class HomeToolbarMenuItem(
 	@DrawableRes val iconRes: Int,
 )
 
+/**
+ * 发帖菜单面板几何：面板宽度 200dp，外层定宽包裹使其水平居中于发帖圆钮
+ * （圆钮宽 48dp、右缘距屏幕 116dp，圆钮中心距屏幕右缘 140dp；包裹右缘 = 140 - 200/2 = 40dp）。
+ * 展开高度与行布局同其他菜单一致，无额外顶部空玻璃。
+ */
+private const val COMPOSE_MENU_WIDTH_DP = 200
+private const val COMPOSE_MENU_END_PADDING_DP = 40
+
+data class HomeToolbarComposeMenuItem(
+	val id: Int,
+	val title: String,
+	val icon: androidx.compose.ui.graphics.vector.ImageVector,
+)
+
 class HomeLiquidToolbarController(
 	context: Context,
 	private val onTimelineSelected: IntConsumer,
 	private val onNewPosts: Runnable,
 	private val onCompose: Runnable,
 	private val onMenuItem: IntConsumer,
+	private val onSearch: Runnable,
 ) {
 	private val backdrop = ViewBitmapBackdrop()
 	private var statusBarInsetState by mutableIntStateOf(0)
@@ -114,11 +132,13 @@ class HomeLiquidToolbarController(
 	private var showNewPostsState by mutableStateOf(false)
 	private var remindersState by mutableStateOf(homeToolbarReminderState(false, false))
 	private var rootMenuState by mutableStateOf(emptyList<HomeToolbarMenuItem>())
+	private var composeMenuState by mutableStateOf(emptyList<HomeToolbarComposeMenuItem>())
 	private var listsState by mutableStateOf(emptyList<HomeToolbarMenuItem>())
 	private var hashtagsState by mutableStateOf(emptyList<HomeToolbarMenuItem>())
 	private var menuPageState by mutableStateOf(HomeToolbarMenuPage.NONE)
 	private var pendingMenuPageState by mutableStateOf(HomeToolbarMenuPage.NONE)
 	private var highlightedMenuIndexState by mutableStateOf<Int?>(null)
+	private var pendingTrailingAction: TrailingToolbarAction = TrailingToolbarAction.MORE
 	private var menuOpenListener: Consumer<Boolean>? = null
 	private var contentTouchTarget: View? = null
 	private var outsideGestureDown: MotionEvent? = null
@@ -247,6 +267,9 @@ class HomeLiquidToolbarController(
 		listsState = lists
 		hashtagsState = hashtags
 	}
+	fun setComposeMenu(items: List<HomeToolbarComposeMenuItem>) {
+		composeMenuState = items
+	}
 	fun closeMenu() {
 		val wasPending = pendingMenuPageState!=HomeToolbarMenuPage.NONE
 		pendingMenuPageState = HomeToolbarMenuPage.NONE
@@ -278,24 +301,32 @@ class HomeLiquidToolbarController(
 		target.dispatchTouchEvent(event)
 		event.recycle()
 	}
-	private fun isMenuVisible(): Boolean = menuPageState!=HomeToolbarMenuPage.NONE || pendingMenuPageState!=HomeToolbarMenuPage.NONE
-	private fun isInsideActiveGlass(x: Float, y: Float): Boolean {
-		val density = view.resources.displayMetrics.density
-		val top = statusBarInsetState + 8f * density
-		val activePage = menuPageState.takeIf { it!=HomeToolbarMenuPage.NONE } ?: pendingMenuPageState
-		val rowCount = when(activePage) {
-			HomeToolbarMenuPage.TIMELINES -> timelinesState.size
-			HomeToolbarMenuPage.ROOT -> rootMenuState.size
-			HomeToolbarMenuPage.LISTS -> listsState.size + 1
-			HomeToolbarMenuPage.HASHTAGS -> hashtagsState.size + 1
-			HomeToolbarMenuPage.NONE -> 1
+private fun isMenuVisible(): Boolean = menuPageState!=HomeToolbarMenuPage.NONE || pendingMenuPageState!=HomeToolbarMenuPage.NONE
+		private fun isInsideActiveGlass(x: Float, y: Float): Boolean {
+			val density = view.resources.displayMetrics.density
+			val activePage = menuPageState.takeIf { it!=HomeToolbarMenuPage.NONE } ?: pendingMenuPageState
+			val top = statusBarInsetState + (if(activePage==HomeToolbarMenuPage.COMPOSE) 62f else 8f) * density
+			val rowCount = when(activePage) {
+				HomeToolbarMenuPage.TIMELINES -> timelinesState.size
+				HomeToolbarMenuPage.COMPOSE -> composeMenuState.size
+				HomeToolbarMenuPage.ROOT -> rootMenuState.size
+				HomeToolbarMenuPage.LISTS -> listsState.size + 1
+				HomeToolbarMenuPage.HASHTAGS -> hashtagsState.size + 1
+				HomeToolbarMenuPage.NONE -> 1
+			}
+			val bottom = top + toolbarMenuHeightDp(rowCount, false) * density
+			if(y !in top..bottom) return false
+			return when(activePage) {
+				HomeToolbarMenuPage.TIMELINES -> x in 12f*density..260f*density
+				HomeToolbarMenuPage.COMPOSE -> x in view.width-240f*density..view.width-40f*density
+				HomeToolbarMenuPage.ROOT, HomeToolbarMenuPage.LISTS, HomeToolbarMenuPage.HASHTAGS -> x in view.width-260f*density..view.width-12f*density
+				HomeToolbarMenuPage.NONE -> false
+			}
 		}
-		val bottom = top + toolbarMenuHeightDp(rowCount, false) * density
-		if(y !in top..bottom) return false
-		return when(activePage) {
-			HomeToolbarMenuPage.TIMELINES -> x in 12f*density..260f*density
-			HomeToolbarMenuPage.ROOT, HomeToolbarMenuPage.LISTS, HomeToolbarMenuPage.HASHTAGS -> x in view.width-260f*density..view.width-12f*density
-			HomeToolbarMenuPage.NONE -> false
+	private fun activateComposeItem(index: Int) {
+		composeMenuState.getOrNull(index)?.let { item ->
+			closeMenu()
+			onMenuItem.accept(item.id)
 		}
 	}
 	private fun activateMenuItem(page: HomeToolbarMenuPage, item: HomeToolbarMenuItem) {
@@ -347,6 +378,7 @@ class HomeLiquidToolbarController(
 		)
 		val menuItems = when(menuPageState) {
 			HomeToolbarMenuPage.TIMELINES -> timelinesState.map { HomeToolbarMenuItem(it.id, it.title, it.iconRes) }
+			HomeToolbarMenuPage.COMPOSE -> composeMenuState.map { HomeToolbarMenuItem(it.id, it.title, 0) }
 			HomeToolbarMenuPage.LISTS -> listsState
 			HomeToolbarMenuPage.HASHTAGS -> hashtagsState
 			HomeToolbarMenuPage.ROOT -> rootMenuState
@@ -412,28 +444,32 @@ class HomeLiquidToolbarController(
 				},
 			)
 
-			val trailingExpanded = menuPageState==HomeToolbarMenuPage.ROOT || menuPageState==HomeToolbarMenuPage.LISTS || menuPageState==HomeToolbarMenuPage.HASHTAGS
-			val trailingRows = menuItems.size + if(menuPageState==HomeToolbarMenuPage.LISTS || menuPageState==HomeToolbarMenuPage.HASHTAGS) 1 else 0
+val trailingExpanded = menuPageState==HomeToolbarMenuPage.ROOT || menuPageState==HomeToolbarMenuPage.LISTS || menuPageState==HomeToolbarMenuPage.HASHTAGS
+			val trailingRows = if(menuPageState==HomeToolbarMenuPage.COMPOSE) composeMenuState.size else menuItems.size + if(menuPageState==HomeToolbarMenuPage.LISTS || menuPageState==HomeToolbarMenuPage.HASHTAGS) 1 else 0
+			val trailingHasBack = menuPageState==HomeToolbarMenuPage.LISTS || menuPageState==HomeToolbarMenuPage.HASHTAGS
 			MorphingGlassContainer(
 				expanded = trailingExpanded,
 				closedWidth = 96.dp,
 				closedHeight = 48.dp,
 				expandedWidth = 248.dp,
-				expandedHeight = toolbarMenuHeightDp(menuItems.size, menuPageState==HomeToolbarMenuPage.LISTS || menuPageState==HomeToolbarMenuPage.HASHTAGS).dp,
+				expandedHeight = toolbarMenuHeightDp(trailingRows, trailingHasBack).dp,
 				backdrop = backdrop,
 				anchorFractionX = 1f,
-				selectionItemCount = menuItems.size + if(menuPageState==HomeToolbarMenuPage.LISTS || menuPageState==HomeToolbarMenuPage.HASHTAGS) 1 else 0,
+				selectionItemCount = trailingRows,
 				enableDragSelection = shouldInstallToolbarDragRecognizer(isLeading = false),
-				shouldExpandFromClosed = { position, size -> trailingToolbarAction(position.x, size.width.toFloat())==TrailingToolbarAction.MORE },
+				shouldExpandFromClosed = { position, size -> pendingTrailingAction = trailingToolbarAction(position.x, size.width.toFloat()); pendingTrailingAction==TrailingToolbarAction.MORE },
 				onExpansionRequested = { requestMenu(HomeToolbarMenuPage.ROOT) },
-				onClosedTap = { position, size -> if(trailingToolbarAction(position.x, size.width.toFloat())==TrailingToolbarAction.COMPOSE) onCompose.run() },
+				onClosedTap = { position, size ->
+					val action=trailingToolbarAction(position.x, size.width.toFloat())
+					if(action==TrailingToolbarAction.SEARCH) onSearch.run() else requestMenu(HomeToolbarMenuPage.ROOT)
+				},
 				modifier = Modifier.zIndex(toolbarGlassZIndex(trailingExpanded)).align(Alignment.TopEnd).padding(top = topInset + 8.dp, end = 12.dp),
 				onExpansionStarted = {},
 				onExpansionFinished = { open -> if(!open && menuPageState==HomeToolbarMenuPage.NONE) menuOpenListener?.accept(false) },
 				onClick = {},
 				onSelectionChanged = { highlightedMenuIndexState = it },
 				onSelectionConfirmed = { rawIndex ->
-					val hasBack = menuPageState==HomeToolbarMenuPage.LISTS || menuPageState==HomeToolbarMenuPage.HASHTAGS
+					val hasBack = trailingHasBack
 					if(hasBack && rawIndex==0) menuPageState = HomeToolbarMenuPage.ROOT
 					else menuItems.getOrNull(rawIndex - if(hasBack) 1 else 0)?.let { activateMenuItem(menuPageState, it) }
 				},
@@ -441,7 +477,7 @@ class HomeLiquidToolbarController(
 				onBoundsChanged = { _, _ -> },
 				closedContent = {
 					Row(Modifier.height(48.dp), verticalAlignment = Alignment.CenterVertically) {
-					ToolbarIcon(R.drawable.ic_fluent_edit_24_regular)
+					SearchAnchorIcon()
 					Box {
 						ToolbarIcon(R.drawable.ic_fluent_more_vertical_24_regular)
 						if(remindersState.overflowBadged) Box(Modifier.align(Alignment.TopEnd).size(7.dp).background(Color.Red, CircleShape))
@@ -450,12 +486,57 @@ class HomeLiquidToolbarController(
 				},
 				expandedContent = { progress -> MenuContent(menuPageState, progress, highlightedMenuIndexState) },
 			)
+
+			// 发帖按钮：与"更多菜单"使用同一形态变化组件（MorphingGlassContainer）。
+			// 外层定宽包裹使容器水平居中于发帖圆钮：闭态即圆钮本身（原位），
+			// 展开时玻璃以按钮中心为锚对称膨胀并向下生长，菜单行落在按钮正下方；
+			// 更多菜单则是右缘锚定、向按钮左下方展开。
+			val composeExpanded = menuPageState==HomeToolbarMenuPage.COMPOSE || pendingMenuPageState==HomeToolbarMenuPage.COMPOSE
+			val composeMenuRows = composeMenuState.size
+			Box(
+				Modifier
+					.zIndex(toolbarGlassZIndex(composeExpanded))
+					.align(Alignment.TopEnd)
+					.padding(top = topInset + 8.dp, end = COMPOSE_MENU_END_PADDING_DP.dp)
+					.width(COMPOSE_MENU_WIDTH_DP.dp)
+			) {
+				MorphingGlassContainer(
+					expanded = composeExpanded,
+					closedWidth = 48.dp,
+					closedHeight = 48.dp,
+					expandedWidth = COMPOSE_MENU_WIDTH_DP.dp,
+					expandedHeight = toolbarMenuHeightDp(composeMenuRows, false).dp,
+					backdrop = backdrop,
+					anchorFractionX = 0.5f,
+					selectionItemCount = composeMenuRows,
+					enableDragSelection = shouldInstallToolbarDragRecognizer(isLeading = false),
+					shouldExpandFromClosed = { _, _ -> true },
+					onExpansionRequested = { requestMenu(HomeToolbarMenuPage.COMPOSE) },
+					onClosedTap = { _, _ -> requestMenu(HomeToolbarMenuPage.COMPOSE) },
+					modifier = Modifier.align(Alignment.TopCenter),
+					onExpansionStarted = {},
+					onExpansionFinished = { open -> if(!open && menuPageState==HomeToolbarMenuPage.NONE) menuOpenListener?.accept(false) },
+					onClick = {},
+					onSelectionChanged = { highlightedMenuIndexState = it },
+					onSelectionConfirmed = { index -> activateComposeItem(index) },
+					onUpwardFling = { closeMenu() },
+					onBoundsChanged = { _, _ -> },
+					closedContent = {
+						Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+							ResourceIcon(R.drawable.ic_fluent_edit_24_regular, 24, contentColor)
+						}
+					},
+					expandedContent = { progress ->
+						MenuContent(HomeToolbarMenuPage.COMPOSE, progress, highlightedMenuIndexState)
+					},
+				)
+			}
 		}
 	}
 
 	@Composable
 	private fun MenuContent(page: HomeToolbarMenuPage, progress: Float, highlightedIndex: Int?) {
-		if(page==HomeToolbarMenuPage.TIMELINES || page==HomeToolbarMenuPage.ROOT) {
+		if(page==HomeToolbarMenuPage.TIMELINES || page==HomeToolbarMenuPage.ROOT || page==HomeToolbarMenuPage.COMPOSE) {
 			MenuPage(page, progress, highlightedIndex)
 			return
 		}
@@ -479,25 +560,32 @@ class HomeLiquidToolbarController(
 
 	@Composable
 	private fun MenuPage(animatedPage: HomeToolbarMenuPage, progress: Float, highlightedIndex: Int?) {
-		val animatedItems = when(animatedPage) {
-			HomeToolbarMenuPage.TIMELINES -> timelinesState.map { HomeToolbarMenuItem(it.id, it.title, it.iconRes) }
-			HomeToolbarMenuPage.LISTS -> listsState
-			HomeToolbarMenuPage.HASHTAGS -> hashtagsState
-			HomeToolbarMenuPage.ROOT -> rootMenuState
-			HomeToolbarMenuPage.NONE -> emptyList()
-		}
+		val offset = if(animatedPage==HomeToolbarMenuPage.LISTS || animatedPage==HomeToolbarMenuPage.HASHTAGS) 1 else 0
 		Column(
 			Modifier
 				.heightIn(max = 420.dp)
 				.verticalScroll(rememberScrollState())
 				.padding(top = 14.dp, bottom = 6.dp),
 		) {
+				if(animatedPage==HomeToolbarMenuPage.COMPOSE) {
+					composeMenuState.forEachIndexed { index, item ->
+						MenuRow(item.icon, item.title, false, highlightedIndex==index+offset) { activateComposeItem(index) }
+					}
+					return@Column
+				}
 				if(animatedPage==HomeToolbarMenuPage.LISTS || animatedPage==HomeToolbarMenuPage.HASHTAGS) {
 					MenuRow(R.drawable.ic_fluent_chevron_left_24_regular, view.context.getString(R.string.back), false, highlightedIndex==0) { menuPageState = HomeToolbarMenuPage.ROOT }
+}
+			val animatedItems = when(animatedPage) {
+					HomeToolbarMenuPage.TIMELINES -> timelinesState.map { HomeToolbarMenuItem(it.id, it.title, it.iconRes) }
+					HomeToolbarMenuPage.LISTS -> listsState
+					HomeToolbarMenuPage.HASHTAGS -> hashtagsState
+					HomeToolbarMenuPage.ROOT -> rootMenuState
+					HomeToolbarMenuPage.COMPOSE -> emptyList()
+					HomeToolbarMenuPage.NONE -> emptyList()
 				}
 				animatedItems.forEachIndexed { index, item ->
 					val badged = (item.id==R.id.announcements && remindersState.announcementsBadged) || (item.id==R.id.settings && remindersState.settingsBadged)
-					val offset = if(animatedPage==HomeToolbarMenuPage.LISTS || animatedPage==HomeToolbarMenuPage.HASHTAGS) 1 else 0
 					MenuRow(item.iconRes, item.title, badged, highlightedIndex==index+offset) { activateMenuItem(animatedPage, item) }
 				}
 			}
@@ -515,6 +603,20 @@ class HomeLiquidToolbarController(
 			if(badged) Box(Modifier.size(7.dp).background(Color.Red, CircleShape))
 		}
 	}
+
+	@Composable
+	private fun MenuRow(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, badged: Boolean, highlighted: Boolean, onClick: () -> Unit) {
+		Row(
+			modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(if(highlighted) MiuixTheme.colorScheme.onSurface.copy(alpha = 0.10f) else Color.Transparent).clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 10.dp),
+			verticalAlignment = Alignment.CenterVertically,
+		) {
+			Icon(imageVector = icon, contentDescription = null, tint = MiuixTheme.colorScheme.onSurface)
+			Spacer(Modifier.width(12.dp))
+			Text(title, modifier = Modifier.weight(1f), fontSize = homeLiquidToolbarVisualSpec().menuTextSp.sp)
+			if(badged) Box(Modifier.size(7.dp).background(Color.Red, CircleShape))
+		}
+	}
+
 
 	@Composable
 	private fun GlassSurface(modifier: Modifier, onClick: () -> Unit, content: @Composable () -> Unit) {
@@ -573,4 +675,28 @@ class HomeLiquidToolbarController(
 			},
 		)
 	}
+
+/**
+	 * 搜索按钮锚点（玻璃胶囊左半部分）。SearchQueryFragment 的展开动画通过
+	 * 这个 id 从按钮位置放大到全屏。
+	 */
+		@Composable
+	private fun SearchAnchorIcon() {
+		val tint = MiuixTheme.colorScheme.onSurface.toArgb()
+		AndroidView(
+			modifier = Modifier.size(48.dp).padding(12.dp),
+			factory = { context -> ImageView(context).apply {
+				id = R.id.home_search_btn
+				scaleType = ImageView.ScaleType.CENTER_INSIDE
+				isClickable = false
+				isFocusable = false
+				isEnabled = false
+			} },
+			update = { imageView ->
+				imageView.setImageResource(R.drawable.ic_fluent_search_24_regular)
+				imageView.imageTintList = ColorStateList.valueOf(tint)
+			},
+		)
+	}
+
 }

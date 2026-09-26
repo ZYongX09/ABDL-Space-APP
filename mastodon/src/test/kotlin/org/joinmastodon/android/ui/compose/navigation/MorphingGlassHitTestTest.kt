@@ -15,8 +15,8 @@ class MorphingGlassHitTestTest {
 	}
 
 	@Test
-	fun trailingPillSplitsComposeAndMoreAtVisualMidpoint() {
-		assertEquals(TrailingToolbarAction.COMPOSE, trailingToolbarAction(26f, 108f))
+	fun trailingPillSplitsSearchAndMoreAtVisualMidpoint() {
+		assertEquals(TrailingToolbarAction.SEARCH, trailingToolbarAction(26f, 108f))
 		assertEquals(TrailingToolbarAction.MORE, trailingToolbarAction(82f, 108f))
 		assertEquals(TrailingToolbarAction.MORE, trailingToolbarAction(54f, 108f))
 	}

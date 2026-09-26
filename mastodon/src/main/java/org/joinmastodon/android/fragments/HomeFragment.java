@@ -46,6 +46,7 @@ import org.joinmastodon.android.ui.utils.OemUtils;
 import org.joinmastodon.android.ui.OutlineProviders;
 import org.joinmastodon.android.ui.compose.navigation.HomeLiquidNavigationController;
 import org.joinmastodon.android.ui.compose.navigation.HomeLiquidToolbarController;
+import org.joinmastodon.android.ui.compose.navigation.HomeToolbarComposeMenuItem;
 import org.joinmastodon.android.ui.sheets.AccountSwitcherSheet;
 import org.joinmastodon.android.ui.utils.UiUtils;
 import org.joinmastodon.android.ui.views.BackdropCaptureFrameLayout;
@@ -54,6 +55,11 @@ import org.joinmastodon.android.utils.ObjectIdComparator;
 import org.parceler.Parcels;
 
 import static org.joinmastodon.android.ui.compose.navigation.HomeLiquidToolbarModelKt.homeToolbarCaptureHeightDp;
+
+import top.yukonga.miuix.kmp.icon.MiuixIcons;
+
+import static top.yukonga.miuix.kmp.icon.extended.ContactsBookKt.getContactsBook;
+import static top.yukonga.miuix.kmp.icon.extended.NotesKt.getNotes;
 
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -687,8 +693,15 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 				homeTabFragment::onLiquidTimelineSelected,
 				homeTabFragment::onLiquidNewPosts,
 				homeTabFragment::onLiquidCompose,
-				homeTabFragment::onLiquidMenuItem
+				homeTabFragment::onLiquidMenuItem,
+				homeTabFragment::openSearch
 		);
+
+		List<HomeToolbarComposeMenuItem> composeItems=new ArrayList<>();
+		composeItems.add(new HomeToolbarComposeMenuItem(R.id.compose_post, getString(R.string.compose_menu_post), getNotes(MiuixIcons.INSTANCE)));
+		composeItems.add(new HomeToolbarComposeMenuItem(R.id.compose_friend_request, getString(R.string.compose_menu_friend_request), getContactsBook(MiuixIcons.INSTANCE)));
+		liquidToolbarController.setComposeMenu(composeItems);
+
 		liquidToolbarController.setMenuOpenListener(open->{
 			liquidToolbarMenuOpen=open;
 			updateCaptureHeights();

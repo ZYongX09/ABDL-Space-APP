@@ -75,7 +75,7 @@ class HomeLiquidToolbarModelTest {
 
 	@Test
 	fun liquidTimelineUsesScrollableTopPaddingInsteadOfFixedToolbarSpace() {
-		assertEquals(72, homeTimelineTopPaddingDp(liquidMode = true))
+		assertEquals(56, homeTimelineTopPaddingDp(liquidMode = true))
 		assertEquals(0, homeTimelineTopPaddingDp(liquidMode = false))
 	}
 
