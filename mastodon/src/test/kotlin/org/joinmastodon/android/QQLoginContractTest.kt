@@ -99,8 +99,12 @@ class QQLoginContractTest {
 		assertTrue(settings.contains("R.string.qq_account_description"))
 		assertTrue(settings.contains("R.string.qq_bind_consent_title"))
 		assertTrue(settings.contains("R.string.qq_bind_consent_message"))
-		assertTrue(settings.contains("qqBound=bound"))
-		assertFalse(settings.contains("qqItem.subtitle="))
+		assertTrue(settings.contains("QQBindingState.UNKNOWN"))
+		assertTrue(settings.contains("QQBindingState.BOUND"))
+		assertTrue(settings.contains("QQBindingState.UNBOUND"))
+		assertTrue(settings.contains("qqItem.subtitle=state==QQBindingState.BOUND ? nickname"))
+		assertTrue(settings.contains("verificationItem.subtitle=verificationSubtitle(account)"))
+		assertTrue(settings.contains("R.string.verification_account_approved"))
 		assertFalse(settings.contains("refreshVerificationStatus()"))
 	}
 
@@ -115,7 +119,23 @@ class QQLoginContractTest {
 		assertTrue(holder.contains("if(icon!=null && item.iconRes!=0)"))
 		assertTrue(holder.contains("ColorStateList tint=item.iconTintEnabled ? defaultIconTint : null"))
 		assertTrue(holder.contains("icon.setImageTintList(tint)"))
-		assertTrue(settings.contains("qqItem.iconTintEnabled=false"))
+		assertTrue(settings.contains("R.drawable.ic_qq_login"))
+		assertFalse(settings.contains("qqItem.iconTintEnabled=false"))
+	}
+
+	@Test
+	fun bindingResponsesRequireBoundTrueAndUseBindingSpecificErrors() {
+		val auth = File(moduleDir, "src/main/java/org/joinmastodon/android/QQAuthActivity.java").readText()
+		assertTrue(auth.contains("json==null || !json.optBoolean(\"bound\", false)"))
+		assertTrue(auth.contains("bindingErrorMessage(httpStatus, serverCode)"))
+		assertTrue(auth.contains("R.string.qq_bind_session_expired"))
+		assertTrue(auth.contains("R.string.qq_binding_exists"))
+		assertTrue(auth.contains("R.string.qq_already_bound"))
+		assertTrue(auth.contains("R.string.qq_credential_invalid"))
+		assertTrue(auth.contains("R.string.qq_service_unavailable"))
+		assertTrue(auth.contains("R.string.qq_too_many_requests"))
+		assertTrue(auth.contains("json.optString(\"code\", null)"))
+		assertTrue(auth.contains("json.optString(\"access_token\", null)"))
 	}
 
 	@Test

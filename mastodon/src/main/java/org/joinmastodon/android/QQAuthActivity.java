@@ -59,7 +59,7 @@ public class QQAuthActivity extends Activity{
 
 		@Override
 		public void onError(UiError error){
-			showMessageAndFinish(R.string.qq_login_failed);
+			showMessageAndFinish(MODE_BIND.equals(mode) ? R.string.qq_bind_failed : R.string.qq_login_failed);
 		}
 
 		@Override
@@ -83,9 +83,12 @@ public class QQAuthActivity extends Activity{
 			finish();
 			return;
 		}
-		if(MODE_BIND.equals(mode) && AccountSessionManager.getInstance().tryGetAccount(accountID)==null){
-			showMessageAndFinish(R.string.qq_account_session_missing);
-			return;
+		if(MODE_BIND.equals(mode)){
+			AccountSession session=AccountSessionManager.getInstance().tryGetAccount(accountID);
+			if(session==null || session.token==null || TextUtils.isEmpty(session.token.accessToken)){
+				showMessageAndFinish(R.string.qq_account_session_missing);
+				return;
+			}
 		}
 		Tencent.setIsPermissionGranted(true, Build.MODEL);
 		tencent=Tencent.createInstance(BuildConfig.QQ_APP_ID, getApplicationContext(), getPackageName()+".fileprovider");
@@ -133,7 +136,7 @@ public class QQAuthActivity extends Activity{
 				.post(RequestBody.create(JSON, json.toString()));
 		if(MODE_BIND.equals(mode)){
 			AccountSession session=AccountSessionManager.getInstance().tryGetAccount(accountID);
-			if(session==null){
+			if(session==null || session.token==null || TextUtils.isEmpty(session.token.accessToken)){
 				showMessageAndFinish(R.string.qq_account_session_missing);
 				return;
 			}
@@ -165,15 +168,14 @@ public class QQAuthActivity extends Activity{
 	}
 
 	private void handleExchangeResponse(int httpStatus, String responseBody){
-		JSONObject json;
-		try{
-			json=new JSONObject(responseBody);
-		}catch(JSONException error){
-			showMessageAndFinish(R.string.qq_login_failed);
-			return;
+		JSONObject json=null;
+		if(!TextUtils.isEmpty(responseBody)){
+			try{
+				json=new JSONObject(responseBody);
+			}catch(JSONException ignored){}
 		}
-		String action=json.optString("action", null);
-		String serverCode=firstNonEmpty(json.optString("code", null), json.optString("error", null), json.optString("error_code", null));
+		String action=json==null ? null : json.optString("action", null);
+		String serverCode=json==null ? null : firstNonEmpty(json.optString("code", null), json.optString("error", null), json.optString("error_code", null));
 		if("QQ_UNIONID_REQUIRED".equals(serverCode)){
 			showMessageAndFinish(R.string.qq_unionid_required);
 			return;
@@ -183,14 +185,22 @@ public class QQAuthActivity extends Activity{
 			return;
 		}
 		if(httpStatus<200 || httpStatus>=300){
-			showMessageAndFinish(R.string.qq_login_failed);
+			showMessageAndFinish(MODE_BIND.equals(mode) ? bindingErrorMessage(httpStatus, serverCode) : R.string.qq_login_failed);
 			return;
 		}
 		if(MODE_BIND.equals(mode)){
+			if(json==null || !json.optBoolean("bound", false)){
+				showMessageAndFinish(R.string.qq_bind_failed);
+				return;
+			}
 			dismissProgress();
 			Toast.makeText(this, R.string.qq_bind_success, Toast.LENGTH_SHORT).show();
 			setResult(RESULT_BINDING_CHANGED);
 			finish();
+			return;
+		}
+		if(json==null){
+			showMessageAndFinish(R.string.qq_login_failed);
 			return;
 		}
 		String abdlToken=json.optString("token", null);
@@ -212,6 +222,17 @@ public class QQAuthActivity extends Activity{
 				finish();
 			}
 		});
+	}
+
+	private int bindingErrorMessage(int httpStatus, String serverCode){
+		if("QQ_BINDING_EXISTS".equals(serverCode)) return R.string.qq_binding_exists;
+		if("QQ_ALREADY_BOUND".equals(serverCode)) return R.string.qq_already_bound;
+		if("QQ_CREDENTIAL_INVALID".equals(serverCode) || "QQ_REQUEST_INVALID".equals(serverCode)) return R.string.qq_credential_invalid;
+		if("QQ_UPSTREAM_UNAVAILABLE".equals(serverCode) || httpStatus==502 || httpStatus==503) return R.string.qq_service_unavailable;
+		if(httpStatus==429) return R.string.qq_too_many_requests;
+		if(httpStatus==401 || "Authentication required".equals(serverCode) || "Session expired, please login again".equals(serverCode))
+			return R.string.qq_bind_session_expired;
+		return R.string.qq_bind_failed;
 	}
 
 	private String firstNonEmpty(String... values){

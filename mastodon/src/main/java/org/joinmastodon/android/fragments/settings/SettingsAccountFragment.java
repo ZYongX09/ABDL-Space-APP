@@ -51,11 +51,18 @@ public class SettingsAccountFragment extends BaseSettingsFragment<Void>{
 	private boolean loggedOut;
 	private ListItem<Void> nbwItem;
 	private ListItem<Void> qqItem;
-	private boolean qqBound;
+	private ListItem<Void> verificationItem;
+	private QQBindingState qqBindingState=QQBindingState.UNKNOWN;
 	private AccountSession pinnedSession;
+	private org.joinmastodon.android.api.MastodonAPIRequest<?> accountStatusRequest;
 	private Call qqStatusCall;
 	private Call qqUnbindCall;
+	private int accountStatusGeneration;
 	private int qqStatusGeneration;
+
+	private enum QQBindingState{
+		UNKNOWN, UNBOUND, BOUND
+	}
 
 	@Override
 	public void onCreate(Bundle savedInstanceState){
@@ -76,19 +83,19 @@ public class SettingsAccountFragment extends BaseSettingsFragment<Void>{
 		items.add(new ListItem<>(R.string.settings_notifications, 0, R.drawable.ic_notifications_24px, this::onNotificationsClick));
 			items.add(new ListItem<>(R.string.settings_posting_defaults, 0, R.drawable.ic_edit_square_24px, this::onPostingDefaultsClick));
 
-			items.add(new SectionHeaderListItem(R.string.verification_section));
-			items.add(new ListItem<>(R.string.verification_title, R.string.verification_description, R.drawable.ic_badge_24px, this::onVerificationClick));
+				items.add(new SectionHeaderListItem(R.string.verification_section));
+				verificationItem=new ListItem<>(getString(R.string.verification_title), verificationSubtitle(account.self), R.drawable.ic_badge_24px, this::onVerificationClick);
+				items.add(verificationItem);
 
 			// 第三方账户
 			String nbwStatus=account.self.nbwUsername!=null ? account.self.nbwUsername : getString(R.string.nbw_unbound);
 			items.add(new SectionHeaderListItem(R.string.nbw_third_party_account));
 			nbwItem=new ListItem<>(getString(R.string.nbw_third_party_nbw), nbwStatus, R.drawable.ic_nbw, this::onNBWBindClick);
 			items.add(nbwItem);
-			if(BuildConfig.QQ_LOGIN_ENABLED){
-				qqItem=new ListItem<>(R.string.qq_account_title, R.string.qq_account_description, R.drawable.ic_qq_login, this::onQQBindClick);
-				qqItem.iconTintEnabled=false;
-				items.add(qqItem);
-			}
+				if(BuildConfig.QQ_LOGIN_ENABLED){
+					qqItem=new ListItem<>(R.string.qq_account_title, R.string.qq_account_description, R.drawable.ic_qq_login, this::onQQBindClick);
+					items.add(qqItem);
+				}
 
 
 		// 赞助者中心：独立栏目，始终作用于当前点击的账号会话
@@ -121,26 +128,32 @@ public class SettingsAccountFragment extends BaseSettingsFragment<Void>{
 
 
 	private void refreshNBWStatus(){
-		if(nbwItem == null || pinnedSession==null || AccountSessionManager.getInstance().tryGetAccount(accountID)!=pinnedSession) return;
-		new GetOwnAccount()
-			.setCallback(new me.grishka.appkit.api.Callback<Account>(){
-				@Override
-				public void onSuccess(Account account){
-					Activity activity=getActivity();
-					if(activity==null) return;
-					activity.runOnUiThread(()->{
-						if(getActivity()==null || AccountSessionManager.getInstance().tryGetAccount(accountID)!=pinnedSession) return;
-						AccountSessionManager.getInstance().updateAccountInfo(accountID, account);
-						String nbwStatus = account.nbwUsername != null ? account.nbwUsername : getString(R.string.nbw_unbound);
-						nbwItem.subtitle = nbwStatus;
-						rebindItem(nbwItem);
-					});
-				}
+		if(nbwItem==null || verificationItem==null || pinnedSession==null || AccountSessionManager.getInstance().tryGetAccount(accountID)!=pinnedSession) return;
+		if(accountStatusRequest!=null) accountStatusRequest.cancel();
+		final int generation=++accountStatusGeneration;
+		GetOwnAccount request=new GetOwnAccount();
+		accountStatusRequest=request;
+		request.setCallback(new me.grishka.appkit.api.Callback<Account>(){
+			@Override
+			public void onSuccess(Account account){
+				Activity activity=getActivity();
+				if(activity==null) return;
+				activity.runOnUiThread(()->{
+					if(generation!=accountStatusGeneration || getActivity()==null || AccountSessionManager.getInstance().tryGetAccount(accountID)!=pinnedSession) return;
+					accountStatusRequest=null;
+					AccountSessionManager.getInstance().updateAccountInfo(accountID, account);
+					nbwItem.subtitle=account.nbwUsername!=null ? account.nbwUsername : getString(R.string.nbw_unbound);
+					verificationItem.subtitle=verificationSubtitle(account);
+					rebindItem(nbwItem);
+					rebindItem(verificationItem);
+				});
+			}
 
-				@Override
-				public void onError(ErrorResponse error){}
-			})
-			.exec(accountID);
+			@Override
+			public void onError(ErrorResponse error){
+				if(generation==accountStatusGeneration) accountStatusRequest=null;
+			}
+		}).exec(accountID);
 	}
 
 	@Override
@@ -228,14 +241,33 @@ public class SettingsAccountFragment extends BaseSettingsFragment<Void>{
 		Nav.go(getActivity(), BabyVerificationFragment.class, makeFragmentArgs());
 	}
 
+	private String verificationSubtitle(Account account){
+		return account!=null && account.babyVerification!=null && account.babyVerification.verified
+				? getString(R.string.verification_account_approved)
+				: getString(R.string.verification_description);
+	}
+
+	@Override
+	public void onStop(){
+		cancelStatusQueries();
+		super.onStop();
+	}
+
 	@Override
 	public void onDestroy(){
-		qqStatusGeneration++;
-		if(qqStatusCall!=null) qqStatusCall.cancel();
+		cancelStatusQueries();
 		if(qqUnbindCall!=null) qqUnbindCall.cancel();
-		qqStatusCall=null;
 		qqUnbindCall=null;
 		super.onDestroy();
+	}
+
+	private void cancelStatusQueries(){
+		accountStatusGeneration++;
+		qqStatusGeneration++;
+		if(accountStatusRequest!=null) accountStatusRequest.cancel();
+		if(qqStatusCall!=null) qqStatusCall.cancel();
+		accountStatusRequest=null;
+		qqStatusCall=null;
 	}
 
 	private boolean useStagingEnvironmentForDonations(){
@@ -312,49 +344,75 @@ public class SettingsAccountFragment extends BaseSettingsFragment<Void>{
 		qqStatusCall.enqueue(new okhttp3.Callback(){
 			@Override
 			public void onFailure(Call call, IOException error){
-					if(call.isCanceled()) return;
-					updateQQStatus(generation, false);
-				}
+				if(call.isCanceled()) return;
+				updateQQStatusUnavailable(generation);
+			}
 
-				@Override
-				public void onResponse(Call call, Response response) throws IOException{
-					okhttp3.ResponseBody responseBody=response.body();
-					String body=responseBody==null ? "" : responseBody.string();
-					boolean successful=response.isSuccessful();
-					response.close();
-					boolean bound=false;
-					if(successful){
-						try{
-							org.json.JSONObject json=new org.json.JSONObject(body);
-							bound=json.optBoolean("bound", json.optBoolean("is_bound", false));
-						}catch(org.json.JSONException ignored){}
+			@Override
+			public void onResponse(Call call, Response response) throws IOException{
+				okhttp3.ResponseBody responseBody=response.body();
+				String body=responseBody==null ? "" : responseBody.string();
+				boolean successful=response.isSuccessful();
+				response.close();
+				if(!successful){
+					updateQQStatusUnavailable(generation);
+					return;
+				}
+				try{
+					org.json.JSONObject json=new org.json.JSONObject(body);
+					boolean bound=json.getBoolean("bound");
+					String nickname=bound ? json.optString("nickname", "").trim() : null;
+					if(bound && TextUtils.isEmpty(nickname)){
+						updateQQStatusUnavailable(generation);
+						return;
 					}
-					updateQQStatus(generation, bound);
+					updateQQStatus(generation, bound ? QQBindingState.BOUND : QQBindingState.UNBOUND, nickname);
+				}catch(org.json.JSONException ignored){
+					updateQQStatusUnavailable(generation);
 				}
-			});
-		}
+			}
+		});
+	}
 
-	private void updateQQStatus(int generation, boolean bound){
+	private void updateQQStatus(int generation, QQBindingState state, String nickname){
 		Activity activity=getActivity();
 		if(activity==null) return;
 		activity.runOnUiThread(()->{
 			if(generation!=qqStatusGeneration || getActivity()==null || AccountSessionManager.getInstance().tryGetAccount(accountID)!=pinnedSession) return;
-			qqBound=bound;
+			qqStatusCall=null;
+			qqBindingState=state;
+			qqItem.subtitle=state==QQBindingState.BOUND ? nickname : getString(R.string.qq_account_description);
+			rebindItem(qqItem);
+		});
+	}
+
+	private void updateQQStatusUnavailable(int generation){
+		Activity activity=getActivity();
+		if(activity==null) return;
+		activity.runOnUiThread(()->{
+			if(generation!=qqStatusGeneration || getActivity()==null || AccountSessionManager.getInstance().tryGetAccount(accountID)!=pinnedSession) return;
+			qqStatusCall=null;
+			if(qqBindingState==QQBindingState.UNKNOWN){
+				qqItem.subtitle=getString(R.string.qq_status_unavailable);
+				rebindItem(qqItem);
+			}
 		});
 	}
 
 
 	private void onQQBindClick(ListItem<?> item){
 		if(!BuildConfig.QQ_LOGIN_ENABLED || getActivity()==null) return;
-		if(qqBound){
+		if(qqBindingState==QQBindingState.BOUND){
 			new M3AlertDialogBuilder(getActivity())
 					.setTitle(R.string.qq_unbind_title)
 					.setMessage(R.string.qq_unbind_message)
 					.setPositiveButton(R.string.qq_unbind, (dialog, which)->unbindQQ())
 					.setNegativeButton(R.string.cancel, null)
 					.show();
-		}else{
+		}else if(qqBindingState==QQBindingState.UNBOUND){
 			showQQBindConsentDialog();
+		}else{
+			refreshQQStatus();
 		}
 	}
 
@@ -404,11 +462,14 @@ public class SettingsAccountFragment extends BaseSettingsFragment<Void>{
 					String body=response.body()==null ? "" : response.body().string();
 					response.close();
 					if(successful){
-
 					showQQToast(R.string.qq_unbind_success);
 					Activity activity=getActivity();
 					if(activity!=null) activity.runOnUiThread(()->{
-						if(AccountSessionManager.getInstance().tryGetAccount(accountID)==pinnedSession) refreshQQStatus();
+						if(AccountSessionManager.getInstance().tryGetAccount(accountID)!=pinnedSession) return;
+						qqBindingState=QQBindingState.UNBOUND;
+						qqItem.subtitle=getString(R.string.qq_account_description);
+						rebindItem(qqItem);
+						refreshQQStatus();
 					});
 					}else{
 						boolean wouldLock=false;
