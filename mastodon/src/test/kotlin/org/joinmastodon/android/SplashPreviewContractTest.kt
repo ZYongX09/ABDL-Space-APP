@@ -32,5 +32,18 @@ class SplashPreviewContractTest {
 		assertTrue(manifest.contains("android:theme=\"@style/Theme.Mastodon.SplashScreen\""))
 	}
 
+	@Test
+	fun splashHoldsItsWindowUntilMainContentIsReady() {
+		val activity = source("src/main/kotlin/org/joinmastodon/android/ui/SplashActivity.kt")
+		val legacyStyles = source("src/main/res/values/styles.xml")
+		val android12Styles = source("src/main/res/values-v31/styles.xml")
+		val home = source("src/main/java/org/joinmastodon/android/fragments/HomeFragment.java")
+		assertTrue(activity.contains("startActivity(Intent(this, MainActivity::class.java))"))
+		assertTrue(!activity.contains("Intent.FLAG_ACTIVITY_CLEAR_TASK"))
+		assertTrue(legacyStyles.contains("<item name=\"colorM3Background\">@color/splash_bg</item>"))
+		assertTrue(android12Styles.contains("<item name=\"colorM3Background\">@color/splash_bg</item>"))
+		assertTrue(home.contains(".commitNow();"))
+	}
+
 	private fun source(path: String) = File(projectDir, path).readText()
 }

@@ -354,13 +354,22 @@ public class SettingsAccountFragment extends BaseSettingsFragment<Void>{
 					.setNegativeButton(R.string.cancel, null)
 					.show();
 		}else{
-			new M3AlertDialogBuilder(getActivity())
-					.setTitle(R.string.qq_bind_consent_title)
-					.setMessage(R.string.qq_bind_consent_message)
-					.setPositiveButton(R.string.confirm, (dialog, which)->startQQBind())
-					.setNegativeButton(R.string.cancel, null)
-					.show();
+			showQQBindConsentDialog();
 		}
+	}
+
+	private void showQQBindConsentDialog(){
+		android.app.AlertDialog dialog=new M3AlertDialogBuilder(getActivity())
+				.setTitle(R.string.qq_bind_consent_title)
+				.setMessage(android.text.Html.fromHtml(getString(R.string.qq_bind_consent_message)))
+				.setPositiveButton(R.string.confirm, (ignored, which)->startQQBind())
+				.setNegativeButton(R.string.cancel, null)
+				.create();
+		dialog.setOnShowListener(ignored->{
+			TextView message=dialog.findViewById(android.R.id.message);
+			if(message!=null) message.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());
+		});
+		dialog.show();
 	}
 
 	private void startQQBind(){

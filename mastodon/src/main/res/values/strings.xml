@@ -5,10 +5,12 @@
 <string name="oauth_login">使用网页端授权登录</string>
 	<string name="password_login">使用账号密码登录</string>
 	<string name="consent_title">确认同意协议</string>
-	<string name="consent_message">登录前请仔细阅读&lt;a href="https://abdl-space.top/agreement">《用户协议》&lt;/a>和&lt;a href="https://abdl-space.top/privacy">《隐私政策》&lt;/a>，若您同意以上协议请点击确认按钮。</string>
-	<string name="qq_login">腾讯 QQ 登录</string>
-	<string name="qq_consent_title">使用腾讯 QQ 登录</string>
-	<string name="qq_consent_message">继续后将启动腾讯 QQ 互联 SDK 完成授权。QQ 将向 ABDL Space 提供 OpenID、UnionID、昵称、头像和用于兼容性诊断的设备型号；登录或绑定必须取得 UnionID。请同时阅读&lt;a href="https://abdl-space.top/agreement">《用户协议》&lt;/a>和&lt;a href="https://abdl-space.top/privacy">《隐私政策》&lt;/a>。</string>
+		<string name="consent_message">登录前请仔细阅读&lt;a href="https://abdl-space.top/terms">《用户协议》&lt;/a>和&lt;a href="https://abdl-space.top/privacy">《隐私政策》&lt;/a>，若您同意以上协议请点击确认按钮。</string>
+		<string name="login_agreement_text">我已阅读并同意&lt;a href="https://abdl-space.top/terms">《用户协议》&lt;/a>和&lt;a href="https://abdl-space.top/privacy">《隐私政策》&lt;/a></string>
+		<string name="legacy_login_agreement_text">在登录前您需要仔细阅读&lt;a href="https://abdl-space.top/terms">《用户协议》&lt;/a>和&lt;a href="https://abdl-space.top/privacy">《隐私政策》&lt;/a></string>
+		<string name="qq_login">腾讯 QQ 登录</string>
+		<string name="qq_consent_title">使用腾讯 QQ 登录</string>
+		<string name="qq_consent_message">继续后将启动腾讯 QQ 应用程序进行授权登录流程。ABDL Space将会从腾讯 QQ 获取您的用户ID、用户昵称、头像和用于兼容性诊断的设备型号。详细说明请访问本平台的官方网站查看&lt;a href="https://abdl-space.top/terms">《用户协议》&lt;/a>和&lt;a href="https://abdl-space.top/privacy">《隐私政策》&lt;/a>，点击“确认”按钮继续，继续即表示您同意本平台的&lt;a href="https://abdl-space.top/terms">《用户协议》&lt;/a>和&lt;a href="https://abdl-space.top/privacy">《隐私政策》&lt;/a></string>
 	<string name="qq_authorizing">正在请求 QQ 授权…</string>
 	<string name="qq_finishing_auth">正在完成 QQ 登录…</string>
 	<string name="qq_login_invalid_response">QQ 授权结果无效，请重试</string>
@@ -22,7 +24,7 @@
 	<string name="qq_account_title">腾讯 QQ</string>
 	<string name="qq_account_description">授权绑定腾讯QQ账户</string>
 	<string name="qq_bind_consent_title">绑定腾讯 QQ 账号</string>
-	<string name="qq_bind_consent_message">继续后将启动腾讯 QQ 应用程序进行授权流程。ABDL Space将会从腾讯 QQ 获取您的用户ID、用户昵称、头像和用于兼容性诊断的设备型号。详细说明请访问本平台的官方网站查看《用户协议》和《隐私政策》，点击“确认”按钮继续，继续即表示您同意本平台的《用户协议》和《隐私政策》</string>
+		<string name="qq_bind_consent_message">继续后将启动腾讯 QQ 应用程序进行授权流程。ABDL Space将会从腾讯 QQ 获取您的用户ID、用户昵称、头像和用于兼容性诊断的设备型号。详细说明请访问本平台的官方网站查看&lt;a href="https://abdl-space.top/terms">《用户协议》&lt;/a>和&lt;a href="https://abdl-space.top/privacy">《隐私政策》&lt;/a>，点击“确认”按钮继续，继续即表示您同意本平台的&lt;a href="https://abdl-space.top/terms">《用户协议》&lt;/a>和&lt;a href="https://abdl-space.top/privacy">《隐私政策》&lt;/a></string>
 	<string name="qq_status_loading">正在查询绑定状态…</string>
 	<string name="qq_status_bound">已绑定</string>
 	<string name="qq_status_unbound">未绑定</string>

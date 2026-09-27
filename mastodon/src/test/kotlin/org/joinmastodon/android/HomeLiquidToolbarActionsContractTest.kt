@@ -41,6 +41,10 @@ class HomeLiquidToolbarActionsContractTest {
 		assertTrue(homeTab.contains("if(id==R.id.compose_post)"))
 		assertTrue(homeTab.contains("if(id==R.id.compose_friend_request)"))
 		assertTrue(homeTab.contains("public void openSearch()"))
+		val composeAction = homeTab.substringAfter("public void onLiquidCompose(){").substringBefore("\n\t}")
+		assertTrue(composeAction.contains("args.putString(\"account\", accountID)"))
+		assertTrue(composeAction.contains("Nav.go(getActivity(), ComposeFragment.class, args)"))
+		assertFalse(composeAction.contains("onFabClick(fab)"))
 	}
 
 	@Test

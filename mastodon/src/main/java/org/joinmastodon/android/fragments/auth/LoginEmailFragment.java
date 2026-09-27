@@ -125,14 +125,11 @@ public class LoginEmailFragment extends AppKitFragment {
         }
 
         // 协议
-        tvAgreement.setText(android.text.Html.fromHtml(
-            "我已阅读并同意<a href=\"https://abdl-space.top/agreement\">《用户协议》</a>和<a href=\"https://abdl-space.top/privacy\">《隐私政策》</a>"));
+        tvAgreement.setText(android.text.Html.fromHtml(getString(R.string.login_agreement_text)));
         tvAgreement.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());
 
-        // 点击整行切换复选框（含超链接区域）
         View agreementRow = view.findViewById(R.id.agreement_row);
         agreementRow.setOnClickListener(v -> cbAgreement.setChecked(!cbAgreement.isChecked()));
-        tvAgreement.setOnClickListener(v -> cbAgreement.setChecked(!cbAgreement.isChecked()));
 
         cbAgreement.setOnCheckedChangeListener((btn, checked) -> updateButtonState());
         emailEdit.addTextChangedListener(new android.text.TextWatcher() {

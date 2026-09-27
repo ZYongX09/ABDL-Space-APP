@@ -211,7 +211,7 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 					.add(me.grishka.appkit.R.id.fragment_wrap, conversationsFragment).hide(conversationsFragment)
 					.add(me.grishka.appkit.R.id.fragment_wrap, diaperListFragment).hide(diaperListFragment)
 					.add(me.grishka.appkit.R.id.fragment_wrap, profileFragment).hide(profileFragment)
-					.commit();
+					.commitNow();
 
 			String defaultTab=getArguments().getString("tab");
 			if("notifications".equals(defaultTab)){

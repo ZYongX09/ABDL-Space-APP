@@ -81,10 +81,7 @@ class SplashActivity : ComponentActivity() {
     private fun routeToMain() {
         if (routed) return
         routed = true
-        startActivity(
-            Intent(this, MainActivity::class.java)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK),
-        )
+        startActivity(Intent(this, MainActivity::class.java))
         overridePendingTransition(0, 0)
         finish()
     }

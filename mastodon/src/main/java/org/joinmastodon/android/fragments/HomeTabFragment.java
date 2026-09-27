@@ -718,7 +718,9 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 	}
 
 	public void onLiquidCompose(){
-		onFabClick(fab);
+		Bundle args=new Bundle();
+		args.putString("account", accountID);
+		Nav.go(getActivity(), ComposeFragment.class, args);
 	}
 
 	public void onLiquidMenuItem(int id){
