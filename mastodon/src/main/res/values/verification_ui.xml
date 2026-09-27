@@ -38,5 +38,11 @@
 	<string name="verification_photo_retake_required">照片校验未通过，请放弃当前草稿并重新拍摄。</string>
 	<string name="verification_refresh">刷新状态</string>
 	<string name="verification_certificate_unavailable">证书暂时不可用，请刷新后重试。</string>
+	<string name="verification_certificate_pending_sync">认证已通过，证书仍在同步中，请稍后刷新。</string>
+	<string name="verification_certificate_active_summary">当前证书有效 · 第%1$d代</string>
+	<string name="verification_certificate_revoked_title">认证证书已吊销</string>
+	<string name="verification_certificate_revoked_detail">吊销时间：%1$s\n原因：%2$s</string>
+	<string name="verification_certificate_refresh_failed">无法刷新证书状态，请重试。</string>
+	<string name="verification_application_with_certificate">%1$s\n\n%2$s</string>
 	<string name="verification_retry_safe">系统会先核对申请状态并安全重试，不会重复提交。</string>
 </resources>

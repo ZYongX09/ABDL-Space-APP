@@ -103,9 +103,9 @@ class QQLoginContractTest {
 		assertTrue(settings.contains("QQBindingState.BOUND"))
 		assertTrue(settings.contains("QQBindingState.UNBOUND"))
 		assertTrue(settings.contains("qqItem.subtitle=state==QQBindingState.BOUND ? nickname"))
-		assertTrue(settings.contains("verificationItem.subtitle=verificationSubtitle(account)"))
-		assertTrue(settings.contains("R.string.verification_account_approved"))
-		assertFalse(settings.contains("refreshVerificationStatus()"))
+		assertTrue(settings.contains("verificationItem.subtitle=verificationSubtitle(stateResult[0], certificateResult[0].certificate)"))
+		assertTrue(settings.contains("R.string.verification_account_active"))
+		assertTrue(settings.contains("refreshVerificationStatus()"))
 	}
 
 	@Test

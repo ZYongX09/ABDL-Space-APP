@@ -31,6 +31,7 @@ import org.joinmastodon.android.model.verification.VerificationModels.Applicatio
 import org.joinmastodon.android.model.verification.VerificationModels.ApplicationResult;
 import org.joinmastodon.android.model.verification.VerificationModels.CancelResult;
 import org.joinmastodon.android.model.verification.VerificationModels.CaptureSession;
+import org.joinmastodon.android.model.verification.VerificationModels.Certificate;
 import org.joinmastodon.android.model.verification.VerificationModels.CertificateEnvelope;
 import org.joinmastodon.android.model.verification.VerificationModels.Evidence;
 import org.joinmastodon.android.model.verification.VerificationModels.EvidenceComplete;
@@ -47,6 +48,10 @@ import org.joinmastodon.android.verification.VerificationSessionGuard;
 import org.joinmastodon.android.verification.VerificationUploader;
 
 import java.io.File;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.time.format.FormatStyle;
 import java.util.ArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -68,6 +73,7 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 	private AccountSession session;
 	private VerificationSessionGuard guard;
 	private State currentState;
+	private Certificate currentCertificate;
 	private ApplicationDetail currentDetail;
 	private CaptureSession captureSession;
 	private VerificationPendingCapture pendingCapture;
@@ -154,7 +160,7 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 	public void onResume(){
 		super.onResume();
 		if(!resumedOnce){ resumedOnce=true; return; }
-		if(viewReady && !busy && currentState!=null && (currentState.status()==Status.SUBMITTED || currentState.status()==Status.REVIEWING)) loadState();
+		if(viewReady && !busy) loadState();
 	}
 
 	private void loadState(){
@@ -167,30 +173,58 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 		busy=true;
 		showLoading(stageForState(currentState), R.string.verification_status_loading);
 		int generation=guard.nextGeneration();
-		VerificationRequest<State> request=guard.track(VerificationRequest.state());
-		request.setCallback(new Callback<>(){
-			@Override public void onSuccess(State state){
-				guard.done(request);
-				if(!guard.live(generation) || !viewReady) return;
-				currentState=state;
-				renderState(state, generation);
-			}
-			@Override public void onError(ErrorResponse error){
-				guard.done(request);
-				if(!guard.live(generation) || !viewReady) return;
+		final State[] stateResult={null};
+		final CertificateEnvelope[] certificateResult={null};
+		final ErrorResponse[] firstError={null};
+		final int[] remaining={2};
+		VerificationRequest<State> stateRequest=guard.track(VerificationRequest.state());
+		VerificationRequest<CertificateEnvelope> certificateRequest=guard.track(VerificationRequest.certificate());
+		Runnable finish=()->{
+			if(--remaining[0]!=0 || !guard.live(generation) || !viewReady) return;
+			if(firstError[0]!=null || stateResult[0]==null || certificateResult[0]==null){
 				busy=false;
-				showMessage(stageForState(currentState), false, getString(R.string.verification_state_error), errorText(error), false,
+				showMessage(stageForState(currentState), false, getString(R.string.verification_state_error), errorText(firstError[0]), false,
 						R.string.verification_retry, v->loadState(), 0, null);
+				return;
 			}
+			currentState=stateResult[0];
+			currentCertificate=certificateResult[0].certificate;
+			renderState(currentState, currentCertificate, generation);
+		};
+		stateRequest.setCallback(new Callback<>(){
+			@Override public void onSuccess(State state){ guard.done(stateRequest); stateResult[0]=state; finish.run(); }
+			@Override public void onError(ErrorResponse error){ guard.done(stateRequest); if(firstError[0]==null) firstError[0]=error; finish.run(); }
+		}).exec(accountID);
+		certificateRequest.setCallback(new Callback<>(){
+			@Override public void onSuccess(CertificateEnvelope result){ guard.done(certificateRequest); certificateResult[0]=result; finish.run(); }
+			@Override public void onError(ErrorResponse error){ guard.done(certificateRequest); if(firstError[0]==null) firstError[0]=error; finish.run(); }
 		}).exec(accountID);
 	}
 
-	private void renderState(State state, int generation){
+	private void renderState(State state, Certificate certificate, int generation){
+		if(certificate!=null && certificate.isRevoked()){
+			busy=false;
+			String detail=revokedDetail(certificate);
+			String application=applicationSummary(state);
+			if(application!=null) detail=getString(R.string.verification_application_with_certificate, application, detail);
+			showMessage(BabyVerificationProgressView.STAGE_REVIEW, false, getString(R.string.verification_certificate_revoked_title), detail, false,
+					R.string.verification_refresh, v->loadState(), 0, null);
+			return;
+		}
+		if(certificate!=null && certificate.isActive()){
+			busy=false;
+			String detail=getString(R.string.verification_certificate_active_summary, certificate.generation);
+			String application=applicationSummary(state);
+			if(application!=null) detail=getString(R.string.verification_application_with_certificate, application, detail);
+			showMessage(BabyVerificationProgressView.STAGE_REVIEW, state.status()==Status.APPROVED, state.status()==Status.APPROVED ? getString(R.string.verification_status_approved) : applicationTitle(state), detail, false,
+					R.string.verification_certificate_title, v->openCertificate(certificate), R.string.verification_refresh, v->loadState());
+			return;
+		}
 		switch(state.status()){
 			case APPROVED -> {
 				busy=false;
-				showMessage(BabyVerificationProgressView.STAGE_REVIEW, true, getString(R.string.verification_status_approved), getString(R.string.verification_passed_badge_description), false,
-						R.string.verification_certificate_title, v->loadCertificate(), R.string.verification_refresh, v->loadState());
+				showMessage(BabyVerificationProgressView.STAGE_REVIEW, false, getString(R.string.verification_status_approved), getString(R.string.verification_certificate_pending_sync), false,
+						R.string.verification_refresh, v->loadState(), 0, null);
 			}
 			case SUBMITTED, REVIEWING -> {
 				busy=false;
@@ -297,7 +331,7 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 					cancelPendingCapture(false);
 					busy=false;
 					showMessage(BabyVerificationProgressView.STAGE_INFORMATION, false, getString(R.string.verification_state_error), error.getMessage(), false,
-							R.string.verification_retry, v->renderState(currentState, guard.nextGeneration()), 0, null);
+							R.string.verification_retry, v->renderState(currentState, currentCertificate, guard.nextGeneration()), 0, null);
 				}
 			}
 			@Override public void onError(ErrorResponse error){
@@ -305,7 +339,7 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 				if(!guard.live(generation) || !viewReady) return;
 				busy=false;
 				showMessage(BabyVerificationProgressView.STAGE_INFORMATION, false, getString(R.string.verification_state_error), errorText(error), false,
-						R.string.verification_retry, v->renderState(currentState, guard.nextGeneration()), 0, null);
+						R.string.verification_retry, v->renderState(currentState, currentCertificate, guard.nextGeneration()), 0, null);
 			}
 		}).exec(accountID);
 	}
@@ -572,7 +606,8 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 				boolean same=state.application!=null && id.equals(state.application.id);
 				if(same && (state.status()==Status.SUBMITTED || state.status()==Status.REVIEWING || state.status()==Status.APPROVED)){
 					deleteCurrentLocalFiles();
-					renderState(state, generation);
+						currentState=state;
+						loadState();
 				}else if(same && state.status()==Status.DRAFT && allowRetry){
 					submitApplication(id, true);
 				}else{
@@ -656,35 +691,40 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 		}).exec(accountID);
 	}
 
-	private void loadCertificate(){
-		busy=true;
-		showLoading(BabyVerificationProgressView.STAGE_REVIEW, R.string.verification_status_loading);
-		VerificationRequest<CertificateEnvelope> request=VerificationRequest.certificate();
-		flowRequests.add(request);
-		request.setCallback(new Callback<>(){
-			@Override public void onSuccess(CertificateEnvelope result){
-				flowRequests.remove(request);
-				if(!viewReady) return;
-				busy=false;
-				if(result.certificate==null){
-					showMessage(BabyVerificationProgressView.STAGE_REVIEW, true, getString(R.string.verification_status_approved), getString(R.string.verification_certificate_unavailable), false,
-							R.string.verification_refresh, v->loadState(), 0, null);
-					return;
-				}
-				Bundle args=new Bundle();
-				args.putString("account", accountID);
-				args.putString("certificate", MastodonAPIController.gson.toJson(result.certificate));
-				if(currentState!=null) renderState(currentState, guard.nextGeneration());
-				Nav.go(getActivity(), BabyVerificationCertificateFragment.class, args);
-			}
-			@Override public void onError(ErrorResponse error){
-				flowRequests.remove(request);
-				if(!viewReady) return;
-				busy=false;
-				showMessage(BabyVerificationProgressView.STAGE_REVIEW, true, getString(R.string.verification_status_approved), errorText(error), false,
-						R.string.verification_retry, v->loadCertificate(), R.string.verification_refresh, v->loadState());
-			}
-		}).exec(accountID);
+	private void openCertificate(Certificate certificate){
+		if(certificate==null || !certificate.isActive() || !sessionValid()) return;
+		Bundle args=new Bundle();
+		args.putString("account", accountID);
+		args.putString("certificate", MastodonAPIController.gson.toJson(certificate));
+		Nav.go(getActivity(), BabyVerificationCertificateFragment.class, args);
+	}
+
+	private String revokedDetail(Certificate certificate){
+		return getString(R.string.verification_certificate_revoked_detail, formatTime(certificate.revokedAt), certificate.revokeReason);
+	}
+
+	private String applicationSummary(State state){
+		return switch(state.status()){
+			case APPROVED, NOT_STARTED, CANCELLED -> null;
+			case SUBMITTED, REVIEWING -> getString(R.string.verification_review_title);
+			case DRAFT -> getString(R.string.verification_draft_title);
+			case REJECTED -> getString(R.string.verification_rejected_title)+"："+state.application.decisionNote;
+		};
+	}
+
+	private String applicationTitle(State state){
+		return switch(state.status()){
+			case SUBMITTED, REVIEWING -> getString(R.string.verification_review_title);
+			case DRAFT -> getString(R.string.verification_draft_title);
+			case REJECTED -> getString(R.string.verification_rejected_title);
+			case APPROVED -> getString(R.string.verification_status_approved);
+			case NOT_STARTED, CANCELLED -> getString(R.string.verification_certificate_title);
+		};
+	}
+
+	private String formatTime(Long seconds){
+		if(seconds==null || seconds<=0) return "—";
+		return DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM).format(Instant.ofEpochSecond(seconds).atZone(ZoneId.systemDefault()));
 	}
 
 	private void showLoading(int stage, int textRes){

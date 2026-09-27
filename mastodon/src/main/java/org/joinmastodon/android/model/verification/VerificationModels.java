@@ -189,24 +189,38 @@ public final class VerificationModels{
 	}
 
 	public static class Certificate extends BaseModel{
-		public String id, status, verificationToken, verifyPath;
+		public String id, status, verificationToken, verifyPath, revokeReason;
 		public long issuedAt;
+		public Long revokedAt;
 		public int generation;
 		@Override public void postprocess() throws ObjectValidationException{
-			if(!uuid(id) || !"active".equals(status) || !VerificationLink.isValidToken(verificationToken) || verifyPath==null || !verifyPath.equals("/api/v1/baby-verification/verify/"+verificationToken))
+			if(!uuid(id) || !Set.of("active", "revoked").contains(status) || issuedAt<=0 || generation<1)
+				throw new ObjectValidationException("认证证书响应无效");
+			if("active".equals(status) && (!VerificationLink.isValidToken(verificationToken) || verifyPath==null || !verifyPath.equals("/api/v1/baby-verification/verify/"+verificationToken)))
+				throw new ObjectValidationException("认证证书响应无效");
+			if("revoked".equals(status) && (revokedAt==null || revokedAt<=0 || revokeReason==null || revokeReason.isBlank()))
 				throw new ObjectValidationException("认证证书响应无效");
 		}
-		public String publicUrl(){ return "https://abdl-space.top/c/"+verificationToken; }
+		public boolean isActive(){ return "active".equals(status); }
+		public boolean isRevoked(){ return "revoked".equals(status); }
+		public String publicUrl(){
+			if(!isActive() || !VerificationLink.isValidToken(verificationToken)) throw new IllegalStateException("证书已失效");
+			return "https://abdl-space.top/c/"+verificationToken;
+		}
 	}
 
 	public static class VerifyResult extends BaseModel{
 		public boolean valid, superseded;
-		public String status, username;
-		public Long issuedAt;
+		public String status, username, revokeReason;
+		public Long issuedAt, revokedAt, supersededAt;
 		public int generation;
 		@Override public void postprocess() throws ObjectValidationException{
-			if(!Set.of("active", "superseded", "revoked", "unknown").contains(status) || valid!="active".equals(status)) throw new ObjectValidationException("验真响应无效");
-			if(valid && (username==null || username.isBlank() || issuedAt==null)) throw new ObjectValidationException("验真响应无效");
+			if(!Set.of("active", "superseded", "revoked", "unknown").contains(status) || valid!="active".equals(status)
+					|| superseded!="superseded".equals(status)) throw new ObjectValidationException("验真响应无效");
+			if("active".equals(status) && (username==null || username.isBlank() || issuedAt==null || issuedAt<=0 || generation<1))
+				throw new ObjectValidationException("验真响应无效");
+			if("superseded".equals(status) && (supersededAt==null || supersededAt<=0)) throw new ObjectValidationException("验真响应无效");
+			if("revoked".equals(status) && (revokedAt==null || revokedAt<=0 || revokeReason==null || revokeReason.isBlank())) throw new ObjectValidationException("验真响应无效");
 		}
 	}
 

@@ -41,6 +41,41 @@ class BabyVerificationFlowContractTest {
 	}
 
 	@Test
+	fun applicationAndCertificateAreFetchedTogetherAndRenderedAsCombinedState() {
+		val fragment = source("src/main/java/org/joinmastodon/android/fragments/settings/BabyVerificationFragment.java")
+		assertTrue(fragment.contains("VerificationRequest.state()"))
+		assertTrue(fragment.contains("VerificationRequest.certificate()"))
+		assertTrue(fragment.contains("renderState(currentState, currentCertificate, generation)"))
+		assertTrue(fragment.contains("certificate.isRevoked()"))
+		assertTrue(fragment.contains("certificate.isActive()"))
+		assertTrue(fragment.contains("verification_certificate_pending_sync"))
+	}
+
+	@Test
+	fun certificatePageRefreshesBeforeExportAndDropsOldBitmap() {
+		val fragment = source("src/main/java/org/joinmastodon/android/fragments/settings/BabyVerificationCertificateFragment.java")
+		assertTrue(fragment.contains("refresh(PendingAction.SAVE)"))
+		assertTrue(fragment.contains("refresh(PendingAction.SHARE)"))
+		assertTrue(fragment.contains("clearRendered()"))
+		assertTrue(fragment.contains("certificate.isRevoked()"))
+		assertTrue(fragment.contains("certificate.isActive()"))
+		assertTrue(fragment.contains("token==generation"))
+	}
+
+	@Test
+	fun settingsAndPublicVerifierUseCertificateLifecycleStates() {
+		val settings = source("src/main/java/org/joinmastodon/android/fragments/settings/SettingsAccountFragment.java")
+		val result = source("src/main/java/org/joinmastodon/android/fragments/settings/BabyVerificationResultFragment.java")
+		assertTrue(settings.contains("refreshVerificationStatus()"))
+		assertTrue(settings.contains("VerificationRequest.certificate()"))
+		assertFalse(settings.contains("babyVerification.verified"))
+		assertTrue(result.contains("case \"superseded\""))
+		assertTrue(result.contains("case \"revoked\""))
+		assertTrue(result.contains("case \"unknown\""))
+		assertTrue(result.contains("verification_verify_network_error"))
+	}
+
+	@Test
 	fun signedUploadContractIncludesContentLengthAndPrivateIntegrityHeaders() {
 		val models = source("src/main/java/org/joinmastodon/android/model/verification/VerificationModels.java")
 		val uploader = source("src/main/java/org/joinmastodon/android/verification/VerificationUploader.java")

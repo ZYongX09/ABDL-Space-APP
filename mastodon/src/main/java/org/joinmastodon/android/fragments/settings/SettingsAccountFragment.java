@@ -16,10 +16,15 @@ import org.joinmastodon.android.R;
 import org.joinmastodon.android.api.MastodonAPIController;
 import org.joinmastodon.android.api.requests.accounts.GetOwnAccount;
 import org.joinmastodon.android.api.requests.catalog.GetDonationCampaigns;
+import org.joinmastodon.android.api.requests.verification.VerificationRequest;
 import org.joinmastodon.android.api.session.AccountSession;
 import org.joinmastodon.android.api.session.AccountSessionManager;
 import org.joinmastodon.android.model.Account;
 import org.joinmastodon.android.model.donations.DonationCampaign;
+import org.joinmastodon.android.model.verification.VerificationModels.Certificate;
+import org.joinmastodon.android.model.verification.VerificationModels.CertificateEnvelope;
+import org.joinmastodon.android.model.verification.VerificationModels.State;
+import org.joinmastodon.android.model.verification.VerificationModels.Status;
 import org.joinmastodon.android.model.viewmodel.ListItem;
 import org.joinmastodon.android.model.viewmodel.SectionHeaderListItem;
 import org.joinmastodon.android.ui.M3AlertDialogBuilder;
@@ -55,9 +60,12 @@ public class SettingsAccountFragment extends BaseSettingsFragment<Void>{
 	private QQBindingState qqBindingState=QQBindingState.UNKNOWN;
 	private AccountSession pinnedSession;
 	private org.joinmastodon.android.api.MastodonAPIRequest<?> accountStatusRequest;
+	private VerificationRequest<State> verificationStateRequest;
+	private VerificationRequest<CertificateEnvelope> verificationCertificateRequest;
 	private Call qqStatusCall;
 	private Call qqUnbindCall;
 	private int accountStatusGeneration;
+	private int verificationStatusGeneration;
 	private int qqStatusGeneration;
 
 	private enum QQBindingState{
@@ -84,7 +92,7 @@ public class SettingsAccountFragment extends BaseSettingsFragment<Void>{
 			items.add(new ListItem<>(R.string.settings_posting_defaults, 0, R.drawable.ic_edit_square_24px, this::onPostingDefaultsClick));
 
 				items.add(new SectionHeaderListItem(R.string.verification_section));
-				verificationItem=new ListItem<>(getString(R.string.verification_title), verificationSubtitle(account.self), R.drawable.ic_badge_24px, this::onVerificationClick);
+				verificationItem=new ListItem<>(getString(R.string.verification_title), getString(R.string.verification_description), R.drawable.ic_badge_24px, this::onVerificationClick);
 				items.add(verificationItem);
 
 			// 第三方账户
@@ -123,6 +131,7 @@ public class SettingsAccountFragment extends BaseSettingsFragment<Void>{
 	public void onResume(){
 		super.onResume();
 		refreshNBWStatus();
+		refreshVerificationStatus();
 		refreshQQStatus();
 	}
 
@@ -143,9 +152,7 @@ public class SettingsAccountFragment extends BaseSettingsFragment<Void>{
 					accountStatusRequest=null;
 					AccountSessionManager.getInstance().updateAccountInfo(accountID, account);
 					nbwItem.subtitle=account.nbwUsername!=null ? account.nbwUsername : getString(R.string.nbw_unbound);
-					verificationItem.subtitle=verificationSubtitle(account);
 					rebindItem(nbwItem);
-					rebindItem(verificationItem);
 				});
 			}
 
@@ -241,10 +248,46 @@ public class SettingsAccountFragment extends BaseSettingsFragment<Void>{
 		Nav.go(getActivity(), BabyVerificationFragment.class, makeFragmentArgs());
 	}
 
-	private String verificationSubtitle(Account account){
-		return account!=null && account.babyVerification!=null && account.babyVerification.verified
-				? getString(R.string.verification_account_approved)
-				: getString(R.string.verification_description);
+	private void refreshVerificationStatus(){
+		if(verificationItem==null || pinnedSession==null || AccountSessionManager.getInstance().tryGetAccount(accountID)!=pinnedSession) return;
+		if(verificationStateRequest!=null) verificationStateRequest.cancel();
+		if(verificationCertificateRequest!=null) verificationCertificateRequest.cancel();
+		final int generation=++verificationStatusGeneration;
+		final State[] stateResult={null};
+		final CertificateEnvelope[] certificateResult={null};
+		final int[] remaining={2};
+		Runnable finish=()->{
+			if(--remaining[0]!=0 || generation!=verificationStatusGeneration || getActivity()==null || AccountSessionManager.getInstance().tryGetAccount(accountID)!=pinnedSession) return;
+			verificationStateRequest=null;
+			verificationCertificateRequest=null;
+			if(stateResult[0]==null || certificateResult[0]==null) return;
+			verificationItem.subtitle=verificationSubtitle(stateResult[0], certificateResult[0].certificate);
+			rebindItem(verificationItem);
+		};
+		VerificationRequest<State> stateRequest=VerificationRequest.state();
+		VerificationRequest<CertificateEnvelope> certificateRequest=VerificationRequest.certificate();
+		verificationStateRequest=stateRequest;
+		verificationCertificateRequest=certificateRequest;
+		stateRequest.setCallback(new Callback<>(){
+			@Override public void onSuccess(State result){ stateResult[0]=result; finish.run(); }
+			@Override public void onError(ErrorResponse error){ finish.run(); }
+		}).exec(accountID);
+		certificateRequest.setCallback(new Callback<>(){
+			@Override public void onSuccess(CertificateEnvelope result){ certificateResult[0]=result; finish.run(); }
+			@Override public void onError(ErrorResponse error){ finish.run(); }
+		}).exec(accountID);
+	}
+
+	private String verificationSubtitle(State state, Certificate certificate){
+		if(certificate!=null && certificate.isActive()) return getString(R.string.verification_account_active, certificate.generation);
+		if(certificate!=null && certificate.isRevoked()) return getString(R.string.verification_account_revoked);
+		return switch(state.status()){
+			case APPROVED -> getString(R.string.verification_account_pending_sync);
+			case SUBMITTED, REVIEWING -> getString(R.string.verification_account_reviewing);
+			case DRAFT -> getString(R.string.verification_account_draft);
+			case REJECTED -> getString(R.string.verification_account_rejected);
+			case NOT_STARTED, CANCELLED -> getString(R.string.verification_description);
+		};
 	}
 
 	@Override
@@ -263,10 +306,15 @@ public class SettingsAccountFragment extends BaseSettingsFragment<Void>{
 
 	private void cancelStatusQueries(){
 		accountStatusGeneration++;
+		verificationStatusGeneration++;
 		qqStatusGeneration++;
 		if(accountStatusRequest!=null) accountStatusRequest.cancel();
+		if(verificationStateRequest!=null) verificationStateRequest.cancel();
+		if(verificationCertificateRequest!=null) verificationCertificateRequest.cancel();
 		if(qqStatusCall!=null) qqStatusCall.cancel();
 		accountStatusRequest=null;
+		verificationStateRequest=null;
+		verificationCertificateRequest=null;
 		qqStatusCall=null;
 	}
 

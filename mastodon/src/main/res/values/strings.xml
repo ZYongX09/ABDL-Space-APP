@@ -1155,8 +1155,14 @@
 	<string name="new_badge_how_to_get">Badges are granted by admins or earned by meeting conditions. Pick one to show next to your name in your profile.</string>
 	<string name="verification_section">身份与认证</string>
 	<string name="verification_title">宝宝认证</string>
-		<string name="verification_description">认证宝宝身份 获得专属证书</string>
-		<string name="verification_account_approved">您已通过认证</string>
+			<string name="verification_description">认证宝宝身份 获得专属证书</string>
+			<string name="verification_account_approved">您已通过认证</string>
+		<string name="verification_account_active">证书有效 · 第%1$d代</string>
+		<string name="verification_account_revoked">证书已吊销</string>
+		<string name="verification_account_pending_sync">已通过 · 证书待同步</string>
+		<string name="verification_account_reviewing">审核中</string>
+		<string name="verification_account_draft">待完成提交</string>
+		<string name="verification_account_rejected">认证未通过</string>
 	<string name="verification_status_loading">正在查询认证状态…</string>
 	<string name="verification_status_not_started">未认证</string>
 	<string name="verification_status_draft">待完成拍摄</string>
@@ -1201,10 +1207,17 @@
 	<string name="verification_verify_title">宝宝认证验真</string>
 	<string name="verification_verify_valid">认证凭据有效</string>
 	<string name="verification_verify_invalid">认证凭据无效</string>
+	<string name="verification_verify_status_superseded">认证凭据已被替代</string>
+	<string name="verification_verify_status_revoked">认证凭据已吊销</string>
+	<string name="verification_verify_status_unknown">未找到认证凭据</string>
+	<string name="verification_verify_network_error">无法连接验真服务，尚未判定凭据状态。</string>
 	<string name="verification_verify_user">认证用户：%1$s</string>
 	<string name="verification_verify_issued">签发时间：%1$s</string>
 	<string name="verification_verify_generation">凭据代次：%1$d</string>
 	<string name="verification_verify_superseded">该二维码已被补发的新凭据替代，请让持有人提供最新证书。</string>
+	<string name="verification_verify_superseded_at">替代时间：%1$s</string>
 	<string name="verification_verify_revoked">该认证证书已被吊销。</string>
+	<string name="verification_verify_revoked_at">吊销时间：%1$s</string>
+	<string name="verification_verify_reason">原因：%1$s</string>
 	<string name="verification_verify_unknown">未找到该认证凭据，或链接格式无效。</string>
 </resources>
