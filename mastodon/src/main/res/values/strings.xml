@@ -20,6 +20,9 @@
 	<string name="qq_unionid_required">无法取得 QQ UnionID，请确认 QQ 互联应用配置后重试。</string>
 	<string name="qq_account_session_missing">找不到当前 ABDL Space 账户，请返回后重试</string>
 	<string name="qq_account_title">腾讯 QQ</string>
+	<string name="qq_account_description">授权绑定腾讯QQ账户</string>
+	<string name="qq_bind_consent_title">绑定腾讯 QQ 账号</string>
+	<string name="qq_bind_consent_message">继续后将启动腾讯 QQ 应用程序进行授权流程。ABDL Space将会从腾讯 QQ 获取您的用户ID、用户昵称、头像和用于兼容性诊断的设备型号。详细说明请访问本平台的官方网站查看《用户协议》和《隐私政策》，点击“确认”按钮继续，继续即表示您同意本平台的《用户协议》和《隐私政策》</string>
 	<string name="qq_status_loading">正在查询绑定状态…</string>
 	<string name="qq_status_bound">已绑定</string>
 	<string name="qq_status_unbound">未绑定</string>
@@ -1143,6 +1146,7 @@
 	<string name="new_badge_how_to_get">Badges are granted by admins or earned by meeting conditions. Pick one to show next to your name in your profile.</string>
 	<string name="verification_section">身份与认证</string>
 	<string name="verification_title">宝宝认证</string>
+	<string name="verification_description">认证宝宝身份 获得专属证书</string>
 	<string name="verification_status_loading">正在查询认证状态…</string>
 	<string name="verification_status_not_started">未认证</string>
 	<string name="verification_status_draft">待完成拍摄</string>

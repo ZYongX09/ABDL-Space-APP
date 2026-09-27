@@ -23,7 +23,11 @@ class LoginConsentLayoutContractTest {
 			"src/main/java/org/joinmastodon/android/fragments/auth/LoginPasswordFragment.java",
 		)) {
 			val page = source(path)
-			assertTrue(page.contains("if (iconView != null) iconView.setImageResource(iconRes)"))
+			assertTrue(page.contains("boolean iconTintEnabled"))
+			assertTrue(page.contains("iconView.setImageResource(iconRes)"))
+			assertTrue(page.contains("iconView.setImageTintList(iconTintEnabled ? defaultIconTint : null)"))
+			assertTrue(page.contains("R.drawable.ic_qq_login,\n            false,"))
+			assertTrue(page.contains("R.drawable.ic_description_24, true, onConfirm"))
 			assertTrue(page.contains("isAdded() && !activity.isFinishing() && !activity.isDestroyed()"))
 		}
 	}

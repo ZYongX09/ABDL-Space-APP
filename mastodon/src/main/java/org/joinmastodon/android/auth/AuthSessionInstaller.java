@@ -63,12 +63,12 @@ public final class AuthSessionInstaller{
 								if(listener!=null) listener.onError(new InstallationErrorResponse());
 								return;
 							}
-							if(listener!=null) listener.onInstalled(installedSession.getID());
 							if(openMainActivity && !activity.isFinishing() && !activity.isDestroyed()){
 								Intent intent=new Intent(activity, MainActivity.class);
 								intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
 								activity.startActivity(intent);
 							}
+							if(listener!=null) listener.onInstalled(installedSession.getID());
 						}
 
 						@Override

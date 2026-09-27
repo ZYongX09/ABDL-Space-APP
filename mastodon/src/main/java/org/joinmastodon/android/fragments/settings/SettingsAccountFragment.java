@@ -51,13 +51,10 @@ public class SettingsAccountFragment extends BaseSettingsFragment<Void>{
 	private boolean loggedOut;
 	private ListItem<Void> nbwItem;
 	private ListItem<Void> qqItem;
-	private ListItem<Void> verificationItem;
 	private boolean qqBound;
-	private org.joinmastodon.android.api.MastodonAPIRequest<?> verificationRequest;
 	private AccountSession pinnedSession;
 	private Call qqStatusCall;
 	private Call qqUnbindCall;
-	private int verificationGeneration;
 	private int qqStatusGeneration;
 
 	@Override
@@ -80,17 +77,16 @@ public class SettingsAccountFragment extends BaseSettingsFragment<Void>{
 			items.add(new ListItem<>(R.string.settings_posting_defaults, 0, R.drawable.ic_edit_square_24px, this::onPostingDefaultsClick));
 
 			items.add(new SectionHeaderListItem(R.string.verification_section));
-			verificationItem=new ListItem<>(getString(R.string.verification_title), getString(R.string.verification_status_loading), R.drawable.ic_badge_24px, this::onVerificationClick);
-			items.add(verificationItem);
+			items.add(new ListItem<>(R.string.verification_title, R.string.verification_description, R.drawable.ic_badge_24px, this::onVerificationClick));
 
 			// 第三方账户
-
-		String nbwStatus = account.self.nbwUsername != null ? account.self.nbwUsername : getString(R.string.nbw_unbound);
-		items.add(new SectionHeaderListItem(R.string.nbw_third_party_account));
-			nbwItem = new ListItem<>(getString(R.string.nbw_third_party_nbw), nbwStatus, R.drawable.ic_nbw, this::onNBWBindClick);
+			String nbwStatus=account.self.nbwUsername!=null ? account.self.nbwUsername : getString(R.string.nbw_unbound);
+			items.add(new SectionHeaderListItem(R.string.nbw_third_party_account));
+			nbwItem=new ListItem<>(getString(R.string.nbw_third_party_nbw), nbwStatus, R.drawable.ic_nbw, this::onNBWBindClick);
 			items.add(nbwItem);
 			if(BuildConfig.QQ_LOGIN_ENABLED){
-				qqItem=new ListItem<>(getString(R.string.qq_account_title), getString(R.string.qq_status_loading), R.drawable.ic_qq_login, this::onQQBindClick);
+				qqItem=new ListItem<>(R.string.qq_account_title, R.string.qq_account_description, R.drawable.ic_qq_login, this::onQQBindClick);
+				qqItem.iconTintEnabled=false;
 				items.add(qqItem);
 			}
 
@@ -117,12 +113,11 @@ public class SettingsAccountFragment extends BaseSettingsFragment<Void>{
 	protected void doLoadData(int offset, int count){}
 
 	@Override
-		public void onResume(){
-			super.onResume();
-			refreshNBWStatus();
-			refreshQQStatus();
-			refreshVerificationStatus();
-		}
+	public void onResume(){
+		super.onResume();
+		refreshNBWStatus();
+		refreshQQStatus();
+	}
 
 
 	private void refreshNBWStatus(){
@@ -233,36 +228,11 @@ public class SettingsAccountFragment extends BaseSettingsFragment<Void>{
 		Nav.go(getActivity(), BabyVerificationFragment.class, makeFragmentArgs());
 	}
 
-	private void refreshVerificationStatus(){
-		if(verificationItem==null) return;
-		if(verificationRequest!=null) verificationRequest.cancel();
-		int generation=++verificationGeneration;
-		org.joinmastodon.android.api.requests.verification.VerificationRequest<org.joinmastodon.android.model.verification.VerificationModels.State> request=org.joinmastodon.android.api.requests.verification.VerificationRequest.state();
-		verificationRequest=request.setCallback(new me.grishka.appkit.api.Callback<>(){
-			@Override public void onSuccess(org.joinmastodon.android.model.verification.VerificationModels.State state){
-				if(generation!=verificationGeneration || getActivity()==null || AccountSessionManager.getInstance().tryGetAccount(accountID)!=pinnedSession) return;
-				verificationRequest=null;
-				verificationItem.subtitle=getString(switch(state.status()){
-					case APPROVED -> R.string.verification_status_approved;
-					case REJECTED -> R.string.verification_status_rejected;
-					case SUBMITTED, REVIEWING -> R.string.verification_status_review;
-					case DRAFT -> R.string.verification_status_draft;
-					default -> R.string.verification_status_not_started;
-				});
-				rebindItem(verificationItem);
-			}
-			@Override public void onError(me.grishka.appkit.api.ErrorResponse error){ if(generation==verificationGeneration) verificationRequest=null; }
-		}).exec(accountID);
-	}
-
 	@Override
 	public void onDestroy(){
-		verificationGeneration++;
 		qqStatusGeneration++;
-		if(verificationRequest!=null) verificationRequest.cancel();
 		if(qqStatusCall!=null) qqStatusCall.cancel();
 		if(qqUnbindCall!=null) qqUnbindCall.cancel();
-		verificationRequest=null;
 		qqStatusCall=null;
 		qqUnbindCall=null;
 		super.onDestroy();
@@ -343,7 +313,7 @@ public class SettingsAccountFragment extends BaseSettingsFragment<Void>{
 			@Override
 			public void onFailure(Call call, IOException error){
 					if(call.isCanceled()) return;
-					updateQQStatus(generation, false, getString(R.string.qq_status_unavailable));
+					updateQQStatus(generation, false);
 				}
 
 				@Override
@@ -353,32 +323,25 @@ public class SettingsAccountFragment extends BaseSettingsFragment<Void>{
 					boolean successful=response.isSuccessful();
 					response.close();
 					boolean bound=false;
-					String subtitle=getString(successful ? R.string.qq_status_unbound : R.string.qq_status_unavailable);
 					if(successful){
 						try{
 							org.json.JSONObject json=new org.json.JSONObject(body);
 							bound=json.optBoolean("bound", json.optBoolean("is_bound", false));
-							String nickname=json.optString("nickname", "").trim();
-							subtitle=bound && !TextUtils.isEmpty(nickname) ? nickname : getString(bound ? R.string.qq_status_bound : R.string.qq_status_unbound);
 						}catch(org.json.JSONException ignored){}
 					}
-					updateQQStatus(generation, bound, subtitle);
+					updateQQStatus(generation, bound);
 				}
 			});
 		}
 
-		private void updateQQStatus(int generation, boolean bound, String subtitle){
-			Activity activity=getActivity();
-			if(activity==null) return;
-			activity.runOnUiThread(()->{
-				if(generation!=qqStatusGeneration || getActivity()==null || AccountSessionManager.getInstance().tryGetAccount(accountID)!=pinnedSession) return;
-				qqBound=bound;
-				if(qqItem!=null){
-					qqItem.subtitle=subtitle;
-					rebindItem(qqItem);
-				}
-			});
-		}
+	private void updateQQStatus(int generation, boolean bound){
+		Activity activity=getActivity();
+		if(activity==null) return;
+		activity.runOnUiThread(()->{
+			if(generation!=qqStatusGeneration || getActivity()==null || AccountSessionManager.getInstance().tryGetAccount(accountID)!=pinnedSession) return;
+			qqBound=bound;
+		});
+	}
 
 
 	private void onQQBindClick(ListItem<?> item){
@@ -392,8 +355,8 @@ public class SettingsAccountFragment extends BaseSettingsFragment<Void>{
 					.show();
 		}else{
 			new M3AlertDialogBuilder(getActivity())
-					.setTitle(R.string.qq_consent_title)
-					.setMessage(R.string.qq_consent_message)
+					.setTitle(R.string.qq_bind_consent_title)
+					.setMessage(R.string.qq_bind_consent_message)
 					.setPositiveButton(R.string.confirm, (dialog, which)->startQQBind())
 					.setNegativeButton(R.string.cancel, null)
 					.show();

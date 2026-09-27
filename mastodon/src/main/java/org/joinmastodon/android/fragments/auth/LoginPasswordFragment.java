@@ -279,6 +279,7 @@ public class LoginPasswordFragment extends AppKitFragment {
             getString(R.string.qq_consent_title),
             getString(R.string.qq_consent_message),
             R.drawable.ic_qq_login,
+            false,
             () -> {
                 android.app.Activity activity = getActivity();
                 if (activity == null) return;
@@ -290,15 +291,19 @@ public class LoginPasswordFragment extends AppKitFragment {
     }
 
     private void showConsentSheet(Runnable onConfirm) {
-        showConsentSheet(getString(R.string.consent_title), getString(R.string.consent_message), R.drawable.ic_description_24, onConfirm);
+        showConsentSheet(getString(R.string.consent_title), getString(R.string.consent_message), R.drawable.ic_description_24, true, onConfirm);
     }
 
-    private void showConsentSheet(String titleText, String messageText, int iconRes, Runnable onConfirm) {
+    private void showConsentSheet(String titleText, String messageText, int iconRes, boolean iconTintEnabled, Runnable onConfirm) {
         android.app.Activity activity = getActivity();
         if (activity == null) return;
         View sheetView = LayoutInflater.from(activity).inflate(R.layout.sheet_qr_login, null);
         ImageView iconView = sheetView.findViewById(R.id.icon);
-        if (iconView != null) iconView.setImageResource(iconRes);
+        if (iconView != null) {
+            android.content.res.ColorStateList defaultIconTint = iconView.getImageTintList();
+            iconView.setImageResource(iconRes);
+            iconView.setImageTintList(iconTintEnabled ? defaultIconTint : null);
+        }
         me.grishka.appkit.views.BottomSheet sheet = new me.grishka.appkit.views.BottomSheet(activity) {{
             setContentView(sheetView);
             setNavigationBarBackground(new android.graphics.drawable.ColorDrawable(

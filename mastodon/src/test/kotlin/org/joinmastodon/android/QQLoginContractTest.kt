@@ -78,6 +78,61 @@ class QQLoginContractTest {
 	}
 
 	@Test
+	fun qqLoginStartsMainActivityBeforeSuccessListenerCanFinishAuthActivity() {
+		val installer = File(moduleDir, "src/main/java/org/joinmastodon/android/auth/AuthSessionInstaller.java").readText()
+		val startMain = installer.indexOf("activity.startActivity(intent);")
+		val notifyInstalled = installer.indexOf("listener.onInstalled(installedSession.getID())")
+		assertTrue("MainActivity must be started before the listener can finish QQAuthActivity", startMain >= 0 && notifyInstalled > startMain)
+		assertTrue(installer.contains("Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK"))
+	}
+
+	@Test
+	fun accountSettingsUseFixedDescriptionsAndBindingSpecificConsent() {
+		val strings = File(moduleDir, "src/main/res/values/strings.xml").readText()
+		val settings = File(moduleDir, "src/main/java/org/joinmastodon/android/fragments/settings/SettingsAccountFragment.java").readText()
+		assertTrue(strings.contains("<string name=\"verification_description\">认证宝宝身份 获得专属证书</string>"))
+		assertTrue(strings.contains("<string name=\"qq_account_description\">授权绑定腾讯QQ账户</string>"))
+		assertTrue(strings.contains("<string name=\"qq_bind_consent_title\">绑定腾讯 QQ 账号</string>"))
+		assertTrue(strings.contains("继续后将启动腾讯 QQ 应用程序进行授权流程。ABDL Space将会从腾讯 QQ 获取您的用户ID、用户昵称、头像和用于兼容性诊断的设备型号。"))
+		assertTrue(settings.contains("R.string.verification_description"))
+		assertTrue(settings.contains("R.string.qq_account_description"))
+		assertTrue(settings.contains("R.string.qq_bind_consent_title"))
+		assertTrue(settings.contains("R.string.qq_bind_consent_message"))
+		assertTrue(settings.contains("qqBound=bound"))
+		assertFalse(settings.contains("qqItem.subtitle="))
+		assertFalse(settings.contains("refreshVerificationStatus()"))
+	}
+
+	@Test
+	fun listItemsResetIconTintAcrossRecycledRows() {
+		val model = File(moduleDir, "src/main/java/org/joinmastodon/android/model/viewmodel/ListItem.java").readText()
+		val holder = File(moduleDir, "src/main/java/org/joinmastodon/android/ui/viewholders/ListItemViewHolder.java").readText()
+		val settings = File(moduleDir, "src/main/java/org/joinmastodon/android/fragments/settings/SettingsAccountFragment.java").readText()
+		assertTrue(model.contains("public boolean iconTintEnabled=true"))
+		assertTrue(holder.contains("defaultIconTint=icon.getImageTintList()"))
+		assertTrue(holder.contains("ColorStateList tint=item.iconTintEnabled ? defaultIconTint : null"))
+		assertTrue(holder.contains("icon.setImageTintList(tint)"))
+		assertTrue(settings.contains("qqItem.iconTintEnabled=false"))
+	}
+
+	@Test
+	fun qqAssetsComeFromDensitySpecificWebpResources() {
+		val expected = mapOf(
+			"mdpi" to Pair(30, 24),
+			"hdpi" to Pair(45, 36),
+			"xhdpi" to Pair(60, 48),
+			"xxhdpi" to Pair(90, 72),
+			"xxxhdpi" to Pair(120, 96),
+		)
+		expected.forEach { (density, dimensions) ->
+			assertVp8lDimensions(File(moduleDir, "src/main/res/drawable-$density/ic_qq_login.webp"), dimensions.first, dimensions.first)
+			assertVp8lDimensions(File(moduleDir, "src/main/res/drawable-$density/ic_field_qq.webp"), dimensions.second, dimensions.second)
+		}
+		assertFalse(File(moduleDir, "src/main/res/drawable/ic_qq_login.xml").exists())
+		assertFalse(File(moduleDir, "src/main/res/drawable/ic_field_qq.xml").exists())
+	}
+
+	@Test
 	fun repositoryDoesNotContainQqAppKeyMaterial() {
 		val textExtensions = setOf("java", "kt", "kts", "gradle", "xml", "properties", "json", "txt")
 		moduleDir.walkTopDown()
@@ -87,6 +142,20 @@ class QQLoginContractTest {
 					assertFalse("QQ App Key value must not be committed: ${file.path}", Regex("(?im)^\\s*(?:QQ_ANDROID_APP_KEY|QQ_APP_KEY|qq[_ -]?app[_ -]?key)\\s*[:=]\\s*['\\\"]?[^#\\s'\\\"]+").containsMatchIn(text))
 
 			}
+	}
+
+	private fun assertVp8lDimensions(file: File, expectedWidth: Int, expectedHeight: Int) {
+		assertTrue("missing ${file.path}", file.isFile)
+		val bytes = file.readBytes()
+		assertTrue("${file.path} must be a lossless WebP", bytes.size >= 25 && String(bytes, 0, 4) == "RIFF" && String(bytes, 8, 4) == "WEBP" && String(bytes, 12, 4) == "VP8L" && bytes[20].toInt() and 0xff == 0x2f)
+		val b1 = bytes[21].toInt() and 0xff
+		val b2 = bytes[22].toInt() and 0xff
+		val b3 = bytes[23].toInt() and 0xff
+		val b4 = bytes[24].toInt() and 0xff
+		val width = 1 + ((b1 or (b2 shl 8)) and 0x3fff)
+		val height = 1 + (((b2 shr 6) or (b3 shl 2) or (b4 shl 10)) and 0x3fff)
+		assertEquals(expectedWidth, width)
+		assertEquals(expectedHeight, height)
 	}
 
 	@Test
