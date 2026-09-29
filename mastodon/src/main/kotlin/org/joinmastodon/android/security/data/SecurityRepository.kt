@@ -34,6 +34,12 @@ interface SecurityRepository {
 
 	suspend fun disablePin(currentPin: CharArray): PinProtectedMutationResult
 
+	/**
+	 * Demotes the lock method from [LockMethod.Biometrics] back to [LockMethod.Pin]. Other methods
+	 * and NoLock stores are rejected; biometric key deletion is the caller's responsibility.
+	 */
+	suspend fun demoteToPinAfterBiometricInvalidation(): SecurityResult<SecurityState>
+
 	/** Changes only lockout policy. PIN digits can change only with setupPin/changePin. */
 	suspend fun editLockoutPolicy(
 		trials: PinTrials,

@@ -18,14 +18,19 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import org.joinmastodon.android.R
 import org.joinmastodon.android.security.data.SecurityRepository
 import org.joinmastodon.android.security.data.SecurityResult
 import org.joinmastodon.android.security.domain.PinTimeout
 import org.joinmastodon.android.security.domain.PinTrials
+import org.joinmastodon.android.security.ui.BiometricUiController
+import org.joinmastodon.android.security.ui.BiometricUiResult
+import org.joinmastodon.android.security.ui.UnavailableBiometricUiController
 
 class SecurityViewModel(
 	private val securityRepository: SecurityRepository,
+	private val biometricController: BiometricUiController = UnavailableBiometricUiController,
 ) : ViewModel() {
 	private val _uiState = MutableStateFlow(SecurityUiState())
 	val uiState: StateFlow<SecurityUiState> = _uiState.asStateFlow()
@@ -35,6 +40,7 @@ class SecurityViewModel(
 
 	private var refreshJob: Job? = null
 	private var policyJob: Job? = null
+	private var biometricJob: Job? = null
 
 	init {
 		refresh()
@@ -62,14 +68,43 @@ class SecurityViewModel(
 	}
 
 	fun requestBiometricEnable() {
-		if (!_uiState.value.hasPin) return
-		viewModelScope.launch { effectChannel.send(SecurityEffect.BiometricUnavailable) }
+		if (!_uiState.value.hasPin || biometricJob?.isActive == true) return
+		biometricJob = viewModelScope.launch {
+			val result = suspendCancellableCoroutine { continuation ->
+				biometricController.requestEnable { value ->
+					if (continuation.isActive) continuation.resume(value) {}
+				}
+			}
+			when (result) {
+				BiometricUiResult.Enabled -> refresh()
+				BiometricUiResult.Unavailable -> effectChannel.send(SecurityEffect.BiometricUnavailable)
+				BiometricUiResult.Cancelled -> Unit
+			}
+			biometricJob = null
+		}
 	}
 
-	fun disableBiometricPlaceholder() {
-		// The current increment never persists a biometric lock method. A stale biometric value from
-		// future storage is therefore only reflected; it is not mutated here without PIN validation.
-		viewModelScope.launch { effectChannel.send(SecurityEffect.BiometricUnavailable) }
+	/** Called by the host after the platform biometric prompt validated the crypto object. */
+	fun onBiometricEnabled() {
+		viewModelScope.launch {
+			effectChannel.send(SecurityEffect.BiometricEnabled)
+			refresh()
+		}
+	}
+
+	fun disableBiometric() {
+		if (!_uiState.value.hasPin || biometricJob?.isActive == true) return
+		biometricJob = viewModelScope.launch {
+			// Never flip the toggle before the repository confirms the demotion.
+			when (securityRepository.demoteToPinAfterBiometricInvalidation()) {
+				is SecurityResult.Success -> refresh()
+				else -> {
+					_uiState.update { it.copy(policyUpdating = false) }
+					effectChannel.send(SecurityEffect.BiometricUnavailable)
+				}
+			}
+			biometricJob = null
+		}
 	}
 
 	fun clearError() {
@@ -119,6 +154,7 @@ class SecurityViewModel(
 	override fun onCleared() {
 		refreshJob?.cancel()
 		policyJob?.cancel()
+		biometricJob?.cancel()
 		effectChannel.close()
 		super.onCleared()
 	}

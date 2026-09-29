@@ -43,8 +43,9 @@
     <string name="security_a11y_biometric">Use biometric authentication</string>
     <string name="security_a11y_digit_key">Digit %1$d</string>
     <string name="security_a11y_verifying">Verifying PIN</string>
-    <string name="security_biometric_unavailable">Biometric lock is not available in this version yet.</string>
-    <string name="security_biometric_placeholder_summary">Biometric lock will be available in a future update. Your PIN remains enabled.</string>
+    <string name="security_biometric_unavailable">Biometric authentication is not available right now. Use your PIN.</string>
+    <string name="security_biometric_error">Biometric error: %s</string>
+    <string name="security_error_no_fragment_activity">Could not open biometric prompt. Restart the app and try again.</string>
     <string name="security_error_invalid_input">The PIN input is invalid. Please try again.</string>
     <string name="security_error_invalid_state">Security settings changed. Return and try again.</string>
     <string name="security_error_store_corrupted">Security data is damaged and could not be updated.</string>

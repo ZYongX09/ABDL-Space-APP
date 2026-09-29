@@ -38,11 +38,14 @@ internal class FakeSecurityRepository(
 	var setupResult: SecurityResult<SecurityState> = SecurityResult.Success(securityState(LockMethod.Pin))
 	var changeResult: PinProtectedMutationResult = PinProtectedMutationResult.Success(securityState(LockMethod.Pin))
 	var disableResult: PinProtectedMutationResult = PinProtectedMutationResult.Success(securityState())
+	var demoteResult: SecurityResult<SecurityState> =
+		SecurityResult.Success(securityState(LockMethod.Pin))
 	var policyResult: SecurityResult<SecurityState>? = null
 
 	var setupCalls = 0
 	var changeCalls = 0
 	var disableCalls = 0
+	var demoteCalls = 0
 	var policyCalls = 0
 	var verifyCalls = 0
 
@@ -95,6 +98,13 @@ internal class FakeSecurityRepository(
 		disablePinCopy = currentPin.copyOf()
 		currentPin.fill('\u0000')
 		return disableResult
+	}
+
+	override suspend fun demoteToPinAfterBiometricInvalidation(): SecurityResult<SecurityState> {
+		demoteCalls += 1
+		return demoteResult.also { result ->
+			if (result is SecurityResult.Success) stateResult = result
+		}
 	}
 
 	override suspend fun editLockoutPolicy(

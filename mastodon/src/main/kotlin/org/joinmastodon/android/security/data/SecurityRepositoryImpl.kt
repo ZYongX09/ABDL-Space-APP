@@ -29,6 +29,7 @@ class SecurityRepositoryImpl(
 	private val pinCipher: PinCipher,
 	private val elapsedRealtimeProvider: ElapsedRealtimeProvider,
 	private val bootSessionMarkerProvider: BootSessionMarkerProvider,
+	private val biometricKeyCleanup: () -> Unit = {},
 	private val operationMutex: Mutex = Mutex(),
 ) : SecurityRepository {
 	private val pinVerifier = PinVerifier(pinCipher)
@@ -96,6 +97,40 @@ class SecurityRepositoryImpl(
 			currentPin.clearSensitive()
 		}
 	}
+
+	override suspend fun demoteToPinAfterBiometricInvalidation(): SecurityResult<SecurityState> =
+		operationMutex.withLock {
+			try {
+				when (val updated = store.update { current ->
+					val existing = current.requireLocked()
+					if (existing.lockStatus != LockMethodEntity.FINGERPRINT_WITH_PIN_SECURED) {
+						throw InvalidSetupStateException()
+					}
+					existing.copy(
+						lockStatus = LockMethodEntity.PIN_SECURED,
+						invalidPinStatus = InvalidPinStatusEntity(),
+					)
+				}) {
+					is SecurityStoreResult.Success -> SecurityResult.Success(
+						updated.value.toSecurityState(InvalidPinStatus.Default),
+					)
+					SecurityStoreResult.Corrupted,
+					SecurityStoreResult.Missing,
+					-> SecurityResult.Corrupted
+					SecurityStoreResult.Unavailable -> SecurityResult.StoreError
+				}
+			} catch (error: CancellationException) {
+				throw error
+			} catch (_: InvalidSetupStateException) {
+				SecurityResult.InvalidState
+			} catch (_: CorruptedSecurityStoreException) {
+				SecurityResult.Corrupted
+			} catch (_: UnavailableSecurityStoreException) {
+				SecurityResult.StoreError
+			} catch (_: Exception) {
+				SecurityResult.StoreError
+			}
+		}
 
 	override suspend fun editLockoutPolicy(
 		trials: PinTrials,
@@ -338,9 +373,14 @@ class SecurityRepositoryImpl(
 				}
 			}) {
 				is SecurityStoreResult.Success -> when (val mutation = outcome) {
-					MutationOutcome.Success -> PinProtectedMutationResult.Success(
-						updated.value.toSecurityState(InvalidPinStatus.Default),
-					)
+					MutationOutcome.Success -> {
+						// The disable is committed; removing the optional biometric key afterwards
+						// cannot fail the operation (deletion is idempotent).
+						biometricKeyCleanup()
+						PinProtectedMutationResult.Success(
+							updated.value.toSecurityState(InvalidPinStatus.Default),
+						)
+					}
 					is MutationOutcome.Wrong -> PinProtectedMutationResult.Wrong(mutation.status)
 					is MutationOutcome.Blocked -> PinProtectedMutationResult.Blocked(mutation.status)
 					null -> PinProtectedMutationResult.StoreError

@@ -69,6 +69,7 @@ class SecurityActivity : FragmentActivity() {
 					setupPinViewModel = setupPinViewModel,
 					changePinViewModel = changePinViewModel,
 					disablePinViewModel = disablePinViewModel,
+					biometricKeyProvider = graph.biometricKeyProvider,
 					onFinish = ::finish,
 				)
 			}
@@ -89,6 +90,7 @@ private fun SecurityHost(
 	setupPinViewModel: SetupPinViewModel,
 	changePinViewModel: ChangePinViewModel,
 	disablePinViewModel: DisablePinViewModel,
+	biometricKeyProvider: org.joinmastodon.android.security.data.BiometricKeyProvider,
 	onFinish: () -> Unit,
 ) {
 	var route by rememberSaveable { mutableStateOf(SecurityRoute.Security.name) }
@@ -108,14 +110,15 @@ private fun SecurityHost(
 	}
 	androidx.compose.foundation.layout.Box(modifier = Modifier.fillMaxSize()) {
 			when (currentRoute) {
-				SecurityRoute.Security -> {
+			SecurityRoute.Security -> {
 				LaunchedEffect(securityViewModel) { securityViewModel.refresh() }
 				SecurityScreen(
 					viewModel = securityViewModel,
+					biometricKeyProvider = biometricKeyProvider,
 					onBack = onFinish,
-						openSetupPin = { openRoute(SecurityRoute.SetupPin) },
-						openChangePin = { openRoute(SecurityRoute.ChangePin) },
-						openDisablePin = { openRoute(SecurityRoute.DisablePin) },
+					openSetupPin = { openRoute(SecurityRoute.SetupPin) },
+					openChangePin = { openRoute(SecurityRoute.ChangePin) },
+					openDisablePin = { openRoute(SecurityRoute.DisablePin) },
 				)
 			}
 			SecurityRoute.SetupPin -> {

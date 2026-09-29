@@ -20,12 +20,16 @@ object SecurityComponents {
 		requireMainProcess(applicationContext)
 		repository?.let { return it }
 		return synchronized(this) {
-			repository ?: SecurityRepositoryImpl(
-				store = EncryptedPreferencesSecurityStore(applicationContext),
-				pinCipher = AndroidKeystorePinCipher(applicationContext.packageName),
-				elapsedRealtimeProvider = AndroidElapsedRealtimeProvider,
-				bootSessionMarkerProvider = AndroidBootSessionMarkerProvider(applicationContext),
-			).also { repository = it }
+			repository ?: run {
+				val keyProvider = AndroidKeystoreBiometricKeyProvider(applicationContext.packageName)
+				SecurityRepositoryImpl(
+					store = EncryptedPreferencesSecurityStore(applicationContext),
+					pinCipher = AndroidKeystorePinCipher(applicationContext.packageName),
+					elapsedRealtimeProvider = AndroidElapsedRealtimeProvider,
+					bootSessionMarkerProvider = AndroidBootSessionMarkerProvider(applicationContext),
+					biometricKeyCleanup = keyProvider::deleteSecretKey,
+				).also { repository = it }
+			}
 		}
 	}
 

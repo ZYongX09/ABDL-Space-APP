@@ -27,4 +27,5 @@ data class SecurityUiState(
 
 sealed interface SecurityEffect {
 	data object BiometricUnavailable : SecurityEffect
+	data object BiometricEnabled : SecurityEffect
 }

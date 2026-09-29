@@ -59,6 +59,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 @Composable
 fun SecurityScreen(
 	viewModel: SecurityViewModel,
+	biometricKeyProvider: org.joinmastodon.android.security.data.BiometricKeyProvider,
 	onBack: () -> Unit,
 	openSetupPin: () -> Unit,
 	openDisablePin: () -> Unit,
@@ -68,6 +69,7 @@ fun SecurityScreen(
 	val context = LocalContext.current
 	var showTrialsDialog by remember { mutableStateOf(false) }
 	var showTimeoutDialog by remember { mutableStateOf(false) }
+	var showBiometricDialog by remember { mutableStateOf(false) }
 	LaunchedEffect(viewModel) {
 		viewModel.effects.collect { effect ->
 			when (effect) {
@@ -76,6 +78,7 @@ fun SecurityScreen(
 					R.string.security_biometric_unavailable,
 					Toast.LENGTH_SHORT,
 				).show()
+				SecurityEffect.BiometricEnabled -> Unit
 			}
 		}
 	}
@@ -173,11 +176,13 @@ fun SecurityScreen(
 							SwitchPreference(
 								checked = uiState.lockMethod == LockMethod.Biometrics,
 								onCheckedChange = {
-									if (it) viewModel.requestBiometricEnable()
-									else viewModel.disableBiometricPlaceholder()
+									if (it) {
+										showBiometricDialog = true
+									} else {
+										viewModel.disableBiometric()
+									}
 								},
 								title = stringResource(R.string.settings__option_fingerprint),
-								summary = stringResource(R.string.security_biometric_placeholder_summary),
 								startAction = { SecurityIcon(R.drawable.ic_fluent_fingerprint_24_regular) },
 							)
 						}
@@ -221,6 +226,20 @@ fun SecurityScreen(
 				viewModel.updatePinTimeout(PinTimeout.entries[it])
 				showTimeoutDialog = false
 			},
+		)
+	}
+	if (showBiometricDialog) {
+		org.joinmastodon.android.security.ui.biometric.BiometricDialog(
+			title = stringResource(R.string.biometric_dialog_setup_title),
+			subtitle = stringResource(R.string.biometric_dialog_auth_subtitle),
+			negative = stringResource(R.string.biometric_dialog_setup_cancel),
+			biometricKeyProvider = biometricKeyProvider,
+			onSuccess = {
+				showBiometricDialog = false
+				viewModel.onBiometricEnabled()
+			},
+			onDismiss = { showBiometricDialog = false },
+			onInvalidated = { showBiometricDialog = false },
 		)
 	}
 }

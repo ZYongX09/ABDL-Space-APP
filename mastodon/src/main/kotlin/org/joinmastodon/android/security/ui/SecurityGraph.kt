@@ -7,15 +7,19 @@
 package org.joinmastodon.android.security.ui
 
 import android.content.Context
+import org.joinmastodon.android.security.data.AndroidKeystoreBiometricKeyProvider
+import org.joinmastodon.android.security.data.BiometricKeyProvider
 import org.joinmastodon.android.security.data.SecurityComponents
 import org.joinmastodon.android.security.data.SecurityRepository
 
 internal class SecurityGraph private constructor(
 	val repository: SecurityRepository,
+	val biometricKeyProvider: BiometricKeyProvider,
 ) {
 	companion object {
 		fun create(context: Context): SecurityGraph = SecurityGraph(
 			repository = SecurityComponents.createRepository(context),
+			biometricKeyProvider = AndroidKeystoreBiometricKeyProvider(context.applicationContext.packageName),
 		)
 	}
 }

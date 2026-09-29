@@ -43,8 +43,9 @@
     <string name="security_a11y_biometric">使用生物辨識驗證</string>
     <string name="security_a11y_digit_key">數字 %1$d</string>
     <string name="security_a11y_verifying">正在驗證 PIN 碼</string>
-    <string name="security_biometric_unavailable">此版本暫不支援生物辨識鎖定。</string>
-    <string name="security_biometric_placeholder_summary">生物辨識鎖定將於後續更新提供。您的 PIN 碼仍保持啟用。</string>
+    <string name="security_biometric_unavailable">生物辨識暫不可用，請使用 PIN 碼。</string>
+    <string name="security_biometric_error">生物辨識錯誤：%s</string>
+    <string name="security_error_no_fragment_activity">無法開啟生物辨識驗證，請重新啟動應用程式後再試。</string>
     <string name="security_error_invalid_input">PIN 碼輸入無效，請再試一次。</string>
     <string name="security_error_invalid_state">安全性設定已變更，請返回後再試一次。</string>
     <string name="security_error_store_corrupted">安全性資料已損毀，無法更新。</string>

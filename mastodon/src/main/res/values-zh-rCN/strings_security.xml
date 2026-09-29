@@ -43,8 +43,9 @@
     <string name="security_a11y_biometric">使用生物识别验证</string>
     <string name="security_a11y_digit_key">数字 %1$d</string>
     <string name="security_a11y_verifying">正在验证 PIN 码</string>
-    <string name="security_biometric_unavailable">此版本暂不支持生物识别锁定。</string>
-    <string name="security_biometric_placeholder_summary">生物识别锁定将在后续更新中提供。您的 PIN 码仍保持启用。</string>
+    <string name="security_biometric_unavailable">生物识别暂不可用，请使用 PIN 码。</string>
+    <string name="security_biometric_error">生物识别错误：%s</string>
+    <string name="security_error_no_fragment_activity">无法打开生物识别验证，请重启应用后重试。</string>
     <string name="security_error_invalid_input">PIN 码输入无效，请重试。</string>
     <string name="security_error_invalid_state">安全设置已发生变化，请返回后重试。</string>
     <string name="security_error_store_corrupted">安全数据已损坏，无法更新。</string>

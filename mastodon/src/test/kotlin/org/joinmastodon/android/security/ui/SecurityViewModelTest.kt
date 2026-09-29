@@ -12,6 +12,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -77,22 +78,61 @@ class SecurityViewModelTest {
 	}
 
 	@Test
-	fun biometricPlaceholderEmitsUnavailableAndNeverWritesRepository() = runTest {
+	fun biometricEnableFlowUsesControllerAndIgnoresRepositoryWrites() = runTest {
 		withMainDispatcher {
 			val repository = FakeSecurityRepository(
 				SecurityResult.Success(securityState(lockMethod = LockMethod.Pin)),
 			)
-			val viewModel = SecurityViewModel(repository)
+			val controller = FakeBiometricController(BiometricUiResult.Enabled)
+			val viewModel = SecurityViewModel(repository, controller)
+			runCurrent()
+			viewModel.requestBiometricEnable()
+			runCurrent()
+
+			assertEquals(1, controller.calls)
+			assertEquals(0, repository.policyCalls)
+			assertEquals(0, repository.setupCalls)
+			assertEquals(0, repository.changeCalls)
+			assertEquals(0, repository.disableCalls)
+			assertEquals(LockMethod.Pin, viewModel.uiState.value.lockMethod)
+
+			val effect = async { viewModel.effects.first() }
+			viewModel.onBiometricEnabled()
+			runCurrent()
+			assertEquals(SecurityEffect.BiometricEnabled, effect.await())
+		}
+	}
+
+	@Test
+	fun biometricUnavailableResultEmitsEffectWithoutStateChange() = runTest {
+		withMainDispatcher {
+			val repository = FakeSecurityRepository(
+				SecurityResult.Success(securityState(lockMethod = LockMethod.Pin)),
+			)
+			val controller = FakeBiometricController(BiometricUiResult.Unavailable)
+			val viewModel = SecurityViewModel(repository, controller)
 			runCurrent()
 			val effect = async { viewModel.effects.first() }
 			viewModel.requestBiometricEnable()
 			runCurrent()
 
 			assertEquals(SecurityEffect.BiometricUnavailable, effect.await())
-			assertEquals(0, repository.policyCalls)
-			assertEquals(0, repository.setupCalls)
-			assertEquals(0, repository.changeCalls)
-			assertEquals(0, repository.disableCalls)
+			assertEquals(LockMethod.Pin, viewModel.uiState.value.lockMethod)
+		}
+	}
+
+	@Test
+	fun disableBiometricDemotesViaRepository() = runTest {
+		withMainDispatcher {
+			val repository = FakeSecurityRepository(
+				SecurityResult.Success(securityState(lockMethod = LockMethod.Biometrics)),
+			)
+			val viewModel = SecurityViewModel(repository, FakeBiometricController(BiometricUiResult.Enabled))
+			runCurrent()
+			viewModel.disableBiometric()
+			advanceUntilIdle()
+
+			assertEquals(1, repository.demoteCalls)
 			assertEquals(LockMethod.Pin, viewModel.uiState.value.lockMethod)
 		}
 	}
@@ -107,6 +147,18 @@ class SecurityViewModelTest {
 			runCurrent()
 			assertEquals(LockMethod.NoLock, viewModel.uiState.value.lockMethod)
 			assertEquals(0, repository.policyCalls)
+		}
+	}
+
+	private class FakeBiometricController(
+		private val result: BiometricUiResult,
+	) : BiometricUiController {
+		var calls = 0
+			private set
+
+		override fun requestEnable(onResult: (BiometricUiResult) -> Unit) {
+			calls += 1
+			onResult(result)
 		}
 	}
 
