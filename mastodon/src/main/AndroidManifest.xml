@@ -54,6 +54,8 @@
 	<application
 		android:name=".MastodonApp"
 		android:allowBackup="true"
+		android:fullBackupContent="@xml/backup_rules"
+		android:dataExtractionRules="@xml/data_extraction_rules"
 		android:label="@string/mo_app_name"
 		android:supportsRtl="true"
 		android:networkSecurityConfig="@xml/network_security_config"

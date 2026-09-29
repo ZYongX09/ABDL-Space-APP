@@ -29,6 +29,7 @@ public class OpenSourceLicensesFragment extends ToolbarFragment {
 	private static final List<OpenSourceLibrary> LIBRARIES = List.of(
 		// 项目本体与上游
 		new OpenSourceLibrary("Moshidon", null, "GPL-3.0", "https://github.com/LucasGGamerM/moshidon"),
+		new OpenSourceLibrary("2FAS Security", "5.6.0", "GPL-3.0", "https://github.com/twofas/2fas-android/tree/119ead28ed8d3d2215afd8f55428c1586401149b"),
 		new OpenSourceLibrary("FlowReader (reader-core)", null, "GPL-3.0", "https://github.com/HuZaiGong/flowreader"),
 		// 界面基础
 		new OpenSourceLibrary("miuix", "0.9.3", "Apache-2.0", "https://github.com/compose-miuix-ui/miuix"),
