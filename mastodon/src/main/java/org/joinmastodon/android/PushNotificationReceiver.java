@@ -209,7 +209,7 @@ public class PushNotificationReceiver extends BroadcastReceiver{
 				replyIntent.putExtra("visibility", notification.status.visibility.toString());
 				replyIntent.putExtra("replyPrefix", replyPrefix);
 				builder.addAction(new Notification.Action.Builder(Icon.createWithResource(context, R.drawable.ic_reply_24px),
-						context.getString(R.string.button_reply), PendingIntent.getService(context, (accountID+pn.notificationId+"reply").hashCode(), replyIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE))
+						context.getString(R.string.button_reply), PendingIntent.getActivity(context, (accountID+pn.notificationId+"reply").hashCode(), new Intent(context, org.joinmastodon.android.security.ui.lock.LockActivity.class).putExtra("pending_notification_action", replyIntent), PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE))
 								.addRemoteInput(new RemoteInput.Builder("replyText").setLabel(context.getString(R.string.button_reply)).build())
 								.build());
 			}
@@ -220,7 +220,7 @@ public class PushNotificationReceiver extends BroadcastReceiver{
 			favIntent.putExtra("post", notification.status.id);
 			favIntent.putExtra("notificationTag", notificationTag);
 			builder.addAction(new Notification.Action.Builder(Icon.createWithResource(context, R.drawable.ic_star_24px),
-					context.getString(R.string.button_favorite), PendingIntent.getService(context, (accountID+pn.notificationId+"favorite").hashCode(), favIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE)).build());
+					context.getString(R.string.button_favorite), PendingIntent.getActivity(context, (accountID+pn.notificationId+"favorite").hashCode(), new Intent(context, org.joinmastodon.android.security.ui.lock.LockActivity.class).putExtra("pending_notification_action", favIntent), PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE)).build());
 
 			PendingIntent boostActionIntent;
 			if(notification.status.visibility!=StatusPrivacy.DIRECT){
@@ -229,7 +229,7 @@ public class PushNotificationReceiver extends BroadcastReceiver{
 				boostIntent.putExtra("account", accountID);
 				boostIntent.putExtra("post", notification.status.id);
 				boostIntent.putExtra("notificationTag", notificationTag);
-				boostActionIntent=PendingIntent.getService(context, (accountID+pn.notificationId+"boost").hashCode(), boostIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+				boostActionIntent=PendingIntent.getActivity(context, (accountID+pn.notificationId+"boost").hashCode(), new Intent(context, org.joinmastodon.android.security.ui.lock.LockActivity.class).putExtra("pending_notification_action", boostIntent), PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 			}else{
 				boostActionIntent=null;
 			}

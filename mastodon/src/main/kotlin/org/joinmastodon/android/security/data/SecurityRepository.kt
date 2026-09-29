@@ -34,6 +34,9 @@ interface SecurityRepository {
 
 	suspend fun disablePin(currentPin: CharArray): PinProtectedMutationResult
 
+	/** Persists the biometric lock method after the platform prompt has authenticated successfully. */
+	suspend fun enableBiometrics(): SecurityResult<SecurityState>
+
 	/**
 	 * Demotes the lock method from [LockMethod.Biometrics] back to [LockMethod.Pin]. Other methods
 	 * and NoLock stores are rejected; biometric key deletion is the caller's responsibility.

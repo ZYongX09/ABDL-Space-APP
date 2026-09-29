@@ -154,7 +154,7 @@ private class SecurityViewModelFactory(
 ) : ViewModelProvider.Factory {
 	override fun <T : ViewModel> create(modelClass: Class<T>): T {
 		val viewModel: ViewModel = when (modelClass) {
-			SecurityViewModel::class.java -> SecurityViewModel(graph.repository)
+			SecurityViewModel::class.java -> SecurityViewModel(graph.repository, biometricKeyProvider = graph.biometricKeyProvider)
 			SetupPinViewModel::class.java -> SetupPinViewModel(graph.repository)
 			ChangePinViewModel::class.java -> ChangePinViewModel(graph.repository)
 			DisablePinViewModel::class.java -> DisablePinViewModel(graph.repository)

@@ -17,6 +17,10 @@ public class NovelExternalImportActivity extends FragmentStackActivity{
 		String accountID=AccountSessionManager.getInstance().getLastActiveAccountID();
 		var session=AccountSessionManager.getInstance().tryGetAccount(accountID); if(session!=null)UiUtils.setUserPreferredTheme(this,session);
 		super.onCreate(state); if(session==null){finish();return;}
+		if(org.joinmastodon.android.security.AppSecurity.isLocked()){
+			startActivity(new Intent(this, org.joinmastodon.android.security.ui.lock.LockActivity.class));
+			return;
+		}
 		if(state==null){Uri uri=document(getIntent());if(uri==null){finish();return;}showFragment(NovelWorkspaceFragment.newInstance(accountID,uri,getIntent().getFlags()));}
 	}
 	private static Uri document(Intent intent){

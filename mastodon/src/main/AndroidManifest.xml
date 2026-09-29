@@ -68,6 +68,15 @@
 			android:name=".fragments.settings.ComposeAboutActivity"
 			android:exported="false" />
 		<activity
+			android:name="org.joinmastodon.android.security.ui.lock.LockActivity"
+			android:exported="false"
+			android:launchMode="singleTop"
+			android:theme="@style/Theme.Mastodon.AutoLightDark" />
+		<activity
+			android:name="org.joinmastodon.android.security.ui.SecurityActivity"
+			android:exported="false"
+			android:theme="@style/Theme.Mastodon.AutoLightDark" />
+		<activity
 			android:name=".QQAuthActivity"
 			android:exported="false"
 			android:theme="@style/Theme.Mastodon.AutoLightDark"

@@ -26,8 +26,12 @@ public class ExternalShareActivity extends FragmentStackActivity{
 	@Override
 	protected void onCreate(@Nullable Bundle savedInstanceState){
 		UiUtils.setUserPreferredTheme(this);
-		super.onCreate(savedInstanceState);
-		if(savedInstanceState==null){
+			super.onCreate(savedInstanceState);
+			if(org.joinmastodon.android.security.AppSecurity.isLocked()){
+				startActivity(new Intent(this, org.joinmastodon.android.security.ui.lock.LockActivity.class));
+				return;
+			}
+			if(savedInstanceState==null){
 			List<AccountSession> sessions=AccountSessionManager.getInstance().getLoggedInAccounts();
 			if(sessions.isEmpty()){
 				Toast.makeText(this, R.string.err_not_logged_in, Toast.LENGTH_SHORT).show();

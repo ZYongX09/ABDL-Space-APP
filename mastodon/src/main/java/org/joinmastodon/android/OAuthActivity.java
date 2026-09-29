@@ -36,8 +36,12 @@ public class OAuthActivity extends Activity{
 	@Override
 	protected void onCreate(@Nullable Bundle savedInstanceState){
 		UiUtils.setUserPreferredTheme(this);
-		super.onCreate(savedInstanceState);
-		Uri uri=getIntent().getData();
+			super.onCreate(savedInstanceState);
+			if(org.joinmastodon.android.security.AppSecurity.isLocked()){
+				startActivity(new Intent(this, org.joinmastodon.android.security.ui.lock.LockActivity.class));
+				return;
+			}
+			Uri uri=getIntent().getData();
 		if(uri==null){
 			finish();
 			return;

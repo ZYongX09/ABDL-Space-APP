@@ -20,6 +20,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import org.joinmastodon.android.R
+import org.joinmastodon.android.security.data.BiometricKeyProvider
+import org.joinmastodon.android.security.data.BiometricKeyStoreUnavailableException
 import org.joinmastodon.android.security.data.SecurityRepository
 import org.joinmastodon.android.security.data.SecurityResult
 import org.joinmastodon.android.security.domain.PinTimeout
@@ -31,6 +33,7 @@ import org.joinmastodon.android.security.ui.UnavailableBiometricUiController
 class SecurityViewModel(
 	private val securityRepository: SecurityRepository,
 	private val biometricController: BiometricUiController = UnavailableBiometricUiController,
+	private val biometricKeyProvider: BiometricKeyProvider? = null,
 ) : ViewModel() {
 	private val _uiState = MutableStateFlow(SecurityUiState())
 	val uiState: StateFlow<SecurityUiState> = _uiState.asStateFlow()
@@ -87,8 +90,16 @@ class SecurityViewModel(
 	/** Called by the host after the platform biometric prompt validated the crypto object. */
 	fun onBiometricEnabled() {
 		viewModelScope.launch {
-			effectChannel.send(SecurityEffect.BiometricEnabled)
-			refresh()
+			try {
+				biometricKeyProvider?.createSecretKey()
+			} catch (_: Exception) {
+				effectChannel.send(SecurityEffect.BiometricUnavailable)
+				return@launch
+			}
+			when (securityRepository.enableBiometrics()) {
+				is SecurityResult.Success -> refresh()
+				else -> effectChannel.send(SecurityEffect.BiometricUnavailable)
+			}
 		}
 	}
 

@@ -36,6 +36,7 @@ internal class FakeSecurityRepository(
 ) : SecurityRepository {
 	var verifyResult: PinVerificationResult = PinVerificationResult.Success
 	var setupResult: SecurityResult<SecurityState> = SecurityResult.Success(securityState(LockMethod.Pin))
+	var enableResult: SecurityResult<SecurityState> = SecurityResult.Success(securityState(LockMethod.Biometrics))
 	var changeResult: PinProtectedMutationResult = PinProtectedMutationResult.Success(securityState(LockMethod.Pin))
 	var disableResult: PinProtectedMutationResult = PinProtectedMutationResult.Success(securityState())
 	var demoteResult: SecurityResult<SecurityState> =
@@ -43,6 +44,7 @@ internal class FakeSecurityRepository(
 	var policyResult: SecurityResult<SecurityState>? = null
 
 	var setupCalls = 0
+	var enableCalls = 0
 	var changeCalls = 0
 	var disableCalls = 0
 	var demoteCalls = 0
@@ -64,6 +66,12 @@ internal class FakeSecurityRepository(
 		verifyCalls += 1
 		pin.fill('\u0000')
 		return verifyResult
+	}
+
+	override suspend fun enableBiometrics(): SecurityResult<SecurityState> {
+		enableCalls += 1
+		if (enableResult is SecurityResult.Success) stateResult = enableResult
+		return enableResult
 	}
 
 	override suspend fun setupPin(

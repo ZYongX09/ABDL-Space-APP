@@ -75,6 +75,7 @@ public class MastodonApp extends Application{
 		}
 		GlobalUserPreferences.load();
 		if(isMainProcess(getPackageName(), processName)){
+			org.joinmastodon.android.security.AppSecurity.install(this);
 			NovelAccountCleanupWorker.enqueuePending(context);
 			for(AccountSession session:AccountSessionManager.getInstance().getLoggedInAccounts()){
 				NovelUploadWorker.enqueuePending(context, session.getID());

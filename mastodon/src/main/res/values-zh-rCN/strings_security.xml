@@ -50,4 +50,6 @@
     <string name="security_error_invalid_state">安全设置已发生变化，请返回后重试。</string>
     <string name="security_error_store_corrupted">安全数据已损坏，无法更新。</string>
     <string name="security_error_store_unavailable">无法保存安全设置，请重试。</string>
+<string name="security__enter_pin">请输入您的 PIN 码</string>
+<string name="fingerprint__biometric_invalidated">由于系统生物识别设置更改，生物识别登录已停用。请使用 PIN 码。</string>
 </resources>

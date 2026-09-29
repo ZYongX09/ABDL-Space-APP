@@ -96,10 +96,10 @@ class SecurityViewModelTest {
 			assertEquals(0, repository.disableCalls)
 			assertEquals(LockMethod.Pin, viewModel.uiState.value.lockMethod)
 
-			val effect = async { viewModel.effects.first() }
 			viewModel.onBiometricEnabled()
-			runCurrent()
-			assertEquals(SecurityEffect.BiometricEnabled, effect.await())
+			advanceUntilIdle()
+			assertEquals(1, repository.enableCalls)
+			assertEquals(LockMethod.Biometrics, viewModel.uiState.value.lockMethod)
 		}
 	}
 
