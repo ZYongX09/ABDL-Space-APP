@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- Copyright (c) Two Factor Authentication Service, Inc. -->
+<!-- Source: https://github.com/twofas/2fas-android/blob/119ead28ed8d3d2215afd8f55428c1586401149b/core/locale/src/main/res/values/strings.xml -->
+<!-- Modified for ABDL Space, 2026. -->
+<resources>
+    <string name="security__change_pin">Change PIN</string>
+    <string name="security__enter_current_pin">Please enter your current PIN</string>
+    <string name="security__pin_error_incorrect">PIN incorrect! Please try again</string>
+    <string name="security__disable_pin">Disable PIN</string>
+    <string name="biometric_dialog_auth_title">Authenticate</string>
+    <string name="biometric_dialog_auth_subtitle">Use your biometric credential</string>
+    <string name="biometric_dialog_auth_cancel">Use PIN this time</string>
+    <string name="settings__security">Security</string>
+    <string name="settings__pin_code">PIN code</string>
+    <string name="settings__biometrics">Biometrics</string>
+    <string name="settings__option_fingerprint">Biometric Lock</string>
+    <string name="settings__option_fingerprint_description">To enable Biometric Lock, you need to enable and set a PIN Code.</string>
+    <string name="settings__settings">Settings</string>
+    <string name="settings__app_blocking">Lockout settings</string>
+    <string name="settings__limit_of_trials">Max failed attempts</string>
+    <string name="settings__no_limit">No limit</string>
+    <string name="settings__how_many_attempts_footer">Select the maximum number of unsuccessful attempts to enter the passcode before locking the application (lockout time can be changed below).\n</string>
+    <string name="settings__block_for">Lockout time</string>
+    <string name="settings__block_for_footer">Select the time for which the app will be locked.\n</string>
+    <string name="biometric_dialog_setup_title">Enable authentication</string>
+    <string name="biometric_dialog_setup_cancel">Cancel</string>
+    <string name="commons__no">No</string>
+    <string name="commons__yes">Yes</string>
+    <string name="security__create_pin">Create PIN</string>
+    <string name="settings__pin_4_digits">4-digits code</string>
+    <string name="settings__pin_6_digits">6-digits code</string>
+    <string name="settings__select_pin_length">Select PIN length</string>
+    <string name="security__enter_your_new_pin">Please enter your new %s PIN</string>
+    <string name="security__confirm_new_pin">Please confirm your new PIN</string>
+    <string name="security_error_no_match">PIN does not match! Please try again.</string>
+    <string name="settings__3_minutes">3 minutes</string>
+    <string name="settings__5_minutes">5 minutes</string>
+    <string name="settings__10_minutes">10 minutes</string>
+    <string name="security__too_many_attempts_try_again_after">Too many attempts. Please try again after %s minutes.</string>
+    <string name="security_a11y_pin_progress">%1$d of %2$d digits entered</string>
+    <string name="security_a11y_backspace">Delete last digit</string>
+    <string name="security_a11y_biometric">Use biometric authentication</string>
+    <string name="security_a11y_digit_key">Digit %1$d</string>
+    <string name="security_a11y_verifying">Verifying PIN</string>
+    <string name="security_biometric_unavailable">Biometric lock is not available in this version yet.</string>
+    <string name="security_biometric_placeholder_summary">Biometric lock will be available in a future update. Your PIN remains enabled.</string>
+    <string name="security_error_invalid_input">The PIN input is invalid. Please try again.</string>
+    <string name="security_error_invalid_state">Security settings changed. Return and try again.</string>
+    <string name="security_error_store_corrupted">Security data is damaged and could not be updated.</string>
+    <string name="security_error_store_unavailable">Security settings could not be saved. Please try again.</string>
+</resources>

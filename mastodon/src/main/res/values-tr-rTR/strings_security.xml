@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- Copyright (c) Two Factor Authentication Service, Inc. -->
+<!-- Source: https://github.com/twofas/2fas-android/blob/119ead28ed8d3d2215afd8f55428c1586401149b/core/locale/src/main/res/values-tr-rTR/strings.xml -->
+<!-- Modified for ABDL Space, 2026. -->
+<resources>
+    <string name="security__change_pin">PIN\'i değiştir</string>
+    <string name="security__enter_current_pin">Lütfen mevcut PIN\'inizi girin</string>
+    <string name="security__pin_error_incorrect">PIN yanlış! Lütfen tekrar deneyin</string>
+    <string name="security__disable_pin">PIN\'i devre dışı bırak</string>
+    <string name="biometric_dialog_auth_title">Doğrula</string>
+    <string name="biometric_dialog_auth_subtitle">Biyometrik kimliğinizi kullanın</string>
+    <string name="biometric_dialog_auth_cancel">Bu sefer PIN kullan</string>
+    <string name="settings__security">Güvenlik</string>
+    <string name="settings__pin_code">PIN kodu</string>
+    <string name="settings__biometrics">Biyometrikler</string>
+    <string name="settings__option_fingerprint">Biyometrik kilit</string>
+    <string name="settings__option_fingerprint_description">Biyometrik kilidi etkinleştirmek için PIN kodunu etkinleştirip ayarlamanız gerekir.</string>
+    <string name="settings__settings">Ayarlar</string>
+    <string name="settings__app_blocking">Kilitlenme ayarları</string>
+    <string name="settings__limit_of_trials">En fazla başarısız deneme</string>
+    <string name="settings__no_limit">Sınır yok</string>
+    <string name="settings__how_many_attempts_footer">Uygulama kilitlenmeden önce izin verilen en fazla başarısız parola denemesi sayısını seçin (kilitlenme süresi aşağıdan değiştirilebilir).</string>
+    <string name="settings__block_for">Kilitlenme süresi</string>
+    <string name="settings__block_for_footer">Uygulamanın kilitlenmesi için gereken süreyi seçin</string>
+    <string name="biometric_dialog_setup_title">Doğrulamayı etkinleştir</string>
+    <string name="biometric_dialog_setup_cancel">İptal</string>
+    <string name="commons__no">Hayır</string>
+    <string name="commons__yes">Evet</string>
+    <string name="security__create_pin">PIN oluştur</string>
+    <string name="settings__pin_4_digits">4 basamak</string>
+    <string name="settings__pin_6_digits">6 basamak</string>
+    <string name="settings__select_pin_length">PIN uzunluğu seç</string>
+    <string name="security__enter_your_new_pin">Lütfen yeni %s PIN\'inizi girin</string>
+    <string name="security__confirm_new_pin">Lütfen yeni PIN\'inizi onaylayın</string>
+    <string name="security_error_no_match">PIN eşleşmiyor! Lütfen tekrar deneyin.</string>
+    <string name="settings__3_minutes">3 dakika</string>
+    <string name="settings__5_minutes">5 dakika</string>
+    <string name="settings__10_minutes">10 dakika</string>
+    <string name="security__too_many_attempts_try_again_after">Çok fazla deneme. Lütfen %s dakika sonra tekrar deneyin.</string>
+</resources>

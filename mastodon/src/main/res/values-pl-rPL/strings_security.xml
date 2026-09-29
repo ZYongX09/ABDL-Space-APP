@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- Copyright (c) Two Factor Authentication Service, Inc. -->
+<!-- Source: https://github.com/twofas/2fas-android/blob/119ead28ed8d3d2215afd8f55428c1586401149b/core/locale/src/main/res/values-pl-rPL/strings.xml -->
+<!-- Modified for ABDL Space, 2026. -->
+<resources>
+    <string name="security__change_pin">Zmień PIN</string>
+    <string name="security__enter_current_pin">Wprowadź aktualny PIN</string>
+    <string name="security__pin_error_incorrect">Błędny PIN. Spróbój ponownie.</string>
+    <string name="security__disable_pin">Wyłączyć PIN</string>
+    <string name="biometric_dialog_auth_title">Weryfikacja</string>
+    <string name="biometric_dialog_auth_subtitle">Potwierdź swoją tożsamość</string>
+    <string name="biometric_dialog_auth_cancel">Zaloguj się podając PIN</string>
+    <string name="settings__security">Bezpieczeństwo</string>
+    <string name="settings__pin_code">Kod PIN</string>
+    <string name="settings__biometrics">Biometryka</string>
+    <string name="settings__option_fingerprint">Użyj biometryki</string>
+    <string name="settings__option_fingerprint_description">Aby włączyć Blokadę Biometryczną, włącz i ustaw kod PIN.</string>
+    <string name="settings__settings">Ustawienia</string>
+    <string name="settings__app_blocking">Ustawienia blokady</string>
+    <string name="settings__limit_of_trials">Maksymalna liczba nieudanych prób</string>
+    <string name="settings__no_limit">Brak limitu</string>
+    <string name="settings__how_many_attempts_footer">Wybierz maksymalną liczbę nieudanych prób wprowadzenia PINu przed zablokowaniem aplikacji (czas blokady można zmienić poniżej).</string>
+    <string name="settings__block_for">Czas blokady</string>
+    <string name="settings__block_for_footer">Wybierz na jaki czas aplikacja zostanie zablokowana.\n</string>
+    <string name="biometric_dialog_setup_title">Włącz weryfikacje</string>
+    <string name="biometric_dialog_setup_cancel">Anuluj</string>
+    <string name="commons__no">Nie</string>
+    <string name="commons__yes">Tak</string>
+    <string name="security__create_pin">Stwórz PIN</string>
+    <string name="settings__pin_4_digits">4 cyfrowy kod</string>
+    <string name="settings__pin_6_digits">6 cyfrowy kod</string>
+    <string name="settings__select_pin_length">Wybierz długość PIN-u</string>
+    <string name="security__enter_your_new_pin">Podaj nowy %s PIN</string>
+    <string name="security__confirm_new_pin">Potwierdź swój nowy PIN</string>
+    <string name="security_error_no_match">PIN nie pasuje! Proszę spróbować ponownie.</string>
+    <string name="settings__3_minutes">3 minuty</string>
+    <string name="settings__5_minutes">5 minut</string>
+    <string name="settings__10_minutes">10 minut</string>
+    <string name="security__too_many_attempts_try_again_after">Zbyt wiele prób. Proszę spróbować ponownie po %s minutach.</string>
+</resources>

@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- Copyright (c) Two Factor Authentication Service, Inc. -->
+<!-- Source: https://github.com/twofas/2fas-android/blob/119ead28ed8d3d2215afd8f55428c1586401149b/core/locale/src/main/res/values-ja-rJP/strings.xml -->
+<!-- Modified for ABDL Space, 2026. -->
+<resources>
+    <string name="security__change_pin">PIN変更</string>
+    <string name="security__enter_current_pin">現在のPINを入力してください</string>
+    <string name="security__pin_error_incorrect">PINが間違っています。もう一度お試しください</string>
+    <string name="security__disable_pin">PIN無効</string>
+    <string name="biometric_dialog_auth_title">ロック解除</string>
+    <string name="biometric_dialog_auth_subtitle">生体認証を行ってください</string>
+    <string name="biometric_dialog_auth_cancel">今回はPINを使用</string>
+    <string name="settings__security">セキュリティ</string>
+    <string name="settings__pin_code">PIN</string>
+    <string name="settings__biometrics">生体認証</string>
+    <string name="settings__option_fingerprint">生体認証ロック</string>
+    <string name="settings__option_fingerprint_description">生体認証を有効にするには、PINコードを有効にする必要があります。</string>
+    <string name="settings__settings">設定</string>
+    <string name="settings__app_blocking">ロックアウト設定</string>
+    <string name="settings__limit_of_trials">最大試行回数</string>
+    <string name="settings__no_limit">制限なし</string>
+    <string name="settings__how_many_attempts_footer">アプリをロックするまでのパスコード入力の最大試行回数を選択 (ロックアウト時間は以下で変更できます)。</string>
+    <string name="settings__block_for">ロックアウト時間</string>
+    <string name="settings__block_for_footer">アプリがロックされるまでの時間を設定します。</string>
+    <string name="biometric_dialog_setup_title">認証を有効にする</string>
+    <string name="biometric_dialog_setup_cancel">キャンセル</string>
+    <string name="commons__no">いいえ</string>
+    <string name="commons__yes">はい</string>
+    <string name="security__create_pin">PIN作成</string>
+    <string name="settings__pin_4_digits">4桁のコード</string>
+    <string name="settings__pin_6_digits">6桁のコード</string>
+    <string name="settings__select_pin_length">PINの長さを選ぶ</string>
+    <string name="security__enter_your_new_pin">新しい %s PIN を入力してください</string>
+    <string name="security__confirm_new_pin">新しいPINを確認してください</string>
+    <string name="security_error_no_match">PINが一致しません。もう一度お試しください。</string>
+    <string name="settings__3_minutes">3分</string>
+    <string name="settings__5_minutes">5分</string>
+    <string name="settings__10_minutes">10分</string>
+    <string name="security__too_many_attempts_try_again_after">試行回数が多すぎます。%s 分後にもう一度お試しください。</string>
+</resources>

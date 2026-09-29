@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- Copyright (c) Two Factor Authentication Service, Inc. -->
+<!-- Source: https://github.com/twofas/2fas-android/blob/119ead28ed8d3d2215afd8f55428c1586401149b/core/locale/src/main/res/values-in/strings.xml -->
+<!-- Modified for ABDL Space, 2026. -->
+<resources>
+    <string name="security__change_pin">Ganti PIN</string>
+    <string name="security__enter_current_pin">Masukkan PIN anda saat ini</string>
+    <string name="security__pin_error_incorrect">PIN salah! Silakan coba lagi</string>
+    <string name="security__disable_pin">Nonaktifkan PIN</string>
+    <string name="biometric_dialog_auth_title">Otentikasi</string>
+    <string name="biometric_dialog_auth_subtitle">Gunakan kredensial biometrik Anda</string>
+    <string name="biometric_dialog_auth_cancel">Gunakan PIN kali ini</string>
+    <string name="settings__security">Keamanan</string>
+    <string name="settings__pin_code">Kode PIN</string>
+    <string name="settings__biometrics">Biometrik</string>
+    <string name="settings__option_fingerprint">Kunci Biometrik</string>
+    <string name="settings__option_fingerprint_description">Untuk mengaktifkan Kunci Biometrik, Anda perlu mengaktifkan dan mengatur Kode PIN.</string>
+    <string name="settings__settings">Pengaturan</string>
+    <string name="settings__app_blocking">Pengaturan penguncian</string>
+    <string name="settings__limit_of_trials">Upaya gagal maksimal</string>
+    <string name="settings__no_limit">Tidak ada batas</string>
+    <string name="settings__how_many_attempts_footer">Pilih jumlah maksimum percobaan yang gagal untuk memasukkan kode sandi sebelum mengunci aplikasi (waktu penguncian dapat diubah di bawah).</string>
+    <string name="settings__block_for">Waktu penguncian</string>
+    <string name="settings__block_for_footer">Pilih waktu untuk mengunci aplikasi.</string>
+    <string name="biometric_dialog_setup_title">Aktifkan autentikasi</string>
+    <string name="biometric_dialog_setup_cancel">Membatalkan</string>
+    <string name="commons__no">Tidak</string>
+    <string name="commons__yes">Ya</string>
+    <string name="security__create_pin">Buat PIN</string>
+    <string name="settings__pin_4_digits">Kode 4 digit</string>
+    <string name="settings__pin_6_digits">Kode 6 digit</string>
+    <string name="settings__select_pin_length">Pilih panjang PIN</string>
+    <string name="security__enter_your_new_pin">Masukkan %s PIN baru anda</string>
+    <string name="security__confirm_new_pin">Harap konfirmasi PIN baru anda</string>
+    <string name="security_error_no_match">PIN tidak cocok! Silakan coba lagi.</string>
+    <string name="settings__3_minutes">3 menit</string>
+    <string name="settings__5_minutes">5 menit</string>
+    <string name="settings__10_minutes">10 menit</string>
+    <string name="security__too_many_attempts_try_again_after">Terlalu banyak upaya.\u0020\u0020Silakan coba lagi setelah %s menit.</string>
+</resources>

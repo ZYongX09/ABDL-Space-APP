@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- Copyright (c) Two Factor Authentication Service, Inc. -->
+<!-- Source: https://github.com/twofas/2fas-android/blob/119ead28ed8d3d2215afd8f55428c1586401149b/core/locale/src/main/res/values-zh-rCN/strings.xml -->
+<!-- Modified for ABDL Space, 2026. -->
+<resources>
+    <string name="security__change_pin">更改 PIN 码</string>
+    <string name="security__enter_current_pin">请输入您当前的 PIN 码</string>
+    <string name="security__pin_error_incorrect">PIN 码不正确！请重试。</string>
+    <string name="security__disable_pin">禁用 PIN 码</string>
+    <string name="biometric_dialog_auth_title">身份验证</string>
+    <string name="biometric_dialog_auth_subtitle">使用您的生物识别</string>
+    <string name="biometric_dialog_auth_cancel">这次使用 PIN 码</string>
+    <string name="settings__security">安全性</string>
+    <string name="settings__pin_code">PIN 码</string>
+    <string name="settings__biometrics">生物识别</string>
+    <string name="settings__option_fingerprint">生物识别锁定</string>
+    <string name="settings__option_fingerprint_description">要启用生物识别锁定，您需要启用并设置 PIN 码。</string>
+    <string name="settings__settings">设置</string>
+    <string name="settings__app_blocking">锁定设置</string>
+    <string name="settings__limit_of_trials">最大失败尝试次数</string>
+    <string name="settings__no_limit">无限制</string>
+    <string name="settings__how_many_attempts_footer">在应用被锁定之前，选择最大允许的连续失败尝试次数（锁定时间可在下方更改）。\n</string>
+    <string name="settings__block_for">锁定时间</string>
+    <string name="settings__block_for_footer">选择锁定应用的时间。</string>
+    <string name="biometric_dialog_setup_title">启用身份验证</string>
+    <string name="biometric_dialog_setup_cancel">取消</string>
+    <string name="commons__no">否</string>
+    <string name="commons__yes">是</string>
+    <string name="security__create_pin">创建 PIN 码</string>
+    <string name="settings__pin_4_digits">4位数字</string>
+    <string name="settings__pin_6_digits">6位数字</string>
+    <string name="settings__select_pin_length">选择 PIN 码长度</string>
+    <string name="security__enter_your_new_pin">请设置您的新 %s PIN码</string>
+    <string name="security__confirm_new_pin">请确认您的新 PIN 码</string>
+    <string name="security_error_no_match">PIN 码不一致！请重试。</string>
+    <string name="settings__3_minutes">3分钟</string>
+    <string name="settings__5_minutes">5分钟</string>
+    <string name="settings__10_minutes">10分钟</string>
+    <string name="security__too_many_attempts_try_again_after">尝试次数过多。请在 %s 分钟后重试。</string>
+    <string name="security_a11y_pin_progress">已输入 %1$d 位，共 %2$d 位</string>
+    <string name="security_a11y_backspace">删除上一位数字</string>
+    <string name="security_a11y_biometric">使用生物识别验证</string>
+    <string name="security_a11y_digit_key">数字 %1$d</string>
+    <string name="security_a11y_verifying">正在验证 PIN 码</string>
+    <string name="security_biometric_unavailable">此版本暂不支持生物识别锁定。</string>
+    <string name="security_biometric_placeholder_summary">生物识别锁定将在后续更新中提供。您的 PIN 码仍保持启用。</string>
+    <string name="security_error_invalid_input">PIN 码输入无效，请重试。</string>
+    <string name="security_error_invalid_state">安全设置已发生变化，请返回后重试。</string>
+    <string name="security_error_store_corrupted">安全数据已损坏，无法更新。</string>
+    <string name="security_error_store_unavailable">无法保存安全设置，请重试。</string>
+</resources>

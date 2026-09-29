@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- Copyright (c) Two Factor Authentication Service, Inc. -->
+<!-- Source: https://github.com/twofas/2fas-android/blob/119ead28ed8d3d2215afd8f55428c1586401149b/core/locale/src/main/res/values-de-rDE/strings.xml -->
+<!-- Modified for ABDL Space, 2026. -->
+<resources>
+    <string name="security__change_pin">PIN ändern</string>
+    <string name="security__enter_current_pin">Bitte gib deine aktuelle PIN ein</string>
+    <string name="security__pin_error_incorrect">Falsche PIN! Bitte versuche es erneut</string>
+    <string name="security__disable_pin">PIN deaktivieren</string>
+    <string name="biometric_dialog_auth_title">Authentifizierung</string>
+    <string name="biometric_dialog_auth_subtitle">Verwende deine biometrischen Anmeldeinformationen</string>
+    <string name="biometric_dialog_auth_cancel">Verwende dieses Mal die PIN</string>
+    <string name="settings__security">Sicherheit</string>
+    <string name="settings__pin_code">PIN-Code</string>
+    <string name="settings__biometrics">Biometrie</string>
+    <string name="settings__option_fingerprint">Biometrische Sperre</string>
+    <string name="settings__option_fingerprint_description">Um die biometrische Sperre zu aktivieren, musst du einen PIN-Code aktivieren und festlegen.</string>
+    <string name="settings__settings">Einstellungen</string>
+    <string name="settings__app_blocking">Sperreinstellungen</string>
+    <string name="settings__limit_of_trials">Maximale Fehlversuche</string>
+    <string name="settings__no_limit">Kein Limit</string>
+    <string name="settings__how_many_attempts_footer">Wähle die maximale Anzahl von Fehlversuchen bei der Eingabe des Passworts, bevor die Anwendung gesperrt wird (Die Sperrzeit kann darunter geändert werden).</string>
+    <string name="settings__block_for">Sperrzeit</string>
+    <string name="settings__block_for_footer">Wähle die Zeit, für die die App gesperrt werden soll.</string>
+    <string name="biometric_dialog_setup_title">Aktiviere die Authentifizierung</string>
+    <string name="biometric_dialog_setup_cancel">Abbrechen</string>
+    <string name="commons__no">Nein</string>
+    <string name="commons__yes">Ja</string>
+    <string name="security__create_pin">PIN erstellen</string>
+    <string name="settings__pin_4_digits">4-stelliger Code</string>
+    <string name="settings__pin_6_digits">6-stelliger Code</string>
+    <string name="settings__select_pin_length">PIN Länge auswählen</string>
+    <string name="security__enter_your_new_pin">Bitte gib deine neue %s PIN ein</string>
+    <string name="security__confirm_new_pin">Bitte bestätige deine neue PIN</string>
+    <string name="security_error_no_match">PIN stimmt nicht überein! Bitte erneut versuchen.</string>
+    <string name="settings__3_minutes">3 Minuten</string>
+    <string name="settings__5_minutes">5 Minuten</string>
+    <string name="settings__10_minutes">10 Minuten</string>
+    <string name="security__too_many_attempts_try_again_after">Zu viele Versuche. Bitte versuche es nach %s Minuten erneut.</string>
+</resources>

@@ -15,13 +15,15 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
 fun BackNavigationIcon(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    contentDescription: String? = null,
 ) {
     val layoutDirection = LocalLayoutDirection.current
-    IconButton(modifier = modifier, onClick = onClick) {
+    IconButton(modifier = modifier, onClick = onClick, enabled = enabled) {
         Icon(
             modifier = Modifier.graphicsLayer { if (layoutDirection == LayoutDirection.Rtl) scaleX = -1f },
             imageVector = MiuixIcons.Back,
-            contentDescription = null,
+            contentDescription = contentDescription,
             tint = colorScheme.onBackground,
         )
     }
