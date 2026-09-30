@@ -33,15 +33,26 @@ import me.grishka.appkit.api.Callback;
 import me.grishka.appkit.api.ErrorResponse;
 
 public class OAuthActivity extends Activity{
+	private Uri consumedCallback;
+
 	@Override
 	protected void onCreate(@Nullable Bundle savedInstanceState){
 		UiUtils.setUserPreferredTheme(this);
-			super.onCreate(savedInstanceState);
-			if(org.joinmastodon.android.security.AppSecurity.isLocked()){
-				startActivity(new Intent(this, org.joinmastodon.android.security.ui.lock.LockActivity.class));
-				return;
-			}
-			Uri uri=getIntent().getData();
+		super.onCreate(savedInstanceState);
+		org.joinmastodon.android.security.AppSecurity.runAfterUnlock(this, this::processCallback);
+	}
+
+	@Override
+	protected void onNewIntent(Intent intent){
+		super.onNewIntent(intent);
+		setIntent(intent);
+		org.joinmastodon.android.security.AppSecurity.runAfterUnlock(this, this::processCallback);
+	}
+
+	private void processCallback(){
+		Uri uri=getIntent().getData();
+		if(uri!=null && uri.equals(consumedCallback)) return;
+		consumedCallback=uri;
 		if(uri==null){
 			finish();
 			return;

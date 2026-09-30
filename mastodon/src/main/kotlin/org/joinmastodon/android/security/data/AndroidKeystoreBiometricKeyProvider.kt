@@ -60,6 +60,15 @@ class AndroidKeystoreBiometricKeyProvider(
 						.setRandomizedEncryptionRequired(true)
 						.setUserAuthenticationRequired(true)
 						.apply {
+							if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+								setUserAuthenticationParameters(
+									0,
+									KeyProperties.AUTH_BIOMETRIC_STRONG,
+								)
+							} else {
+								@Suppress("DEPRECATION")
+								setUserAuthenticationValidityDurationSeconds(-1)
+							}
 							if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
 								setInvalidatedByBiometricEnrollment(true)
 							}

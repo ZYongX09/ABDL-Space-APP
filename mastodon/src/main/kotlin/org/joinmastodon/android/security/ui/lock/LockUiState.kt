@@ -16,6 +16,9 @@ data class LockUiState(
 	val lockMethod: LockMethod = LockMethod.Pin,
 	val digits: PinDigits = PinDigits.Code4,
 	val invalidPinStatus: InvalidPinStatus = InvalidPinStatus.Default,
+	val enteredCount: Int = 0,
+	val ready: Boolean = false,
+	val finished: Boolean = false,
 	@StringRes val errorMessageRes: Int? = null,
 	val pinScreenState: PinScreenState = PinScreenState.Loading,
 )

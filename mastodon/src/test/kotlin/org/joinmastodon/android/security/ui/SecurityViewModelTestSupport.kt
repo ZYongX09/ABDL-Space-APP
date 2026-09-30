@@ -68,6 +68,8 @@ internal class FakeSecurityRepository(
 		return verifyResult
 	}
 
+	override suspend fun completeBiometricUnlock(): SecurityResult<SecurityState> = stateResult
+
 	override suspend fun enableBiometrics(): SecurityResult<SecurityState> {
 		enableCalls += 1
 		if (enableResult is SecurityResult.Success) stateResult = enableResult

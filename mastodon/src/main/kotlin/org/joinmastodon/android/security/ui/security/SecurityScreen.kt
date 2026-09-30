@@ -24,6 +24,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -70,6 +71,7 @@ fun SecurityScreen(
 	var showTrialsDialog by remember { mutableStateOf(false) }
 	var showTimeoutDialog by remember { mutableStateOf(false) }
 	var showBiometricDialog by remember { mutableStateOf(false) }
+	var biometricRequestId by remember { mutableIntStateOf(0) }
 	LaunchedEffect(viewModel) {
 		viewModel.effects.collect { effect ->
 			when (effect) {
@@ -176,8 +178,9 @@ fun SecurityScreen(
 							SwitchPreference(
 								checked = uiState.lockMethod == LockMethod.Biometrics,
 								onCheckedChange = {
-									if (it) {
-										showBiometricDialog = true
+								if (it) {
+									biometricRequestId++
+									showBiometricDialog = true
 									} else {
 										viewModel.disableBiometric()
 									}
@@ -234,9 +237,11 @@ fun SecurityScreen(
 			subtitle = stringResource(R.string.biometric_dialog_auth_subtitle),
 			negative = stringResource(R.string.biometric_dialog_setup_cancel),
 			biometricKeyProvider = biometricKeyProvider,
+			createKeyIfMissing = true,
+			requestId = biometricRequestId,
 			onSuccess = {
 				showBiometricDialog = false
-				viewModel.onBiometricEnabled()
+				viewModel.onBiometricEnabled(keyAlreadyCreated = true)
 			},
 			onDismiss = { showBiometricDialog = false },
 			onInvalidated = { showBiometricDialog = false },

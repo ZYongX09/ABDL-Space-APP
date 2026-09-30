@@ -88,17 +88,23 @@ class SecurityViewModel(
 	}
 
 	/** Called by the host after the platform biometric prompt validated the crypto object. */
-	fun onBiometricEnabled() {
+	fun onBiometricEnabled(keyAlreadyCreated: Boolean = false) {
 		viewModelScope.launch {
-			try {
-				biometricKeyProvider?.createSecretKey()
+			val createdKey = if (keyAlreadyCreated) true else try {
+				biometricKeyProvider?.createSecretKey() != null
 			} catch (_: Exception) {
+				false
+			}
+			if (!createdKey) {
 				effectChannel.send(SecurityEffect.BiometricUnavailable)
 				return@launch
 			}
 			when (securityRepository.enableBiometrics()) {
 				is SecurityResult.Success -> refresh()
-				else -> effectChannel.send(SecurityEffect.BiometricUnavailable)
+				else -> {
+					biometricKeyProvider?.deleteSecretKey()
+					effectChannel.send(SecurityEffect.BiometricUnavailable)
+				}
 			}
 		}
 	}

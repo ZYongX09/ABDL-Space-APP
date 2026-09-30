@@ -124,7 +124,7 @@
 			</intent-filter>
 		</activity>
 		<!-- Export only a strict App Link gate; MainActivity remains private. -->
-		<activity android:name=".VerificationLinkActivity" android:exported="true" android:noHistory="true" android:theme="@style/Theme.Mastodon.AutoLightDark">
+		<activity android:name=".VerificationLinkActivity" android:exported="true" android:theme="@style/Theme.Mastodon.AutoLightDark">
 			<intent-filter android:autoVerify="true">
 				<action android:name="android.intent.action.VIEW"/>
 				<category android:name="android.intent.category.DEFAULT"/>

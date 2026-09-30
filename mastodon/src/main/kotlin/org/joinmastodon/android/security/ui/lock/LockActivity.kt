@@ -7,89 +7,92 @@
 package org.joinmastodon.android.security.ui.lock
 
 import android.app.Activity
+import android.app.RemoteInput
 import android.content.Intent
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.core.content.IntentCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import org.joinmastodon.android.security.ui.SecurityGraphFactory
+import org.joinmastodon.android.NotificationActionHandlerService
+import org.joinmastodon.android.security.AppSecurity
+import org.joinmastodon.android.security.ui.SecurityGraph
 import org.joinmastodon.android.ui.compose.MiuixAppTheme
 import org.joinmastodon.android.ui.utils.UiUtils
 
-/**
- * App lock screen. Back always exits the whole task when the lock is mandatory (canGoBack=false is
- * the only mode used by the gatekeeper), matching the upstream behavior.
- */
 class LockActivity : androidx.fragment.app.FragmentActivity() {
-	private lateinit var authTracker: org.joinmastodon.android.security.AuthTracker
+	private var finishedUnlock = false
 	private var pendingNotificationAction: Intent? = null
 
 	override fun onCreate(savedInstanceState: Bundle?) {
 		UiUtils.setUserPreferredTheme(this)
-		overridePendingTransition(0, 0)
 		super.onCreate(savedInstanceState)
 		window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-			window.setHideOverlayWindows(true)
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) window.setHideOverlayWindows(true)
+		val darkTheme = UiUtils.isDarkTheme()
+		enableEdgeToEdge(
+			statusBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT) { darkTheme },
+			navigationBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT) { darkTheme },
+		)
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) window.isNavigationBarContrastEnforced = false
+		val graph = SecurityGraph.create(this)
+		val tracker = AppSecurity.authTrackerOrNull() ?: graph.authTracker
+		tracker.onAuthenticateScreen()
+		pendingNotificationAction = readNotificationAction(intent)
+		val factory = object : ViewModelProvider.Factory {
+			override fun <T : ViewModel> create(modelClass: Class<T>): T {
+				@Suppress("UNCHECKED_CAST")
+				return LockViewModel(graph.repository, tracker) as T
+			}
 		}
-		val graph = SecurityGraphFactory.create(this)
-		authTracker = org.joinmastodon.android.security.AppSecurity.authTrackerOrNull() ?: graph.authTracker
-		authTracker.onAuthenticateScreen()
-		pendingNotificationAction = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-				intent.getParcelableExtra("pending_notification_action", Intent::class.java)
-			} else {
-				@Suppress("DEPRECATION")
-				intent.getParcelableExtra("pending_notification_action")
+		val viewModel = ViewModelProvider(this, factory)[LockViewModel::class.java]
+		onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+			override fun handleOnBackPressed() {
+				AppSecurity.onLockFinished(false)
+				setResult(Activity.RESULT_CANCELED)
+				finishAffinity()
 			}
-		val viewModel = LockViewModel(graph.repository, authTracker)
+		})
 		setContent {
-			val darkTheme = UiUtils.isDarkTheme()
-			androidx.compose.runtime.DisposableEffect(darkTheme) {
-				enableEdgeToEdge(
-					statusBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT) { darkTheme },
-					navigationBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT) { darkTheme },
-				)
-				if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-					window.isNavigationBarContrastEnforced = false
-				}
-				onDispose {}
-			}
 			MiuixAppTheme {
-				LockScreen(
-					viewModel = viewModel,
-					biometricKeyProvider = graph.biometricKeyProvider,
-					onSuccess = ::finishWithSuccess,
-				)
+				LockScreen(viewModel, graph.biometricKeyProvider, ::finishWithSuccess)
 			}
 		}
 	}
 
-	override fun onResume() {
-		super.onResume()
-		authTracker.onAuthenticateScreen()
+	override fun onNewIntent(intent: Intent) {
+		super.onNewIntent(intent)
+		setIntent(intent)
+		pendingNotificationAction = readNotificationAction(intent)
+	}
+
+	private fun readNotificationAction(source: Intent): Intent? = try {
+		IntentCompat.getParcelableExtra(source, "pending_notification_action", Intent::class.java)?.also { action ->
+			if (action.component?.className != NotificationActionHandlerService::class.java.name) return null
+			val input = RemoteInput.getResultsFromIntent(source)
+			if (input != null) {
+				RemoteInput.addResultsToIntent(arrayOf(RemoteInput.Builder("replyText").build()), action, input)
+			}
+		}
+	} catch (_: RuntimeException) {
+		null
 	}
 
 	private fun finishWithSuccess() {
-		org.joinmastodon.android.security.AppSecurity.onLockFinished(true)
-		pendingNotificationAction?.let {
-			it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-			startService(it)
+		if (finishedUnlock) return
+		finishedUnlock = true
+		AppSecurity.onLockFinished(true)
+		pendingNotificationAction?.let { action ->
 			pendingNotificationAction = null
+			startService(action)
 		}
 		setResult(Activity.RESULT_OK)
 		finish()
-	}
-
-	@Deprecated("Deprecated in Java")
-	override fun onBackPressed() {
-		// A mandatory lock cannot be dismissed with back; closing the task is the only way out.
-		org.joinmastodon.android.security.AppSecurity.onLockFinished(false)
-		setResult(Activity.RESULT_CANCELED)
-		finishAffinity()
 	}
 }

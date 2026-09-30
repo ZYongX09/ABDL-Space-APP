@@ -129,6 +129,28 @@ class SecurityRepositoryImpl(
 		}
 	}
 
+	override suspend fun completeBiometricUnlock(): SecurityResult<SecurityState> = operationMutex.withLock {
+		try {
+			when (val updated = store.update { current ->
+				val existing = current.requireLocked()
+				if (existing.lockStatus != LockMethodEntity.FINGERPRINT_WITH_PIN_SECURED) throw InvalidSetupStateException()
+				existing.copy(invalidPinStatus = InvalidPinStatusEntity())
+			}) {
+				is SecurityStoreResult.Success -> SecurityResult.Success(updated.value.toSecurityState(InvalidPinStatus.Default))
+				SecurityStoreResult.Corrupted, SecurityStoreResult.Missing -> SecurityResult.Corrupted
+				SecurityStoreResult.Unavailable -> SecurityResult.StoreError
+			}
+		} catch (error: CancellationException) {
+			throw error
+		} catch (_: InvalidSetupStateException) {
+			SecurityResult.InvalidState
+		} catch (_: CorruptedSecurityStoreException) {
+			SecurityResult.Corrupted
+		} catch (_: Exception) {
+			SecurityResult.StoreError
+		}
+	}
+
 	override suspend fun demoteToPinAfterBiometricInvalidation(): SecurityResult<SecurityState> =
 		operationMutex.withLock {
 			try {

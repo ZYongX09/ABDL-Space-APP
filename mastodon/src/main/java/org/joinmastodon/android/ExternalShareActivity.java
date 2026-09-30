@@ -23,49 +23,46 @@ import androidx.annotation.Nullable;
 import me.grishka.appkit.FragmentStackActivity;
 
 public class ExternalShareActivity extends FragmentStackActivity{
-	private static final int REQUEST_UNLOCK=12022;
-	private boolean awaitingUnlock;
+	private boolean shareInitialized;
 
 	@Override
 	protected void onCreate(@Nullable Bundle savedInstanceState){
 		UiUtils.setUserPreferredTheme(this);
-			super.onCreate(savedInstanceState);
-			if(org.joinmastodon.android.security.AppSecurity.isLocked()){
-				awaitingUnlock=true;
-				startActivityForResult(new Intent(this, org.joinmastodon.android.security.ui.lock.LockActivity.class), REQUEST_UNLOCK);
-				return;
-			}
-			if(savedInstanceState==null){
-			List<AccountSession> sessions=AccountSessionManager.getInstance().getLoggedInAccounts();
-			if(sessions.isEmpty()){
-				Toast.makeText(this, R.string.err_not_logged_in, Toast.LENGTH_SHORT).show();
-				finish();
-			}else if(sessions.size()==1){
-				openComposeFragment(sessions.get(0).getID());
-			}else{
-				getWindow().setBackgroundDrawable(new ColorDrawable(0xff000000));
-				new M3AlertDialogBuilder(this)
-						.setItems(sessions.stream().map(as->"@"+as.self.username+"@"+as.domain).toArray(String[]::new), (dialog, which)->{
-							openComposeFragment(sessions.get(which).getID());
-						})
-						.setTitle(R.string.choose_account)
-						.setOnCancelListener(dialog -> finish())
-						.show();
-			}
+		super.onCreate(savedInstanceState);
+		shareInitialized=savedInstanceState!=null && savedInstanceState.getBoolean("shareInitialized");
+		if(!shareInitialized){
+			org.joinmastodon.android.security.AppSecurity.runAfterUnlock(this, this::processShareIntent);
 		}
 	}
 
 	@Override
-	protected void onActivityResult(int requestCode, int resultCode, Intent data){
-		super.onActivityResult(requestCode, resultCode, data);
-		if(requestCode==REQUEST_UNLOCK && awaitingUnlock){
-			awaitingUnlock=false;
-			if(resultCode==RESULT_OK) onCreate(null);
-			else finish();
+	protected void onSaveInstanceState(Bundle outState){
+		outState.putBoolean("shareInitialized", shareInitialized);
+		super.onSaveInstanceState(outState);
+	}
+
+	private void processShareIntent(){
+		if(shareInitialized) return;
+		List<AccountSession> sessions=AccountSessionManager.getInstance().getLoggedInAccounts();
+		if(sessions.isEmpty()){
+			Toast.makeText(this, R.string.err_not_logged_in, Toast.LENGTH_SHORT).show();
+			finish();
+		}else if(sessions.size()==1){
+			openComposeFragment(sessions.get(0).getID());
+		}else{
+			getWindow().setBackgroundDrawable(new ColorDrawable(0xff000000));
+			new M3AlertDialogBuilder(this)
+					.setItems(sessions.stream().map(as->"@"+as.self.username+"@"+as.domain).toArray(String[]::new), (dialog, which)->{
+						openComposeFragment(sessions.get(which).getID());
+					})
+					.setTitle(R.string.choose_account)
+					.setOnCancelListener(dialog -> finish())
+					.show();
 		}
 	}
 
 	private void openComposeFragment(String accountID){
+		shareInitialized=true;
 		getWindow().setBackgroundDrawable(null);
 
 		Intent intent=getIntent();
@@ -109,11 +106,9 @@ public class ExternalShareActivity extends FragmentStackActivity{
 		showFragmentClearingBackStack(fragment);
 	}
 
-	private static <T> ArrayList<T> toArrayList(List<T> l){
-		if(l instanceof ArrayList)
-			return (ArrayList<T>) l;
-		if(l==null)
-			return null;
-		return new ArrayList<>(l);
+	private static <T> ArrayList<T> toArrayList(List<T> list){
+		if(list instanceof ArrayList)
+			return (ArrayList<T>) list;
+		return list==null ? null : new ArrayList<>(list);
 	}
 }

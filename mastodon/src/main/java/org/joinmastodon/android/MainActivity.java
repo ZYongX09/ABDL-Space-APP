@@ -142,19 +142,23 @@ public class MainActivity extends FragmentStackActivity implements LifecycleOwne
 			}
 		});
 
-		if(savedInstanceState==null){
-			restartHomeFragment();
-			connectChatWebSocket();
-			refreshChatConversations();
-		}
-		if(getIntent().getBooleanExtra(EXTRA_OPEN_SOURCE_LICENSES, false)){
-			getWindow().getDecorView().post(()->openSourceLicenses(getIntent()));
-		}
+		org.joinmastodon.android.security.AppSecurity.runAfterUnlock(this, ()->{
+			if(savedInstanceState==null){
+				restartHomeFragment();
+				connectChatWebSocket();
+				refreshChatConversations();
+			}
+			if(getIntent().getBooleanExtra(EXTRA_OPEN_SOURCE_LICENSES, false)){
+				openSourceLicenses(getIntent());
+			}
+		});
 
 		// 冷启动提示统一串行：服务公告、认证驳回、新徽章。
 		if(savedInstanceState==null){
-			startupPromptCoordinator=new StartupPromptCoordinator(this);
-			startupPromptCoordinator.start();
+			org.joinmastodon.android.security.AppSecurity.runAfterUnlock(this, ()->{
+				startupPromptCoordinator=new StartupPromptCoordinator(this);
+				startupPromptCoordinator.start();
+			});
 		}
 
 		// 位置权限引导序列已迁移到 HomeFragment.onShown 的 showSetupGuideSequence
@@ -344,6 +348,10 @@ public class MainActivity extends FragmentStackActivity implements LifecycleOwne
 	protected void onNewIntent(Intent intent){
 		super.onNewIntent(intent);
 		setIntent(intent);
+		org.joinmastodon.android.security.AppSecurity.runAfterUnlock(this, ()->processNavigationIntent(intent));
+	}
+
+	private void processNavigationIntent(Intent intent){
 		if(intent.getBooleanExtra(EXTRA_OPEN_SOURCE_LICENSES, false)){
 			openSourceLicenses(intent);
 		}else if(intent.getBooleanExtra("fromNotification", false)){
@@ -569,7 +577,9 @@ public class MainActivity extends FragmentStackActivity implements LifecycleOwne
 	protected void onResume(){
 		super.onResume();
 		lifecycleRegistry.setCurrentState(Lifecycle.State.RESUMED);
-		if(chatWsClient!=null) chatWsClient.connect();
+		org.joinmastodon.android.security.AppSecurity.runAfterUnlock(this, ()->{
+			if(chatWsClient!=null) chatWsClient.connect();
+		});
 	}
 
 	@Override

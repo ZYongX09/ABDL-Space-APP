@@ -90,6 +90,10 @@ public class QQAuthActivity extends Activity{
 				return;
 			}
 		}
+		org.joinmastodon.android.security.AppSecurity.runAfterUnlock(this, this::beginAuthorization);
+	}
+
+	private void beginAuthorization(){
 		Tencent.setIsPermissionGranted(true, Build.MODEL);
 		tencent=Tencent.createInstance(BuildConfig.QQ_APP_ID, getApplicationContext(), getPackageName()+".fileprovider");
 		if(tencent==null){
@@ -106,7 +110,8 @@ public class QQAuthActivity extends Activity{
 	@Override
 	protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data){
 		super.onActivityResult(requestCode, resultCode, data);
-		Tencent.onActivityResultData(requestCode, resultCode, data, loginListener);
+		org.joinmastodon.android.security.AppSecurity.runAfterUnlock(this, ()->
+			Tencent.onActivityResultData(requestCode, resultCode, data, loginListener));
 	}
 
 	private String extractOneTimeCode(Object response){

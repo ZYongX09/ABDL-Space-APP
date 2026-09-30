@@ -36,7 +36,7 @@ import org.joinmastodon.android.security.ui.setuppin.SetupPinViewModel
 import org.joinmastodon.android.ui.compose.MiuixAppTheme
 import org.joinmastodon.android.ui.utils.UiUtils
 
-/** Compiles as the future host but is intentionally not registered in AndroidManifest this round. */
+/** Host for the global Security settings; registered privately in the app manifest. */
 class SecurityActivity : FragmentActivity() {
 	override fun onCreate(savedInstanceState: Bundle?) {
 		UiUtils.setUserPreferredTheme(this)
@@ -45,6 +45,10 @@ class SecurityActivity : FragmentActivity() {
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
 			window.setHideOverlayWindows(true)
 		}
+		org.joinmastodon.android.security.AppSecurity.runAfterUnlock(this) { showSecurityContent() }
+	}
+
+	private fun showSecurityContent() {
 		val graph = SecurityGraph.create(this)
 		val factory = SecurityViewModelFactory(graph)
 		val securityViewModel = ViewModelProvider(this, factory)[SecurityViewModel::class.java]
@@ -99,6 +103,10 @@ private fun SecurityHost(
 		route = SecurityRoute.Security.name
 		securityViewModel.refresh()
 	}
+	val configurationFinished = {
+		org.joinmastodon.android.security.AppSecurity.authTrackerOrNull()?.onChangingLockStatus()
+		backToSecurity()
+	}
 	val openRoute = { next: SecurityRoute ->
 		route = next.name
 		when (next) {
@@ -126,7 +134,7 @@ private fun SecurityHost(
 				SetupPinScreen(
 					viewModel = setupPinViewModel,
 					onBack = backToSecurity,
-					onFinished = backToSecurity,
+					onFinished = configurationFinished,
 				)
 			}
 			SecurityRoute.ChangePin -> {
@@ -134,7 +142,7 @@ private fun SecurityHost(
 				ChangePinScreen(
 					viewModel = changePinViewModel,
 					onBack = backToSecurity,
-					onFinished = backToSecurity,
+					onFinished = configurationFinished,
 				)
 			}
 			SecurityRoute.DisablePin -> {
@@ -142,7 +150,7 @@ private fun SecurityHost(
 				DisablePinScreen(
 					viewModel = disablePinViewModel,
 					onBack = backToSecurity,
-					onFinished = backToSecurity,
+					onFinished = configurationFinished,
 				)
 			}
 		}

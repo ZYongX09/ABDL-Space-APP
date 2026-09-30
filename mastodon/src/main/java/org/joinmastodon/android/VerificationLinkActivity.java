@@ -12,11 +12,13 @@ public class VerificationLinkActivity extends Activity{
 	@Override
 	protected void onCreate(Bundle savedInstanceState){
 		super.onCreate(savedInstanceState);
-		Uri uri=getIntent()==null ? null : getIntent().getData();
-		if(VerificationLink.parseToken(uri)!=null){
-			Intent intent=new Intent(this, MainActivity.class).setAction(Intent.ACTION_VIEW).setData(uri);
-			startActivity(intent);
-		}
-		finish();
+		org.joinmastodon.android.security.AppSecurity.runAfterUnlock(this, ()->{
+			Uri uri=getIntent()==null ? null : getIntent().getData();
+			if(VerificationLink.parseToken(uri)!=null){
+				Intent intent=new Intent(this, MainActivity.class).setAction(Intent.ACTION_VIEW).setData(uri);
+				startActivity(intent);
+			}
+			finish();
+		});
 	}
 }

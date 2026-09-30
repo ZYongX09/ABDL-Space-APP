@@ -6,98 +6,99 @@
  */
 package org.joinmastodon.android.security
 
-import org.joinmastodon.android.security.domain.LockMethod
 import org.joinmastodon.android.security.data.SecurityRepository
+import org.joinmastodon.android.security.data.SecurityResult
+import org.joinmastodon.android.security.domain.LockMethod
 
-enum class AuthenticationStatus {
-	Valid,
-	Expired,
-}
+enum class AuthenticationStatus { Valid, Expired }
 
-/**
- * Process-wide authentication session. Mirrors the upstream 30 second background grace period but
- * uses [SystemClock.elapsedRealtime] instead of the wall clock so changing the system time cannot
- * extend a session. The lock method is re-read from the repository on every check; the in-memory
- * flag only survives within this process.
- */
 class AuthTracker(
 	private val repository: SecurityRepository,
 	private val clock: ElapsedRealtimeClock = SystemElapsedRealtimeClock,
 ) {
-	companion object {
-		const val VALIDITY_TIME_MS = 30 * 1000L
-	}
+	private var backgroundTime: Long? = null
+	private var authenticated = false
+	private var lockMethod: LockMethod? = null
+	private var generation = 0L
 
-	internal var lastBackgroundElapsedMs: Long = Long.MIN_VALUE
-	internal var lastForegroundElapsedMs: Long = 0L
-	internal var isAuthenticated: Boolean = false
-		private set
-
+	@Synchronized
 	fun onAppCreate() {
+		lockMethod = null
 		reset()
 	}
 
-	fun onSplashScreen() {
-		reset()
-	}
+	@Synchronized
+	fun onSplashScreen() = reset()
 
-	fun onAuthenticateScreen() {
-		reset()
-	}
+	@Synchronized
+	fun onAuthenticateScreen() = reset()
 
-	/** Keeps the session authenticated while the user reconfigures the lock in settings. */
+	@Synchronized
 	fun onChangingLockStatus() {
-		isAuthenticated = true
+		lockMethod = null
+		backgroundTime = null
+		authenticated = true
+		generation++
 	}
 
+	@Synchronized
 	fun onMovingToBackground() {
-		if (isAuthenticated) {
-			lastBackgroundElapsedMs = clock.now()
-			isAuthenticated = false
-		}
+		backgroundTime = if (authenticated) clock.now() else null
+		authenticated = false
+		generation++
 	}
 
+	@Synchronized
 	fun onMovingToForeground() {
-		lastForegroundElapsedMs = clock.now()
-		if (isNotValidityTimeElapsed()) {
-			isAuthenticated = true
+		val elapsed = backgroundTime?.let { clock.now() - it }
+		if (elapsed != null && elapsed in 0..VALIDITY_TIME_MS) authenticated = true
+		backgroundTime = null
+		generation++
+	}
+
+	@Synchronized
+	fun onAuthenticated() {
+		authenticated = true
+		backgroundTime = null
+		generation++
+	}
+
+	@Synchronized
+	fun sessionGeneration(): Long = generation
+
+	@Synchronized
+	fun isAccessKnownValid(): Boolean = lockMethod == LockMethod.NoLock || authenticated
+
+	@Synchronized
+	fun isProtectionEnabled(): Boolean = lockMethod != LockMethod.NoLock
+
+	suspend fun shouldAuthenticate(): AuthenticationStatus {
+		val state = repository.getSecurityState()
+		return synchronized(this) {
+			when (state) {
+				is SecurityResult.Success -> {
+					lockMethod = state.value.lockMethod
+					if (lockMethod == LockMethod.NoLock || authenticated) AuthenticationStatus.Valid
+					else AuthenticationStatus.Expired
+				}
+				else -> {
+					lockMethod = null
+					AuthenticationStatus.Expired
+				}
+			}
 		}
 	}
-
-	fun onAuthenticated() {
-		isAuthenticated = true
-	}
-
-	suspend fun shouldAuthenticate(): AuthenticationStatus = when {
-		isNoLock() -> AuthenticationStatus.Valid
-		isSessionStillAuthenticated() -> AuthenticationStatus.Valid
-		isValidityTimeElapsed() -> AuthenticationStatus.Expired
-		else -> AuthenticationStatus.Valid
-	}
-
-	private fun isSessionStillAuthenticated() = isAuthenticated
-
-	private suspend fun isNoLock(): Boolean = when (val state = repository.getSecurityState()) {
-		is org.joinmastodon.android.security.data.SecurityResult.Success ->
-			state.value.lockMethod == LockMethod.NoLock
-		else -> false
-	}
-
-	private fun isValidityTimeElapsed() =
-		lastForegroundElapsedMs - VALIDITY_TIME_MS > lastBackgroundElapsedMs
-
-	private fun isNotValidityTimeElapsed() = !isValidityTimeElapsed()
 
 	private fun reset() {
-		lastBackgroundElapsedMs = Long.MIN_VALUE
-		lastForegroundElapsedMs = clock.now()
-		isAuthenticated = false
+		backgroundTime = null
+		authenticated = false
+		generation++
 	}
+
+	companion object { const val VALIDITY_TIME_MS = 30_000L }
 }
 
-fun interface ElapsedRealtimeClock {
-	fun now(): Long
-}
+fun interface ElapsedRealtimeClock { fun now(): Long }
 
 object SystemElapsedRealtimeClock : ElapsedRealtimeClock {
 	override fun now(): Long = android.os.SystemClock.elapsedRealtime()

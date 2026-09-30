@@ -37,6 +37,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import androidx.lifecycle.lifecycleScope
 import org.joinmastodon.android.BuildConfig
 import org.joinmastodon.android.MainActivity
 import org.joinmastodon.android.R
@@ -60,7 +62,6 @@ class SplashActivity : ComponentActivity() {
 
     companion object {
         private const val SPLASH_SECONDS = 3
-        private const val REQUEST_UNLOCK = 12022
     }
 
     private var routed = false
@@ -69,31 +70,20 @@ class SplashActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         makeEdgeToEdge()
 
-        // A mandatory app lock must appear before any brand animation; the lock routes to Main on
-        // success (the gatekeeper covers Main and every other activity while locked).
-        val mustLock = org.joinmastodon.android.security.AppSecurity.isLocked()
-        if (mustLock) {
-            val intent = android.content.Intent(this, org.joinmastodon.android.security.ui.lock.LockActivity::class.java)
-            startActivityForResult(intent, REQUEST_UNLOCK)
-            overridePendingTransition(0, 0)
-            return
-        }
-
-        setContent { SplashScreenContent(totalSeconds = SPLASH_SECONDS, onSkip = ::routeToMain) }
-
-        // 总时长兜底计时（与 Compose 内每秒倒计时独立）
-        window.decorView.postDelayed({ routeToMain() }, SPLASH_SECONDS * 1000L)
-    }
-
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == REQUEST_UNLOCK) {
-            if (resultCode == RESULT_OK) {
+        val wasLocked = org.joinmastodon.android.security.AppSecurity.isLocked()
+        org.joinmastodon.android.security.AppSecurity.runAfterUnlock(this) {
+            if (wasLocked && org.joinmastodon.android.security.AppSecurity.authTracker().isProtectionEnabled()) {
                 routeToMain()
             } else {
-                finishAffinity()
+                showBrandSplash()
             }
         }
+    }
+
+    private fun showBrandSplash() {
+        if (routed) return
+        setContent { SplashScreenContent(totalSeconds = SPLASH_SECONDS, onSkip = ::routeToMain) }
+        window.decorView.postDelayed({ routeToMain() }, SPLASH_SECONDS * 1000L)
     }
 
     override fun onBackPressed() {

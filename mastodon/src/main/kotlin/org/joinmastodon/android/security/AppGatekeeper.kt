@@ -7,138 +7,183 @@ package org.joinmastodon.android.security
 import android.app.Activity
 import android.app.Application
 import android.content.Intent
+import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
-import androidx.core.content.ContextCompat
+import java.lang.ref.WeakReference
+import java.util.WeakHashMap
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.util.Collections
-import java.util.WeakHashMap
 import org.joinmastodon.android.R
-import org.joinmastodon.android.security.ui.SecurityGraph
-import org.joinmastodon.android.security.ui.SecurityGraphFactory
+import org.joinmastodon.android.security.ui.lock.LockActivity
+import org.joinmastodon.android.ui.utils.UiUtils
 
-/**
- * Fail-closed app gate. Every first-party activity is protected by default; only [LockActivity]
- * itself is exempt. When the session is expired, a non-interactive shield is installed over the
- * activity's decor before its content can be touched, and a single [LockActivity] (guarded by
- * [lockInFlight]) is launched over the task. A duplicate launch during an in-flight one is a no-op.
- */
 class AppGatekeeper(
 	private val application: Application,
 	private val authTracker: AuthTracker,
+	private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+	mainDispatcher: CoroutineDispatcher = Dispatchers.Main.immediate,
+	private val lockLauncher: (Activity) -> Unit = { activity ->
+		activity.startActivity(Intent(activity, LockActivity::class.java))
+	},
 ) : Application.ActivityLifecycleCallbacks {
-
-	companion object {
-		private val SHIELD_TAG = "abdl_security_shield"
+	private class ActivityState {
+		var resumed = false
+		var check: Job? = null
+		val continuations = ArrayDeque<Runnable>()
+		val accessibility = WeakHashMap<View, Int>()
 	}
 
-	private var lockActivity: Activity? = null
-	private var lockLaunchPending = false
-	private val shieldedActivities = java.util.Collections.synchronizedMap(java.util.WeakHashMap<Activity, Boolean>())
-	private val ioScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO)
+	private val scope = CoroutineScope(SupervisorJob() + mainDispatcher)
+	private val activities = WeakHashMap<Activity, ActivityState>()
+	private var lockActivity: WeakReference<Activity>? = null
+	private var launchPending = false
 
-	fun onConfigurationChangedWhileLocking() {
-		// The Activity instance may be recreated; the gate remains in-flight until success/cancel.
-		lockLaunchPending = true
-	}
-
-	fun install() {
-		application.registerActivityLifecycleCallbacks(this)
-	}
+	fun install() = application.registerActivityLifecycleCallbacks(this)
 
 	override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {
-		if (SecurityGraphFactory.isLockActivity(activity)) {
-			lockActivity = activity
-			lockLaunchPending = false
+		if (activity is LockActivity) {
+			lockActivity = WeakReference(activity)
+			launchPending = false
 			return
 		}
-		installShield(activity)
+		activities.getOrPut(activity) { ActivityState() }
+		if (!authTracker.isAccessKnownValid()) installShield(activity)
 	}
 
-	override fun onActivityStarted(activity: Activity) {}
+	override fun onActivityStarted(activity: Activity) = Unit
 
 	override fun onActivityResumed(activity: Activity) {
-		if (SecurityGraphFactory.isLockActivity(activity)) return
-		// The repository owns the final verdict; the repository call is quick (local prefs) and the
-		// gatekeeper only runs on activity resume where a short blocking read is acceptable.
-		installShield(activity)
-		ioScope.launch {
-			val locked = authTracker.shouldAuthenticate() == AuthenticationStatus.Expired
-			withContext(kotlinx.coroutines.Dispatchers.Main.immediate) {
-				if (locked) launchLock(activity) else removeShield(activity)
-			}
+		if (activity is LockActivity) return
+		val state = activities.getOrPut(activity) { ActivityState() }
+		state.resumed = true
+		checkAccess(activity, state)
+	}
+
+	override fun onActivityPaused(activity: Activity) {
+		activities[activity]?.let {
+			it.resumed = false
+			it.check?.cancel()
+			it.check = null
 		}
 	}
 
-	override fun onActivityPaused(activity: Activity) {}
-	override fun onActivityStopped(activity: Activity) {}
-	override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {}
+	override fun onActivityStopped(activity: Activity) = Unit
+	override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) = Unit
 
 	override fun onActivityDestroyed(activity: Activity) {
+		activities[activity]?.check?.cancel()
 		removeShield(activity)
-		if (activity === lockActivity) {
+		activities.remove(activity)
+		if (lockActivity?.get() === activity) {
 			lockActivity = null
-			lockLaunchPending = false
+			launchPending = activity.isChangingConfigurations
 		}
 	}
 
-	/** Called by [LockActivity] after a successful unlock. */
 	fun onUnlocked() {
+		launchPending = false
 		lockActivity = null
-		lockLaunchPending = false
 		authTracker.onAuthenticated()
-		synchronized(shieldedActivities) {
-			shieldedActivities.keys.toList().forEach(::removeShield)
+		activities.entries.toList().forEach { (activity, state) ->
+			if (state.resumed) checkAccess(activity, state)
 		}
 	}
 
 	fun onLockFinishedWithoutSuccess() {
+		launchPending = false
 		lockActivity = null
-		lockLaunchPending = false
+		authTracker.onAuthenticateScreen()
+		activities.values.forEach { it.continuations.clear() }
+	}
+
+	fun runAfterUnlock(activity: Activity, continuation: Runnable) {
+		if (activity.isFinishing || activity.isDestroyed) return
+		val state = activities.getOrPut(activity) { ActivityState() }
+		state.continuations.addLast(continuation)
+		if (!authTracker.isAccessKnownValid()) installShield(activity)
+		if (state.resumed) checkAccess(activity, state)
+	}
+
+	private fun checkAccess(activity: Activity, state: ActivityState) {
+		state.check?.cancel()
+		if (!authTracker.isAccessKnownValid()) installShield(activity)
+		state.check = scope.launch {
+			val generation = authTracker.sessionGeneration()
+			val status = try {
+				withContext(ioDispatcher) { authTracker.shouldAuthenticate() }
+			} catch (error: CancellationException) {
+				throw error
+			} catch (_: Exception) {
+				AuthenticationStatus.Expired
+			}
+			if (activities[activity] !== state || !state.resumed || activity.isFinishing || activity.isDestroyed) return@launch
+			if (generation != authTracker.sessionGeneration()) {
+				checkAccess(activity, state)
+				return@launch
+			}
+			if (status == AuthenticationStatus.Expired) {
+				installShield(activity)
+				launchLock(activity)
+				return@launch
+			}
+			removeShield(activity)
+			val callbacks = state.continuations.toList()
+			state.continuations.clear()
+			for (callback in callbacks) {
+				if (activity.isFinishing || activity.isDestroyed) break
+				callback.run()
+			}
+		}
 	}
 
 	private fun launchLock(activity: Activity) {
-		if (lockActivity != null || lockLaunchPending) return
-		lockLaunchPending = true
-		val intent = Intent(activity, SecurityGraphFactory.lockActivityClass()).apply {
-			addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+		if (launchPending || lockActivity?.get()?.let { !it.isFinishing && !it.isDestroyed } == true) return
+		launchPending = true
+		try {
+			lockLauncher(activity)
+		} catch (_: RuntimeException) {
+			launchPending = false
 		}
-		activity.startActivity(intent)
-		activity.overridePendingTransition(0, 0)
 	}
 
 	private fun installShield(activity: Activity) {
 		val decor = activity.window.decorView as? ViewGroup ?: return
-		if (decor.findViewWithTag<View>(SHIELD_TAG) != null) return
+		val state = activities.getOrPut(activity) { ActivityState() }
+		for (index in 0 until decor.childCount) {
+			val child = decor.getChildAt(index)
+			if (child.tag != SHIELD_TAG && !state.accessibility.containsKey(child)) {
+				state.accessibility[child] = child.importantForAccessibility
+				child.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+			}
+		}
+		decor.findViewWithTag<View>(SHIELD_TAG)?.let { it.bringToFront(); return }
 		val shield = FrameLayout(activity).apply {
 			tag = SHIELD_TAG
-			background = android.graphics.drawable.ColorDrawable(
-				ContextCompat.getColor(activity, R.color.gray_50),
-			)
+			background = ColorDrawable(UiUtils.getThemeColor(activity, R.attr.colorM3Background))
 			isClickable = true
 			isFocusable = true
-			importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+			filterTouchesWhenObscured = true
 		}
-		decor.addView(
-			shield,
-			ViewGroup.LayoutParams(
-				ViewGroup.LayoutParams.MATCH_PARENT,
-				ViewGroup.LayoutParams.MATCH_PARENT,
-			),
-		)
-		shieldedActivities[activity] = true
-		shield.setOnClickListener { launchLock(activity) }
+		decor.addView(shield, ViewGroup.LayoutParams(-1, -1))
 	}
 
 	private fun removeShield(activity: Activity) {
 		val decor = activity.window.decorView as? ViewGroup ?: return
-		decor.findViewWithTag<View>(SHIELD_TAG)?.let { decor.removeView(it) }
-		shieldedActivities.remove(activity)
+		decor.findViewWithTag<View>(SHIELD_TAG)?.let(decor::removeView)
+		activities[activity]?.accessibility?.let { original ->
+			original.forEach { (view, importance) -> view.importantForAccessibility = importance }
+			original.clear()
+		}
 	}
+
+	companion object { internal const val SHIELD_TAG = "abdl_security_shield" }
 }
