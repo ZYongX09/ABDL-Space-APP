@@ -42,6 +42,12 @@ object AppSecurity {
 
 	fun authTrackerOrNull(): AuthTracker? = if (::trackerInstance.isInitialized) trackerInstance else null
 
+	@JvmStatic
+	fun onLockFinished(success: Boolean) {
+		if (!::gatekeeper.isInitialized) return
+		if (success) gatekeeper.onUnlocked() else gatekeeper.onLockFinishedWithoutSuccess()
+	}
+
 	/**
 	 * Whether a mandatory lock must be shown right now. Synchronous local-prefs read; only used
 	 * from the splash cold-start path before any brand content is shown.

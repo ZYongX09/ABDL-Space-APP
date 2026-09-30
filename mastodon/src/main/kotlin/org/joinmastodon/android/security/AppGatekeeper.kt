@@ -12,6 +12,13 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.core.content.ContextCompat
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.util.Collections
+import java.util.WeakHashMap
 import org.joinmastodon.android.R
 import org.joinmastodon.android.security.ui.SecurityGraph
 import org.joinmastodon.android.security.ui.SecurityGraphFactory
@@ -31,8 +38,15 @@ class AppGatekeeper(
 		private val SHIELD_TAG = "abdl_security_shield"
 	}
 
-	private var lockInFlight = false
+	private var lockActivity: Activity? = null
+	private var lockLaunchPending = false
+	private val shieldedActivities = java.util.Collections.synchronizedMap(java.util.WeakHashMap<Activity, Boolean>())
+	private val ioScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO)
 
+	fun onConfigurationChangedWhileLocking() {
+		// The Activity instance may be recreated; the gate remains in-flight until success/cancel.
+		lockLaunchPending = true
+	}
 
 	fun install() {
 		application.registerActivityLifecycleCallbacks(this)
@@ -40,12 +54,11 @@ class AppGatekeeper(
 
 	override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {
 		if (SecurityGraphFactory.isLockActivity(activity)) {
-			lockInFlight = true
+			lockActivity = activity
+			lockLaunchPending = false
 			return
 		}
-		if (activity.window.peekDecorView() != null) {
-			installShield(activity)
-		}
+		installShield(activity)
 	}
 
 	override fun onActivityStarted(activity: Activity) {}
@@ -54,12 +67,12 @@ class AppGatekeeper(
 		if (SecurityGraphFactory.isLockActivity(activity)) return
 		// The repository owns the final verdict; the repository call is quick (local prefs) and the
 		// gatekeeper only runs on activity resume where a short blocking read is acceptable.
-		val locked = kotlinx.coroutines.runBlocking { authTracker.shouldAuthenticate() == AuthenticationStatus.Expired }
-		if (locked) {
-			installShield(activity)
-			launchLock(activity)
-		} else {
-			removeShield(activity)
+		installShield(activity)
+		ioScope.launch {
+			val locked = authTracker.shouldAuthenticate() == AuthenticationStatus.Expired
+			withContext(kotlinx.coroutines.Dispatchers.Main.immediate) {
+				if (locked) launchLock(activity) else removeShield(activity)
+			}
 		}
 	}
 
@@ -69,22 +82,30 @@ class AppGatekeeper(
 
 	override fun onActivityDestroyed(activity: Activity) {
 		removeShield(activity)
+		if (activity === lockActivity) {
+			lockActivity = null
+			lockLaunchPending = false
+		}
 	}
 
 	/** Called by [LockActivity] after a successful unlock. */
-	fun onUnlocked(activity: Activity) {
-		lockInFlight = false
+	fun onUnlocked() {
+		lockActivity = null
+		lockLaunchPending = false
 		authTracker.onAuthenticated()
-		removeShield(activity)
+		synchronized(shieldedActivities) {
+			shieldedActivities.keys.toList().forEach(::removeShield)
+		}
 	}
 
 	fun onLockFinishedWithoutSuccess() {
-		lockInFlight = false
+		lockActivity = null
+		lockLaunchPending = false
 	}
 
 	private fun launchLock(activity: Activity) {
-		if (lockInFlight) return
-		lockInFlight = true
+		if (lockActivity != null || lockLaunchPending) return
+		lockLaunchPending = true
 		val intent = Intent(activity, SecurityGraphFactory.lockActivityClass()).apply {
 			addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
 		}
@@ -111,11 +132,13 @@ class AppGatekeeper(
 				ViewGroup.LayoutParams.MATCH_PARENT,
 			),
 		)
+		shieldedActivities[activity] = true
 		shield.setOnClickListener { launchLock(activity) }
 	}
 
 	private fun removeShield(activity: Activity) {
 		val decor = activity.window.decorView as? ViewGroup ?: return
 		decor.findViewWithTag<View>(SHIELD_TAG)?.let { decor.removeView(it) }
+		shieldedActivities.remove(activity)
 	}
 }

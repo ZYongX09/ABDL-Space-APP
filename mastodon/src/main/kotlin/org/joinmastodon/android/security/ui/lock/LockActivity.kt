@@ -40,7 +40,12 @@ class LockActivity : androidx.fragment.app.FragmentActivity() {
 		val graph = SecurityGraphFactory.create(this)
 		authTracker = org.joinmastodon.android.security.AppSecurity.authTrackerOrNull() ?: graph.authTracker
 		authTracker.onAuthenticateScreen()
-		pendingNotificationAction = intent.getParcelableExtra("pending_notification_action")
+		pendingNotificationAction = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+				intent.getParcelableExtra("pending_notification_action", Intent::class.java)
+			} else {
+				@Suppress("DEPRECATION")
+				intent.getParcelableExtra("pending_notification_action")
+			}
 		val viewModel = LockViewModel(graph.repository, authTracker)
 		setContent {
 			val darkTheme = UiUtils.isDarkTheme()
@@ -70,7 +75,7 @@ class LockActivity : androidx.fragment.app.FragmentActivity() {
 	}
 
 	private fun finishWithSuccess() {
-		authTracker.onAuthenticated()
+		org.joinmastodon.android.security.AppSecurity.onLockFinished(true)
 		pendingNotificationAction?.let {
 			it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 			startService(it)
@@ -83,6 +88,7 @@ class LockActivity : androidx.fragment.app.FragmentActivity() {
 	@Deprecated("Deprecated in Java")
 	override fun onBackPressed() {
 		// A mandatory lock cannot be dismissed with back; closing the task is the only way out.
+		org.joinmastodon.android.security.AppSecurity.onLockFinished(false)
 		setResult(Activity.RESULT_CANCELED)
 		finishAffinity()
 	}

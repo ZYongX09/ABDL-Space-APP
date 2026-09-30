@@ -23,12 +23,16 @@ import androidx.annotation.Nullable;
 import me.grishka.appkit.FragmentStackActivity;
 
 public class ExternalShareActivity extends FragmentStackActivity{
+	private static final int REQUEST_UNLOCK=12022;
+	private boolean awaitingUnlock;
+
 	@Override
 	protected void onCreate(@Nullable Bundle savedInstanceState){
 		UiUtils.setUserPreferredTheme(this);
 			super.onCreate(savedInstanceState);
 			if(org.joinmastodon.android.security.AppSecurity.isLocked()){
-				startActivity(new Intent(this, org.joinmastodon.android.security.ui.lock.LockActivity.class));
+				awaitingUnlock=true;
+				startActivityForResult(new Intent(this, org.joinmastodon.android.security.ui.lock.LockActivity.class), REQUEST_UNLOCK);
 				return;
 			}
 			if(savedInstanceState==null){
@@ -48,6 +52,16 @@ public class ExternalShareActivity extends FragmentStackActivity{
 						.setOnCancelListener(dialog -> finish())
 						.show();
 			}
+		}
+	}
+
+	@Override
+	protected void onActivityResult(int requestCode, int resultCode, Intent data){
+		super.onActivityResult(requestCode, resultCode, data);
+		if(requestCode==REQUEST_UNLOCK && awaitingUnlock){
+			awaitingUnlock=false;
+			if(resultCode==RESULT_OK) onCreate(null);
+			else finish();
 		}
 	}
 

@@ -19,6 +19,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.joinmastodon.android.R
 import org.joinmastodon.android.security.data.SecurityResult
+import org.joinmastodon.android.security.data.BiometricKeyProvider
 import org.joinmastodon.android.security.domain.LockMethod
 import org.joinmastodon.android.security.domain.PinTimeout
 import org.joinmastodon.android.security.domain.PinTrials
@@ -84,7 +85,7 @@ class SecurityViewModelTest {
 				SecurityResult.Success(securityState(lockMethod = LockMethod.Pin)),
 			)
 			val controller = FakeBiometricController(BiometricUiResult.Enabled)
-			val viewModel = SecurityViewModel(repository, controller)
+			val viewModel = SecurityViewModel(repository, controller, FakeBiometricKeyProvider())
 			runCurrent()
 			viewModel.requestBiometricEnable()
 			runCurrent()
@@ -148,6 +149,17 @@ class SecurityViewModelTest {
 			assertEquals(LockMethod.NoLock, viewModel.uiState.value.lockMethod)
 			assertEquals(0, repository.policyCalls)
 		}
+	}
+
+	private class FakeBiometricKeyProvider : BiometricKeyProvider {
+		private val key = object : javax.crypto.SecretKey {
+			override fun getAlgorithm() = "AES"
+			override fun getFormat() = "RAW"
+			override fun getEncoded() = ByteArray(32)
+		}
+		override fun loadSecretKey(): javax.crypto.SecretKey? = key
+		override fun createSecretKey(): javax.crypto.SecretKey = key
+		override fun deleteSecretKey() = Unit
 	}
 
 	private class FakeBiometricController(
