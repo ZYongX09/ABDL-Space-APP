@@ -82,6 +82,11 @@ public class MediaCameraController{
 		cameraManager=activity.getSystemService(CameraManager.class);
 	}
 
+	@SuppressWarnings("deprecation")
+	private int displayRotation(){
+		return activity.getWindowManager().getDefaultDisplay().getRotation();
+	}
+
 	public State getState(){
 		return state;
 	}
@@ -220,7 +225,7 @@ public class MediaCameraController{
 				applyFlash(request, false);
 				applyCrop(request);
 				Integer sensor=characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION);
-				request.set(CaptureRequest.JPEG_ORIENTATION, MediaCameraContract.jpegOrientation(sensor==null ? 0 : sensor, activity.getDisplay().getRotation(), isFrontFacing()));
+				request.set(CaptureRequest.JPEG_ORIENTATION, MediaCameraContract.jpegOrientation(sensor==null ? 0 : sensor, displayRotation(), isFrontFacing()));
 				session.capture(request.build(), new CameraCaptureSession.CaptureCallback(){
 					@Override public void onCaptureCompleted(CameraCaptureSession captureSession, CaptureRequest captureRequest, TotalCaptureResult result){
 						state=State.PREVIEW;
@@ -291,7 +296,7 @@ public class MediaCameraController{
 		mediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
 		mediaRecorder.setMaxDuration(60_000);
 		Integer sensor=characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION);
-		mediaRecorder.setOrientationHint(MediaCameraContract.jpegOrientation(sensor==null ? 0 : sensor, activity.getDisplay().getRotation(), isFrontFacing()));
+		mediaRecorder.setOrientationHint(MediaCameraContract.jpegOrientation(sensor==null ? 0 : sensor, displayRotation(), isFrontFacing()));
 		mediaRecorder.setOnInfoListener((recorder, what, extra)->{
 			if(what==MediaRecorder.MEDIA_RECORDER_INFO_MAX_DURATION_REACHED)
 				stopRecording(true);

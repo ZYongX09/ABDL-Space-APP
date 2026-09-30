@@ -6,162 +6,138 @@
  */
 package org.joinmastodon.android.security.ui.security
 
-import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
 import org.joinmastodon.android.R
 import org.joinmastodon.android.security.data.BiometricKeyProvider
-import org.joinmastodon.android.security.data.BiometricKeyStoreUnavailableException
 import org.joinmastodon.android.security.data.SecurityRepository
 import org.joinmastodon.android.security.data.SecurityResult
+import org.joinmastodon.android.security.domain.LockMethod
 import org.joinmastodon.android.security.domain.PinTimeout
 import org.joinmastodon.android.security.domain.PinTrials
-import org.joinmastodon.android.security.ui.BiometricUiController
-import org.joinmastodon.android.security.ui.BiometricUiResult
-import org.joinmastodon.android.security.ui.UnavailableBiometricUiController
+import org.joinmastodon.android.security.domain.SecurityState
 
 class SecurityViewModel(
 	private val securityRepository: SecurityRepository,
-	private val biometricController: BiometricUiController = UnavailableBiometricUiController,
 	private val biometricKeyProvider: BiometricKeyProvider? = null,
+	private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : ViewModel() {
-	private val _uiState = MutableStateFlow(SecurityUiState())
-	val uiState: StateFlow<SecurityUiState> = _uiState.asStateFlow()
-
+	private val state = MutableStateFlow(SecurityUiState())
+	val uiState = state.asStateFlow()
 	private val effectChannel = Channel<SecurityEffect>(Channel.BUFFERED)
 	val effects = effectChannel.receiveAsFlow()
-
 	private var refreshJob: Job? = null
-	private var policyJob: Job? = null
-	private var biometricJob: Job? = null
+	private var mutationJob: Job? = null
+	private var generation = 0L
 
-	init {
-		refresh()
-	}
+	init { refresh() }
 
 	fun refresh() {
-		if (refreshJob?.isActive == true) return
+		if (mutationJob?.isActive == true) return
+		refreshJob?.cancel()
+		val request = ++generation
 		refreshJob = viewModelScope.launch {
-			when (val result = safeGetState()) {
-				is SecurityResult.Success -> applyState(result.value)
-				else -> _uiState.update {
-					it.copy(loading = false, errorMessageRes = result.stateErrorMessage())
-				}
-			}
-			refreshJob = null
-		}
-	}
-
-	fun updatePinTrials(pinTrials: PinTrials) {
-		updatePolicy(pinTrials, _uiState.value.pinTimeout)
-	}
-
-	fun updatePinTimeout(pinTimeout: PinTimeout) {
-		updatePolicy(_uiState.value.pinTrials, pinTimeout)
-	}
-
-	fun requestBiometricEnable() {
-		if (!_uiState.value.hasPin || biometricJob?.isActive == true) return
-		biometricJob = viewModelScope.launch {
-			val result = suspendCancellableCoroutine { continuation ->
-				biometricController.requestEnable { value ->
-					if (continuation.isActive) continuation.resume(value) {}
-				}
-			}
+			val result = safeRead()
+			if (request != generation) return@launch
 			when (result) {
-				BiometricUiResult.Enabled -> refresh()
-				BiometricUiResult.Unavailable -> effectChannel.send(SecurityEffect.BiometricUnavailable)
-				BiometricUiResult.Cancelled -> Unit
-			}
-			biometricJob = null
-		}
-	}
-
-	/** Called by the host after the platform biometric prompt validated the crypto object. */
-	fun onBiometricEnabled(keyAlreadyCreated: Boolean = false) {
-		viewModelScope.launch {
-			val createdKey = if (keyAlreadyCreated) true else try {
-				biometricKeyProvider?.createSecretKey() != null
-			} catch (_: Exception) {
-				false
-			}
-			if (!createdKey) {
-				effectChannel.send(SecurityEffect.BiometricUnavailable)
-				return@launch
-			}
-			when (securityRepository.enableBiometrics()) {
-				is SecurityResult.Success -> refresh()
-				else -> {
-					biometricKeyProvider?.deleteSecretKey()
-					effectChannel.send(SecurityEffect.BiometricUnavailable)
-				}
+				is SecurityResult.Success -> applyState(result.value)
+				else -> state.update { it.copy(loading = false, errorMessageRes = result.errorMessage()) }
 			}
 		}
 	}
 
-	fun disableBiometric() {
-		if (!_uiState.value.hasPin || biometricJob?.isActive == true) return
-		biometricJob = viewModelScope.launch {
-			// Never flip the toggle before the repository confirms the demotion.
-			when (securityRepository.demoteToPinAfterBiometricInvalidation()) {
-				is SecurityResult.Success -> refresh()
-				else -> {
-					_uiState.update { it.copy(policyUpdating = false) }
-					effectChannel.send(SecurityEffect.BiometricUnavailable)
-				}
-			}
-			biometricJob = null
-		}
-	}
+	fun updatePinTrials(trials: PinTrials) = updatePolicy(trials, state.value.pinTimeout)
+	fun updatePinTimeout(timeout: PinTimeout) = updatePolicy(state.value.pinTrials, timeout)
 
-	fun clearError() {
-		_uiState.update { it.copy(errorMessageRes = null) }
-	}
-
-	private fun updatePolicy(pinTrials: PinTrials, pinTimeout: PinTimeout) {
-		if (policyJob?.isActive == true || !_uiState.value.hasPin) return
-		_uiState.update { it.copy(policyUpdating = true, errorMessageRes = null) }
-		policyJob = viewModelScope.launch {
+	/** The setup CryptoObject has succeeded; only persist the already-authenticated key. */
+	fun onBiometricEnabled() {
+		if (!state.value.hasPin || mutationJob?.isActive == true) return
+		beginMutation()
+		mutationJob = viewModelScope.launch {
 			val result = try {
-				securityRepository.editLockoutPolicy(pinTrials, pinTimeout)
+				withContext(ioDispatcher) {
+					if (biometricKeyProvider?.loadSecretKey() == null) SecurityResult.StoreError
+					else securityRepository.enableBiometrics()
+				}
 			} catch (error: CancellationException) {
 				throw error
 			} catch (_: Exception) {
 				SecurityResult.StoreError
 			}
-			when (result) {
-				is SecurityResult.Success -> applyState(result.value)
-				else -> _uiState.update {
-					it.copy(policyUpdating = false, errorMessageRes = result.stateErrorMessage())
-				}
+			if (result !is SecurityResult.Success) {
+				withContext(ioDispatcher) { runCatching { biometricKeyProvider?.deleteSecretKey() } }
 			}
-			policyJob = null
+			finishMutation(result)
 		}
 	}
 
-	private fun applyState(state: org.joinmastodon.android.security.domain.SecurityState) {
-		_uiState.value = SecurityUiState(
-			loading = false,
-			lockMethod = state.lockMethod,
-			pinTrials = state.pinOptions.trials,
-			pinTimeout = state.pinOptions.timeout,
-			pinDigits = state.pinOptions.digits,
-			policyUpdating = false,
-		)
+	fun disableBiometric() {
+		if (state.value.lockMethod != LockMethod.Biometrics || mutationJob?.isActive == true) return
+		beginMutation()
+		mutationJob = viewModelScope.launch {
+			val result = try {
+				withContext(ioDispatcher) {
+					securityRepository.demoteToPinAfterBiometricInvalidation().also {
+						if (it is SecurityResult.Success) runCatching { biometricKeyProvider?.deleteSecretKey() }
+					}
+				}
+			} catch (error: CancellationException) {
+				throw error
+			} catch (_: Exception) {
+				SecurityResult.StoreError
+			}
+			finishMutation(result)
+		}
 	}
 
-	private suspend fun safeGetState() = try {
-		securityRepository.getSecurityState()
+	fun clearError() = state.update { it.copy(errorMessageRes = null) }
+
+	private fun beginMutation() {
+		generation++
+		refreshJob?.cancel()
+		state.update { it.copy(policyUpdating = true, errorMessageRes = null) }
+	}
+
+	private fun updatePolicy(trials: PinTrials, timeout: PinTimeout) {
+		if (!state.value.hasPin || mutationJob?.isActive == true) return
+		beginMutation()
+		mutationJob = viewModelScope.launch {
+			val result = try {
+				withContext(ioDispatcher) { securityRepository.editLockoutPolicy(trials, timeout) }
+			} catch (error: CancellationException) {
+				throw error
+			} catch (_: Exception) {
+				SecurityResult.StoreError
+			}
+			finishMutation(result)
+		}
+	}
+
+	private fun finishMutation(result: SecurityResult<SecurityState>) {
+		when (result) {
+			is SecurityResult.Success -> applyState(result.value)
+			else -> state.update { it.copy(policyUpdating = false, errorMessageRes = result.errorMessage()) }
+		}
+	}
+
+	private fun applyState(value: SecurityState) {
+		state.value = SecurityUiState(loading = false, lockMethod = value.lockMethod,
+			pinTrials = value.pinOptions.trials, pinTimeout = value.pinOptions.timeout, pinDigits = value.pinOptions.digits)
+	}
+
+	private suspend fun safeRead(): SecurityResult<SecurityState> = try {
+		withContext(ioDispatcher) { securityRepository.getSecurityState() }
 	} catch (error: CancellationException) {
 		throw error
 	} catch (_: Exception) {
@@ -169,19 +145,14 @@ class SecurityViewModel(
 	}
 
 	override fun onCleared() {
-		refreshJob?.cancel()
-		policyJob?.cancel()
-		biometricJob?.cancel()
 		effectChannel.close()
 		super.onCleared()
 	}
 }
 
-@StringRes
-private fun SecurityResult<*>.stateErrorMessage(): Int = when (this) {
+private fun SecurityResult<*>.errorMessage(): Int = when (this) {
 	SecurityResult.InvalidInput -> R.string.security_error_invalid_input
 	SecurityResult.InvalidState -> R.string.security_error_invalid_state
 	SecurityResult.Corrupted -> R.string.security_error_store_corrupted
-	SecurityResult.StoreError -> R.string.security_error_store_unavailable
-	is SecurityResult.Success -> R.string.security_error_store_unavailable
+	else -> R.string.security_error_store_unavailable
 }

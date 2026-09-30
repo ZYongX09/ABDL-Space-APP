@@ -7,34 +7,39 @@
 package org.joinmastodon.android.security.ui.biometric
 
 import android.content.Context
+import android.security.keystore.KeyPermanentlyInvalidatedException
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.withResumed
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.joinmastodon.android.R
 import org.joinmastodon.android.security.data.BiometricKeyInvalidatedException
 import org.joinmastodon.android.security.data.BiometricKeyProvider
 import org.joinmastodon.android.security.data.BiometricKeyStoreCorruptedException
-import org.joinmastodon.android.security.data.BiometricKeyStoreUnavailableException
-import java.util.concurrent.atomic.AtomicInteger
+import org.joinmastodon.android.security.ui.BiometricSession
 import javax.crypto.Cipher
 
-/**
- * Crypto-object biometric prompt. A request id starts one prompt session; disposing the composable
- * cancels the platform prompt and invalidates all late callbacks. When [createKeyIfMissing] is true
- * (the setup flow), a newly-created key is deleted if the user cancels or the prompt fails.
- */
+private class PromptRequest {
+	val session = BiometricSession()
+	var prompt: BiometricPrompt? = null
+	@Volatile var disposed = false
+	@Volatile var setupKeyCreated = false
+	@Volatile var verified = false
+}
+
 @Composable
 internal fun BiometricDialog(
 	title: String,
@@ -48,171 +53,131 @@ internal fun BiometricDialog(
 	requestId: Int = 0,
 ) {
 	val context = LocalContext.current
-	val activity = context.findFragmentActivity()
-	val lifecycleOwner = LocalLifecycleOwner.current
-	val sessionCounter = remember { AtomicInteger(0) }
-	var prompt by remember { mutableStateOf<BiometricPrompt?>(null) }
-
-	if (activity == null) {
-		LaunchedEffect(Unit) {
-			toast(context, context.getString(R.string.security_error_no_fragment_activity))
-			onDismiss()
-		}
-		return
-	}
-
-	LaunchedEffect(requestId, lifecycleOwner.lifecycle.currentState) {
-		val lifecycleState = lifecycleOwner.lifecycle.currentState
-		if (!lifecycleState.isAtLeast(Lifecycle.State.RESUMED)) return@LaunchedEffect
-		val session = sessionCounter.incrementAndGet()
-		val isCurrentSession = { sessionCounter.get() == session }
-		runPrompt(
-			activity = activity,
-			keyProvider = biometricKeyProvider,
-			title = title,
-			subtitle = subtitle,
-			negative = negative,
-			createKeyIfMissing = createKeyIfMissing,
-			isCurrentSession = isCurrentSession,
-			setPrompt = { prompt = it },
-			onSuccess = { if (isCurrentSession()) onSuccess() },
-			onDismiss = { if (isCurrentSession()) onDismiss() },
-			onInvalidated = { if (isCurrentSession()) onInvalidated() },
-		)
-	}
-
-	DisposableEffect(lifecycleOwner, requestId) {
+	val activity = remember(context) { context.findFragmentActivity() }
+	val owner = LocalLifecycleOwner.current
+	val request = remember(activity, requestId) { PromptRequest() }
+	val success = rememberUpdatedState(onSuccess)
+	val dismiss = rememberUpdatedState(onDismiss)
+	val invalidated = rememberUpdatedState(onInvalidated)
+	DisposableEffect(request, owner) {
 		val observer = LifecycleEventObserver { _, event ->
-			if (event == Lifecycle.Event.ON_DESTROY) {
-				sessionCounter.incrementAndGet()
-				prompt?.cancelAuthentication()
+			if (event == Lifecycle.Event.ON_STOP) {
+				request.session.cancel()
+				request.prompt?.cancelAuthentication()
+				dismiss.value()
 			}
 		}
-		lifecycleOwner.lifecycle.addObserver(observer)
+		owner.lifecycle.addObserver(observer)
 		onDispose {
-			sessionCounter.incrementAndGet()
-			prompt?.cancelAuthentication()
-			prompt = null
-			lifecycleOwner.lifecycle.removeObserver(observer)
-		}
-	}
-}
-
-private fun runPrompt(
-	activity: FragmentActivity,
-	keyProvider: BiometricKeyProvider,
-	title: String,
-	subtitle: String,
-	negative: String,
-	createKeyIfMissing: Boolean,
-	isCurrentSession: () -> Boolean,
-	setPrompt: (BiometricPrompt) -> Unit,
-	onSuccess: () -> Unit,
-	onDismiss: () -> Unit,
-	onInvalidated: () -> Unit,
-) {
-	val availability = BiometricManager.from(activity).canAuthenticate(
-		BiometricManager.Authenticators.BIOMETRIC_STRONG,
-	)
-	if (availability != BiometricManager.BIOMETRIC_SUCCESS) {
-		if (isCurrentSession()) {
-			toast(activity, activity.getString(R.string.security_biometric_unavailable))
-			onDismiss()
-		}
-		return
-	}
-
-	var createdForSession = false
-	val secretKey = try {
-		try {
-			keyProvider.loadSecretKey()
-		} catch (_: BiometricKeyInvalidatedException) {
-			if (!createKeyIfMissing) throw BiometricKeyInvalidatedException()
-			keyProvider.deleteSecretKey()
-			null
-		} ?: run {
-			if (!createKeyIfMissing) throw BiometricKeyStoreCorruptedException()
-			createdForSession = true
-			keyProvider.createSecretKey()
-		}
-	} catch (_: BiometricKeyInvalidatedException) {
-		if (isCurrentSession()) onInvalidated()
-		return
-	} catch (_: BiometricKeyStoreCorruptedException) {
-		if (isCurrentSession()) onInvalidated()
-		return
-	} catch (_: BiometricKeyStoreUnavailableException) {
-		toast(activity, activity.getString(R.string.security_biometric_unavailable))
-		if (isCurrentSession()) onDismiss()
-		return
-	} catch (error: Exception) {
-		toast(activity, activity.getString(R.string.security_biometric_error, error.message ?: ""))
-		if (isCurrentSession()) onDismiss()
-		return
-	}
-
-	val promptInfo = BiometricPrompt.PromptInfo.Builder()
-		.setTitle(title)
-		.setSubtitle(subtitle)
-		.setNegativeButtonText(negative)
-		.setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
-		.build()
-	val callback = object : BiometricPrompt.AuthenticationCallback() {
-		override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-			if (isCurrentSession()) {
-				createdForSession = false
-				onSuccess()
-			}
-		}
-
-		override fun onAuthenticationFailed() {
-			// Non-terminal: the system prompt remains visible for the next attempt.
-		}
-
-		override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
-			if (!isCurrentSession()) return
-			if (createdForSession) keyProvider.deleteSecretKey()
-			when (errorCode) {
-				BiometricPrompt.ERROR_USER_CANCELED,
-				BiometricPrompt.ERROR_NEGATIVE_BUTTON,
-				BiometricPrompt.ERROR_CANCELED,
-				BiometricPrompt.ERROR_LOCKOUT,
-				BiometricPrompt.ERROR_LOCKOUT_PERMANENT,
-				-> onDismiss()
-
-				else -> {
-					toast(activity, activity.getString(R.string.security_biometric_error, errString))
-					onDismiss()
+			owner.lifecycle.removeObserver(observer)
+			request.disposed = true
+			request.session.cancel()
+			request.prompt?.cancelAuthentication()
+			if (createKeyIfMissing && request.setupKeyCreated && !request.verified) {
+				ContextCompat.getMainExecutor(context).execute {
+					runCatching { biometricKeyProvider.deleteSecretKey() }
 				}
 			}
 		}
 	}
-	val biometricPrompt = BiometricPrompt(activity, ContextCompat.getMainExecutor(activity), callback)
-	setPrompt(biometricPrompt)
-	val cipher = try {
-		Cipher.getInstance(BiometricKeyProvider.TRANSFORMATION).apply {
-			init(Cipher.ENCRYPT_MODE, secretKey)
+	LaunchedEffect(request) {
+		if (activity == null) {
+			toast(context, context.getString(R.string.security_error_no_fragment_activity))
+			dismiss.value()
+			return@LaunchedEffect
 		}
-	} catch (error: BiometricKeyInvalidatedException) {
-		if (createdForSession) keyProvider.deleteSecretKey()
-		if (isCurrentSession()) onInvalidated()
-		return
-	} catch (error: Exception) {
-		if (createdForSession) keyProvider.deleteSecretKey()
-		toast(activity, activity.getString(R.string.security_biometric_error, error.message ?: ""))
-		if (isCurrentSession()) onDismiss()
-		return
+		owner.lifecycle.withResumed { }
+		val session = request.session.begin()
+		val availability = BiometricManager.from(activity).canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG)
+		if (availability != BiometricManager.BIOMETRIC_SUCCESS) {
+			if (request.session.complete(session)) {
+				toast(context, context.getString(R.string.security_biometric_unavailable))
+				dismiss.value()
+			}
+			return@LaunchedEffect
+		}
+		val cipher = try {
+			withContext(Dispatchers.IO) {
+				val key = if (createKeyIfMissing) {
+					// A disabled biometric method owns no active key. Replace any orphan left by
+					// an interrupted setup; the new key still requires a fresh crypto prompt.
+					biometricKeyProvider.deleteSecretKey()
+					biometricKeyProvider.createSecretKey().also {
+						request.setupKeyCreated = true
+						if (request.disposed) biometricKeyProvider.deleteSecretKey()
+					}
+				} else biometricKeyProvider.loadSecretKey() ?: throw BiometricKeyStoreCorruptedException()
+				Cipher.getInstance(BiometricKeyProvider.TRANSFORMATION).apply { init(Cipher.ENCRYPT_MODE, key) }
+			}
+		} catch (error: CancellationException) {
+			throw error
+		} catch (_: KeyPermanentlyInvalidatedException) {
+			if (request.session.complete(session)) invalidated.value()
+			return@LaunchedEffect
+		} catch (_: BiometricKeyInvalidatedException) {
+			if (request.session.complete(session)) invalidated.value()
+			return@LaunchedEffect
+		} catch (_: BiometricKeyStoreCorruptedException) {
+			if (request.session.complete(session)) invalidated.value()
+			return@LaunchedEffect
+		} catch (_: Exception) {
+			if (request.session.complete(session)) {
+				toast(context, context.getString(R.string.security_biometric_unavailable))
+				dismiss.value()
+			}
+			return@LaunchedEffect
+		}
+		if (request.disposed || !request.session.isActive(session)) return@LaunchedEffect
+		val callback = object : BiometricPrompt.AuthenticationCallback() {
+			override fun onAuthenticationFailed() = Unit
+			override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+				if (!request.session.isActive(session) || !owner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) return
+				try {
+					val authenticatedCipher = result.cryptoObject?.cipher ?: throw IllegalStateException()
+					authenticatedCipher.doFinal(byteArrayOf(0))
+					if (request.session.complete(session)) {
+						request.verified = true
+						success.value()
+					}
+				} catch (_: Exception) {
+					if (request.session.complete(session)) dismiss.value()
+				}
+			}
+			override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+				if (!request.session.complete(session)) return
+				if (biometricErrorNeedsMessage(errorCode)) {
+					toast(context, context.getString(R.string.security_biometric_unavailable))
+				}
+				dismiss.value()
+			}
+		}
+		request.prompt = BiometricPrompt(activity, ContextCompat.getMainExecutor(activity), callback)
+		val info = BiometricPrompt.PromptInfo.Builder()
+			.setTitle(title).setSubtitle(subtitle).setNegativeButtonText(negative)
+			.setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG).build()
+		try {
+			request.prompt?.authenticate(info, BiometricPrompt.CryptoObject(cipher))
+		} catch (_: RuntimeException) {
+			if (request.session.complete(session)) dismiss.value()
+		}
 	}
-	biometricPrompt.authenticate(promptInfo, BiometricPrompt.CryptoObject(cipher))
 }
+
+internal fun biometricErrorNeedsMessage(code: Int): Boolean = code !in setOf(
+	BiometricPrompt.ERROR_USER_CANCELED,
+	BiometricPrompt.ERROR_NEGATIVE_BUTTON,
+	BiometricPrompt.ERROR_CANCELED,
+)
 
 private fun Context.findFragmentActivity(): FragmentActivity? {
 	var current = this
 	while (current is android.content.ContextWrapper) {
 		if (current is FragmentActivity) return current
-		current = current.baseContext
+		val next = current.baseContext
+		if (next === current) return null
+		current = next
 	}
-	return null
+	return current as? FragmentActivity
 }
 
 private fun toast(context: Context, message: String) {

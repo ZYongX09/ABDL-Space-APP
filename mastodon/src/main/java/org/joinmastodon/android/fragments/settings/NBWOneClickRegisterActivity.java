@@ -10,7 +10,8 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.View;
-import android.view.WindowInsets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 import android.webkit.SslErrorHandler;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
@@ -92,8 +93,8 @@ public class NBWOneClickRegisterActivity extends Activity {
 
         // 状态栏 padding — 应用到内容容器而非 android.R.id.content
         View contentContainer = findViewById(R.id.content_container);
-        contentContainer.setOnApplyWindowInsetsListener((v, insets) -> {
-            int statusBar = insets.getInsets(WindowInsets.Type.statusBars()).top;
+        ViewCompat.setOnApplyWindowInsetsListener(contentContainer, (v, insets) -> {
+            int statusBar = insets.getInsets(WindowInsetsCompat.Type.statusBars()).top;
             v.setPadding(0, statusBar, 0, 0);
             return insets;
         });

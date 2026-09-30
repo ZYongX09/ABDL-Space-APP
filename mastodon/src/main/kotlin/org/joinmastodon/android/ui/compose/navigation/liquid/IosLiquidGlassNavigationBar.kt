@@ -207,9 +207,10 @@ internal fun IosLiquidGlassNavigationBar(
     val accentColor = MiuixTheme.colorScheme.primary
     val tabContentColor = MiuixTheme.colorScheme.onSurface
     val surfaceContainer = MiuixTheme.colorScheme.surfaceContainer
-    val containerColor = if (isBlurActive) surfaceContainer.copy(alpha = 0.4f) else surfaceContainer
+    val blurActive = isBlurActive && org.joinmastodon.android.ui.compose.utils.supportsRuntimeGraphicsEffects()
+    val containerColor = if (blurActive) surfaceContainer.copy(alpha = 0.4f) else surfaceContainer
 
-    val tabsBackdrop = rememberLayerBackdrop()
+    val tabsBackdrop = if (blurActive) rememberLayerBackdrop() else null
     val density = LocalDensity.current
     val isLtr = LocalLayoutDirection.current == LayoutDirection.Ltr
     val animationScope = rememberCoroutineScope()
@@ -325,7 +326,9 @@ internal fun IosLiquidGlassNavigationBar(
     val baseHighlight = rememberGravityRotatedHighlight(iosIndicatorSpecular, extraDegrees = -45f)
     val pillHighlight = rememberGravityRotatedHighlight(iosIndicatorSpecular, extraDegrees = 90f)
 
-    val combinedBackdrop = backdrop?.let { rememberCombinedBackdrop(it, tabsBackdrop) }
+    val combinedBackdrop = if (blurActive && backdrop != null && tabsBackdrop != null) {
+        rememberCombinedBackdrop(backdrop, tabsBackdrop)
+    } else null
 
     val bottomPaddingValue = bottomPaddingOverride ?: run {
         val navBarBottomPadding = WindowInsets.navigationBars.only(WindowInsetsSides.Bottom).asPaddingValues().calculateBottomPadding()
@@ -429,7 +432,7 @@ internal fun IosLiquidGlassNavigationBar(
                             onClick = {},
                         )
                         .then(
-                            if (isBlurActive && backdrop != null) {
+                            if (blurActive && backdrop != null && tabsBackdrop != null) {
                                 Modifier.drawBackdrop(
                                     backdrop = backdrop,
                                     shape = { pillShape },
@@ -460,7 +463,7 @@ internal fun IosLiquidGlassNavigationBar(
                                     .background(containerColor, pillShape)
                             },
                         )
-                        .then(if (isBlurActive) interactiveHighlight.modifier else Modifier)
+                        .then(if (blurActive) interactiveHighlight.modifier else Modifier)
                         .height(64.dp)
                         .padding(4.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -468,7 +471,7 @@ internal fun IosLiquidGlassNavigationBar(
                 )
             }
 
-            if (isBlurActive && backdrop != null) {
+            if (blurActive && backdrop != null && tabsBackdrop != null) {
                 CompositionLocalProvider(
                     LocalIosTabScale provides { lerp(1f, 1.2f, dampedDrag.pressProgress) },
                     LocalContentColor provides accentColor,
@@ -503,7 +506,7 @@ internal fun IosLiquidGlassNavigationBar(
 
             if (tabWidthPx > 0f) {
                 val tabWidthDp = with(density) { tabWidthPx.toDp() }
-                if (isBlurActive && combinedBackdrop != null) {
+                if (blurActive && combinedBackdrop != null) {
                     Box(
                         modifier = Modifier
                             .padding(horizontal = 4.dp)

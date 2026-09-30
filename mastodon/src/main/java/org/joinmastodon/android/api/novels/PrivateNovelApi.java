@@ -166,7 +166,11 @@ public class PrivateNovelApi{
 	}
 
 	private static String encode(String value){
-		return URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20");
+		try {
+			return URLEncoder.encode(value, StandardCharsets.UTF_8.name()).replace("+", "%20");
+		}catch(java.io.UnsupportedEncodingException impossible){
+			throw new AssertionError(impossible);
+		}
 	}
 
 	public static class UploadMetadata{

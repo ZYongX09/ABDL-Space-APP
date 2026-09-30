@@ -68,7 +68,8 @@ internal fun PinScreen(
 	}
 
 	val configuration = LocalConfiguration.current
-	val shortHeight = configuration.screenHeightDp < 560 || configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+	val shortHeight = configuration.screenWidthDp >= 600 &&
+		(configuration.screenHeightDp < 560 || configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE)
 	val contentModifier = modifier
 		.fillMaxSize()
 		.verticalScroll(rememberScrollState())

@@ -114,7 +114,7 @@ fun AdaptiveTopAppBar(
 @Composable
 fun rememberBlurBackdrop(): LayerBackdrop? {
     val appState = LocalAppState.current
-    if (!appState.enableBlur || !isRuntimeShaderSupported()) return null
+    if (!appState.enableBlur || !supportsRuntimeGraphicsEffects() || !isRuntimeShaderSupported()) return null
     val surfaceColor = MiuixTheme.colorScheme.surface
     return rememberLayerBackdrop {
         drawRect(surfaceColor)
@@ -129,7 +129,7 @@ fun BlurredBar(
     scrollBehavior: ScrollBehavior? = null,
     content: @Composable () -> Unit,
 ) {
-    val blurActive = blurEnabled && backdrop != null
+    val blurActive = supportsRuntimeGraphicsEffects() && blurEnabled && backdrop != null
     Box(
         modifier = if (blurActive) {
             Modifier.textureBlur(

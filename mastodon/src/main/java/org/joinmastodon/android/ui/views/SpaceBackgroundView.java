@@ -11,6 +11,8 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.AttributeSet;
 import android.view.View;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -64,8 +66,8 @@ public class SpaceBackgroundView extends View {
         dustPaint.setStyle(Paint.Style.FILL);
 
         // 自动添加状态栏 padding
-        setOnApplyWindowInsetsListener((v, insets) -> {
-            int statusBarHeight = insets.getInsets(android.view.WindowInsets.Type.statusBars()).top;
+        ViewCompat.setOnApplyWindowInsetsListener(this, (v, insets) -> {
+            int statusBarHeight = insets.getInsets(WindowInsetsCompat.Type.statusBars()).top;
             setPadding(0, statusBarHeight, 0, 0);
             return insets;
         });

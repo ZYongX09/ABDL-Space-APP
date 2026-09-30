@@ -11,8 +11,10 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.RuntimeEnvironment;
+import org.robolectric.annotation.Config;
 
 @RunWith(RobolectricTestRunner.class)
+@Config(sdk=26)
 public class VerificationPendingCaptureTest{
 	private static final String SESSION="123e4567-e89b-42d3-a456-426614174000";
 	private Context context;

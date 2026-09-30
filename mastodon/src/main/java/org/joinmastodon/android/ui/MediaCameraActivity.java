@@ -10,8 +10,10 @@ import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
 import android.view.TextureView;
 import android.view.View;
-import android.view.WindowInsets;
-import android.view.WindowInsetsController;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.ImageView;
@@ -71,11 +73,11 @@ public class MediaCameraActivity extends Activity implements MediaCameraControll
 		super.onCreate(savedInstanceState);
 		getWindow().setStatusBarColor(0x00000000);
 		getWindow().setNavigationBarColor(0xff000000);
-		getWindow().setDecorFitsSystemWindows(false);
+		WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
 		setContentView(R.layout.activity_media_camera);
-		WindowInsetsController insetsController=getWindow().getInsetsController();
-		if(insetsController!=null)
-			insetsController.setSystemBarsAppearance(0, WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS|WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS);
+		WindowInsetsControllerCompat insetsController=WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
+		insetsController.setAppearanceLightStatusBars(false);
+		insetsController.setAppearanceLightNavigationBars(false);
 
 		preview=findViewById(R.id.camera_preview);
 		reviewImage=findViewById(R.id.camera_review_image);
@@ -91,8 +93,8 @@ public class MediaCameraActivity extends Activity implements MediaCameraControll
 		controller=new MediaCameraController(this, this);
 
 		View topControls=findViewById(R.id.camera_top_controls);
-		topControls.setOnApplyWindowInsetsListener((view, insets)->{
-			int top=insets.getInsets(WindowInsets.Type.statusBars()).top;
+		ViewCompat.setOnApplyWindowInsetsListener(topControls, (view, insets)->{
+			int top=insets.getInsets(WindowInsetsCompat.Type.statusBars()).top;
 			view.setPadding(view.getPaddingLeft(), top+dp(12), view.getPaddingRight(), view.getPaddingBottom());
 			return insets;
 		});

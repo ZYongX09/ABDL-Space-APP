@@ -177,6 +177,7 @@ fun SecurityScreen(
 						SecurityCard {
 							SwitchPreference(
 								checked = uiState.lockMethod == LockMethod.Biometrics,
+								enabled = !uiState.policyUpdating && !showBiometricDialog,
 								onCheckedChange = {
 								if (it) {
 									biometricRequestId++
@@ -241,7 +242,7 @@ fun SecurityScreen(
 			requestId = biometricRequestId,
 			onSuccess = {
 				showBiometricDialog = false
-				viewModel.onBiometricEnabled(keyAlreadyCreated = true)
+				viewModel.onBiometricEnabled()
 			},
 			onDismiss = { showBiometricDialog = false },
 			onInvalidated = { showBiometricDialog = false },

@@ -22,13 +22,13 @@ object SecurityComponents {
 		return synchronized(this) {
 			repository ?: run {
 				val keyProvider = AndroidKeystoreBiometricKeyProvider(applicationContext.packageName)
-				SecurityRepositoryImpl(
+				IoSecurityRepository(SecurityRepositoryImpl(
 					store = EncryptedPreferencesSecurityStore(applicationContext),
 					pinCipher = AndroidKeystorePinCipher(applicationContext.packageName),
 					elapsedRealtimeProvider = AndroidElapsedRealtimeProvider,
 					bootSessionMarkerProvider = AndroidBootSessionMarkerProvider(applicationContext),
 					biometricKeyCleanup = keyProvider::deleteSecretKey,
-				).also { repository = it }
+				)).also { repository = it }
 			}
 		}
 	}

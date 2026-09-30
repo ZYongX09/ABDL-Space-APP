@@ -32,7 +32,9 @@ fun BgEffectBackground(
     alpha: () -> Float = { 1f },
     content: @Composable (BoxScope.() -> Unit),
 ) {
-    val shaderSupported = remember { isRuntimeShaderSupported() }
+    val shaderSupported = remember {
+        org.joinmastodon.android.ui.compose.utils.supportsRuntimeGraphicsEffects() && isRuntimeShaderSupported()
+    }
     if (!shaderSupported) {
         Box(modifier = modifier, content = content)
         return

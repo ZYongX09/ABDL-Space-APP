@@ -49,6 +49,12 @@ class SecurityActivity : FragmentActivity() {
 	}
 
 	private fun showSecurityContent() {
+		val darkTheme = UiUtils.isDarkTheme()
+		enableEdgeToEdge(
+			statusBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT) { darkTheme },
+			navigationBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT) { darkTheme },
+		)
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) window.isNavigationBarContrastEnforced = false
 		val graph = SecurityGraph.create(this)
 		val factory = SecurityViewModelFactory(graph)
 		val securityViewModel = ViewModelProvider(this, factory)[SecurityViewModel::class.java]
@@ -56,17 +62,6 @@ class SecurityActivity : FragmentActivity() {
 		val changePinViewModel = ViewModelProvider(this, factory)[ChangePinViewModel::class.java]
 		val disablePinViewModel = ViewModelProvider(this, factory)[DisablePinViewModel::class.java]
 		setContent {
-			val darkTheme = UiUtils.isDarkTheme()
-			DisposableEffect(darkTheme) {
-				enableEdgeToEdge(
-					statusBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT) { darkTheme },
-					navigationBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT) { darkTheme },
-				)
-				if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-					window.isNavigationBarContrastEnforced = false
-				}
-				onDispose {}
-			}
 			MiuixAppTheme {
 				SecurityHost(
 					securityViewModel = securityViewModel,

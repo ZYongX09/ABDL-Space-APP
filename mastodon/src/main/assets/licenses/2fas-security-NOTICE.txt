@@ -5,9 +5,11 @@ Source: 2FAS Android 5.6.0, commit
 119ead28ed8d3d2215afd8f55428c1586401149b
 https://github.com/twofas/2fas-android/tree/119ead28ed8d3d2215afd8f55428c1586401149b
 
-ABDL Space adapts selected PIN domain models, repository/mapping structure, and
-lockout behavior under GPL-3.0-only. The storage and AndroidKeyStore AES/GCM
-implementation is specific to ABDL Space.
+ABDL Space copies and adapts selected PIN domain/repository models, Security/PIN
+setup/change/disable/lock screens, authentication tracking, biometric key/prompt
+structure, and locale strings under GPL-3.0-only. Dependency injection, navigation,
+themes, lifecycle integration, storage, and safety/compatibility fixes are adapted
+for ABDL Space. The PIN storage uses an ABDL-specific AndroidKeyStore AES/GCM adapter.
 
 No 2FAS screenshots, artwork, branding, BUSL/develop-branch code, or legacy
 adorsys AAR is included.

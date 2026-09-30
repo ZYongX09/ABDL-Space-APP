@@ -427,9 +427,9 @@ class SecurityRepositoryImpl(
 			}) {
 				is SecurityStoreResult.Success -> when (val mutation = outcome) {
 					MutationOutcome.Success -> {
-						// The disable is committed; removing the optional biometric key afterwards
-						// cannot fail the operation (deletion is idempotent).
-						biometricKeyCleanup()
+						// The PIN removal is already committed. A leftover optional key must not
+						// turn a completed disable into an apparent storage failure.
+						runCatching { biometricKeyCleanup() }
 						PinProtectedMutationResult.Success(
 							updated.value.toSecurityState(InvalidPinStatus.Default),
 						)

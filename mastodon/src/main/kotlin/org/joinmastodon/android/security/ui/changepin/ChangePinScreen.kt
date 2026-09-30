@@ -18,6 +18,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.delay
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -41,10 +42,12 @@ fun ChangePinScreen(
 	val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 	val context = LocalContext.current
 	var showPinOptions by remember { mutableStateOf(false) }
-	LaunchedEffect(uiState.blockedMinutes) {
-		if (uiState.blockedMinutes > 0) {
-			delay(1000L)
-			viewModel.refreshLockout()
+	val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+	LaunchedEffect(lifecycle, uiState.blockedMinutes > 0) {
+		lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
+			if (uiState.blockedMinutes > 0) {
+				while (true) { delay(1000L); viewModel.refreshLockout() }
+			}
 		}
 	}
 	LaunchedEffect(viewModel) {

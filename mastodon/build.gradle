@@ -176,6 +176,14 @@ android {
 	}
 	composeOptions {
 	}
+	testOptions {
+		unitTests.includeAndroidResources = true
+		unitTests.all {
+			maxHeapSize = '1024m'
+			maxParallelForks = 1
+			forkEvery = 1
+		}
+	}
 	secrets {
 		propertiesFileName = "/dev/null"
 		defaultPropertiesFileName = "/dev/null"

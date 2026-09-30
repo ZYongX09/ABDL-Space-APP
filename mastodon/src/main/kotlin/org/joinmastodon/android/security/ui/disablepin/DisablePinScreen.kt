@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.delay
 import org.joinmastodon.android.R
 import org.joinmastodon.android.security.ui.pin.PinScreen
@@ -31,10 +32,12 @@ fun DisablePinScreen(
 ) {
 	val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 	val context = LocalContext.current
-	LaunchedEffect(uiState.blockedMinutes) {
-		if (uiState.blockedMinutes > 0) {
-			delay(1000L)
-			viewModel.refreshLockout()
+	val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+	LaunchedEffect(lifecycle, uiState.blockedMinutes > 0) {
+		lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
+			if (uiState.blockedMinutes > 0) {
+				while (true) { delay(1000L); viewModel.refreshLockout() }
+			}
 		}
 	}
 	LaunchedEffect(viewModel) {

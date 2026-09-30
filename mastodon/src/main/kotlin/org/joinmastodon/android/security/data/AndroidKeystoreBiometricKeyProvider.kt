@@ -88,7 +88,7 @@ class AndroidKeystoreBiometricKeyProvider(
 		try {
 			keyStore().deleteEntry(keyAlias)
 		} catch (_: Exception) {
-			// Deleting an already absent key is idempotent; other failures are non-fatal.
+			throw BiometricKeyStoreUnavailableException()
 		}
 	}
 
