@@ -98,6 +98,59 @@ public class VerificationUploaderTest{
 		assertEquals(1, transport.completeCalls);
 	}
 
+	@Test
+	public void readyEvidenceSkipsAuthorizePutAndComplete(){
+		FakeTransport transport=new FakeTransport();
+		RecordingListener listener=new RecordingListener();
+		VerificationUploader uploader=uploader(transport, listener);
+		uploader.resume(APPLICATION, null, VerificationUploader.Recovery.complete(EVIDENCE, image.size()));
+		assertEquals(EVIDENCE, listener.success.id);
+		assertEquals(0, transport.authorizeCalls);
+		assertEquals(0, transport.completeCalls);
+	}
+
+	@Test
+	public void completeFailurePreservesBoundaryAndRetryDoesNotReupload(){
+		FakeTransport transport=new FakeTransport();
+		transport.authorization=authorization();
+		transport.completeErrors.add(new VerificationUploader.TransportException("offline", 0, "transport_failure", true, true));
+		RecordingListener first=new RecordingListener();
+		uploader(transport, first).start(APPLICATION, image);
+		assertEquals(VerificationUploader.Phase.COMPLETE_PENDING, first.error.recovery.phase);
+		transport.completeResult=complete();
+		RecordingListener retry=new RecordingListener();
+		uploader(transport, retry).resume(APPLICATION, image, first.error.recovery);
+		assertSame(transport.completeResult, retry.success);
+		assertEquals(1, transport.authorizeCalls);
+		assertEquals(2, transport.completeCalls);
+	}
+
+	@Test
+	public void actualLocalPutUsesSignedHeadersAndExactPhotoBytes() throws Exception{
+		okhttp3.mockwebserver.MockWebServer server=new okhttp3.mockwebserver.MockWebServer();
+		server.start();
+		try{
+			server.enqueue(new okhttp3.mockwebserver.MockResponse().setResponseCode(200));
+			FakeTransport transport=new FakeTransport();
+			transport.authorization=authorization();
+			// Keep production HTTPS DTO validation; only the test transport routes PUT to loopback.
+			String localUrl=server.url("/private/photo").toString();
+			transport.completeResult=complete();
+			RecordingListener listener=new RecordingListener();
+			OkHttpClient client=new OkHttpClient.Builder().addInterceptor(chain->chain.proceed(chain.request().newBuilder().url(localUrl).build())).build();
+			new VerificationUploader(transport, client, Runnable::run, Runnable::run, millis->{}, value->{}, listener).start(APPLICATION, image);
+			assertNull(listener.error==null ? null : listener.error.code+": "+listener.error.error);
+			assertSame(transport.completeResult, listener.success);
+			okhttp3.mockwebserver.RecordedRequest request=server.takeRequest(2, java.util.concurrent.TimeUnit.SECONDS);
+			assertEquals("PUT", request.getMethod());
+			assertEquals(image.size(), request.getBodySize());
+			org.junit.Assert.assertArrayEquals(java.nio.file.Files.readAllBytes(image.file().toPath()), request.getBody().readByteArray());
+			assertEquals(image.md5Base64(), request.getHeader("Content-MD5"));
+			assertEquals("private", request.getHeader("x-cos-acl"));
+			assertEquals("true", request.getHeader("x-cos-forbid-overwrite"));
+		}finally{ server.shutdown(); }
+	}
+
 	private VerificationUploader uploader(FakeTransport transport, RecordingListener listener){
 		OkHttpClient client=new OkHttpClient.Builder().addInterceptor(chain->new Response.Builder()
 				.request(chain.request())

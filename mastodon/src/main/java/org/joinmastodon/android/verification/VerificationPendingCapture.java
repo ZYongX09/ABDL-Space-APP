@@ -75,6 +75,19 @@ public record VerificationPendingCapture(String sessionId, String qq, String dec
 		return new File(root(context, sessionId), "capture.jpg");
 	}
 
+	public File rawFile(Context context){
+		return new File(root(context, sessionId), "raw-0.jpg");
+	}
+
+	public boolean hasRecoverablePhoto(Context context){
+		return controlledNonempty(photoFile(context)) || controlledNonempty(rawFile(context));
+	}
+
+	private static boolean controlledNonempty(File file){
+		try{ return file.isFile() && file.length()>0 && file.getCanonicalPath().equals(file.getAbsolutePath()); }
+		catch(IOException ignored){ return false; }
+	}
+
 	public void deleteMetadata(Context context){
 		new File(root(context, sessionId), FILE_NAME).delete();
 	}

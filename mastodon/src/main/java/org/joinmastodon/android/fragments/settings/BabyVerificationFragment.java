@@ -80,8 +80,8 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 	private VerificationImageProcessor.Result photo;
 	private VerificationUploader uploader;
 	private final ArrayList<VerificationRequest<?>> flowRequests=new ArrayList<>();
-	private int imageGeneration;
-	private boolean busy, formAvailable, viewReady, resumedOnce;
+	private int imageGeneration, flowGeneration;
+	private boolean cameraResultConsumed, reconcileApplication, busy, localFlow, formAvailable, viewReady, resumedOnce;
 
 	private ScrollView scroll;
 	private View loadingState, formCard, messageCard;
@@ -137,7 +137,10 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 		});
 		startButton.setOnClickListener(v->start());
 		viewReady=true;
-		loadState();
+		if(pendingCapture!=null && applicationId==null && !reconcileApplication){
+			localFlow=true;
+			showPendingCapture();
+		}else loadState();
 		return view;
 	}
 
@@ -160,11 +163,12 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 	public void onResume(){
 		super.onResume();
 		if(!resumedOnce){ resumedOnce=true; return; }
-		if(viewReady && !busy) loadState();
+		if(viewReady && !busy && !localFlow) loadState();
 	}
 
 	private void loadState(){
-		if(!viewReady) return;
+		if(!viewReady || (localFlow && busy)) return;
+		localFlow=false;
 		if(session==null || AccountSessionManager.getInstance().tryGetAccount(accountID)!=session){
 			busy=false;
 			showMessage(BabyVerificationProgressView.STAGE_INFORMATION, false, getString(R.string.verification_state_error), getString(R.string.verification_account_changed), false, 0, null, 0, null);
@@ -180,7 +184,7 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 		VerificationRequest<State> stateRequest=guard.track(VerificationRequest.state());
 		VerificationRequest<CertificateEnvelope> certificateRequest=guard.track(VerificationRequest.certificate());
 		Runnable finish=()->{
-			if(--remaining[0]!=0 || !guard.live(generation) || !viewReady) return;
+			if(--remaining[0]!=0 || !guard.live(generation) || !viewReady || localFlow) return;
 			if(firstError[0]!=null || stateResult[0]==null || certificateResult[0]==null){
 				busy=false;
 				showMessage(stageForState(currentState), false, getString(R.string.verification_state_error), errorText(firstError[0]), false,
@@ -188,6 +192,7 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 				return;
 			}
 			currentState=stateResult[0];
+			reconcileApplication=false;
 			currentCertificate=certificateResult[0].certificate;
 			renderState(currentState, currentCertificate, generation);
 		};
@@ -240,7 +245,7 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 			case NOT_STARTED, CANCELLED -> {
 				busy=false;
 				pendingCapture=VerificationPendingCapture.findActive(getActivity(), System.currentTimeMillis()/1000);
-				if(pendingCapture!=null) showPendingCapture();
+				if(pendingCapture!=null){ localFlow=true; showPendingCapture(); }
 				else showForm(state, null);
 			}
 		}
@@ -253,7 +258,7 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 		request.setCallback(new Callback<>(){
 			@Override public void onSuccess(ApplicationDetail detail){
 				guard.done(request);
-				if(!guard.live(generation) || !viewReady) return;
+				if(!guard.live(generation) || !viewReady || localFlow) return;
 				if(detail.parsedStatus!=Status.DRAFT){ loadState(); return; }
 				currentDetail=detail;
 				applicationId=detail.id;
@@ -262,7 +267,7 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 			}
 			@Override public void onError(ErrorResponse error){
 				guard.done(request);
-				if(!guard.live(generation) || !viewReady) return;
+				if(!guard.live(generation) || !viewReady || localFlow) return;
 				busy=false;
 				showMessage(BabyVerificationProgressView.STAGE_PHOTO, false, getString(R.string.verification_draft_title), errorText(error), false,
 						R.string.verification_retry, v->loadState(), 0, null);
@@ -284,11 +289,11 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 	}
 
 	private void showPendingCapture(){
-		boolean hasPhoto=pendingCapture.photoFile(getActivity()).isFile();
+		boolean hasPhoto=pendingCapture.hasRecoverablePhoto(getActivity());
 		showMessage(BabyVerificationProgressView.STAGE_PHOTO, false, getString(R.string.verification_capture_title),
 				hasPhoto ? getString(R.string.verification_processing_photo_body) : pendingCapture.requirement(), false,
 				hasPhoto ? R.string.verification_continue_submit : R.string.verification_continue_capture,
-				hasPhoto ? v->resumeProcessedCapture() : v->launchCamera(),
+				hasPhoto ? v->resumePendingCapture() : v->launchCamera(),
 				R.string.verification_discard_draft, v->cancelPendingCapture(true));
 	}
 
@@ -357,6 +362,8 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 			Toast.makeText(getActivity(), R.string.verification_capture_expired, Toast.LENGTH_LONG).show();
 			return;
 		}
+		beginLocalFlow();
+		cameraResultConsumed=false;
 		busy=true;
 		showMessage(BabyVerificationProgressView.STAGE_PHOTO, false, getString(R.string.verification_capture_title), pendingCapture.requirement(), false, 0, null, 0, null);
 		Intent intent=MediaCameraContract.createCertificationIntent(getActivity(), pendingCapture.sessionId(), 0, pendingCapture.requirement(), duration);
@@ -380,7 +387,7 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 	@Override
 	public void onActivityResult(int requestCode, int resultCode, Intent data){
 		super.onActivityResult(requestCode, resultCode, data);
-		if(requestCode!=CAMERA_REQUEST) return;
+		if(requestCode!=CAMERA_REQUEST || cameraResultConsumed) return;
 		String resultSession=MediaCameraContract.getCertificationSession(data);
 		if(resultCode!=Activity.RESULT_OK){ cancelPendingCapture(true); return; }
 		String path=MediaCameraContract.getControlledPath(data);
@@ -403,10 +410,13 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 			return;
 		}
 		pendingCapture=restored;
+		cameraResultConsumed=true;
+		if(!viewReady){ busy=false; return; }
 		processCameraPhoto(new File(path), restored);
 	}
 
 	private void processCameraPhoto(File raw, VerificationPendingCapture capture){
+		beginLocalFlow();
 		busy=true;
 		showMessage(BabyVerificationProgressView.STAGE_PHOTO, false, getString(R.string.verification_processing_photo_title), getString(R.string.verification_processing_photo_body), true, 0, null, 0, null);
 		int generation=++imageGeneration;
@@ -414,14 +424,16 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 		IMAGE_EXECUTOR.execute(()->{
 			VerificationImageProcessor.Result result=null;
 			Exception failure=null;
-			try{ result=VerificationImageProcessor.process(raw, destination, capture.maxEvidenceSize()); }
+			try{ result=raw.isFile() ? VerificationImageProcessor.process(raw, destination, capture.maxEvidenceSize())
+					: VerificationImageProcessor.inspectProcessed(destination, capture.maxEvidenceSize()); }
 			catch(Exception error){ failure=error; }
-			finally{ raw.delete(); }
+			// Keep raw on failure so a destroyed view can retry processing.
+			if(result!=null) raw.delete();
 			VerificationImageProcessor.Result finalResult=result;
 			Exception finalFailure=failure;
 			Activity activity=getActivity();
 			if(activity!=null) activity.runOnUiThread(()->{
-				if(!viewReady || generation!=imageGeneration) return;
+				if(!sessionValid() || generation!=imageGeneration) return;
 				if(finalFailure!=null){
 					busy=false;
 					showMessage(BabyVerificationProgressView.STAGE_PHOTO, false, getString(R.string.verification_state_error), finalFailure.getMessage(), false,
@@ -434,8 +446,23 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 		});
 	}
 
+	private void resumePendingCapture(){
+		if(busy || pendingCapture==null || !pendingCapture.hasRecoverablePhoto(getActivity())) return;
+		if(pendingCapture.photoFile(getActivity()).isFile()) resumeProcessedCapture();
+		else processCameraPhoto(pendingCapture.rawFile(getActivity()), pendingCapture);
+	}
+
+	private void beginLocalFlow(){
+		localFlow=true;
+		flowGeneration++;
+		guard.nextGeneration(); // Discard /me, /certificates and detail responses from before the camera result.
+	}
+
+	private boolean flowLive(int token){ return token==flowGeneration && sessionValid(); }
+
 	private void resumeProcessedCapture(){
 		if(pendingCapture==null) return;
+		beginLocalFlow();
 		busy=true;
 		showMessage(BabyVerificationProgressView.STAGE_PHOTO, false, getString(R.string.verification_processing_photo_title), getString(R.string.verification_processing_photo_body), true, 0, null, 0, null);
 		int generation=++imageGeneration;
@@ -450,7 +477,7 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 			Exception finalFailure=failure;
 			Activity activity=getActivity();
 			if(activity!=null) activity.runOnUiThread(()->{
-				if(!viewReady || generation!=imageGeneration) return;
+				if(!sessionValid() || generation!=imageGeneration) return;
 				if(finalFailure!=null){ busy=false; showPendingCapture(); return; }
 				photo=finalResult;
 				completeCapture(capture);
@@ -459,6 +486,8 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 	}
 
 	private void completeCapture(VerificationPendingCapture capture){
+		beginLocalFlow();
+		int token=flowGeneration;
 		busy=true;
 		showMessage(BabyVerificationProgressView.STAGE_PHOTO, false, getString(R.string.verification_processing_photo_title), getString(R.string.verification_processing_photo_body), true, 0, null, 0, null);
 		VerificationRequest<CaptureSession> request=VerificationRequest.finishCapture(capture.sessionId());
@@ -466,12 +495,12 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 		request.setCallback(new Callback<>(){
 			@Override public void onSuccess(CaptureSession ignored){
 				flowRequests.remove(request);
-				if(!sessionValid()) return;
+				if(!flowLive(token)) return;
 				createApplication(capture);
 			}
 			@Override public void onError(ErrorResponse error){
 				flowRequests.remove(request);
-				if(!viewReady) return;
+				if(!flowLive(token)) return;
 				busy=false;
 				showMessage(BabyVerificationProgressView.STAGE_PHOTO, false, getString(R.string.verification_state_error), errorText(error), false,
 						R.string.verification_retry, v->completeCapture(capture), R.string.verification_discard_draft, v->cancelPendingCapture(true));
@@ -480,32 +509,37 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 	}
 
 	private void createApplication(VerificationPendingCapture capture){
+		reconcileApplication=true; // Cancellation/lost response may still have created a server draft.
+		busy=true;
+		beginLocalFlow();
+		int token=flowGeneration;
 		VerificationRequest<ApplicationResult> request=VerificationRequest.createApplication(capture.sessionId(), capture.qq(), capture.declarationVersion());
 		flowRequests.add(request);
 		request.setCallback(new Callback<>(){
 			@Override public void onSuccess(ApplicationResult result){
 				flowRequests.remove(request);
-				if(!sessionValid()) return;
+				if(!flowLive(token)) return;
 				applicationId=result.id;
 				capture.deleteMetadata(getActivity());
 				startUploader(result.id, photo, VerificationUploader.Recovery.prepared());
 			}
 			@Override public void onError(ErrorResponse error){
 				flowRequests.remove(request);
-				if(!viewReady) return;
+				if(!flowLive(token)) return;
 				busy=false;
 				showMessage(BabyVerificationProgressView.STAGE_PHOTO, false, getString(R.string.verification_state_error), errorText(error), false,
-						R.string.verification_retry, v->createApplication(capture), R.string.verification_discard_draft, v->cancelPendingCapture(true));
+						R.string.verification_retry, v->loadState(), R.string.verification_discard_draft, v->cancelPendingCapture(true));
 			}
 		}).exec(accountID);
 	}
 
 	private void continueDraft(ApplicationDetail detail){
+		if(busy) return;
+		beginLocalFlow();
 		applicationId=detail.id;
 		VerificationUploader.Recovery recovery=VerificationUploader.Recovery.fromDetail(detail, "capture_photo");
 		File file=localPhoto(detail);
 		if(file.isFile()){
-			if(recovery.phase==VerificationUploader.Phase.COMPLETE_PENDING) recovery=VerificationUploader.Recovery.putPending(recovery.evidenceId);
 			final VerificationUploader.Recovery resumeRecovery=recovery;
 			busy=true;
 			showMessage(BabyVerificationProgressView.STAGE_PHOTO, false, getString(R.string.verification_processing_photo_title), getString(R.string.verification_processing_photo_body), true, 0, null, 0, null);
@@ -520,7 +554,7 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 				Exception finalFailure=failure;
 				Activity activity=getActivity();
 				if(activity!=null) activity.runOnUiThread(()->{
-					if(!viewReady || generation!=imageGeneration) return;
+					if(!sessionValid() || generation!=imageGeneration) return;
 					photo=finalResult;
 					if(finalFailure!=null && resumeRecovery.phase==VerificationUploader.Phase.PREPARED){ busy=false; showDraft(detail); return; }
 					startUploader(detail.id, finalResult, resumeRecovery);
@@ -534,23 +568,25 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 	}
 
 	private void startUploader(String id, VerificationImageProcessor.Result image, VerificationUploader.Recovery recovery){
-		if(uploader!=null && uploader.isRunning()) return;
+		if(uploader!=null) return;
+		beginLocalFlow();
+		int token=flowGeneration;
 		busy=true;
 		showMessage(BabyVerificationProgressView.STAGE_PHOTO, false, getString(R.string.verification_status_uploading), getString(R.string.verification_uploading_body), true, 0, null, 0, null);
 		uploader=new VerificationUploader(session, new VerificationUploader.UploadListener(){
 			@Override public void onStateChanged(VerificationUploader.State state, VerificationUploader.Recovery value){
-				if(!viewReady) return;
+				if(!flowLive(token)) return;
 				if(state==VerificationUploader.State.AUTHORIZING || state==VerificationUploader.State.UPLOADING || state==VerificationUploader.State.COMPLETING)
 					showMessage(BabyVerificationProgressView.STAGE_PHOTO, false, getString(R.string.verification_status_uploading), getString(R.string.verification_uploading_body), true, 0, null, 0, null);
 			}
 			@Override public void onSuccess(EvidenceComplete result){
+				if(!flowLive(token)) return;
 				uploader=null;
-				if(!sessionValid()) return;
 				submitApplication(id, false);
 			}
 			@Override public void onError(VerificationUploader.UploadError error){
+				if(!flowLive(token)) return;
 				uploader=null;
-				if(!viewReady) return;
 				busy=false;
 				handleUploadError(id, image, error);
 			}
@@ -578,6 +614,8 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 	}
 
 	private void submitApplication(String id, boolean retriedAfterCheck){
+		flowGeneration++; // Ignore any queued upload notifications after the submit boundary.
+		localFlow=true;
 		busy=true;
 		showMessage(BabyVerificationProgressView.STAGE_REVIEW, false, getString(R.string.verification_submission_checking), getString(R.string.verification_retry_safe), true, 0, null, 0, null);
 		int generation=guard.nextGeneration();
@@ -587,6 +625,8 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 				guard.done(request);
 				if(!guard.live(generation) || !viewReady) return;
 				deleteCurrentLocalFiles();
+				busy=false;
+				localFlow=false;
 				loadState();
 			}
 			@Override public void onError(ErrorResponse error){
@@ -598,7 +638,7 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 				}
 				busy=false;
 				showMessage(BabyVerificationProgressView.STAGE_REVIEW, false, getString(R.string.verification_state_error), errorText(error), false,
-						R.string.verification_retry, v->submitApplication(id, false), R.string.verification_refresh, v->loadState());
+						R.string.verification_retry, v->checkSubmitOutcome(id, true), R.string.verification_refresh, v->loadState());
 			}
 		}).exec(accountID);
 	}
@@ -617,6 +657,8 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 				if(same && (state.status()==Status.SUBMITTED || state.status()==Status.REVIEWING || state.status()==Status.APPROVED)){
 					deleteCurrentLocalFiles();
 						currentState=state;
+						busy=false;
+						localFlow=false;
 						loadState();
 				}else if(same && state.status()==Status.DRAFT && allowRetry){
 					submitApplication(id, true);
@@ -652,6 +694,8 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 	}
 
 	private void discardDraft(String id, String captureSessionId){
+		beginLocalFlow();
+		int token=flowGeneration;
 		busy=true;
 		showMessage(BabyVerificationProgressView.STAGE_PHOTO, false, getString(R.string.verification_draft_title), getString(R.string.verification_retry_safe), true, 0, null, 0, null);
 		VerificationRequest<CancelResult> request=VerificationRequest.cancelApplication(id);
@@ -659,15 +703,18 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 		request.setCallback(new Callback<>(){
 			@Override public void onSuccess(CancelResult result){
 				flowRequests.remove(request);
+				if(!flowLive(token)) return;
 				if(captureSessionId!=null) VerificationImageProcessor.deleteTree(VerificationPendingCapture.root(getActivity(), captureSessionId));
 				deleteCurrentLocalFiles();
 				currentDetail=null;
 				applicationId=null;
+				busy=false;
+				localFlow=false;
 				loadState();
 			}
 			@Override public void onError(ErrorResponse error){
 				flowRequests.remove(request);
-				if(!viewReady) return;
+				if(!flowLive(token)) return;
 				busy=false;
 				showMessage(BabyVerificationProgressView.STAGE_PHOTO, false, getString(R.string.verification_state_error), errorText(error), false,
 						R.string.verification_retry, v->discardDraft(id, captureSessionId), R.string.verification_refresh, v->loadState());
@@ -676,6 +723,10 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 	}
 
 	private void cancelPendingCapture(boolean reload){
+		flowGeneration++;
+		imageGeneration++;
+		guard.cancel();
+		localFlow=false;
 		VerificationPendingCapture capture=pendingCapture;
 		if(capture==null && getActivity()!=null) capture=VerificationPendingCapture.findActive(getActivity(), System.currentTimeMillis()/1000);
 		pendingCapture=null;
@@ -820,6 +871,9 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 	@Override
 	public void onDestroyView(){
 		viewReady=false;
+		busy=false;
+		localFlow=false;
+		flowGeneration++;
 		imageGeneration++;
 		if(uploader!=null) uploader.cancel();
 		uploader=null;

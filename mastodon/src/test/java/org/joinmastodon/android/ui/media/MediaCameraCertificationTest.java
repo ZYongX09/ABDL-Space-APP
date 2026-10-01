@@ -107,7 +107,7 @@ public class MediaCameraCertificationTest{
 	}
 
 	@Test public void pausedAndRecreatedCameraDoesNotRestartDeadlineAndCannotAcceptExpiredReview() throws Exception{
-		Intent intent=request().putExtra(MediaCameraContract.EXTRA_CERTIFICATION_DEADLINE, System.currentTimeMillis()+1500);
+		Intent intent=request().putExtra(MediaCameraContract.EXTRA_CERTIFICATION_DEADLINE, System.currentTimeMillis()+60_000);
 		ActivityController<MediaCameraActivity> lifecycle=launch(intent);
 		MediaCameraActivity activity=lifecycle.get();
 		File raw=photo(intent);
@@ -115,8 +115,8 @@ public class MediaCameraCertificationTest{
 		Bundle saved=new Bundle();
 		lifecycle.saveInstanceState(saved).pause().stop().destroy();
 		assertTrue(raw.exists());
-		// System.currentTimeMillis is wall time, not Robolectric's simulated uptime.
-		Thread.sleep(1600);
+		// Expire the saved absolute deadline deterministically; slow CI setup must not expire the initial capture.
+		intent.putExtra(MediaCameraContract.EXTRA_CERTIFICATION_DEADLINE, System.currentTimeMillis()-1);
 		ActivityController<MediaCameraActivity> restored=Robolectric.buildActivity(MediaCameraActivity.class, intent).create(saved).start().resume();
 		MediaCameraActivity second=restored.get();
 		assertFalse(second.findViewById(R.id.camera_use).isEnabled());

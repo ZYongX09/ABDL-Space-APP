@@ -39,6 +39,22 @@ public class VerificationPendingCaptureTest{
 	}
 
 	@Test
+	public void rawOnlyCaptureIsRecoverableAndEmptyOrSymlinkIsNot() throws Exception{
+		VerificationPendingCapture value=new VerificationPendingCapture(SESSION, "123456", "v1", "requirement", 2_000_000_000L, 5L*1024L*1024L);
+		value.save(context);
+		assertEquals(false, value.hasRecoverablePhoto(context));
+		java.nio.file.Files.write(value.rawFile(context).toPath(), new byte[]{1,2,3});
+		assertEquals(true, value.hasRecoverablePhoto(context));
+		assertEquals(false, value.photoFile(context).exists());
+		value.rawFile(context).delete();
+		java.io.File outside=java.io.File.createTempFile("outside", ".jpg", context.getCacheDir());
+		java.nio.file.Files.write(outside.toPath(), new byte[]{1});
+		java.nio.file.Files.createSymbolicLink(value.rawFile(context).toPath(), outside.toPath());
+		assertEquals(false, value.hasRecoverablePhoto(context));
+		value.rawFile(context).delete(); outside.delete();
+	}
+
+	@Test
 	public void expiredCaptureIsRemoved(){
 		try{
 			new VerificationPendingCapture(SESSION, "123456", "2026-09", "拍摄要求", 10L, 5L*1024L*1024L).save(context);
