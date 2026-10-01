@@ -10,9 +10,6 @@ import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -23,7 +20,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.joinmastodon.android.R
 import org.joinmastodon.android.security.domain.PinDigits
@@ -32,7 +28,7 @@ import org.joinmastodon.android.ui.compose.component.BackNavigationIcon
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.TextButton
-import top.yukonga.miuix.kmp.overlay.OverlayDialog
+import org.joinmastodon.android.security.ui.SecuritySelectionDialog
 
 @Composable
 fun SetupPinScreen(
@@ -119,23 +115,13 @@ private fun PinLengthDialog(
 	onDismiss: () -> Unit,
 	onSelected: (PinDigits) -> Unit,
 ) {
-	OverlayDialog(
-		show = true,
+	SecuritySelectionDialog(
 		title = stringResource(R.string.settings__select_pin_length),
-		onDismissRequest = onDismiss,
-	) {
-		Column {
-			PinDigits.entries.forEach { digits ->
-				Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-					TextButton(
-						text = if (digits == selected) "✓ ${stringResource(digits.labelRes())}" else stringResource(digits.labelRes()),
-						onClick = { onSelected(digits) },
-						modifier = Modifier.fillMaxWidth(),
-					)
-				}
-			}
-		}
-	}
+		items = PinDigits.entries.map { stringResource(it.labelRes()) },
+		selected = PinDigits.entries.indexOf(selected),
+		onDismiss = onDismiss,
+		onSelect = { onSelected(PinDigits.entries[it]) },
+	)
 }
 
 internal fun PinDigits.labelRes(): Int = when (this) {

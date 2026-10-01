@@ -8,16 +8,11 @@ package org.joinmastodon.android.security.ui.security
 
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -36,6 +31,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -51,8 +48,8 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.TextButton
-import top.yukonga.miuix.kmp.overlay.OverlayDialog
+import org.joinmastodon.android.security.ui.SecuritySelectionDialog
+import top.yukonga.miuix.kmp.basic.SwitchDefaults
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -114,7 +111,9 @@ fun SecurityScreen(
 					item {
 						SecurityCard {
 							SwitchPreference(
+								switchColors = securitySwitchColors(),
 								checked = false,
+								modifier = Modifier.semantics { toggleableState = ToggleableState.Off },
 								onCheckedChange = { if (it) openSetupPin() },
 								title = stringResource(R.string.settings__pin_code),
 								startAction = { SecurityIcon(R.drawable.ic_fluent_password_24_regular) },
@@ -125,7 +124,9 @@ fun SecurityScreen(
 					item {
 						SecurityCard {
 							SwitchPreference(
+								switchColors = securitySwitchColors(),
 								checked = false,
+								modifier = Modifier.semantics { toggleableState = ToggleableState.Off },
 								onCheckedChange = {},
 								title = stringResource(R.string.settings__option_fingerprint),
 								summary = stringResource(R.string.settings__option_fingerprint_description),
@@ -139,7 +140,9 @@ fun SecurityScreen(
 					item {
 						SecurityCard {
 							SwitchPreference(
+								switchColors = securitySwitchColors(),
 								checked = true,
+								modifier = Modifier.semantics { toggleableState = ToggleableState.On },
 								onCheckedChange = { if (!it) openDisablePin() },
 								title = stringResource(R.string.settings__pin_code),
 								startAction = { SecurityIcon(R.drawable.ic_fluent_password_24_regular) },
@@ -176,7 +179,9 @@ fun SecurityScreen(
 					item {
 						SecurityCard {
 							SwitchPreference(
+								switchColors = securitySwitchColors(),
 								checked = uiState.lockMethod == LockMethod.Biometrics,
+								modifier = Modifier.semantics { toggleableState = ToggleableState(uiState.lockMethod == LockMethod.Biometrics) },
 								enabled = !uiState.policyUpdating && !showBiometricDialog,
 								onCheckedChange = {
 								if (it) {
@@ -209,7 +214,7 @@ fun SecurityScreen(
 		}
 	}
 	if (showTrialsDialog) {
-		SelectionDialog(
+		SecuritySelectionDialog(
 			title = stringResource(R.string.settings__limit_of_trials),
 			items = PinTrials.entries.map { it.displayLabel() },
 			selected = PinTrials.entries.indexOf(uiState.pinTrials),
@@ -221,7 +226,7 @@ fun SecurityScreen(
 		)
 	}
 	if (showTimeoutDialog) {
-		SelectionDialog(
+		SecuritySelectionDialog(
 			title = stringResource(R.string.settings__block_for),
 			items = PinTimeout.entries.map { stringResource(it.labelRes()) },
 			selected = PinTimeout.entries.indexOf(uiState.pinTimeout),
@@ -305,22 +310,9 @@ private fun PinTimeout.labelRes(): Int = when (this) {
 }
 
 @Composable
-private fun SelectionDialog(
-	title: String,
-	items: List<String>,
-	selected: Int,
-	onDismiss: () -> Unit,
-	onSelect: (Int) -> Unit,
-) {
-	OverlayDialog(show = true, title = title, onDismissRequest = onDismiss) {
-		Column {
-			items.forEachIndexed { index, item ->
-				TextButton(
-					text = if (index == selected) "✓ $item" else item,
-					onClick = { onSelect(index) },
-					modifier = Modifier.fillMaxWidth(),
-				)
-			}
-		}
-	}
-}
+internal fun securitySwitchColors() = SwitchDefaults.switchColors(
+	uncheckedTrackColor = MiuixTheme.colorScheme.surfaceContainerHighest,
+	uncheckedThumbColor = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+	disabledUncheckedTrackColor = MiuixTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.5f),
+	disabledUncheckedThumbColor = MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.4f),
+)

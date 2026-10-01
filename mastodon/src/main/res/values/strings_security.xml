@@ -52,4 +52,6 @@
     <string name="security_error_store_unavailable">Security settings could not be saved. Please try again.</string>
 <string name="security__enter_pin">Please enter your PIN</string>
 <string name="fingerprint__biometric_invalidated">Biometric login is disabled due to changes in system biometric settings. Use your PIN.</string>
+	<string name="security_pin_welcome">Welcome back</string>
+	<string name="security_pin_unlock_description">Enter your %1$d-digit PIN to unlock</string>
 </resources>

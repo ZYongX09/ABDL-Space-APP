@@ -30,7 +30,6 @@ import org.joinmastodon.android.security.ui.pin.PinScreen
 import org.joinmastodon.android.security.ui.pin.PinScreenState
 import org.joinmastodon.android.security.ui.setuppin.vibrateInvalidPin
 import top.yukonga.miuix.kmp.basic.Scaffold
-import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 
 @Composable
 internal fun LockScreen(
@@ -70,9 +69,9 @@ internal fun LockScreen(
 			onInvalidated = { showBiometrics = false; viewModel.onBiometricsInvalidated(biometricKeyProvider) },
 		)
 	}
-	Scaffold(topBar = { SmallTopAppBar(title = stringResource(R.string.security__enter_pin)) }) { padding ->
+	Scaffold { padding ->
 		PinScreen(
-			message = stringResource(R.string.security__enter_pin),
+			message = stringResource(R.string.security_pin_unlock_description, state.digits.value),
 			errorMessage = when {
 				state.invalidPinStatus.shouldBlock -> stringResource(R.string.security__too_many_attempts_try_again_after,
 					state.invalidPinStatus.timeLeftMin.coerceAtLeast(1))

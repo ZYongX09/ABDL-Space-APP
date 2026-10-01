@@ -7,8 +7,6 @@
 package org.joinmastodon.android.security.ui.changepin
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -31,7 +29,7 @@ import org.joinmastodon.android.ui.compose.component.BackNavigationIcon
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.TextButton
-import top.yukonga.miuix.kmp.overlay.OverlayDialog
+import org.joinmastodon.android.security.ui.SecuritySelectionDialog
 
 @Composable
 fun ChangePinScreen(
@@ -136,19 +134,11 @@ private fun ChangePinLengthDialog(
 	onDismiss: () -> Unit,
 	onSelected: (PinDigits) -> Unit,
 ) {
-	OverlayDialog(
-		show = true,
+	SecuritySelectionDialog(
 		title = stringResource(R.string.settings__select_pin_length),
-		onDismissRequest = onDismiss,
-	) {
-		Column {
-			PinDigits.entries.forEach { digits ->
-				TextButton(
-					text = if (digits == selected) "✓ ${stringResource(digits.labelRes())}" else stringResource(digits.labelRes()),
-					onClick = { onSelected(digits) },
-					modifier = Modifier.fillMaxWidth(),
-				)
-			}
-		}
-	}
+		items = PinDigits.entries.map { stringResource(it.labelRes()) },
+		selected = PinDigits.entries.indexOf(selected),
+		onDismiss = onDismiss,
+		onSelect = { onSelected(PinDigits.entries[it]) },
+	)
 }

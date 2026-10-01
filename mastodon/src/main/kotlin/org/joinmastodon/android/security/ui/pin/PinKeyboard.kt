@@ -6,6 +6,7 @@
  */
 package org.joinmastodon.android.security.ui.pin
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -33,19 +34,19 @@ import androidx.compose.ui.unit.sp
 import org.joinmastodon.android.R
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 private sealed interface PinKey {
 	data class Digit(val value: Int) : PinKey
 	data object Empty : PinKey
 	data object Biometrics : PinKey
+	data object Backspace : PinKey
 }
 
 private val fixedKeys = listOf(
 	PinKey.Digit(1), PinKey.Digit(2), PinKey.Digit(3),
 	PinKey.Digit(4), PinKey.Digit(5), PinKey.Digit(6),
 	PinKey.Digit(7), PinKey.Digit(8), PinKey.Digit(9),
-	PinKey.Empty, PinKey.Digit(0), PinKey.Biometrics,
+	PinKey.Biometrics, PinKey.Digit(0), PinKey.Backspace,
 )
 
 @Composable
@@ -54,11 +55,13 @@ internal fun PinKeyboard(
 	showBiometrics: Boolean,
 	onKeyClick: (Int) -> Unit,
 	onBiometricsClick: () -> Unit,
+	onBackspace: () -> Unit,
+	canBackspace: Boolean,
 	modifier: Modifier = Modifier,
 ) {
 	Column(
 		modifier = modifier.fillMaxWidth(),
-		verticalArrangement = Arrangement.spacedBy(2.dp),
+		verticalArrangement = Arrangement.spacedBy(12.dp),
 	) {
 		fixedKeys.chunked(3).forEach { row ->
 			Row(
@@ -72,6 +75,8 @@ internal fun PinKeyboard(
 						enabled = isEnabled,
 						onDigit = onKeyClick,
 						onBiometrics = onBiometricsClick,
+						onBackspace = onBackspace,
+						canBackspace = canBackspace,
 						modifier = Modifier.weight(1f),
 					)
 				}
@@ -86,8 +91,12 @@ private fun PinKeyboardKey(
 	enabled: Boolean,
 	onDigit: (Int) -> Unit,
 	onBiometrics: () -> Unit,
+	onBackspace: () -> Unit,
+	canBackspace: Boolean,
 	modifier: Modifier,
 ) {
+	val palette = pinPalette()
+	val backspaceDescription = stringResource(R.string.security_a11y_backspace)
 	val digitDescription = if (key is PinKey.Digit) {
 		stringResource(R.string.security_a11y_digit_key, key.value)
 	} else {
@@ -107,12 +116,14 @@ private fun PinKeyboardKey(
 				role = Role.Button
 			}
 			.clickable(enabled = enabled, onClick = onBiometrics)
+		PinKey.Backspace -> Modifier.semantics { contentDescription = backspaceDescription; role = Role.Button }
+			.clickable(enabled = enabled && canBackspace, onClick = onBackspace)
 		PinKey.Empty -> Modifier
 	}
 	Box(
 		modifier = modifier
 			.padding(horizontal = 8.dp, vertical = 2.dp)
-			.defaultMinSize(minWidth = 48.dp, minHeight = 52.dp)
+			.defaultMinSize(minWidth = 48.dp, minHeight = 72.dp)
 			.clip(CircleShape)
 			.then(clickableModifier),
 		contentAlignment = Alignment.Center,
@@ -120,18 +131,24 @@ private fun PinKeyboardKey(
 		when (key) {
 			is PinKey.Digit -> Text(
 				text = key.value.toString(),
-				fontSize = 32.sp,
-				fontWeight = FontWeight.Light,
-				color = MiuixTheme.colorScheme.onSurface,
+				fontSize = 29.sp,
+				fontWeight = FontWeight.Normal,
+				color = palette.foreground,
 				modifier = Modifier.alpha(if (enabled) 1f else 0.45f),
 			)
 			PinKey.Biometrics -> Icon(
 				painter = painterResource(R.drawable.ic_fluent_fingerprint_24_regular),
 				contentDescription = null,
-				tint = MiuixTheme.colorScheme.onSurface,
+				tint = palette.accent,
 				modifier = Modifier
-					.size(28.dp)
+					.size(64.dp)
+					.background(palette.tile, CircleShape).padding(18.dp)
 					.alpha(if (enabled) 1f else 0.45f),
+			)
+			PinKey.Backspace -> Icon(
+				painter = painterResource(R.drawable.ic_fluent_backspace_24_regular),
+				contentDescription = null, tint = palette.secondary,
+				modifier = Modifier.size(24.dp).alpha(if (enabled && canBackspace) 1f else 0.4f),
 			)
 			PinKey.Empty -> Unit
 		}

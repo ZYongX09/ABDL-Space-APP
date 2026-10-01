@@ -290,6 +290,9 @@ dependencies {
 	}
 	implementation 'top.yukonga.miuix.kmp:miuix-blur-android:0.9.3'
 	debugImplementation 'androidx.compose.ui:ui-tooling'
+	testImplementation composeBom
+	testImplementation 'androidx.compose.ui:ui-test-junit4'
+	debugImplementation 'androidx.compose.ui:ui-test-manifest'
 	testImplementation 'junit:junit:4.13.2'
 
 	// MOSHIDON: we don't do that here

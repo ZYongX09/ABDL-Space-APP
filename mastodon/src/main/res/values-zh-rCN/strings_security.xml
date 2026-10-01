@@ -52,4 +52,6 @@
     <string name="security_error_store_unavailable">无法保存安全设置，请重试。</string>
 <string name="security__enter_pin">请输入您的 PIN 码</string>
 <string name="fingerprint__biometric_invalidated">由于系统生物识别设置更改，生物识别登录已停用。请使用 PIN 码。</string>
+	<string name="security_pin_welcome">欢迎回来</string>
+	<string name="security_pin_unlock_description">请输入 %1$d 位 PIN 码以解锁</string>
 </resources>
