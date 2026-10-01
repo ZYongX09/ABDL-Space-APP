@@ -5,6 +5,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.toggleableState
 import androidx.compose.ui.state.ToggleableState
+import org.junit.Assert.assertTrue
+import org.robolectric.annotation.GraphicsMode
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
@@ -90,4 +92,23 @@ class SecurityUiInteractionTest {
 			assertEquals(1, biometrics)
 		}
 	}
+	@GraphicsMode(GraphicsMode.Mode.NATIVE)
+	@Test fun securityVectorsRenderOpaquePixelsWithTint() {
+		val context = RuntimeEnvironment.getApplication()
+		listOf(R.drawable.ic_security_fingerprint, R.drawable.ic_security_lock_shield, R.drawable.ic_security_backspace).forEach { id ->
+			val drawable = androidx.core.content.res.ResourcesCompat.getDrawable(context.resources, id, context.theme)!!
+			drawable.setTint(android.graphics.Color.RED)
+			drawable.setBounds(0, 0, 96, 96)
+			val bitmap = android.graphics.Bitmap.createBitmap(96, 96, android.graphics.Bitmap.Config.ARGB_8888)
+			drawable.draw(android.graphics.Canvas(bitmap))
+			var visible = 0
+			for (y in 0 until 96) for (x in 0 until 96) {
+				val pixel = bitmap.getPixel(x, y)
+				if (android.graphics.Color.alpha(pixel) > 200 && android.graphics.Color.red(pixel) > 200) visible++
+			}
+			assertTrue("Vector $id must draw opaque tinted paths", visible > 20)
+			bitmap.recycle()
+		}
+	}
+
 }

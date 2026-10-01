@@ -130,7 +130,7 @@ fun SecurityScreen(
 								onCheckedChange = {},
 								title = stringResource(R.string.settings__option_fingerprint),
 								summary = stringResource(R.string.settings__option_fingerprint_description),
-								startAction = { SecurityIcon(R.drawable.ic_fluent_fingerprint_24_regular) },
+								startAction = { SecurityIcon(R.drawable.ic_security_fingerprint) },
 								enabled = false,
 							)
 						}
@@ -192,7 +192,7 @@ fun SecurityScreen(
 									}
 								},
 								title = stringResource(R.string.settings__option_fingerprint),
-								startAction = { SecurityIcon(R.drawable.ic_fluent_fingerprint_24_regular) },
+								startAction = { SecurityIcon(R.drawable.ic_security_fingerprint) },
 							)
 						}
 					}

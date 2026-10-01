@@ -56,7 +56,7 @@ internal fun PinScreen(
 				modifier = Modifier.fillMaxWidth().padding(top = if (compact) 12.dp else 48.dp)) {
 				Box(Modifier.size(56.dp).background(palette.tile, RoundedCornerShape(18.dp)),
 					contentAlignment = Alignment.Center) {
-					Icon(painterResource(R.drawable.ic_fluent_lock_shield_24_regular),
+					Icon(painterResource(R.drawable.ic_security_lock_shield),
 						contentDescription = null, tint = palette.accent, modifier = Modifier.size(28.dp))
 				}
 				Spacer(Modifier.height(if (compact) 16.dp else 26.dp))

@@ -137,7 +137,7 @@ private fun PinKeyboardKey(
 				modifier = Modifier.alpha(if (enabled) 1f else 0.45f),
 			)
 			PinKey.Biometrics -> Icon(
-				painter = painterResource(R.drawable.ic_fluent_fingerprint_24_regular),
+				painter = painterResource(R.drawable.ic_security_fingerprint),
 				contentDescription = null,
 				tint = palette.accent,
 				modifier = Modifier
@@ -146,7 +146,7 @@ private fun PinKeyboardKey(
 					.alpha(if (enabled) 1f else 0.45f),
 			)
 			PinKey.Backspace -> Icon(
-				painter = painterResource(R.drawable.ic_fluent_backspace_24_regular),
+				painter = painterResource(R.drawable.ic_security_backspace),
 				contentDescription = null, tint = palette.secondary,
 				modifier = Modifier.size(24.dp).alpha(if (enabled && canBackspace) 1f else 0.4f),
 			)
