@@ -7,4 +7,6 @@
 	<string name="verification_camera_error_message">相机未能启动或拍摄失败。你可以重试，或退出后重新开始认证。</string>
 	<string name="verification_camera_retry">重试相机</string>
 	<string name="verification_camera_exit">退出认证</string>
+	<string name="verification_camera_remaining">剩余 %1$d 秒，请在到期前确认使用照片</string>
+	<string name="verification_camera_invalid_request">认证拍摄参数无效，请退出后重新开始认证</string>
 </resources>

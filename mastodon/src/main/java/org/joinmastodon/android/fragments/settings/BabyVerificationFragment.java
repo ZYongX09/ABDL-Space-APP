@@ -360,6 +360,7 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 		busy=true;
 		showMessage(BabyVerificationProgressView.STAGE_PHOTO, false, getString(R.string.verification_capture_title), pendingCapture.requirement(), false, 0, null, 0, null);
 		Intent intent=MediaCameraContract.createCertificationIntent(getActivity(), pendingCapture.sessionId(), 0, pendingCapture.requirement(), duration);
+		intent.putExtra(MediaCameraContract.EXTRA_CERTIFICATION_DEADLINE, pendingCapture.expiresAt()*1000);
 		startActivityForResult(intent, CAMERA_REQUEST);
 	}
 
@@ -385,8 +386,17 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 		String path=MediaCameraContract.getControlledPath(data);
 		int slot=MediaCameraContract.getCertificationSlot(data);
 		VerificationPendingCapture restored=VerificationPendingCapture.load(getActivity(), resultSession);
-		if(path==null || slot!=0 || restored==null || (pendingCapture!=null && !pendingCapture.sessionId().equals(resultSession))){
-			if(path!=null) new File(path).delete();
+		boolean controlled=false;
+		try{
+			if(restored!=null && slot==0 && path!=null){
+				File expected=MediaCameraContract.certificationPhotoFile(getActivity(), resultSession, slot);
+				controlled=expected.getAbsolutePath().equals(path) && expected.getCanonicalPath().equals(expected.getAbsolutePath())
+						&& expected.isFile() && expected.length()>0;
+			}
+		}catch(Exception ignored){ }
+		if(!controlled || slot!=0 || restored==null || restored.expiresAt()*1000<=System.currentTimeMillis()
+				|| (pendingCapture!=null && !pendingCapture.sessionId().equals(resultSession))){
+			if(controlled) new File(path).delete();
 			busy=false;
 			showMessage(BabyVerificationProgressView.STAGE_INFORMATION, false, getString(R.string.verification_state_error), getString(R.string.verification_capture_expired), false,
 					R.string.verification_retry, v->loadState(), 0, null);

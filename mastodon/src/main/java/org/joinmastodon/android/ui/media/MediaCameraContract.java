@@ -5,6 +5,9 @@ import android.content.Intent;
 import android.net.Uri;
 import android.view.Surface;
 
+import java.io.File;
+import java.io.IOException;
+
 public final class MediaCameraContract{
 	public static final String EXTRA_ALLOW_VIDEO="media_camera_allow_video";
 	public static final String EXTRA_MEDIA_URI="media_uri";
@@ -17,7 +20,35 @@ public final class MediaCameraContract{
 	public static final String EXTRA_CERTIFICATION_DURATION="media_camera_certification_duration";
 	public static final String EXTRA_CONTROLLED_PATH="media_camera_controlled_path";
 
+	public static final String EXTRA_CERTIFICATION_DEADLINE="media_camera_certification_deadline";
+
 	private MediaCameraContract(){ }
+
+	public static File certificationPhotoFile(Context context, String sessionId, int slot){
+		if(sessionId==null || !sessionId.matches("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}") || slot!=0)
+			throw new IllegalArgumentException("Invalid certification session or slot");
+		return new File(context.getNoBackupFilesDir(), "verification/"+sessionId+"/raw-"+slot+".jpg");
+	}
+
+	public record CertificationRequest(String sessionId, int slot, String requirement, long deadline, File output){ }
+
+	/** Reject malformed requests before touching any caller-supplied file. */
+	public static CertificationRequest readCertificationRequest(Context context, Intent intent) throws IOException{
+		if(!isCertification(intent)) throw new IllegalArgumentException("Not a certification request");
+		String session=getCertificationSession(intent);
+		int slot=getCertificationSlot(intent);
+		File expected=certificationPhotoFile(context, session, slot);
+		String path=getControlledPath(intent);
+		String requirement=intent.getStringExtra(EXTRA_CERTIFICATION_REQUIREMENT);
+		long duration=intent.getLongExtra(EXTRA_CERTIFICATION_DURATION, 0);
+		long deadline=intent.getLongExtra(EXTRA_CERTIFICATION_DEADLINE, 0);
+		File privateRoot=context.getNoBackupFilesDir().getCanonicalFile();
+		if(path==null || !expected.getAbsolutePath().equals(path)
+				|| !expected.getCanonicalPath().equals(new File(privateRoot, "verification/"+session+"/raw-"+slot+".jpg").getAbsolutePath())
+				|| requirement==null || requirement.isBlank() || duration<=0 || deadline<=0)
+			throw new IllegalArgumentException("Invalid certification camera parameters");
+		return new CertificationRequest(session, slot, requirement, deadline, expected);
+	}
 
 	public static Intent createIntent(Context context, boolean allowVideo){
 		return new Intent().setClassName(context, "org.joinmastodon.android.ui.MediaCameraActivity").putExtra(EXTRA_ALLOW_VIDEO, allowVideo);
@@ -28,8 +59,12 @@ public final class MediaCameraContract{
 	}
 
 	public static Intent createCertificationIntent(Context context, String sessionId, int slot, String requirement, long durationMs){
+		long now=System.currentTimeMillis();
+		if(durationMs<=0 || durationMs>Long.MAX_VALUE-now) throw new IllegalArgumentException("Invalid certification duration");
 		return createIntent(context, false).putExtra(EXTRA_CERTIFICATION_MODE, true).putExtra(EXTRA_CERTIFICATION_SESSION, sessionId)
-				.putExtra(EXTRA_CERTIFICATION_SLOT, slot).putExtra(EXTRA_CERTIFICATION_REQUIREMENT, requirement).putExtra(EXTRA_CERTIFICATION_DURATION, durationMs);
+				.putExtra(EXTRA_CERTIFICATION_SLOT, slot).putExtra(EXTRA_CERTIFICATION_REQUIREMENT, requirement).putExtra(EXTRA_CERTIFICATION_DURATION, durationMs)
+				.putExtra(EXTRA_CERTIFICATION_DEADLINE, now+durationMs)
+				.putExtra(EXTRA_CONTROLLED_PATH, certificationPhotoFile(context, sessionId, slot).getAbsolutePath());
 	}
 
 	public static Intent createCertificationResult(String controlledPath, String sessionId, int slot){

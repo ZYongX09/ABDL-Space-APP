@@ -305,7 +305,7 @@ private fun isMenuVisible(): Boolean = menuPageState!=HomeToolbarMenuPage.NONE |
 		private fun isInsideActiveGlass(x: Float, y: Float): Boolean {
 			val density = view.resources.displayMetrics.density
 			val activePage = menuPageState.takeIf { it!=HomeToolbarMenuPage.NONE } ?: pendingMenuPageState
-			val top = statusBarInsetState + (if(activePage==HomeToolbarMenuPage.COMPOSE) 62f else 8f) * density
+			val top = statusBarInsetState + ToolbarMenuGeometry.TOP_OFFSET_DP * density
 			val rowCount = when(activePage) {
 				HomeToolbarMenuPage.TIMELINES -> timelinesState.size
 				HomeToolbarMenuPage.COMPOSE -> composeMenuState.size
@@ -314,11 +314,11 @@ private fun isMenuVisible(): Boolean = menuPageState!=HomeToolbarMenuPage.NONE |
 				HomeToolbarMenuPage.HASHTAGS -> hashtagsState.size + 1
 				HomeToolbarMenuPage.NONE -> 1
 			}
-			val bottom = top + toolbarMenuHeightDp(rowCount, false) * density
+			val bottom = top + ToolbarMenuGeometry.heightDp(rowCount) * density
 			if(y !in top..bottom) return false
 			return when(activePage) {
 				HomeToolbarMenuPage.TIMELINES -> x in 12f*density..260f*density
-				HomeToolbarMenuPage.COMPOSE -> x in view.width-240f*density..view.width-40f*density
+				HomeToolbarMenuPage.COMPOSE -> x in view.width-(COMPOSE_MENU_END_PADDING_DP + COMPOSE_MENU_WIDTH_DP)*density..view.width-COMPOSE_MENU_END_PADDING_DP*density
 				HomeToolbarMenuPage.ROOT, HomeToolbarMenuPage.LISTS, HomeToolbarMenuPage.HASHTAGS -> x in view.width-260f*density..view.width-12f*density
 				HomeToolbarMenuPage.NONE -> false
 			}
@@ -406,7 +406,7 @@ private fun isMenuVisible(): Boolean = menuPageState!=HomeToolbarMenuPage.NONE |
 				closedWidth = leadingClosedWidth,
 				closedHeight = 48.dp,
 				expandedWidth = 248.dp,
-				expandedHeight = toolbarMenuHeightDp(timelinesState.size, false).dp,
+				expandedHeight = ToolbarMenuGeometry.heightDp(timelinesState.size).dp,
 				backdrop = backdrop,
 				anchorFractionX = 0f,
 				selectionItemCount = menuItems.size,
@@ -414,7 +414,7 @@ private fun isMenuVisible(): Boolean = menuPageState!=HomeToolbarMenuPage.NONE |
 				shouldExpandFromClosed = { _, _ -> false },
 				onExpansionRequested = { requestMenu(HomeToolbarMenuPage.TIMELINES) },
 				onClosedTap = { _, _ -> },
-				modifier = Modifier.zIndex(toolbarGlassZIndex(leadingExpanded)).align(Alignment.TopStart).padding(top = topInset + 8.dp, start = 12.dp),
+				modifier = Modifier.zIndex(toolbarGlassZIndex(leadingExpanded)).align(Alignment.TopStart).padding(top = topInset + ToolbarMenuGeometry.TOP_OFFSET_DP.dp, start = 12.dp),
 				onExpansionStarted = {},
 				onExpansionFinished = { open -> if(!open && menuPageState==HomeToolbarMenuPage.NONE) menuOpenListener?.accept(false) },
 				onClick = { if(showNewPostsState) onNewPosts.run() else requestMenu(HomeToolbarMenuPage.TIMELINES) },
@@ -452,7 +452,7 @@ val trailingExpanded = menuPageState==HomeToolbarMenuPage.ROOT || menuPageState=
 				closedWidth = 96.dp,
 				closedHeight = 48.dp,
 				expandedWidth = 248.dp,
-				expandedHeight = toolbarMenuHeightDp(trailingRows, trailingHasBack).dp,
+				expandedHeight = ToolbarMenuGeometry.heightDp(trailingRows).dp,
 				backdrop = backdrop,
 				anchorFractionX = 1f,
 				selectionItemCount = trailingRows,
@@ -463,7 +463,7 @@ val trailingExpanded = menuPageState==HomeToolbarMenuPage.ROOT || menuPageState=
 					val action=trailingToolbarAction(position.x, size.width.toFloat())
 					if(action==TrailingToolbarAction.SEARCH) onSearch.run() else requestMenu(HomeToolbarMenuPage.ROOT)
 				},
-				modifier = Modifier.zIndex(toolbarGlassZIndex(trailingExpanded)).align(Alignment.TopEnd).padding(top = topInset + 8.dp, end = 12.dp),
+				modifier = Modifier.zIndex(toolbarGlassZIndex(trailingExpanded)).align(Alignment.TopEnd).padding(top = topInset + ToolbarMenuGeometry.TOP_OFFSET_DP.dp, end = 12.dp),
 				onExpansionStarted = {},
 				onExpansionFinished = { open -> if(!open && menuPageState==HomeToolbarMenuPage.NONE) menuOpenListener?.accept(false) },
 				onClick = {},
@@ -497,7 +497,7 @@ val trailingExpanded = menuPageState==HomeToolbarMenuPage.ROOT || menuPageState=
 				Modifier
 					.zIndex(toolbarGlassZIndex(composeExpanded))
 					.align(Alignment.TopEnd)
-					.padding(top = topInset + 8.dp, end = COMPOSE_MENU_END_PADDING_DP.dp)
+					.padding(top = topInset + ToolbarMenuGeometry.TOP_OFFSET_DP.dp, end = COMPOSE_MENU_END_PADDING_DP.dp)
 					.width(COMPOSE_MENU_WIDTH_DP.dp)
 			) {
 				MorphingGlassContainer(
@@ -505,7 +505,7 @@ val trailingExpanded = menuPageState==HomeToolbarMenuPage.ROOT || menuPageState=
 					closedWidth = 48.dp,
 					closedHeight = 48.dp,
 					expandedWidth = COMPOSE_MENU_WIDTH_DP.dp,
-					expandedHeight = toolbarMenuHeightDp(composeMenuRows, false).dp,
+					expandedHeight = ToolbarMenuGeometry.heightDp(composeMenuRows).dp,
 					backdrop = backdrop,
 					anchorFractionX = 0.5f,
 					selectionItemCount = composeMenuRows,
@@ -563,9 +563,9 @@ val trailingExpanded = menuPageState==HomeToolbarMenuPage.ROOT || menuPageState=
 		val offset = if(animatedPage==HomeToolbarMenuPage.LISTS || animatedPage==HomeToolbarMenuPage.HASHTAGS) 1 else 0
 		Column(
 			Modifier
-				.heightIn(max = 420.dp)
+				.heightIn(max = ToolbarMenuGeometry.MAX_HEIGHT_DP.dp)
 				.verticalScroll(rememberScrollState())
-				.padding(top = 14.dp, bottom = 6.dp),
+				.padding(top = ToolbarMenuGeometry.CONTENT_TOP_PADDING_DP.dp, bottom = ToolbarMenuGeometry.CONTENT_BOTTOM_PADDING_DP.dp),
 		) {
 				if(animatedPage==HomeToolbarMenuPage.COMPOSE) {
 					composeMenuState.forEachIndexed { index, item ->
@@ -594,7 +594,7 @@ val trailingExpanded = menuPageState==HomeToolbarMenuPage.ROOT || menuPageState=
 	@Composable
 	private fun MenuRow(@DrawableRes icon: Int, title: String, badged: Boolean, highlighted: Boolean, onClick: () -> Unit) {
 		Row(
-			modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(if(highlighted) MiuixTheme.colorScheme.onSurface.copy(alpha = 0.10f) else Color.Transparent).clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 10.dp),
+			modifier = Modifier.fillMaxWidth().height(ToolbarMenuGeometry.ROW_HEIGHT_DP.dp).clip(RoundedCornerShape(14.dp)).background(if(highlighted) MiuixTheme.colorScheme.onSurface.copy(alpha = 0.10f) else Color.Transparent).clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 10.dp),
 			verticalAlignment = Alignment.CenterVertically,
 		) {
 			ResourceIcon(icon, 24, MiuixTheme.colorScheme.onSurface)
@@ -607,7 +607,7 @@ val trailingExpanded = menuPageState==HomeToolbarMenuPage.ROOT || menuPageState=
 	@Composable
 	private fun MenuRow(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, badged: Boolean, highlighted: Boolean, onClick: () -> Unit) {
 		Row(
-			modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(if(highlighted) MiuixTheme.colorScheme.onSurface.copy(alpha = 0.10f) else Color.Transparent).clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 10.dp),
+			modifier = Modifier.fillMaxWidth().height(ToolbarMenuGeometry.ROW_HEIGHT_DP.dp).clip(RoundedCornerShape(14.dp)).background(if(highlighted) MiuixTheme.colorScheme.onSurface.copy(alpha = 0.10f) else Color.Transparent).clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 10.dp),
 			verticalAlignment = Alignment.CenterVertically,
 		) {
 			Icon(imageVector = icon, contentDescription = null, tint = MiuixTheme.colorScheme.onSurface)

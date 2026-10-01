@@ -51,6 +51,32 @@ public class MediaCameraActivity extends Activity implements MediaCameraControll
 	private boolean scaling;
 	private File reviewFile;
 	private boolean reviewIsVideo;
+	private MediaCameraContract.CertificationRequest certification;
+	private boolean certificationMode;
+	private android.widget.TextView certificationTimer;
+	private File pendingCertificationPhoto;
+	private final Runnable certificationTick=new Runnable(){
+		@Override public void run(){
+			if(certification==null || isFinishing()) return;
+			long remaining=Math.max(0, certification.deadline()-System.currentTimeMillis());
+			certificationTimer.setText(remaining==0 ? getString(R.string.verification_capture_expired)
+					: getString(R.string.verification_camera_remaining, (remaining+999)/1000));
+			useButton.setEnabled(remaining>0);
+			shutter.setEnabled(remaining>0);
+			if(remaining>0) certificationTimer.postDelayed(this, Math.min(1000, remaining));
+		}
+	};
+
+	private boolean certificationActive(){
+		if(!certificationMode) return true;
+		if(certification==null || System.currentTimeMillis()>=certification.deadline()){
+			if(certification!=null && certificationTimer!=null) certificationTick.run();
+			Toast.makeText(this, R.string.verification_capture_expired, Toast.LENGTH_LONG).show();
+			return false;
+		}
+		return true;
+	}
+
 	private long recordingStartedAt;
 	private boolean recording;
 	private boolean recordingStarting;
@@ -91,15 +117,35 @@ public class MediaCameraActivity extends Activity implements MediaCameraControll
 		shutter=findViewById(R.id.camera_shutter);
 		recordingTimer=findViewById(R.id.recording_timer);
 		controller=new MediaCameraController(this, this);
+		certificationMode=MediaCameraContract.isCertification(getIntent());
+		if(certificationMode){
+			try{
+				certification=MediaCameraContract.readCertificationRequest(this, getIntent());
+			}catch(Exception error){
+				Toast.makeText(this, R.string.verification_camera_invalid_request, Toast.LENGTH_LONG).show();
+				setResult(RESULT_CANCELED);
+				finish();
+				return;
+			}
+			findViewById(R.id.camera_certification_panel).setVisibility(View.VISIBLE);
+			((android.widget.TextView)findViewById(R.id.camera_certification_requirement)).setText(certification.requirement());
+			certificationTimer=findViewById(R.id.camera_certification_timer);
+			findViewById(R.id.camera_gallery).setVisibility(View.GONE);
+			((android.widget.TextView)findViewById(R.id.camera_capture_hint)).setText(R.string.verification_camera_capture_hint);
+		}
 
 		View topControls=findViewById(R.id.camera_top_controls);
 		ViewCompat.setOnApplyWindowInsetsListener(topControls, (view, insets)->{
 			int top=insets.getInsets(WindowInsetsCompat.Type.statusBars()).top;
 			view.setPadding(view.getPaddingLeft(), top+dp(12), view.getPaddingRight(), view.getPaddingBottom());
+			View panel=findViewById(R.id.camera_certification_panel);
+			android.widget.FrameLayout.LayoutParams params=(android.widget.FrameLayout.LayoutParams)panel.getLayoutParams();
+			params.topMargin=top+dp(72);
+			panel.setLayoutParams(params);
 			return insets;
 		});
 		findViewById(R.id.camera_back).setOnClickListener(v->handleBack());
-		findViewById(R.id.camera_gallery).setOnClickListener(v->handleBack());
+		findViewById(R.id.camera_gallery).setOnClickListener(v->{ if(!certificationMode) handleBack(); });
 		findViewById(R.id.camera_retake).setOnClickListener(v->retake());
 		useButton.setOnClickListener(v->useMedia());
 		flashButton.setOnClickListener(v->updateFlashButton(controller.cycleFlashMode()));
@@ -126,7 +172,8 @@ public class MediaCameraActivity extends Activity implements MediaCameraControll
 
 		if(savedInstanceState!=null){
 			String path=savedInstanceState.getString(STATE_REVIEW_FILE);
-			if(path!=null){
+			if(path!=null && (!certificationMode || (!savedInstanceState.getBoolean(STATE_REVIEW_VIDEO)
+					&& certification.output().getAbsolutePath().equals(path)))){
 				reviewFile=new File(path);
 				reviewIsVideo=savedInstanceState.getBoolean(STATE_REVIEW_VIDEO);
 				if(reviewFile.exists())
@@ -158,6 +205,8 @@ public class MediaCameraActivity extends Activity implements MediaCameraControll
 
 	@Override protected void onResume(){
 		super.onResume();
+		if(isFinishing()) return;
+		if(certificationMode) certificationTick.run();
 		if(reviewFile==null){
 			if(checkSelfPermission(Manifest.permission.CAMERA)!=PackageManager.PERMISSION_GRANTED){
 				Toast.makeText(this, R.string.media_picker_camera_failed, Toast.LENGTH_SHORT).show();
@@ -177,7 +226,9 @@ public class MediaCameraActivity extends Activity implements MediaCameraControll
 	}
 
 	@Override protected void onPause(){
-		if(recording)
+		if(certificationTimer!=null) certificationTimer.removeCallbacks(certificationTick);
+		recordingTimer.removeCallbacks(recordingTick);
+		if(recording || recordingStarting)
 			stopRecording(false);
 		controller.close();
 		super.onPause();
@@ -192,12 +243,22 @@ public class MediaCameraActivity extends Activity implements MediaCameraControll
 	}
 
 	private void capturePhoto(){
-		if(controller.getState()!=MediaCameraController.State.PREVIEW)
+		if(!certificationActive() || controller.getState()!=MediaCameraController.State.PREVIEW)
 			return;
 		try{
-			File dir=new File(getCacheDir(), "images");
-			dir.mkdirs();
-			controller.takePhoto(File.createTempFile("camera_", ".jpg", dir));
+			if(certificationMode){
+				// Revalidate immediately before writing (including symlinks).
+				File output=MediaCameraContract.readCertificationRequest(this, getIntent()).output();
+				File dir=output.getParentFile();
+				if(!dir.isDirectory() && !dir.mkdirs()) throw new java.io.IOException("Cannot create capture directory");
+				if(output.exists() && !output.delete()) throw new java.io.IOException("Cannot replace capture");
+				pendingCertificationPhoto=output;
+				controller.takePhoto(output);
+			}else{
+				File dir=new File(getCacheDir(), "images");
+				dir.mkdirs();
+				controller.takePhoto(File.createTempFile("camera_", ".jpg", dir));
+			}
 		}catch(Exception x){
 			onError(R.string.media_picker_camera_failed);
 		}
@@ -209,12 +270,21 @@ public class MediaCameraActivity extends Activity implements MediaCameraControll
 	}
 
 	@Override public void onPhotoCaptured(File file){
+		if(certificationMode){
+			if(certification==null || !certification.output().equals(file)) return;
+			pendingCertificationPhoto=null;
+			if(isFinishing() || isDestroyed() || !certificationActive()){
+				file.delete();
+				return;
+			}
+		}
 		reviewFile=file;
 		reviewIsVideo=false;
 		showReview();
 	}
 
 	@Override public void onVideoRecorded(File file){
+		if(certificationMode) return;
 		recording=false;
 		recordingTimer.removeCallbacks(recordingTick);
 		reviewFile=file;
@@ -223,7 +293,7 @@ public class MediaCameraActivity extends Activity implements MediaCameraControll
 	}
 
 	private void startRecording(){
-		if(!getIntent().getBooleanExtra(MediaCameraContract.EXTRA_ALLOW_VIDEO, false) || recordingStarting || controller.getState()!=MediaCameraController.State.PREVIEW)
+		if(certificationMode || !getIntent().getBooleanExtra(MediaCameraContract.EXTRA_ALLOW_VIDEO, false) || recordingStarting || controller.getState()!=MediaCameraController.State.PREVIEW)
 			return;
 		if(checkSelfPermission(Manifest.permission.RECORD_AUDIO)!=PackageManager.PERMISSION_GRANTED){
 			requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, AUDIO_PERMISSION_REQUEST);
@@ -252,6 +322,7 @@ public class MediaCameraActivity extends Activity implements MediaCameraControll
 	}
 
 	@Override public void onRecordingStarted(){
+		if(certificationMode){ controller.stopRecording(false); return; }
 		recordingStarting=false;
 		recording=true;
 		recordingStartedAt=System.currentTimeMillis();
@@ -293,14 +364,26 @@ public class MediaCameraActivity extends Activity implements MediaCameraControll
 		reviewControls.setVisibility(View.GONE);
 		preview.setVisibility(View.VISIBLE);
 		captureControls.setVisibility(View.VISIBLE);
-		controller.open(preview);
+		if(certificationActive()) controller.open(preview);
 	}
 
 	private void useMedia(){
-		if(reviewFile==null)
+		if(reviewFile==null || !certificationActive())
 			return;
-		Uri uri=UiUtils.getFileProviderUri(this, reviewFile);
-		setResult(RESULT_OK, MediaCameraContract.createResult(uri, reviewIsVideo, reviewIsVideo ? "video/mp4" : "image/jpeg"));
+		try{
+			if(certificationMode){
+				File expected=MediaCameraContract.readCertificationRequest(this, getIntent()).output();
+				if(reviewIsVideo || !expected.equals(reviewFile) || !reviewFile.isFile() || reviewFile.length()==0)
+					throw new java.io.IOException("Invalid certification photo");
+				setResult(RESULT_OK, MediaCameraContract.createCertificationResult(expected.getAbsolutePath(), certification.sessionId(), certification.slot()));
+			}else{
+				Uri uri=UiUtils.getFileProviderUri(this, reviewFile);
+				setResult(RESULT_OK, MediaCameraContract.createResult(uri, reviewIsVideo, reviewIsVideo ? "video/mp4" : "image/jpeg"));
+			}
+		}catch(Exception error){
+			onError(R.string.media_picker_camera_failed);
+			return;
+		}
 		reviewFile=null;
 		finish();
 	}
@@ -319,13 +402,29 @@ public class MediaCameraActivity extends Activity implements MediaCameraControll
 	}
 
 	@Override public void onError(int messageRes){
-		Toast.makeText(this, messageRes, Toast.LENGTH_SHORT).show();
+		if(isFinishing() || isDestroyed()) return;
+		if(certificationMode){
+			new android.app.AlertDialog.Builder(this)
+					.setTitle(R.string.verification_camera_error_title)
+					.setMessage(R.string.verification_camera_error_message)
+					.setPositiveButton(R.string.verification_camera_retry, (dialog, which)->{
+						if(certificationActive() && reviewFile==null && preview.isAvailable()) controller.open(preview);
+					})
+					.setNegativeButton(R.string.verification_camera_exit, (dialog, which)->{ setResult(RESULT_CANCELED); finish(); })
+					.show();
+		}else{
+			Toast.makeText(this, messageRes, Toast.LENGTH_SHORT).show();
+		}
 	}
 
 	@Override protected void onDestroy(){
+		if(certificationTimer!=null) certificationTimer.removeCallbacks(certificationTick);
+		recordingTimer.removeCallbacks(recordingTick);
 		controller.close();
-		if(isFinishing())
+		if(isFinishing()){
 			deleteReviewFile();
+			if(pendingCertificationPhoto!=null) pendingCertificationPhoto.delete();
+		}
 		super.onDestroy();
 	}
 

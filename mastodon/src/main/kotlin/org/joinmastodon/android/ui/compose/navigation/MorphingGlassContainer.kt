@@ -56,6 +56,25 @@ import top.yukonga.miuix.kmp.blur.drawBackdrop
 import top.yukonga.miuix.kmp.blur.isRuntimeShaderSupported
 import kotlin.math.hypot
 
+/** Shared by the rendered toolbar menus, outside-touch gate and drag selection. */
+internal object ToolbarMenuGeometry {
+	const val TOP_OFFSET_DP = 8
+	const val CONTENT_TOP_PADDING_DP = 14
+	const val CONTENT_BOTTOM_PADDING_DP = 6
+	const val ROW_HEIGHT_DP = 48
+	const val MAX_HEIGHT_DP = 420
+
+	fun heightDp(rowCount: Int): Int =
+		(CONTENT_TOP_PADDING_DP + rowCount.coerceAtLeast(1) * ROW_HEIGHT_DP + CONTENT_BOTTOM_PADDING_DP)
+			.coerceAtMost(MAX_HEIGHT_DP)
+
+	fun rowAt(x: Float, y: Float, width: Float, height: Float, density: Float, rowCount: Int): Int? {
+		val rowY = y - CONTENT_TOP_PADDING_DP * density
+		if(x < 0f || x >= width || y >= height || rowY < 0f) return null
+		return (rowY / (ROW_HEIGHT_DP * density)).toInt().takeIf { it in 0 until rowCount }
+	}
+}
+
 @Composable
 internal fun MorphingGlassContainer(
 	expanded: Boolean,
@@ -214,8 +233,11 @@ internal fun MorphingGlassContainer(
 							totalDy += delta.y
 							if(!dragged && hypot(totalDx, totalDy)>viewConfiguration.touchSlop) dragged = true
 							val canSelect = dragged && expandedState.value && itemCountState.value>0
-							val index = if(canSelect) ((change.position.y - 6.dp.toPx()) / 48.dp.toPx()).toInt()
-								.takeIf { change.position.x in 0f..size.width.toFloat() && it in 0 until itemCountState.value } else null
+							val index = if(canSelect) ToolbarMenuGeometry.rowAt(
+								x = change.position.x, y = change.position.y,
+								width = size.width.toFloat(), height = size.height.toFloat(),
+								density = density, rowCount = itemCountState.value,
+							) else null
 							if(index!=highlighted) {
 								highlighted = index
 								onSelectionChanged(index)

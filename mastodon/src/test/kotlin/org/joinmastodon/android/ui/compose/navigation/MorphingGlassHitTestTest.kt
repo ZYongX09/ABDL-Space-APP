@@ -29,6 +29,26 @@ class MorphingGlassHitTestTest {
 	}
 
 	@Test
+	fun toolbarDragSelectionMatchesRenderedPaddingAndRowBoundaries() {
+		for(density in listOf(1f, 2.75f, 3f)) {
+			val width = 200 * density
+			val height = ToolbarMenuGeometry.heightDp(2) * density
+			fun row(yDp: Float, x: Float = width / 2) = ToolbarMenuGeometry.rowAt(x, yDp * density, width, height, density, 2)
+			assertEquals(116, ToolbarMenuGeometry.heightDp(2))
+			assertNull(row(-1f))
+			assertNull(row(13.9f))
+			assertEquals(0, row(14f))
+			assertEquals(0, row(61.9f))
+			assertEquals(1, row(62f))
+			assertEquals(1, row(109.9f))
+			assertNull(row(110f))
+			assertNull(row(38f, -1f))
+			assertNull(row(38f, width))
+			assertNull(ToolbarMenuGeometry.rowAt(width / 2, 430 * density, width, 420 * density, density, 20))
+		}
+	}
+
+	@Test
 	fun outsideGestureOnlyForwardsAfterTouchSlop() {
 		assertEquals(OutsideGlassGesture.CLOSE_ONLY, outsideGlassGesture(0f, 8f))
 		assertEquals(OutsideGlassGesture.CLOSE_ONLY, outsideGlassGesture(7.9f, 8f))
