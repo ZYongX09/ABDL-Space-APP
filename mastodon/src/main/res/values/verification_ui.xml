@@ -35,6 +35,7 @@
 	<string name="verification_camera_permission_denied">需要相机权限才能完成认证拍摄。</string>
 	<string name="verification_draft_missing_photo">本地照片已不可用。系统会先核对服务器上的上传结果；如无法恢复，需要放弃草稿并重新拍摄。</string>
 	<string name="verification_submission_checking">正在核对上次提交结果…</string>
+	<string name="verification_application_cancelled_unsubmitted">申请已取消，未提交审核。</string>
 	<string name="verification_photo_retake_required">照片校验未通过，请放弃当前草稿并重新拍摄。</string>
 	<string name="verification_refresh">刷新状态</string>
 	<string name="verification_certificate_unavailable">证书暂时不可用，请刷新后重试。</string>

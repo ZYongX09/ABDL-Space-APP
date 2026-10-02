@@ -9,6 +9,7 @@ import org.joinmastodon.android.api.MastodonErrorResponse;
 import org.joinmastodon.android.api.ObjectValidationException;
 import org.joinmastodon.android.api.requests.verification.VerificationRequest;
 import org.joinmastodon.android.api.session.AccountSession;
+import org.joinmastodon.android.api.session.AccountSessionManager;
 import org.joinmastodon.android.model.verification.VerificationModels.ApplicationDetail;
 import org.joinmastodon.android.model.verification.VerificationModels.Evidence;
 import org.joinmastodon.android.model.verification.VerificationModels.EvidenceComplete;
@@ -50,7 +51,7 @@ public final class VerificationUploader{
 	});
 
 	public enum State{ IDLE, AUTHORIZING, UPLOADING, COMPLETING, COMPLETE, FAILED, CANCELED }
-	public enum Phase{ PREPARED, PUT_PENDING, COMPLETE_PENDING, COMPLETE }
+	public enum Phase{ PREPARED, PUT_PENDING, COMPLETE_PENDING, FAILED_EVIDENCE, COMPLETE }
 
 	/** Persistable recovery boundary. Evidence in pending/verifying state resumes at COMPLETE_PENDING first. */
 	public static final class Recovery{
@@ -73,6 +74,7 @@ public final class VerificationUploader{
 		public static Recovery complete(String evidenceId, long verifiedSize){ return new Recovery(evidenceId, Phase.COMPLETE, verifiedSize); }
 		public static Recovery fromEvidence(Evidence evidence){
 			if(evidence==null) return prepared();
+			if("failed".equals(evidence.status)) return new Recovery(evidence.id, Phase.FAILED_EVIDENCE);
 			if("ready".equals(evidence.status)) return complete(evidence.id, evidence.verifiedSize==null ? 0 : evidence.verifiedSize);
 			return completePending(evidence.id);
 		}
@@ -112,6 +114,7 @@ public final class VerificationUploader{
 		EvidenceComplete complete(String evidenceId) throws IOException;
 		void cancel();
 		VerificationRequest<?> getCurrentRequest();
+		default boolean isSessionValid(){ return true; }
 	}
 
 	/** IOException carrying an exact backend error through a synchronous Transport. */
@@ -235,8 +238,12 @@ public final class VerificationUploader{
 			EvidenceComplete result;
 				if(initialRecovery.phase==Phase.COMPLETE){
 					result=completed(initialRecovery.evidenceId, initialRecovery.verifiedSize);
-				}else if(initialRecovery.phase==Phase.PUT_PENDING){
-					result=authorizePutComplete(applicationId, requireImage(image), 0);
+					}else if(initialRecovery.phase==Phase.FAILED_EVIDENCE){
+						// Backend authorizes failed -> pending only with identical metadata and a CAS.
+						result=authorizePutComplete(applicationId, requireImage(image), 0);
+					}else if(initialRecovery.phase==Phase.PUT_PENDING){
+						// Probe first even if the persisted boundary predates the PUT response.
+						result=completeOrReauthorize(applicationId, image, initialRecovery.evidenceId, 0);
 				}else if(initialRecovery.phase==Phase.COMPLETE_PENDING){
 					result=completeOrReauthorize(applicationId, image, initialRecovery.evidenceId, 0);
 				}else{
@@ -270,7 +277,7 @@ public final class VerificationUploader{
 			authorization.postprocess();
 			validateAuthorization(authorization, image);
 		}catch(IOException error){
-			throw failure(localError("authorization_mismatch", error.getMessage(), 0, error, false, false, false));
+			throw failure(localError("authorization_mismatch", error.getMessage(), 0, error, false, true, false));
 		}
 		transition(State.AUTHORIZING, Recovery.putPending(authorization.evidenceId));
 		if(!authorization.alreadyUploaded){
@@ -304,21 +311,58 @@ public final class VerificationUploader{
 					sleepBackoff(attempt);
 					continue;
 				}
+					if(error.status==409 && "evidence_object_missing".equals(error.code)){
+						if(image==null) throw failure(fromTransport(error, true, true));
+						if(reauthorizeAttempt>=MAX_REAUTHORIZE_ATTEMPTS) throw failure(fromTransport(error, false, true));
+						return authorizePutComplete(applicationId, image, reauthorizeAttempt+1);
+					}
 				if("upload_expired".equals(error.code)){
 					if(image==null) throw failure(fromTransport(error, true, true));
 					if(reauthorizeAttempt>=MAX_REAUTHORIZE_ATTEMPTS) throw failure(fromTransport(error, false, false));
-					return authorizePutComplete(applicationId, image, reauthorizeAttempt+1);
+					return renewAndProbe(applicationId, image, evidenceId, reauthorizeAttempt+1);
 				}
+				if("evidence_failed".equals(error.code)) throw failure(fromTransport(error, image==null, true));
 				if("evidence_mismatch".equals(error.code)) throw failure(fromTransport(error, false, true));
 				if("evidence_not_found".equals(error.code) && image==null) throw failure(fromTransport(error, true, true));
 				throw failure(fromTransport(error, false, false));
 			}catch(ObjectValidationException error){
-				throw failure(localError("complete_result_mismatch", error.getMessage(), 0, error, false, false, true));
+				throw failure(localError("complete_result_mismatch", error.getMessage(), 0, error, true, true, false));
 			}catch(IOException error){
 				throw failure(fromTransport(error, false, false));
 			}
 		}
 		throw failure(localError("evidence_verifying", "照片校验仍在进行", 409, null, true, false, false));
+	}
+
+	/** Refresh only the upload lease, then probe. An expired signature is not evidence of a missing object. */
+	private EvidenceComplete renewAndProbe(String applicationId, VerificationImageProcessor.Result image, String evidenceId, int renewAttempt) throws IOException, UploadFailure{
+		checkCanceled();
+		validateImage(image);
+		transition(State.AUTHORIZING, Recovery.completePending(evidenceId));
+		UploadAuthorization authorization;
+		try{ authorization=transport.authorize(applicationId, "capture_photo", image.sha256(), image.md5Base64(), image.size()); }
+		catch(IOException error){ throw failure(fromTransport(error, false, false)); }
+		checkCanceled();
+		try{
+			authorization.postprocess(); validateAuthorization(authorization, image);
+			if(!evidenceId.equals(authorization.evidenceId)) throw new IOException("续传授权与原照片不匹配");
+		}catch(IOException error){ throw failure(localError("authorization_mismatch", error.getMessage(), 0, error, false, true, false)); }
+		try{
+			EvidenceComplete result=completeOrReauthorize(applicationId, null, evidenceId, renewAttempt);
+			if(result.verifiedSize!=image.size()) throw failure(localError("complete_result_mismatch", "照片校验结果与本地文件不匹配", 0, null, true, true, false));
+			return result;
+		}
+		catch(UploadFailure failure){
+			if(!"evidence_object_missing".equals(failure.error.code) || failure.error.httpStatus!=409) throw failure;
+			// Only explicit missing after renewal allows use of this same-metadata no-overwrite authorization.
+			if(authorization.alreadyUploaded) throw failure;
+			checkCanceled(); validateImage(image);
+			transition(State.UPLOADING, Recovery.putPending(evidenceId)); putAttempted=true;
+			try{ put(authorization, image); }
+			catch(PutException error){ if(!isUncertainPut(error.status)) throw failure(localError("put_failed", error.getMessage(), error.status, error, false, false, false)); }
+			catch(IOException ignored){ checkCanceled(); }
+			return completeOrReauthorize(applicationId, image, evidenceId, renewAttempt);
+		}
 	}
 
 	private void put(UploadAuthorization authorization, VerificationImageProcessor.Result image) throws IOException{
@@ -328,7 +372,7 @@ public final class VerificationUploader{
 			@Override public void writeTo(BufferedSink sink) throws IOException{
 				try(FileInputStream input=new FileInputStream(image.file())){
 					byte[] buffer=new byte[8192]; int read;
-					while((read=input.read(buffer))!=-1){ checkCanceled(); sink.write(buffer, 0, read); }
+					while(true){ checkCanceled(); read=input.read(buffer); if(read==-1) break; sink.write(buffer, 0, read); }
 				}
 			}
 		};
@@ -453,7 +497,7 @@ public final class VerificationUploader{
 		}
 	}
 
-	private void checkCanceled() throws CanceledException{ if(canceled || Thread.currentThread().isInterrupted()) throw new CanceledException(); }
+	private void checkCanceled() throws CanceledException{ if(canceled || Thread.currentThread().isInterrupted() || !transport.isSessionValid()) throw new CanceledException(); }
 	private static boolean isUncertainPut(int status){ return status==408 || status==409 || status==429 || status>=500; }
 	private static EvidenceComplete completed(String evidenceId, long verifiedSize){ EvidenceComplete result=new EvidenceComplete(); result.id=evidenceId; result.status="ready"; result.verifiedSize=verifiedSize; return result; }
 	private static String digestHex(File file, String algorithm) throws IOException{ return hex(digest(file, algorithm)); }
@@ -480,10 +524,12 @@ public final class VerificationUploader{
 
 	private static final class RequestTransport implements Transport{
 		private final AccountSession session;
+		private final String accountId, userId;
 		private final AtomicReference<VerificationRequest<?>> currentRequest=new AtomicReference<>();
 		private final AtomicReference<CountDownLatch> currentLatch=new AtomicReference<>();
 
-		RequestTransport(AccountSession session){ if(session==null) throw new IllegalArgumentException("session is required"); this.session=session; }
+		RequestTransport(AccountSession session){ if(session==null || session.self==null) throw new IllegalArgumentException("session is required"); this.session=session; accountId=session.getID(); userId=session.self.id; }
+		@Override public boolean isSessionValid(){ return session.self!=null && userId.equals(session.self.id) && accountId.equals(session.getID()) && AccountSessionManager.getInstance().tryGetAccount(accountId)==session; }
 		@Override public UploadAuthorization authorize(String applicationId, String kind, String sha256, String md5, long size) throws IOException{
 			return execute(VerificationRequest.authorize(applicationId, kind, sha256, md5, size));
 		}
@@ -495,6 +541,7 @@ public final class VerificationUploader{
 		@Override public VerificationRequest<?> getCurrentRequest(){ return currentRequest.get(); }
 
 		private <T> T execute(VerificationRequest<T> request) throws IOException{
+			if(!isSessionValid()) throw new CanceledException();
 			CountDownLatch latch=new CountDownLatch(1);
 			AtomicReference<T> result=new AtomicReference<>();
 			AtomicReference<ErrorResponse> error=new AtomicReference<>();

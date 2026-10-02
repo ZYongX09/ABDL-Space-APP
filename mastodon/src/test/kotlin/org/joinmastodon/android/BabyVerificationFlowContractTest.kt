@@ -26,7 +26,7 @@ class BabyVerificationFlowContractTest {
 		assertTrue(contract.contains("createCertificationResult(String controlledPath, String sessionId, int slot)"))
 		assertTrue(fragment.contains("getCertificationSession(data)"))
 		assertTrue(fragment.contains("getCertificationSlot(data)"))
-		assertTrue(fragment.contains("VerificationPendingCapture.load(getActivity(), resultSession)"))
+		assertTrue(fragment.contains("VerificationPendingCapture.load(getActivity(), resultSession, accountID, ownerUserId())"))
 		assertTrue(fragment.contains("slot!=0"))
 	}
 

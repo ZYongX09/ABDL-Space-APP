@@ -91,13 +91,14 @@ public class BabyVerificationBehaviorTest{
         VerificationImageProcessor.deleteTree(new File(activity.getNoBackupFilesDir(),"verification"));
         var constructor=AccountSession.class.getDeclaredConstructor(); constructor.setAccessible(true);
         AccountSession session=constructor.newInstance();
-        ((Map<String,AccountSession>)field(AccountSessionManager.class,"sessions").get(AccountSessionManager.getInstance())).put("test",session);
-        fragment=new BabyVerificationFragment(); Bundle args=new Bundle(); args.putString("account","test"); fragment.setArguments(args);
+        session.domain="offline.example.test"; session.self=new org.joinmastodon.android.model.Account(); session.self.id="42";
+        ((Map<String,AccountSession>)field(AccountSessionManager.class,"sessions").get(AccountSessionManager.getInstance())).put(session.getID(),session);
+        fragment=new BabyVerificationFragment(); Bundle args=new Bundle(); args.putString("account",session.getID()); fragment.setArguments(args);
         // Attach without creating AppKit's outer navigation shell; exercise its real content view.
         activity.getFragmentManager().beginTransaction().add(fragment,"verification").commit();
         activity.getFragmentManager().executePendingTransactions();
         if(!(boolean)get("viewReady")) content();
-        capture=new VerificationPendingCapture(SESSION,"123456","v1","requirement",System.currentTimeMillis()/1000+600,5*1024*1024);
+        capture=new VerificationPendingCapture(SESSION,"123456","v1","requirement",System.currentTimeMillis()/1000+600,5*1024*1024, "offline.example.test_42", 42);
         capture.save(activity);
     }
     @After public void cleanup() throws Exception{
@@ -134,12 +135,12 @@ public class BabyVerificationBehaviorTest{
     }
     private Intent result(){ return MediaCameraContract.createCertificationResult(capture.rawFile(activity).getAbsolutePath(),SESSION,0); }
     @Test public void missingOrCorruptMetadataIsNotReportedAsExpiry() throws Exception{
-        raw(); capture.deleteMetadata(activity); rejected(result(),R.string.verification_capture_state_missing);
+        raw(); capture.deleteMetadata(activity, "offline.example.test_42", 42); rejected(result(),R.string.verification_capture_state_missing);
         java.nio.file.Files.write(new File(VerificationPendingCapture.root(activity,SESSION),"pending.properties").toPath(),"expires_at=bad".getBytes(java.nio.charset.StandardCharsets.UTF_8));
         rejected(result(),R.string.verification_capture_state_missing);
     }
     @Test public void actualExpiryHasDistinctMessageAndDeletesOnlyControlledRaw() throws Exception{
-        raw(); new VerificationPendingCapture(SESSION,"123456","v1","requirement",1,5*1024*1024).save(activity);
+        raw(); new VerificationPendingCapture(SESSION,"123456","v1","requirement",1,5*1024*1024, "offline.example.test_42", 42).save(activity);
         rejected(result(),R.string.verification_capture_expired); assertFalse(capture.rawFile(activity).exists());
     }
     @Test public void sessionSlotPathAndMissingPhotoHaveDistinctSafeMessages() throws Exception{
@@ -173,7 +174,7 @@ public class BabyVerificationBehaviorTest{
         assertEquals(1,LocalRequests.requests.stream().filter(r->{try{return path(r).endsWith("/complete");}catch(Exception e){throw new RuntimeException(e);}}).count());
         success(last(),completed()); assertTrue(path(last()).endsWith("/applications"));
         error(last()); assertFalse((boolean)get("busy")); assertTrue(capture.photoFile(activity).isFile());
-        assertNotNull(VerificationPendingCapture.load(activity,SESSION));
+        assertNotNull(VerificationPendingCapture.load(activity,SESSION, "offline.example.test_42", 42));
     }
     @Test public void rawOnlyRecoveryUsesProcessingNotCamera() throws Exception{
         raw(); field(BabyVerificationFragment.class,"pendingCapture").set(fragment,capture);
@@ -207,6 +208,20 @@ public class BabyVerificationBehaviorTest{
         state.application.id=SESSION; state.application.status="submitted"; success(last(),state);
         assertFalse(capture.rawFile(activity).exists());
         assertEquals(1,LocalRequests.requests.stream().filter(r->{try{return path(r).endsWith("/submit");}catch(Exception e){throw new RuntimeException(e);}}).count());
+    }
+    @Test public void successfulSubmissionDropsOldDraftReferencesBeforeNextApplication() throws Exception{
+        raw(); field(BabyVerificationFragment.class,"pendingCapture").set(fragment,capture);
+        ApplicationDetail old=new ApplicationDetail(); old.id=SESSION; old.userId=42; old.captureSessionId=SESSION;
+        field(BabyVerificationFragment.class,"currentDetail").set(fragment,old); field(BabyVerificationFragment.class,"applicationId").set(fragment,SESSION);
+        invoke("submitApplication",new Class<?>[]{String.class,boolean.class},SESSION,false);
+        SubmitResult result=new SubmitResult();result.id=SESSION;result.status="submitted";success(last(),result);
+        assertNull(get("currentDetail"));assertNull(get("applicationId"));
+    }
+    @Test public void uncertainSubmitDifferentLatestApplicationChecksExactOriginalDetail() throws Exception{
+        raw(); field(BabyVerificationFragment.class,"pendingCapture").set(fragment,capture);
+        invoke("submitApplication",new Class<?>[]{String.class,boolean.class},SESSION,false);error(last());
+        State state=state();state.application=new org.joinmastodon.android.model.verification.VerificationModels.Application();state.application.id="123e4567-e89b-42d3-a456-426614174099";state.application.status="draft";success(last(),state);
+        assertEquals("/baby-verification/applications/"+SESSION,path(last()));
     }
     @Test public void uncertainSubmitChecksStateBeforeRetryAndPreservesPhoto() throws Exception{
         raw(); field(BabyVerificationFragment.class,"pendingCapture").set(fragment,capture);

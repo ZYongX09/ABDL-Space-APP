@@ -29,7 +29,7 @@ public class VerificationUploaderTest{
 	private static final String EVIDENCE="123e4567-e89b-42d3-a456-426614174002";
 	private final TemporaryFolder folder=new TemporaryFolder();
 	private VerificationImageProcessor.Result image;
-	private int putStatus=200;
+	private int putStatus=200, putCalls;
 
 	@Before
 	public void setUp() throws Exception{
@@ -66,11 +66,11 @@ public class VerificationUploaderTest{
 	}
 
 	@Test
-	public void expiredCompleteReauthorizesAndUploadsAgain(){
+	public void explicitlyMissingCompleteReauthorizesAndUploadsAgain(){
 		putStatus=200;
 		FakeTransport transport=new FakeTransport();
 		transport.authorization=authorization();
-		transport.completeErrors.add(new VerificationUploader.TransportException("expired", 410, "upload_expired", false, false));
+		transport.completeErrors.add(new VerificationUploader.TransportException("missing", 409, "evidence_object_missing", false, false));
 		transport.completeResult=complete();
 		RecordingListener listener=new RecordingListener();
 		VerificationUploader uploader=uploader(transport, listener);
@@ -151,14 +151,46 @@ public class VerificationUploaderTest{
 		}finally{ server.shutdown(); }
 	}
 
+	@Test public void failedEvidenceNoOverwrite409StillProbesReadyObject(){
+		putStatus=409;
+		FakeTransport transport=new FakeTransport(); transport.authorization=authorization(); transport.completeResult=complete();
+		RecordingListener listener=new RecordingListener();
+		uploader(transport, listener).resume(APPLICATION, image, new VerificationUploader.Recovery(EVIDENCE, VerificationUploader.Phase.FAILED_EVIDENCE));
+		assertSame(transport.completeResult, listener.success); assertNull(listener.error); assertEquals(1, transport.completeCalls);
+	}
+
+	@Test public void failedEvidenceHashMismatchNeverOverwritesOrRetries(){
+		putStatus=409;
+		FakeTransport transport=new FakeTransport(); transport.authorization=authorization();
+		transport.completeErrors.add(new VerificationUploader.TransportException("mismatch", 422, "evidence_mismatch", false, false));
+		RecordingListener listener=new RecordingListener();
+		uploader(transport, listener).resume(APPLICATION, image, new VerificationUploader.Recovery(EVIDENCE, VerificationUploader.Phase.FAILED_EVIDENCE));
+		assertNull(listener.success); assertEquals("evidence_mismatch", listener.error.code); org.junit.Assert.assertTrue(listener.error.requiresNewCapture); assertEquals(1, transport.authorizeCalls);
+	}
+
+	@Test public void expiredUploadRenewsAuthorizationAndProbesWithoutPut(){
+		FakeTransport transport=new FakeTransport(); transport.authorization=authorization(); transport.completeResult=complete();
+		transport.completeErrors.add(new VerificationUploader.TransportException("expired", 410, "upload_expired", false, false));
+		RecordingListener listener=new RecordingListener();
+		uploader(transport, listener).resume(APPLICATION, image, VerificationUploader.Recovery.completePending(EVIDENCE));
+		assertSame(transport.completeResult, listener.success); assertEquals(1, transport.authorizeCalls); assertEquals(2, transport.completeCalls); assertEquals(0, putCalls);
+	}
+
+	@Test public void putPendingProbesCompleteBeforeAuthorizing(){
+		FakeTransport transport=new FakeTransport(); transport.completeResult=complete();
+		RecordingListener listener=new RecordingListener();
+		uploader(transport, listener).resume(APPLICATION, image, VerificationUploader.Recovery.putPending(EVIDENCE));
+		assertSame(transport.completeResult, listener.success); assertEquals(0, transport.authorizeCalls);
+	}
+
 	private VerificationUploader uploader(FakeTransport transport, RecordingListener listener){
-		OkHttpClient client=new OkHttpClient.Builder().addInterceptor(chain->new Response.Builder()
+		OkHttpClient client=new OkHttpClient.Builder().addInterceptor(chain->{ putCalls++; return new Response.Builder()
 				.request(chain.request())
 				.protocol(Protocol.HTTP_1_1)
 				.code(putStatus)
 				.message("test")
 				.body(ResponseBody.create(null, new byte[0]))
-				.build()).build();
+				.build(); }).build();
 		return new VerificationUploader(transport, client, Runnable::run, Runnable::run, millis->{}, value->{}, listener);
 	}
 

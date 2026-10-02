@@ -38,7 +38,7 @@ public final class VerificationModels{
 		public int limit, used, remaining;
 		public boolean sponsorActive;
 		@Override public void postprocess() throws ObjectValidationException{
-			if(limit<0 || used<0 || used>limit || remaining!=limit-used) throw new ObjectValidationException("认证额度响应无效");
+			if(limit<0 || used<0 || remaining!=Math.max(0, limit-used)) throw new ObjectValidationException("认证额度响应无效");
 		}
 	}
 
@@ -79,7 +79,7 @@ public final class VerificationModels{
 		public Long verifiedSize, completedAt;
 		@Override public void postprocess() throws ObjectValidationException{
 			if(!uuid(id) || !Set.of("capture_photo", "supporting_photo").contains(kind) || !Set.of("image/jpeg", "image/png", "image/webp").contains(mimeType)
-					|| declaredSize<=0 || !Set.of("pending", "verifying", "ready").contains(status)) throw new ObjectValidationException("认证照片响应无效");
+					|| declaredSize<=0 || !Set.of("pending", "verifying", "ready", "failed").contains(status)) throw new ObjectValidationException("认证照片响应无效");
 			if("ready".equals(status) && (verifiedSize==null || verifiedSize<=0 || completedAt==null || completedAt<=0)) throw new ObjectValidationException("认证照片响应无效");
 		}
 	}
@@ -93,9 +93,11 @@ public final class VerificationModels{
 			config.postprocess(); quota.postprocess(); if(application!=null) application.postprocess();
 		}
 		public Status status(){ return application==null ? Status.NOT_STARTED : application.parsedStatus; }
-		public boolean canStart(){
+		public boolean canStart(){ return canStart(null); }
+		public boolean canStart(Certificate certificate){
 			Status status=status();
-			return config.enabled && quota.remaining>0 && Set.of(Status.NOT_STARTED, Status.CANCELLED, Status.REJECTED).contains(status);
+			return config.enabled && quota.remaining>0 && (Set.of(Status.NOT_STARTED, Status.CANCELLED, Status.REJECTED).contains(status)
+					|| (status==Status.APPROVED && certificate!=null && certificate.isRevoked()));
 		}
 	}
 
@@ -106,7 +108,7 @@ public final class VerificationModels{
 		@Override public void postprocess() throws ObjectValidationException{
 			if(!uuid(id) || !Set.of("active", "completed", "expired", "cancelled").contains(status) || nonce==null || nonce.isBlank() || expiresAt<=0) throw new ObjectValidationException("拍摄会话响应无效");
 			if("active".equals(status) && (paperShape==null || foldInstruction==null || placementInstruction==null || randomText==null)) throw new ObjectValidationException("本次认证要求不完整");
-			if("active".equals(status) && expiresAt<=System.currentTimeMillis()/1000) throw new ObjectValidationException("拍摄会话已过期");
+			// Expiry is a valid server state; the caller must guide a retake rather than classify it as malformed JSON.
 		}
 		public String requirement(String userId, String qq){
 			return "裁剪出"+paperShape+"纸条，"+foldInstruction+"；在纸条上依次写用户 ID "+userId+"、QQ "+qq+"、认证文本“"+randomText+"”；"+placementInstruction+"，并拍下同时包含完整穿着的纸尿裤和纸条的照片。";
@@ -115,7 +117,7 @@ public final class VerificationModels{
 
 	public static class ApplicationResult extends BaseModel{
 		public String id, status;
-		@Override public void postprocess() throws ObjectValidationException{ if(!uuid(id) || status==null) throw new ObjectValidationException("认证申请响应无效"); }
+		@Override public void postprocess() throws ObjectValidationException{ if(!uuid(id) || status==null || Status.parse(status)==Status.NOT_STARTED) throw new ObjectValidationException("认证申请响应无效"); }
 	}
 
 	public static class CancelResult extends BaseModel{

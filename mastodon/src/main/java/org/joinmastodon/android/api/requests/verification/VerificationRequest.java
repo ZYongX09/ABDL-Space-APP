@@ -24,6 +24,7 @@ public final class VerificationRequest<T> extends MastodonAPIRequest<T>{
 	@Override public ErrorResponse deserializeError(JsonObject body,int status){ return new VerificationError(body,status); }
 	@Override protected void onError(String msg,int httpStatus,Throwable exception){ dispatchError(new VerificationError(msg,httpStatus,exception)); }
 	public static VerificationRequest<State> state(){ return new VerificationRequest<>(HttpMethod.GET,"/me",State.class,null); }
+	public static VerificationRequest<CaptureSession> capture(String id){ return new VerificationRequest<>(HttpMethod.GET,"/capture-sessions/"+id,CaptureSession.class,null); }
 	public static VerificationRequest<CaptureSession> start(){ return new VerificationRequest<>(HttpMethod.POST,"/capture-sessions",CaptureSession.class,Map.of()); }
 	public static VerificationRequest<CaptureSession> finishCapture(String id){ return new VerificationRequest<>(HttpMethod.POST,"/capture-sessions/"+id+"/complete",CaptureSession.class,Map.of()); }
 	public static VerificationRequest<CaptureSession> cancelCapture(String id){ return new VerificationRequest<>(HttpMethod.POST,"/capture-sessions/"+id+"/cancel",CaptureSession.class,Map.of()); }
@@ -39,7 +40,7 @@ public final class VerificationRequest<T> extends MastodonAPIRequest<T>{
 	public static final class VerificationError extends MastodonErrorResponse{
 		public final String code; public final boolean retryable,outcomeUnknown;
 		public VerificationError(JsonObject body,int status){ super(string(body,"error","认证服务请求失败，请重试"),status,null); code=string(body,"code","unknown"); retryable=isRetryable(status); outcomeUnknown=status>=500; }
-		public VerificationError(String message,int status,Throwable exception){ super(message==null||message.isBlank()?(status==0?"认证服务连接失败，请检查申请状态后重试":"认证服务响应无效，请重试"):message,status,exception); code=status==0?"transport_failure":"invalid_response"; retryable=isRetryable(status); outcomeUnknown=status==0; }
+		public VerificationError(String message,int status,Throwable exception){ super(message==null||message.isBlank()?(status==0?"认证服务连接失败，请检查申请状态后重试":"认证服务响应无效，请重试"):message,status,exception); code=status==0?"transport_failure":"invalid_response"; retryable=isRetryable(status); outcomeUnknown=status==0 || (status>=200 && status<300); }
 		private static boolean isRetryable(int status){ return status==0||status==408||status==425||status==429||status>=500; }
 		private static String string(JsonObject body,String key,String fallback){ try{return body!=null&&body.has(key)&&!body.get(key).isJsonNull()?body.get(key).getAsString():fallback;}catch(RuntimeException ignored){return fallback;} }
 	}

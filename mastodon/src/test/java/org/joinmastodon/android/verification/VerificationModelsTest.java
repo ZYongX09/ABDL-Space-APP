@@ -124,6 +124,28 @@ public class VerificationModelsTest{
 		}
 	}
 
+	@Test public void sponsorDowngradeQuotaAcceptsUsedAboveLimit() throws Exception{
+		VerificationModels.Quota quota=new VerificationModels.Quota();
+		quota.limit=3; quota.used=5; quota.remaining=0; quota.postprocess();
+		quota.remaining=1;
+		assertThrows(org.joinmastodon.android.api.ObjectValidationException.class, quota::postprocess);
+	}
+
+	@Test public void approvedGateRequiresRevokedCertificateAndQuotaAndEnabled(){
+		VerificationModels.State state=state(Status.APPROVED);
+		assertFalse(state.canStart());
+		assertFalse(state.canStart(certificate("active")));
+		VerificationModels.Certificate revoked=certificate("revoked");
+		assertTrue(state.canStart(revoked));
+		state.quota.remaining=0; assertFalse(state.canStart(revoked));
+		state.quota.remaining=3; state.config.enabled=false; assertFalse(state.canStart(revoked));
+	}
+
+	@Test public void successfulInvalidWriteResponseHasUnknownOutcome(){
+		var error=new org.joinmastodon.android.api.requests.verification.VerificationRequest.VerificationError("invalid", 200, null);
+		assertTrue(error.outcomeUnknown);
+	}
+
 	private static VerificationModels.Certificate certificate(String status){
 		VerificationModels.Certificate value=new VerificationModels.Certificate();
 		value.id="123e4567-e89b-42d3-a456-426614174000";
