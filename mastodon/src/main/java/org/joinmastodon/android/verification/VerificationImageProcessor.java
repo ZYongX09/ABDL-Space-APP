@@ -104,5 +104,15 @@ public final class VerificationImageProcessor{
 	}
 	private static String hex(byte[] bytes){ StringBuilder result=new StringBuilder(); for(byte value:bytes) result.append(String.format(java.util.Locale.US, "%02x", value)); return result.toString(); }
 	public record Result(File file, int width, int height, long size, String sha256, String md5Base64){}
-	public static void deleteTree(File file){ if(file==null || !file.exists()) return; if(file.isDirectory()){ File[] children=file.listFiles(); if(children!=null) for(File child:children) deleteTree(child); } file.delete(); }
+	public static void deleteTree(File file){
+		if(file==null) return;
+		// Delete links themselves, never recurse into a linked private/external directory.
+		if(java.nio.file.Files.isSymbolicLink(file.toPath())){ file.delete(); return; }
+		if(!file.exists()) return;
+		if(file.isDirectory()){
+			File[] children=file.listFiles();
+			if(children!=null) for(File child:children) deleteTree(child);
+		}
+		file.delete();
+	}
 }

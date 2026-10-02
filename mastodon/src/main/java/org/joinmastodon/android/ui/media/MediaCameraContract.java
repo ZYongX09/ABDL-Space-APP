@@ -30,6 +30,23 @@ public final class MediaCameraContract{
 		return new File(context.getNoBackupFilesDir(), "verification/"+sessionId+"/raw-"+slot+".jpg");
 	}
 
+	/** Trust the platform-provided private root alias, never links introduced below it. */
+	public static boolean isControlledFile(Context context, File file) throws IOException{
+		File root=context.getNoBackupFilesDir().getAbsoluteFile();
+		java.nio.file.Path relative;
+		try{ relative=root.toPath().relativize(file.getAbsoluteFile().toPath()); }
+		catch(IllegalArgumentException ignored){ return false; }
+		if(relative.getNameCount()==0 || !file.getAbsoluteFile().equals(new File(root, relative.toString()))) return false;
+		File current=root;
+		for(java.nio.file.Path part:relative){
+			String name=part.toString();
+			if(name.isEmpty() || name.equals(".") || name.equals("..")) return false;
+			current=new File(current, name);
+			if(java.nio.file.Files.isSymbolicLink(current.toPath())) return false;
+		}
+		return file.getCanonicalFile().equals(new File(root.getCanonicalFile(), relative.toString()).getAbsoluteFile());
+	}
+
 	public record CertificationRequest(String sessionId, int slot, String requirement, long deadline, File output){ }
 
 	/** Reject malformed requests before touching any caller-supplied file. */
@@ -42,9 +59,8 @@ public final class MediaCameraContract{
 		String requirement=intent.getStringExtra(EXTRA_CERTIFICATION_REQUIREMENT);
 		long duration=intent.getLongExtra(EXTRA_CERTIFICATION_DURATION, 0);
 		long deadline=intent.getLongExtra(EXTRA_CERTIFICATION_DEADLINE, 0);
-		File privateRoot=context.getNoBackupFilesDir().getCanonicalFile();
 		if(path==null || !expected.getAbsolutePath().equals(path)
-				|| !expected.getCanonicalPath().equals(new File(privateRoot, "verification/"+session+"/raw-"+slot+".jpg").getAbsolutePath())
+				|| !isControlledFile(context, expected)
 				|| requirement==null || requirement.isBlank() || duration<=0 || deadline<=0)
 			throw new IllegalArgumentException("Invalid certification camera parameters");
 		return new CertificationRequest(session, slot, requirement, deadline, expected);

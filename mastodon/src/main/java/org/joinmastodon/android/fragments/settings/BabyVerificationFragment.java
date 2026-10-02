@@ -393,19 +393,30 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 		String path=MediaCameraContract.getControlledPath(data);
 		int slot=MediaCameraContract.getCertificationSlot(data);
 		VerificationPendingCapture restored=VerificationPendingCapture.load(getActivity(), resultSession);
-		boolean controlled=false;
-		try{
-			if(restored!=null && slot==0 && path!=null){
-				File expected=MediaCameraContract.certificationPhotoFile(getActivity(), resultSession, slot);
-				controlled=expected.getAbsolutePath().equals(path) && expected.getCanonicalPath().equals(expected.getAbsolutePath())
-						&& expected.isFile() && expected.length()>0;
+		int failure=0;
+		File expected=null;
+		if(resultSession==null || (pendingCapture!=null && !pendingCapture.sessionId().equals(resultSession)))
+			failure=R.string.verification_capture_session_invalid;
+		else if(slot!=0) failure=R.string.verification_capture_slot_invalid;
+		else{
+			try{
+				expected=MediaCameraContract.certificationPhotoFile(getActivity(), resultSession, slot);
+				if(path==null || !expected.getAbsolutePath().equals(path) || !MediaCameraContract.isControlledFile(getActivity(), expected))
+					failure=R.string.verification_capture_path_invalid;
+			}catch(IllegalArgumentException ignored){ failure=R.string.verification_capture_session_invalid; }
+			catch(java.io.IOException ignored){ failure=R.string.verification_capture_path_invalid; }
+			if(failure==0){
+				if(restored==null) failure=R.string.verification_capture_state_missing;
+				else if(restored.expiresAt()<=System.currentTimeMillis()/1000){
+					failure=R.string.verification_capture_expired;
+					expected.delete();
+				}else if(!expected.isFile() || expected.length()==0) failure=R.string.verification_capture_photo_missing;
 			}
-		}catch(Exception ignored){ }
-		if(!controlled || slot!=0 || restored==null || restored.expiresAt()*1000<=System.currentTimeMillis()
-				|| (pendingCapture!=null && !pendingCapture.sessionId().equals(resultSession))){
-			if(controlled) new File(path).delete();
+		}
+		if(failure!=0){
 			busy=false;
-			showMessage(BabyVerificationProgressView.STAGE_INFORMATION, false, getString(R.string.verification_state_error), getString(R.string.verification_capture_expired), false,
+			if(!viewReady) return;
+			showMessage(BabyVerificationProgressView.STAGE_PHOTO, false, getString(R.string.verification_capture_result_error), getString(failure), false,
 					R.string.verification_retry, v->loadState(), 0, null);
 			return;
 		}
@@ -421,6 +432,16 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 		showMessage(BabyVerificationProgressView.STAGE_PHOTO, false, getString(R.string.verification_processing_photo_title), getString(R.string.verification_processing_photo_body), true, 0, null, 0, null);
 		int generation=++imageGeneration;
 		File destination=capture.photoFile(getActivity());
+		try{
+			if(!MediaCameraContract.isControlledFile(getActivity(), raw) || !MediaCameraContract.isControlledFile(getActivity(), destination)
+					|| !MediaCameraContract.isControlledFile(getActivity(), new File(destination.getParentFile(), destination.getName()+".part")))
+				throw new java.io.IOException();
+		}catch(java.io.IOException ignored){
+			busy=false;
+			showMessage(BabyVerificationProgressView.STAGE_PHOTO, false, getString(R.string.verification_capture_result_error), getString(R.string.verification_capture_path_invalid), false,
+					R.string.verification_retry, v->loadState(), 0, null);
+			return;
+		}
 		IMAGE_EXECUTOR.execute(()->{
 			VerificationImageProcessor.Result result=null;
 			Exception failure=null;
@@ -448,8 +469,11 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 
 	private void resumePendingCapture(){
 		if(busy || pendingCapture==null || !pendingCapture.hasRecoverablePhoto(getActivity())) return;
-		if(pendingCapture.photoFile(getActivity()).isFile()) resumeProcessedCapture();
-		else processCameraPhoto(pendingCapture.rawFile(getActivity()), pendingCapture);
+		try{
+			File processed=pendingCapture.photoFile(getActivity());
+			if(MediaCameraContract.isControlledFile(getActivity(), processed) && processed.isFile() && processed.length()>0) resumeProcessedCapture();
+			else if(MediaCameraContract.isControlledFile(getActivity(), pendingCapture.rawFile(getActivity()))) processCameraPhoto(pendingCapture.rawFile(getActivity()), pendingCapture);
+		}catch(java.io.IOException ignored){ busy=false; }
 	}
 
 	private void beginLocalFlow(){

@@ -19,7 +19,7 @@ android {
 		applicationId "top.abdl_space.app"
 		minSdk 26
 		targetSdk 35
-		versionCode 25
+		versionCode 26
 		versionName "3.0.0"
 		buildConfigField "String", "BABY_VERIFICATION_COS_HOST", "\"${System.getenv('BABY_VERIFICATION_COS_HOST') ?: 'abdl-1339643562.cos.ap-shanghai.myqcloud.com'}\""
 		buildConfigField "String", "QQ_APP_ID", '"1905661071"'

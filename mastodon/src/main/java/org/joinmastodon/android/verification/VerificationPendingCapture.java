@@ -2,6 +2,8 @@ package org.joinmastodon.android.verification;
 
 import android.content.Context;
 
+import org.joinmastodon.android.ui.media.MediaCameraContract;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -23,8 +25,11 @@ public record VerificationPendingCapture(String sessionId, String qq, String dec
 		values.setProperty("expires_at", Long.toString(expiresAt));
 		values.setProperty("max_evidence_size", Long.toString(maxEvidenceSize));
 		File root=root(context, sessionId);
+		if(!validSessionId(sessionId) || !MediaCameraContract.isControlledFile(context, root)) throw new IOException("无法保存认证拍摄状态");
 		if(!root.isDirectory() && !root.mkdirs()) throw new IOException("无法保存认证拍摄状态");
 		File pending=new File(root, FILE_NAME+".part");
+		if(!MediaCameraContract.isControlledFile(context, pending) || !MediaCameraContract.isControlledFile(context, new File(root, FILE_NAME)))
+			throw new IOException("无法保存认证拍摄状态");
 		try(FileOutputStream output=new FileOutputStream(pending)){
 			values.store(output, null);
 			output.getFD().sync();
@@ -38,7 +43,8 @@ public record VerificationPendingCapture(String sessionId, String qq, String dec
 	public static VerificationPendingCapture load(Context context, String sessionId){
 		if(!validSessionId(sessionId)) return null;
 		File file=new File(root(context, sessionId), FILE_NAME);
-		if(!file.isFile()) return null;
+		try{ if(!MediaCameraContract.isControlledFile(context, file) || !file.isFile()) return null; }
+		catch(IOException ignored){ return null; }
 		Properties values=new Properties();
 		try(FileInputStream input=new FileInputStream(file)){
 			values.load(input);
@@ -80,20 +86,25 @@ public record VerificationPendingCapture(String sessionId, String qq, String dec
 	}
 
 	public boolean hasRecoverablePhoto(Context context){
-		return controlledNonempty(photoFile(context)) || controlledNonempty(rawFile(context));
+		return controlledNonempty(context, photoFile(context)) || controlledNonempty(context, rawFile(context));
 	}
 
-	private static boolean controlledNonempty(File file){
-		try{ return file.isFile() && file.length()>0 && file.getCanonicalPath().equals(file.getAbsolutePath()); }
+	private static boolean controlledNonempty(Context context, File file){
+		try{ return MediaCameraContract.isControlledFile(context, file) && file.isFile() && file.length()>0; }
 		catch(IOException ignored){ return false; }
 	}
 
 	public void deleteMetadata(Context context){
-		new File(root(context, sessionId), FILE_NAME).delete();
+		File file=new File(root(context, sessionId), FILE_NAME);
+		try{ if(validSessionId(sessionId) && MediaCameraContract.isControlledFile(context, file)) file.delete(); }
+		catch(IOException ignored){ }
 	}
 
 	public void delete(Context context){
-		VerificationImageProcessor.deleteTree(root(context, sessionId));
+		try{
+			File directory=root(context, sessionId);
+			if(validSessionId(sessionId) && MediaCameraContract.isControlledFile(context, directory)) VerificationImageProcessor.deleteTree(directory);
+		}catch(IOException ignored){ }
 	}
 
 	public static File root(Context context, String sessionId){

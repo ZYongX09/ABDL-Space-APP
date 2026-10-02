@@ -1178,6 +1178,12 @@
 	<string name="verification_capture_title">认证拍摄</string>
 	<string name="verification_capture_countdown">请在 %1$d 秒内完成本张照片</string>
 	<string name="verification_capture_expired">拍摄要求已过期，请重新开始</string>
+	<string name="verification_capture_result_error">无法接收认证照片</string>
+	<string name="verification_capture_state_missing">无法恢复本次拍摄状态，请返回认证页面重试</string>
+	<string name="verification_capture_session_invalid">拍摄结果与本次认证不匹配，请重新拍摄</string>
+	<string name="verification_capture_slot_invalid">拍摄结果的照片编号无效，请重新拍摄</string>
+	<string name="verification_capture_path_invalid">拍摄结果的保存位置无效，请重新拍摄</string>
+	<string name="verification_capture_photo_missing">未找到完整的认证照片，请重新拍摄</string>
 	<string name="verification_capture_only">仅允许后置摄像头拍照；禁止翻拍屏幕、相册导入和任何编辑。</string>
 	<string name="verification_submit">安全上传并提交</string>
 	<string name="verification_retry">安全重试</string>
