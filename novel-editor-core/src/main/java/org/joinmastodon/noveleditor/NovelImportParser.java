@@ -3,7 +3,9 @@ package org.joinmastodon.noveleditor;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Locale;
 import java.util.zip.ZipFile;
 
@@ -29,12 +31,28 @@ public final class NovelImportParser{
 			if(zip.getEntry("word/document.xml")!=null) return "docx";
 			if(zip.getEntry("META-INF/container.xml")!=null){
 				var mimetype=zip.getEntry("mimetype");
-				if(mimetype!=null) try(var in=zip.getInputStream(mimetype)){ if("application/epub+zip".equals(new String(in.readNBytes(64),StandardCharsets.US_ASCII))) return "epub"; }
+				if(mimetype!=null) try(var in=zip.getInputStream(mimetype)){ if("application/epub+zip".equals(new String(readPrefix(in,64),StandardCharsets.US_ASCII))) return "epub"; }
 				return "epub";
 			}
 		}catch(IOException ignored){}
 		if(lower.endsWith(".docx") || lower.endsWith(".epub")) throw new ImportException("CORRUPT_ZIP","Document archive is invalid");
-		try(FileInputStream input=new FileInputStream(file)){ byte[] first=input.readNBytes(512); for(byte b:first) if(b==0) throw new ImportException("UNSUPPORTED_FORMAT","Binary file is not supported"); return "txt"; }
+		try(FileInputStream input=new FileInputStream(file)){ byte[] first=readPrefix(input,512); for(byte b:first) if(b==0) throw new ImportException("UNSUPPORTED_FORMAT","Binary file is not supported"); return "txt"; }
 		catch(IOException error){ throw new ImportException("URI_PERMISSION_DENIED","Unable to read selected file",error); }
+	}
+
+	/** Reads up to limit bytes, continuing after short reads without consuming beyond the prefix. */
+	static byte[] readPrefix(InputStream input,int limit) throws IOException{
+		byte[] bytes=new byte[limit];
+		int offset=0;
+		while(offset<limit){
+			int count=input.read(bytes,offset,limit-offset);
+			if(count<0) break;
+			if(count==0){
+				int next=input.read();
+				if(next<0) break;
+				bytes[offset++]=(byte)next;
+			}else offset+=count;
+		}
+		return offset==limit ? bytes : Arrays.copyOf(bytes,offset);
 	}
 }

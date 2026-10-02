@@ -42,9 +42,13 @@ class ItshoverNavigationIconView @JvmOverloads constructor(
 		}
 
 	init {
-		context.obtainStyledAttributes(attrs, R.styleable.ItshoverNavigationIconView, defStyleAttr, 0).use { values ->
+		val values = context.obtainStyledAttributes(attrs, R.styleable.ItshoverNavigationIconView, defStyleAttr, 0)
+		try {
 			iconType = values.getInt(R.styleable.ItshoverNavigationIconView_iconType, ICON_HOME)
 			tint = values.getColorStateList(R.styleable.ItshoverNavigationIconView_iconTint) ?: tint
+		} finally {
+			// TypedArray only implements AutoCloseable on API 31 and newer.
+			values.recycle()
 		}
 		isClickable = false
 		importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
