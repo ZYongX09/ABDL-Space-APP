@@ -940,6 +940,7 @@
 	<string name="remove_quote_button">移除帖子</string>
 	<string name="settings_posting_defaults_explanation">这些设置会在你撰写新帖子时作为默认值应用，但发布时你也可以在编辑器内手动调整设置。</string>
 	<string name="open_source_licenses">第三方开源许可</string>
+	<string name="third_party_licenses_footer">本列表列出 release 运行时解析的部分开源库、改编源码与图形，以及 desugaring 运行库。仅合并版本相同的组件，不代表完整的传递依赖清单。\n源码改编不等于二进制依赖。再分发时请保留上游版权、许可及适用的 NOTICE 声明；本摘要不替代完整许可文本。\n极光推送（JPush）、QQ 互联等专有 SDK 适用其官方协议，不作为开源库列入本表。</string>
 	<string name="support_us">支持我们</string>
 	<string name="support_us_message">如果 ABDL Space 对你有帮助，欢迎鼓励一下！你可以通过爱发电平台进行捐赠。</string>
 	<string name="settings_about_website">官方网站</string>

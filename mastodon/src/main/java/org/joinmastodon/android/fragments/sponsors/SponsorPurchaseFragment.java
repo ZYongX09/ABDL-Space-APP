@@ -1,5 +1,6 @@
 package org.joinmastodon.android.fragments.sponsors;
 
+import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.res.Configuration;
 import android.net.Uri;
@@ -27,6 +28,7 @@ import org.joinmastodon.android.api.session.AccountSessionManager;
 import org.joinmastodon.android.fragments.MastodonToolbarFragment;
 import org.joinmastodon.android.model.sponsors.SponsorModels.*;
 import org.joinmastodon.android.sponsors.ForegroundReadTimer;
+import org.joinmastodon.android.sponsors.SponsorCheckoutUi;
 import org.joinmastodon.android.sponsors.SponsorOperation;
 import org.joinmastodon.android.sponsors.SponsorPurchaseSafety;
 import org.joinmastodon.android.sponsors.SponsorUi;
@@ -48,6 +50,7 @@ public class SponsorPurchaseFragment extends MastodonToolbarFragment{
 	private TextView readStatus;
 	private android.widget.ProgressBar readProgress;
 	private AccountSession session;
+	private AlertDialog checkoutQuiz;
 	private boolean resumed, shown=true, validating, loaded, rendered;
 	private int generation, scrollPosition;
 	private MastodonAPIRequest<?> request;
@@ -108,13 +111,15 @@ public class SponsorPurchaseFragment extends MastodonToolbarFragment{
 	@Override protected void onHidden(){ shown=false; stopPending(); super.onHidden(); }
 	@Override public void onHiddenChanged(boolean hidden){ super.onHiddenChanged(hidden); shown=!hidden; if(hidden) stopPending(); else if(resumed) refresh(false); }
 	@Override public void onConfigurationChanged(Configuration config){
+		dismissCheckoutQuiz();
 		timer.visible(false, SystemClock.elapsedRealtime());
 		super.onConfigurationChanged(config);
 		// A rotation is not a business-config change: retain reading credit and revalidate.
 		if(resumed) refresh(false);
 	}
 	private boolean sessionValid(){ return session!=null && AccountSessionManager.getInstance().tryGetAccount(accountID)==session; }
-	private boolean visible(){ return sessionValid() && resumed && shown && !isHidden() && scroll!=null && scroll.isShown() && scroll.hasWindowFocus() && getActivity()!=null; }
+	private boolean pageActive(){ return sessionValid() && resumed && shown && !isHidden() && scroll!=null && scroll.isShown() && getActivity()!=null; }
+	private boolean visible(){ return pageActive() && scroll.hasWindowFocus(); }
 	private void updateVisibility(){ timer.visible(visible() && loaded && !validating, SystemClock.elapsedRealtime()); tick(); }
 	private void tick(){
 		handler.removeCallbacks(tick);
@@ -132,13 +137,22 @@ public class SponsorPurchaseFragment extends MastodonToolbarFragment{
 		// Window focus callbacks resume the timer; a completed/hidden page needs no polling loop.
 		if(visible() && loaded && !validating && !timer.ready(now)) handler.postDelayed(tick, 200);
 	}
+	private void dismissCheckoutQuiz(){
+		if(checkoutQuiz!=null){
+			AlertDialog dialog=checkoutQuiz;
+			checkoutQuiz=null;
+			dialog.dismiss();
+		}
+	}
 	private void stopPending(){
+		dismissCheckoutQuiz();
 		generation++; if(request!=null) request.cancel(); request=null; validating=false;
 		timer.visible(false, SystemClock.elapsedRealtime()); handler.removeCallbacks(tick);
 		if(buy!=null) buy.setEnabled(false);
 	}
 	private void refresh(boolean navigate){
 		if(content==null || !resumed || !shown) return;
+		dismissCheckoutQuiz();
 		if(!sessionValid()){ stopPending(); showFailure(R.string.sponsor_ui_session_changed); return; }
 		if(validating && !navigate) return;
 		if(request!=null) request.cancel();
@@ -169,54 +183,29 @@ public class SponsorPurchaseFragment extends MastodonToolbarFragment{
 			}
 		}).exec(accountID);
 	}
-	/** The quiz is a hard gate: launch only after a correct answer on the visible page. */
 	private void showCheckoutQuiz(){
-		if(!visible()) return;
-		LinearLayout quiz=new LinearLayout(getActivity()); quiz.setOrientation(LinearLayout.VERTICAL);
-		LinearLayout.LayoutParams lp;
-		TextView note=new TextView(getActivity());
-		note.setText(R.string.sponsor_ui_quiz_note);
-		note.setTextAppearance(R.style.m3_body_medium);
-		note.setTextColor(UiUtils.getThemeColor(getActivity(), R.attr.colorM3OnSurfaceVariant));
-		note.setPadding(0, V.dp(2), 0, V.dp(8));
-		quiz.addView(note, new LinearLayout.LayoutParams(-1, -2));
-		TextView question=new TextView(getActivity());
-		question.setText(R.string.sponsor_ui_quiz_question);
-		question.setTextAppearance(R.style.m3_title_medium);
-		question.setTextColor(UiUtils.getThemeColor(getActivity(), R.attr.colorM3OnSurface));
-		question.setPadding(0, V.dp(8), 0, V.dp(14));
-		quiz.addView(question, new LinearLayout.LayoutParams(-1, -2));
-		String[] options=getResources().getStringArray(R.array.sponsor_quiz_options);
-		final boolean[] answered={false};
-		for(String option:options){
-			boolean correct=getString(R.string.sponsor_quiz_answer).contentEquals(option);
-			// 四个选项外观一致，不泄露答案；只有答对才跳转购买页
-			Button choice=new Button(new android.view.ContextThemeWrapper(getActivity(), R.style.Widget_Mastodon_M3_Button_Tonal), null, 0);
-			choice.setAllCaps(false);
-			choice.setText(option);
-			choice.setTag(correct);
-			choice.setOnClickListener(v->{
-				if(answered[0]) return;
-				if(Boolean.TRUE.equals(v.getTag())){ answered[0]=true; Toast.makeText(getActivity(), R.string.sponsor_ui_quiz_correct, Toast.LENGTH_SHORT).show(); launchStore(); }
-				else Toast.makeText(getActivity(), R.string.sponsor_ui_quiz_wrong, Toast.LENGTH_SHORT).show();
-			});
-			lp=new LinearLayout.LayoutParams(-1, -2); lp.topMargin=V.dp(6);
-			quiz.addView(choice, lp);
-		}
-		ScrollView quizScroll=new ScrollView(getActivity()); quizScroll.addView(quiz);
-		new org.joinmastodon.android.ui.M3AlertDialogBuilder(getActivity())
-				.setTitle(R.string.sponsor_ui_quiz_title)
-				.setView(quizScroll)
-				.setCancelable(false)
-				.setNegativeButton(R.string.sponsor_ui_cancel, null)
-				.show();
+		if(!visible() || checkoutQuiz!=null) return;
+		String verifiedFingerprint=fingerprint;
+		int verifiedGeneration=generation;
+		AlertDialog dialog=SponsorCheckoutUi.createQuiz(getActivity(),
+				()->pageActive() && loaded && !validating && generation==verifiedGeneration
+						&& SponsorPurchaseSafety.canOpen(verifiedFingerprint, fingerprint, timer.ready(SystemClock.elapsedRealtime()))
+						&& SponsorPurchaseSafety.valid(plan),
+				()->{ dismissCheckoutQuiz(); launchStore(); });
+		checkoutQuiz=dialog;
+		dialog.setOnDismissListener(ignored->{
+			if(checkoutQuiz==dialog) checkoutQuiz=null;
+			updateVisibility();
+		});
+		dialog.show();
 	}
 	private void launchStore(){
-		if(plan==null || !visible()) return;
-		// No account token, extras, implicit payment success, or automatic launch on resume.
+		// The modal owns window focus; require the active page, not the underlying view's focus.
+		if(!pageActive() || !loaded || validating || !SponsorPurchaseSafety.valid(plan)) return;
 		try{ startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(plan.purchaseUrl))); }
 		catch(android.content.ActivityNotFoundException | SecurityException error){ Toast.makeText(getActivity(), R.string.sponsor_ui_no_browser, Toast.LENGTH_LONG).show(); }
 		timer.restart(); timer.configure(fingerprint, catalog.config.minimumReadSeconds, SystemClock.elapsedRealtime());
+		updateVisibility();
 	}
 	private void showFailure(int message){
 		loaded=false; rendered=false; timer.visible(false, SystemClock.elapsedRealtime());
@@ -235,6 +224,7 @@ public class SponsorPurchaseFragment extends MastodonToolbarFragment{
 		LinearLayout summary=SponsorUi.card(content);
 		SponsorUi.text(summary, plan.name, true); SponsorUi.headline(summary, SponsorUi.price(plan));
 		SponsorUi.label(summary, SponsorUi.duration(getActivity(), plan));
+		SponsorCheckoutUi.paymentReminder(content);
 		int index=1;
 		for(String step:catalog.config.purchaseSteps){
 			LinearLayout card=SponsorUi.card(content);
@@ -242,32 +232,6 @@ public class SponsorPurchaseFragment extends MastodonToolbarFragment{
 			number.setTextColor(UiUtils.getThemeColor(getActivity(), R.attr.colorM3Primary));
 			SponsorUi.text(card, step, false);
 		}
-		// 强调：付款成功后要点页面内的“私信”查询兑换码（宝宝粉高亮）
-		LinearLayout pink=SponsorUi.card(content);
-		pink.setBackground(SponsorUi.rounded(android.graphics.Color.parseColor("#F8D7E6"), 24));
-		TextView pinkTitle=new TextView(getActivity());
-		pinkTitle.setText(R.string.sponsor_ui_pink_title);
-		pinkTitle.setTextAppearance(R.style.m3_title_medium);
-		pinkTitle.setTextColor(android.graphics.Color.parseColor("#A63D6F"));
-		pinkTitle.setPadding(0, V.dp(2), 0, V.dp(8));
-		pink.addView(pinkTitle, new LinearLayout.LayoutParams(-1, -2));
-		TextView hintBody=new TextView(getActivity());
-		hintBody.setTextAppearance(R.style.m3_body_large);
-		hintBody.setLineSpacing(V.dp(2), 1);
-		String full=getString(R.string.sponsor_ui_pink_hint);
-		String target=getString(R.string.sponsor_ui_pink_key);
-		android.text.SpannableStringBuilder ssb=new android.text.SpannableStringBuilder(full);
-		int start=full.indexOf(target);
-		if(start>=0){
-			// 宝宝粉泡泡底 + 深粉文字 + 加粗，保证昼夜主题均可读
-			ssb.setSpan(new android.text.style.BackgroundColorSpan(android.graphics.Color.parseColor("#F2A6C5")), start, start+target.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-			ssb.setSpan(new android.text.style.ForegroundColorSpan(android.graphics.Color.parseColor("#7A1F4D")), start, start+target.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-			ssb.setSpan(new android.text.style.StyleSpan(android.graphics.Typeface.BOLD), start, start+target.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-		}
-		hintBody.setText(ssb);
-		hintBody.setTextColor(UiUtils.getThemeColor(getActivity(), R.attr.colorM3OnSurface));
-		hintBody.setPadding(0, V.dp(2), 0, V.dp(2));
-		pink.addView(hintBody, new LinearLayout.LayoutParams(-1, -2));
 		SponsorUi.text(content, getString(R.string.sponsor_ui_external, Uri.parse(plan.purchaseUrl).getHost()), false);
 		SponsorUi.textButton(content, getString(R.string.sponsor_ui_direct_redeem), this::openCenter);
 		ScrollView scrollTarget=scroll; int restoreY=scrollPosition;

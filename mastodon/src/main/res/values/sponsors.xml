@@ -68,14 +68,14 @@
 	<string name="sponsor_ui_read_done">阅读计时已完成，点击后将再次核验方案。</string>
 	<string name="sponsor_ui_continue_free">继续使用免费额度</string>
 	<string name="sponsor_ui_quiz_title">出发前的小问题</string>
-	<string name="sponsor_ui_quiz_question">爱发电付款成功后，点击页面内的什么查询兑换码？</string>
+	<string name="sponsor_ui_quiz_question">爱发电付款成功后点击页面内的什么查询兑换码？</string>
 	<string name="sponsor_quiz_answer">私信按钮</string>
 	<string name="sponsor_ui_quiz_wrong">不对哦，再想一想：付款成功后要点击页面内的“私信”按钮，就能查询兑换码。</string>
 	<string name="sponsor_ui_quiz_correct">答对啦！为你打开官方购买页面。</string>
 	<string name="sponsor_ui_quiz_note">答对这道小问题后，才会帮你打开付款页面哦！</string>
 	<string name="sponsor_ui_pink_title">付款后请看这里</string>
 	<string name="sponsor_ui_pink_key">私信</string>
-	<string name="sponsor_ui_pink_hint">付款成功后，请点击爱发电页面内的「私信」按钮，兑换码会在私信里发给你。</string>
+	<string name="sponsor_ui_pink_hint">爱发电付款成功后，请点击页面内的「私信」按钮，查询兑换码。拿到兑换码后，返回 App 的赞助者中心兑换。</string>
 	<string-array name="sponsor_quiz_options"><item>返回按钮</item><item>私信按钮</item><item>获取兑换码按钮</item><item>赞助按钮</item></string-array>
 	<string name="sponsor_ui_cancel">取消</string>
 	<string name="sponsor_ui_step">第 %1$d 步</string>

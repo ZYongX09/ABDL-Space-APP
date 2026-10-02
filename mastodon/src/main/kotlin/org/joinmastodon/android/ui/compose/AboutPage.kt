@@ -343,12 +343,6 @@ private fun AboutContent(
 						) {
 								ArrowPreference(title = "用户协议", onClick = { uriHandler.openUri("https://abdl-space.top/terms") })
 								ArrowPreference(title = "隐私政策", onClick = { uriHandler.openUri("https://abdl-space.top/privacy") })
-								Text(
-									modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-									text = context.getString(R.string.qq_sdk_disclosure),
-									fontSize = 13.sp,
-									color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-								)
 								ArrowPreference(title = "Cookie 政策", onClick = { uriHandler.openUri("https://abdl-space.top/cookies") })
 								ArrowPreference(title = "支持我们", onClick = { uriHandler.openUri("https://ifdian.net/a/ZYongX") })
 								ArrowPreference(title = "开源许可", endActions = { ValueText("GPL-3.0") }, onClick = { uriHandler.openUri("https://www.gnu.org/licenses/gpl-3.0.html") })
