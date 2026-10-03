@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+	package="org.joinmastodon.android">
+
+	<queries>
+		<package android:name="com.tencent.mobileqq" />
+		<package android:name="com.tencent.tim" />
+		<package android:name="com.tencent.minihd.qq" />
+		<package android:name="com.tencent.qqlite" />
+	</queries>
+
+	<application>
+		<activity
+			android:name="com.tencent.tauth.AuthActivity"
+			android:exported="true"
+			android:launchMode="singleTask"
+			android:noHistory="true">
+			<intent-filter>
+				<action android:name="android.intent.action.VIEW" />
+				<category android:name="android.intent.category.DEFAULT" />
+				<category android:name="android.intent.category.BROWSABLE" />
+				<data android:scheme="tencent1905661071" />
+			</intent-filter>
+		</activity>
+		<activity
+			android:name="com.tencent.connect.common.AssistActivity"
+			android:configChanges="orientation|keyboardHidden|screenSize"
+			android:exported="false" />
+	</application>
+
+</manifest>

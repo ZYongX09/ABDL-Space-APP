@@ -13,11 +13,22 @@ import android.os.Bundle;
 import android.util.Log;
 import android.widget.Toast;
 
+import android.view.GestureDetector;
+import android.view.MotionEvent;
+import android.view.ViewConfiguration;
+
+import org.joinmastodon.android.api.MastodonAPIController;
 import org.joinmastodon.android.api.ObjectValidationException;
+import org.joinmastodon.android.api.requests.announcements.GetServiceNotice;
 import org.joinmastodon.android.api.requests.search.GetSearchResults;
 import org.joinmastodon.android.api.requests.accounts.GetAccountByID;
 import org.joinmastodon.android.api.session.AccountSession;
 import org.joinmastodon.android.api.session.AccountSessionManager;
+import org.joinmastodon.android.chat.ChatController;
+import org.joinmastodon.android.chat.ChatEvents;
+import org.joinmastodon.android.chat.ChatRealtimeClient;
+import org.joinmastodon.android.chat.ui.ConversationsFragment;
+import org.joinmastodon.android.chat.ui.ChatFragment;
 import org.joinmastodon.android.fragments.AssistContentProviderFragment;
 import org.joinmastodon.android.fragments.ComposeFragment;
 import org.joinmastodon.android.fragments.HomeFragment;
@@ -26,31 +37,134 @@ import org.joinmastodon.android.fragments.SplashFragment;
 import org.joinmastodon.android.fragments.ThreadFragment;
 import org.joinmastodon.android.fragments.onboarding.AccountActivationFragment;
 import org.joinmastodon.android.fragments.onboarding.CustomWelcomeFragment;
+import org.joinmastodon.android.fragments.settings.ComposeAboutActivity;
+import org.joinmastodon.android.fragments.settings.OpenSourceLicensesFragment;
+import org.joinmastodon.android.model.Account;
 import org.joinmastodon.android.model.Notification;
+import org.joinmastodon.android.model.ServiceNotice;
 import org.joinmastodon.android.model.SearchResults;
+import org.joinmastodon.android.model.verification.VerificationLink;
+import org.joinmastodon.android.fragments.settings.BabyVerificationResultFragment;
+import org.joinmastodon.android.ui.M3AlertDialogBuilder;
 import org.joinmastodon.android.ui.utils.UiUtils;
 import org.joinmastodon.android.updater.GithubSelfUpdater;
 import org.parceler.Parcels;
 
 import java.lang.reflect.InvocationTargetException;
+import java.util.List;
 
 import androidx.annotation.Nullable;
+import androidx.lifecycle.Lifecycle;
+import androidx.lifecycle.LifecycleOwner;
+import androidx.lifecycle.LifecycleRegistry;
+import androidx.lifecycle.ViewModelStore;
+import androidx.lifecycle.ViewModelStoreOwner;
+import androidx.savedstate.SavedStateRegistry;
+import androidx.savedstate.SavedStateRegistryController;
+import androidx.savedstate.SavedStateRegistryOwner;
 import me.grishka.appkit.FragmentStackActivity;
 import me.grishka.appkit.Nav;
 import me.grishka.appkit.api.Callback;
 import me.grishka.appkit.api.ErrorResponse;
+import me.grishka.appkit.utils.V;
+import org.joinmastodon.android.ui.compose.ComposeLifecycleHelperKt;
+import org.joinmastodon.android.ui.utils.LocationUtils;
+import androidx.core.app.ActivityCompat;
 
-public class MainActivity extends FragmentStackActivity{
+public class MainActivity extends FragmentStackActivity implements LifecycleOwner, ViewModelStoreOwner, SavedStateRegistryOwner {
 	private static final String TAG="MainActivity";
+	public static final String EXTRA_OPEN_SOURCE_LICENSES="open_source_licenses";
+	private final LifecycleRegistry lifecycleRegistry=new LifecycleRegistry(this);
+	private final ViewModelStore viewModelStore=new ViewModelStore();
+	private final SavedStateRegistryController savedStateController=SavedStateRegistryController.create(this);
+
+	@Override public Lifecycle getLifecycle(){ return lifecycleRegistry; }
+	@Override public ViewModelStore getViewModelStore(){ return viewModelStore; }
+	@Override public SavedStateRegistry getSavedStateRegistry(){ return savedStateController.getSavedStateRegistry(); }
+
+	private ChatRealtimeClient chatWsClient;
+	private GestureDetector backGestureDetector;
+	private static final int LOCATION_PERMISSION_REQUEST=7001;
+	/** 服务公告弹窗引用，防止重复弹出 */
+	private android.app.AlertDialog serviceNoticeDialog;
+	private StartupPromptCoordinator startupPromptCoordinator;
+
+	@Override
+	public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults){
+		super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+		if(requestCode==7001){
+			if(grantResults.length>0 && grantResults[0]==PackageManager.PERMISSION_GRANTED){
+				LocationUtils.fetchAndResolve(this, loc->{
+					// 定位失败时用 IP 属地兜底
+					if(loc==null) LocationUtils.fetchProvinceFromIP(this, null);
+				});
+			}else{
+				LocationUtils.fetchProvinceFromIP(this, null);
+			}
+		}
+	}
+
+	@Override
+	public void onBackPressed(){
+		Fragment top=getTopmostFragment();
+		if(top instanceof HomeFragment homeFragment && homeFragment.onBackPressed())
+			return;
+		super.onBackPressed();
+	}
 
 	@Override
 	protected void onCreate(@Nullable Bundle savedInstanceState){
+		savedStateController.performRestore(savedInstanceState);
+		lifecycleRegistry.setCurrentState(Lifecycle.State.CREATED);
+
 		AccountSession session=getCurrentSession();
 		UiUtils.setUserPreferredTheme(this, /* MOSHIDON: this is for per account user themes */ session);
 		super.onCreate(savedInstanceState);
 
+		ComposeLifecycleHelperKt.installComposeLifecycle(this);
+
+		final float minVelocity=ViewConfiguration.get(this).getScaledMinimumFlingVelocity()*2f;
+		final float maxFlingPathLength=V.dp(80);
+		backGestureDetector=new GestureDetector(this, new GestureDetector.SimpleOnGestureListener(){
+			@Override
+			public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY){
+				if(e1==null || e2==null)
+					return false;
+				float dx=e2.getX()-e1.getX();
+				float dy=e2.getY()-e1.getY();
+				if(dx>0 && Math.abs(dx)<=maxFlingPathLength && velocityX>minVelocity && Math.abs(velocityX)>Math.abs(velocityY)*1.5f){
+					if(fragmentContainers!=null && fragmentContainers.size()>1){
+						onBackPressed();
+						return true;
+					}
+				}
+				return false;
+			}
+		});
+
+		org.joinmastodon.android.security.AppSecurity.runAfterUnlock(this, ()->{
+			if(savedInstanceState==null){
+				restartHomeFragment();
+				connectChatWebSocket();
+				refreshChatConversations();
+			}
+			if(getIntent().getBooleanExtra(EXTRA_OPEN_SOURCE_LICENSES, false)){
+				openSourceLicenses(getIntent());
+			}
+		});
+
+		// 冷启动提示统一串行：服务公告、认证驳回、新徽章。
 		if(savedInstanceState==null){
-			restartHomeFragment();
+			org.joinmastodon.android.security.AppSecurity.runAfterUnlock(this, ()->{
+				startupPromptCoordinator=new StartupPromptCoordinator(this);
+				startupPromptCoordinator.start();
+			});
+		}
+
+		// 位置权限引导序列已迁移到 HomeFragment.onShown 的 showSetupGuideSequence
+		// 此处仅保留无权限时的 IP 属地兜底（不阻塞 UI，不弹 sheet）
+		if(savedInstanceState==null && !LocationUtils.hasLocationPermission(this)){
+			LocationUtils.fetchProvinceFromIP(this, null);
 		}
 
 		if(BuildConfig.BUILD_TYPE.startsWith("appcenter")){
@@ -58,7 +172,7 @@ public class MainActivity extends FragmentStackActivity{
 			try{
 				Class.forName("org.joinmastodon.android.AppCenterWrapper").getMethod("init", Application.class).invoke(null, getApplication());
 			}catch(ClassNotFoundException|NoSuchMethodException|IllegalAccessException|InvocationTargetException ignore){}
-		}else if(GithubSelfUpdater.needSelfUpdating()){
+		}else if(GithubSelfUpdater.isSupported()){
 			GithubSelfUpdater.getInstance().maybeCheckForUpdates();
 		}
 
@@ -74,6 +188,12 @@ public class MainActivity extends FragmentStackActivity{
 		// }
 	}
 
+	public void restartStartupPrompts(){
+		if(startupPromptCoordinator!=null) startupPromptCoordinator.stop();
+		startupPromptCoordinator=new StartupPromptCoordinator(this);
+		startupPromptCoordinator.start();
+	}
+
 	private void startLanDiscoveryService(){
 		try{
 			Intent serviceIntent = new Intent(this, LanDiscoveryService.class);
@@ -87,11 +207,154 @@ public class MainActivity extends FragmentStackActivity{
 		}
 	}
 
+	/**
+	 * 服务公告检查：冷启动时拉取后端公告（GET /api/broadcast/notice，零数据库端点）。
+	 * 无公告/请求失败时静默；有公告且本地未看过则弹窗一次（每个公告 ID 只弹一次）。
+	 */
+	// ============ 新徽章通知 ============
+	private java.util.ArrayDeque<Account.Badge> pendingNewBadgeQueue;
+	private String newBadgeAccountId;
+
+	private void checkNewBadges(){
+		AccountSession session=AccountSessionManager.getInstance().getLastActiveAccount();
+		if(session==null || !session.activated)
+			return;
+		newBadgeAccountId=session.getID();
+		String selfId=session.self.id;
+		String url="https://api.abdl-space.top/api/users/"+selfId+"/badges";
+		okhttp3.Request request=new okhttp3.Request.Builder()
+				.url(url)
+				.header("Authorization", "Bearer "+session.token.accessToken)
+				.get()
+				.build();
+		MastodonAPIController.getHttpClient().newCall(request).enqueue(new okhttp3.Callback(){
+			@Override
+			public void onFailure(okhttp3.Call call, java.io.IOException e){}
+
+			@Override
+			public void onResponse(okhttp3.Call call, okhttp3.Response response) throws java.io.IOException{
+				if(!response.isSuccessful()) return;
+				String body=response.body()!=null ? response.body().string() : "";
+				try{
+					com.google.gson.JsonObject json=new com.google.gson.JsonParser().parse(body).getAsJsonObject();
+					com.google.gson.JsonArray badges=json.getAsJsonArray("badges");
+					if(badges==null || badges.size()==0) return;
+					android.content.SharedPreferences prefs=getSharedPreferences("badge_popup", MODE_PRIVATE);
+					java.util.ArrayDeque<Account.Badge> queue=new java.util.ArrayDeque<>();
+					for(int i=badges.size()-1;i>=0;i--){
+						com.google.gson.JsonObject badge=badges.get(i).getAsJsonObject();
+						boolean acknowledged=badge.has("acknowledged") && badge.get("acknowledged").getAsBoolean();
+						if(acknowledged) continue;
+						Account.Badge b=new Account.Badge();
+						b.key=badge.has("key") ? badge.get("key").getAsString() : "";
+						b.name=badge.has("name") ? badge.get("name").getAsString() : "";
+						b.color=badge.has("color") ? badge.get("color").getAsString() : "#7C4DFF";
+						if(b.key.isEmpty()){
+							// 无 key 的徽章无法确认，保持原有行为直接弹
+							queue.add(b);
+							continue;
+						}
+						// 获得徽章后的第二次启动才弹出一次：
+						// 首次启动看到未确认徽章只记录不弹，第二次启动弹出，此后不再重复
+						int launches=prefs.getInt("launches_"+b.key, 0);
+						if(launches==0){
+							prefs.edit().putInt("launches_"+b.key, 1).apply();
+							continue;
+						}
+						if(launches>=2) continue;
+						prefs.edit().putInt("launches_"+b.key, 2).apply();
+						queue.add(b);
+					}
+					if(queue.isEmpty()) return;
+					runOnUiThread(()->showNextNewBadge(queue));
+				}catch(Exception ignored){}
+			}
+		});
+	}
+
+	private void showNextNewBadge(java.util.ArrayDeque<Account.Badge> queue){
+		if(isFinishing() || isDestroyed() || queue.isEmpty())
+			return;
+		Account.Badge badge=queue.poll();
+		new org.joinmastodon.android.ui.sheets.NewBadgeSheet(this, badge.name, null, badge.color, ()->
+				acknowledgeNewBadge(newBadgeAccountId, badge, ()->showNextNewBadge(queue)))
+				.show();
+	}
+
+	private void acknowledgeNewBadge(String accountId, Account.Badge badge, Runnable onDone){
+		AccountSession session=AccountSessionManager.getInstance().getAccount(accountId);
+		if(session==null || badge.key==null || badge.key.isEmpty()){
+			onDone.run();
+			return;
+		}
+		okhttp3.Request request=new okhttp3.Request.Builder()
+				.url("https://api.abdl-space.top/api/users/badge/acknowledge")
+				.header("Authorization", "Bearer "+session.token.accessToken)
+				.post(okhttp3.RequestBody.create(
+						okhttp3.MediaType.parse("application/json; charset=utf-8"),
+						"{\"badge_keys\":[\""+badge.key.replace("\"", "")+"\"]}"))
+				.build();
+		MastodonAPIController.getHttpClient().newCall(request).enqueue(new okhttp3.Callback(){
+			@Override
+			public void onFailure(okhttp3.Call call, java.io.IOException e){ onDone.run(); }
+			@Override
+			public void onResponse(okhttp3.Call call, okhttp3.Response response){ onDone.run(); }
+		});
+	}
+
+	private void maybeShowServiceNotice(){
+		if(getCurrentSession()==null)
+			return;
+		MastodonAPIController.runInBackground(()->{
+			ServiceNotice notice=GetServiceNotice.fetch();
+			if(notice==null)
+				return;
+			final String seenKey="service_notice_"+notice.id;
+			if(GlobalUserPreferences.alertSeen(seenKey))
+				return;
+			runOnUiThread(()->showServiceNoticeDialog(notice));
+		});
+	}
+
+	private void showServiceNoticeDialog(ServiceNotice notice){
+		if(serviceNoticeDialog!=null || isFinishing() || isDestroyed())
+			return;
+		final String seenKey="service_notice_"+notice.id;
+		serviceNoticeDialog=new M3AlertDialogBuilder(this)
+				.setTitle(notice.title!=null && !notice.title.isEmpty() ? notice.title : getString(R.string.service_notice_title))
+				.setMessage(notice.content)
+				.setPositiveButton(R.string.service_notice_ok, (dialog, which)->{
+					GlobalUserPreferences.setAlertSeen(seenKey);
+					dialog.dismiss();
+				})
+				.setCancelable(false)
+				.create();
+		serviceNoticeDialog.setOnDismissListener(dialog->{
+			serviceNoticeDialog=null;
+			GlobalUserPreferences.setAlertSeen(seenKey);
+		});
+		// 直接点击「知道了」时 setPositiveButton 已标记；此处兜底保证任何关闭路径都会记录
+		serviceNoticeDialog.show();
+	}
+
+	@Override
+	public boolean dispatchTouchEvent(MotionEvent ev){
+		if(backGestureDetector!=null)
+			backGestureDetector.onTouchEvent(ev);
+		return super.dispatchTouchEvent(ev);
+	}
+
 	@Override
 	protected void onNewIntent(Intent intent){
 		super.onNewIntent(intent);
 		setIntent(intent);
-		if(intent.getBooleanExtra("fromNotification", false)){
+		org.joinmastodon.android.security.AppSecurity.runAfterUnlock(this, ()->processNavigationIntent(intent));
+	}
+
+	private void processNavigationIntent(Intent intent){
+		if(intent.getBooleanExtra(EXTRA_OPEN_SOURCE_LICENSES, false)){
+			openSourceLicenses(intent);
+		}else if(intent.getBooleanExtra("fromNotification", false)){
 			String accountID=intent.getStringExtra("accountID");
 			AccountSession accountSession;
 			try{
@@ -113,6 +376,13 @@ public class MainActivity extends FragmentStackActivity{
 			}
 		}else if(intent.getBooleanExtra("compose", false)){
 			showCompose();
+		}else if("conversations".equals(intent.getStringExtra("navigate_to"))){
+			showChatConversations();
+		}else if("chat".equals(intent.getStringExtra("navigate_to"))){
+			long peerId=intent.getLongExtra("peer_id", 0);
+			String peerName=intent.getStringExtra("peer_name");
+			String peerAvatar=intent.getStringExtra("peer_avatar");
+			if(peerId>0) showChatFragment(peerId, peerName!=null?peerName:"", peerAvatar);
 		}else if(intent.hasExtra("lan_login_session")){
 			// LAN 登录通知点击 - 显示授权弹窗
 			String sessionId=intent.getStringExtra("lan_login_session");
@@ -123,9 +393,18 @@ public class MainActivity extends FragmentStackActivity{
 			handleURL(intent.getData(), null);
 		}else if(intent.getBooleanExtra("explore", false)){
 			restartHomeFragment();
-		}/*else if(intent.hasExtra(PackageInstaller.EXTRA_STATUS) && GithubSelfUpdater.needSelfUpdating()){
+		}/*else if(intent.hasExtra(PackageInstaller.EXTRA_STATUS) && GithubSelfUpdater.isSupported()){
 			GithubSelfUpdater.getInstance().handleIntentFromInstaller(intent, this);
 		}*/
+	}
+
+	private void openSourceLicenses(Intent intent){
+		intent.removeExtra(EXTRA_OPEN_SOURCE_LICENSES);
+		Bundle args=new Bundle();
+		String accountID=intent.getStringExtra(ComposeAboutActivity.EXTRA_ACCOUNT_ID);
+		if(accountID!=null)
+			args.putString("account", accountID);
+		Nav.go(this, OpenSourceLicensesFragment.class, args);
 	}
 
 	public void handleURL(Uri uri, String accountID){
@@ -133,6 +412,13 @@ public class MainActivity extends FragmentStackActivity{
 			return;
 		if(!"https".equals(uri.getScheme()) && !"http".equals(uri.getScheme()))
 			return;
+
+		String verificationToken=VerificationLink.parseToken(uri);
+		if(verificationToken!=null){
+			Bundle args=new Bundle(); args.putString("token", verificationToken); args.putBoolean("_can_go_back", true);
+			Nav.go(this, BabyVerificationResultFragment.class, args);
+			return;
+		}
 
 		// QR 登录链接处理
 		if("abdl-space.top".equals(uri.getHost()) && uri.getPath().startsWith("/qr-login")){
@@ -287,6 +573,77 @@ public class MainActivity extends FragmentStackActivity{
 		showFragment(compose);
 	}
 
+	@Override
+	protected void onResume(){
+		super.onResume();
+		lifecycleRegistry.setCurrentState(Lifecycle.State.RESUMED);
+		org.joinmastodon.android.security.AppSecurity.runAfterUnlock(this, ()->{
+			if(chatWsClient!=null) chatWsClient.connect();
+		});
+	}
+
+	@Override
+	protected void onPause(){
+		super.onPause();
+		lifecycleRegistry.setCurrentState(Lifecycle.State.STARTED);
+		if(chatWsClient!=null) chatWsClient.disconnect();
+	}
+
+	@Override
+	protected void onDestroy(){
+		super.onDestroy();
+		lifecycleRegistry.setCurrentState(Lifecycle.State.DESTROYED);
+		if(chatWsClient!=null){
+			chatWsClient.disconnect();
+			chatWsClient=null;
+		}
+		if(startupPromptCoordinator!=null){ startupPromptCoordinator.stop(); startupPromptCoordinator=null; }
+	}
+
+	private void connectChatWebSocket(){
+		AccountSession session=AccountSessionManager.getInstance().getLastActiveAccount();
+		if(session==null || !session.activated) return;
+		chatWsClient=new ChatRealtimeClient(session.getID());
+		chatWsClient.connect();
+	}
+
+	private void refreshChatConversations(){
+		AccountSession session=AccountSessionManager.getInstance().getLastActiveAccount();
+		if(session==null || !session.activated) return;
+		ChatController.getInstance(session.getID()).loadConversations(true, new Callback<List<org.joinmastodon.android.chat.model.Conversation>>(){
+			@Override public void onSuccess(List<org.joinmastodon.android.chat.model.Conversation> result){
+				E.post(new ChatEvents.ConversationsUpdatedEvent());
+			}
+
+			@Override public void onError(ErrorResponse error){
+				Log.w(TAG, "Conversation refresh failed: "+error);
+			}
+		});
+	}
+
+	private void showChatConversations(){
+		AccountSession session=AccountSessionManager.getInstance().getLastActiveAccount();
+		if(session==null) return;
+		ConversationsFragment fragment=new ConversationsFragment();
+		Bundle args=new Bundle();
+		args.putString("account", session.getID());
+		fragment.setArguments(args);
+		showFragment(fragment);
+	}
+
+	private void showChatFragment(long peerId, String peerName, String peerAvatar){
+		AccountSession session=AccountSessionManager.getInstance().getLastActiveAccount();
+		if(session==null) return;
+		ChatFragment fragment=new ChatFragment();
+		Bundle args=new Bundle();
+		args.putString("account", session.getID());
+		args.putLong("peer_id", peerId);
+		args.putString("peer_name", peerName);
+		args.putString("peer_avatar", peerAvatar!=null ? peerAvatar : "");
+		fragment.setArguments(args);
+		showFragment(fragment);
+	}
+
 	private void maybeRequestNotificationsPermission(){
 		if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.TIRAMISU && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED){
 			requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 100);
@@ -301,9 +658,14 @@ public class MainActivity extends FragmentStackActivity{
 
 	public void restartHomeFragment(){
 		if(AccountSessionManager.getInstance().getLoggedInAccounts().isEmpty()){
-			// 无账户时直接进入新的验证码登录页
-			org.joinmastodon.android.fragments.auth.LoginEmailFragment loginEmailFragment = new org.joinmastodon.android.fragments.auth.LoginEmailFragment();
-			showFragmentClearingBackStack(loginEmailFragment);
+			Uri data=getIntent().getData(); String verificationToken=Intent.ACTION_VIEW.equals(getIntent().getAction()) ? VerificationLink.parseToken(data) : null;
+			if(verificationToken!=null){
+				BabyVerificationResultFragment fragment=new BabyVerificationResultFragment(); Bundle args=new Bundle(); args.putString("token", verificationToken); fragment.setArguments(args); showFragmentClearingBackStack(fragment);
+			}else{
+				// 无账户时直接进入新的验证码登录页
+				org.joinmastodon.android.fragments.auth.LoginEmailFragment loginEmailFragment = new org.joinmastodon.android.fragments.auth.LoginEmailFragment();
+				showFragmentClearingBackStack(loginEmailFragment);
+			}
 		}else{
 			AccountSessionManager.getInstance().maybeUpdateLocalInfo();
 			AccountSession session;
@@ -337,7 +699,7 @@ public class MainActivity extends FragmentStackActivity{
 			}else if(intent.getBooleanExtra("compose", false)){
 				showCompose();
 			}else if(intent.getBooleanExtra("explore", false) && fragment instanceof HomeFragment hf){
-				getWindow().getDecorView().post(()->hf.setCurrentTab(R.id.tab_search));
+				getWindow().getDecorView().post(()->hf.setCurrentTab(R.id.tab_messages));
 			}else if(Intent.ACTION_VIEW.equals(intent.getAction())){
 				handleURL(intent.getData(), null);
 			}else{

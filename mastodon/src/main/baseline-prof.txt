@@ -1,0 +1,3 @@
+Lorg/joinmastodon/android/fragments/settings/ComposeAboutActivity;
+Lorg/joinmastodon/android/fragments/settings/ComposeAboutActivity**;
+Lorg/joinmastodon/android/ui/compose/**;

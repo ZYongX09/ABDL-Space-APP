@@ -34,6 +34,8 @@ public class MastodonErrorResponse extends ErrorResponse{
 			this.messageResource=R.string.server_error;
 		}else if(httpStatus==404){
 			this.messageResource=R.string.not_found;
+		}else if(isLoginExpiredError(error, httpStatus)){
+			this.messageResource=R.string.login_expired;
 		}else{
 			this.messageResource=0;
 		}
@@ -62,5 +64,15 @@ public class MastodonErrorResponse extends ErrorResponse{
 			message=error;
 		}
 		Toast.makeText(context, message, Toast.LENGTH_SHORT).show();
+	}
+
+	private static boolean isLoginExpiredError(String error, int httpStatus){
+		if(httpStatus!=401 || error==null)
+			return false;
+		String lower=error.toLowerCase();
+		return lower.contains("access token is invalid")
+				|| lower.contains("authentication required")
+				|| lower.contains("session expired")
+				|| lower.contains("invalid token");
 	}
 }

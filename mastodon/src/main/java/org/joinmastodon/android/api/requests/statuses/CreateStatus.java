@@ -1,5 +1,7 @@
 package org.joinmastodon.android.api.requests.statuses;
 
+import com.google.gson.annotations.SerializedName;
+
 import org.joinmastodon.android.api.MastodonAPIRequest;
 import org.joinmastodon.android.model.Status;
 import org.joinmastodon.android.model.StatusPrivacy;
@@ -23,12 +25,22 @@ public class CreateStatus extends MastodonAPIRequest<Status>{
 		public Poll poll;
 		public String inReplyToId;
 		public boolean sensitive;
+		@SerializedName("mental_crisis")
+		public boolean mentalCrisis;
 		public String spoilerText;
 		public StatusPrivacy visibility;
 		public Instant scheduledAt;
 		public String language;
 		public StatusQuotePolicy quoteApprovalPolicy;
 		public String quotedStatusId;
+		@SerializedName("nbw_fid")
+		public Integer nbwFid;
+		@SerializedName("geo_province")
+		public String geoProvince;
+		@SerializedName("geo_city")
+		public String geoCity;
+		@SerializedName("geo_district")
+		public String geoDistrict;
 
 		public static class Poll{
 			public ArrayList<String> options=new ArrayList<>();
@@ -41,11 +53,13 @@ public class CreateStatus extends MastodonAPIRequest<Status>{
 			public String id;
 			public String description;
 			public String focus;
+			public String blurhash;
 
-			public MediaAttribute(String id, String description, String focus){
+			public MediaAttribute(String id, String description, String focus, String blurhash){
 				this.id=id;
 				this.description=description;
 				this.focus=focus;
+				this.blurhash=blurhash;
 			}
 		}
 	}

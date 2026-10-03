@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="48dp"
+    android:layout_height="48dp"
+    android:clickable="true"
+    android:focusable="true"
+    android:background="?android:selectableItemBackgroundBorderless"
+    android:contentDescription="私信">
+
+    <ImageView
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:layout_gravity="center"
+        android:src="@drawable/ic_mail_24px"
+        android:tint="?android:textColorPrimary"
+        android:importantForAccessibility="no" />
+
+    <TextView
+        android:id="@+id/messages_badge"
+        android:layout_width="wrap_content"
+        android:layout_height="16dp"
+        android:minWidth="16dp"
+        android:layout_gravity="top|end"
+        android:layout_marginTop="4dp"
+        android:layout_marginEnd="2dp"
+        android:paddingHorizontal="4dp"
+        android:background="@drawable/bg_tabbar_badge"
+        android:gravity="center"
+        android:includeFontPadding="false"
+        android:textAppearance="@style/m3_label_small"
+        android:textColor="?colorM3OnPrimary"
+        android:visibility="gone"
+        tools:text="12"
+        tools:visibility="visible" />
+</FrameLayout>

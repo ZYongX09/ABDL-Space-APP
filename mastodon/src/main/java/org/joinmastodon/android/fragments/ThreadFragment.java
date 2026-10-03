@@ -45,6 +45,7 @@ import org.joinmastodon.android.ui.displayitems.StatusDisplayItem;
 import org.joinmastodon.android.ui.displayitems.TextStatusDisplayItem;
 import org.joinmastodon.android.ui.text.HtmlParser;
 import org.joinmastodon.android.ui.utils.UiUtils;
+import org.joinmastodon.android.ui.views.CrisisWarningViewController;
 import org.parceler.Parcels;
 
 import java.util.ArrayList;
@@ -77,6 +78,7 @@ public class ThreadFragment extends StatusListFragment implements AssistContentP
 	private LinearLayout replyButton;
 	private ImageView replyButtonAva;
 	private TextView replyButtonText;
+	private CrisisWarningViewController crisisWarningController;
 	private String asyncRefreshID;
 	private Consumer<AsyncRefresh> asyncRefreshCallback=this::onAsyncRefreshFinished;
 	private Snackbar moreRepliesSnackbar;
@@ -292,6 +294,9 @@ public class ThreadFragment extends StatusListFragment implements AssistContentP
 	@Override
 	public void onViewCreated(View view, Bundle savedInstanceState){
 		super.onViewCreated(view, savedInstanceState);
+		crisisWarningController=new CrisisWarningViewController(view);
+		if(mainStatus.getContentStatus().mentalCrisis)
+			crisisWarningController.show();
 		replyContainer=view.findViewById(R.id.reply_button_wrapper);
 		replyButton=replyContainer.findViewById(R.id.reply_button);
 		replyButtonText=replyButton.findViewById(R.id.reply_btn_text);

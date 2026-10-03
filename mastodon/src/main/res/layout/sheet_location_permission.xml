@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<org.joinmastodon.android.ui.views.CustomScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+	android:layout_width="match_parent"
+	android:layout_height="wrap_content"
+	android:background="@drawable/bg_bottom_sheet"
+	android:outlineProvider="background"
+	android:elevation="1dp">
+	<LinearLayout
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:orientation="vertical">
+
+		<View
+			android:layout_width="match_parent"
+			android:layout_height="36dp"
+			android:background="@drawable/bg_bottom_sheet_handle"/>
+
+		<LinearLayout
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:layout_marginHorizontal="16dp"
+			android:orientation="horizontal"
+			android:gravity="center_vertical">
+			<ImageView
+				android:layout_width="40dp"
+				android:layout_height="40dp"
+				android:layout_marginEnd="16dp"
+				android:background="@drawable/white_circle"
+				android:backgroundTint="?colorM3SecondaryContainer"
+				android:scaleType="center"
+				android:tint="?colorM3OnSecondaryContainer"
+				android:src="@drawable/ic_fluent_window_location_target_20_filled"
+				android:importantForAccessibility="no"/>
+
+			<TextView
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:textAppearance="@style/m3_title_large"
+				android:fontFamily="sans-serif"
+				android:textColor="?colorM3OnSurface"
+				android:text="@string/location_permission_title"/>
+		</LinearLayout>
+
+		<TextView
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:layout_marginHorizontal="16dp"
+			android:layout_marginTop="16dp"
+			android:textSize="14sp"
+			android:lineSpacingMultiplier="1.4"
+			android:textColor="?colorM3OnSurfaceVariant"
+			android:text="@string/location_permission_description"/>
+
+		<LinearLayout
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:layout_marginTop="24dp"
+			android:layout_marginBottom="16dp"
+			android:layout_marginHorizontal="16dp"
+			android:orientation="horizontal"
+			android:gravity="end">
+
+			<Button
+				android:id="@+id/btn_skip"
+				android:layout_width="wrap_content"
+				android:layout_height="wrap_content"
+				style="@style/Widget.Mastodon.M3.Button.Text"
+				android:text="@string/location_permission_skip"
+				android:textAllCaps="false"/>
+
+			<Button
+				android:id="@+id/btn_allow"
+				android:layout_width="wrap_content"
+				android:layout_height="wrap_content"
+				style="@style/Widget.Mastodon.M3.Button.Tonal"
+				android:text="@string/location_permission_allow"
+				android:textAllCaps="false"/>
+		</LinearLayout>
+
+	</LinearLayout>
+</org.joinmastodon.android.ui.views.CustomScrollView>

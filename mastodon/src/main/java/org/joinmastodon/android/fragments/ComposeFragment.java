@@ -1,5 +1,6 @@
 package org.joinmastodon.android.fragments;
 
+import android.Manifest;
 import android.animation.Animator;
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
@@ -9,6 +10,7 @@ import android.app.AlertDialog;
 import android.content.ClipData;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.graphics.Insets;
 import android.graphics.PixelFormat;
@@ -49,6 +51,7 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.twitter.twittertext.TwitterTextEmojiRegex;
 
@@ -56,6 +59,8 @@ import org.joinmastodon.android.E;
 import org.joinmastodon.android.GlobalUserPreferences;
 import org.joinmastodon.android.R;
 import org.joinmastodon.android.api.MastodonErrorResponse;
+import org.joinmastodon.android.api.requests.accounts.GetOwnAccount;
+import org.joinmastodon.android.api.requests.nbw.RecommendNBWForum;
 import org.joinmastodon.android.api.requests.statuses.CreateStatus;
 import org.joinmastodon.android.api.requests.statuses.EditStatus;
 import org.joinmastodon.android.api.session.AccountSession;
@@ -64,6 +69,7 @@ import org.joinmastodon.android.events.StatusCountersUpdatedEvent;
 import org.joinmastodon.android.events.StatusCreatedEvent;
 import org.joinmastodon.android.events.StatusUpdatedEvent;
 import org.joinmastodon.android.fragments.account_list.AccountSearchFragment;
+import org.joinmastodon.android.fragments.settings.NBWPostRegisterActivity;
 import org.joinmastodon.android.model.Account;
 import org.joinmastodon.android.model.Emoji;
 import org.joinmastodon.android.model.EmojiCategory;
@@ -83,16 +89,22 @@ import org.joinmastodon.android.ui.PopupKeyboard;
 import org.joinmastodon.android.ui.displayitems.InlineStatusStatusDisplayItem;
 import org.joinmastodon.android.ui.displayitems.StatusDisplayItem;
 import org.joinmastodon.android.ui.drawables.SpoilerStripesDrawable;
-import org.joinmastodon.android.ui.sheets.ComposerVisibilitySheet;
 import org.joinmastodon.android.ui.sheets.ListItemsSheet;
 import org.joinmastodon.android.ui.text.ComposeAutocompleteSpan;
 import org.joinmastodon.android.ui.text.ComposeHashtagOrMentionSpan;
 import org.joinmastodon.android.ui.text.HtmlParser;
 import org.joinmastodon.android.ui.utils.SimpleTextWatcher;
+import org.joinmastodon.android.ui.views.CrisisWarningViewController;
+import org.joinmastodon.android.ui.utils.LocationUtils;
+import org.joinmastodon.android.ui.sheets.LocationPermissionSheet;
 import org.joinmastodon.android.ui.utils.UiUtils;
 import org.joinmastodon.android.ui.viewcontrollers.ComposeAutocompleteViewController;
 import org.joinmastodon.android.ui.viewcontrollers.ComposeLanguageAlertViewController;
 import org.joinmastodon.android.ui.viewcontrollers.ComposeMediaViewController;
+import org.joinmastodon.android.ui.media.MediaPickerConfig;
+import org.joinmastodon.android.ui.media.MediaCameraContract;
+import org.joinmastodon.android.ui.media.MediaStoreLoader;
+import org.joinmastodon.android.ui.sheets.MediaPickerSheet;
 import org.joinmastodon.android.ui.viewcontrollers.ComposePollViewController;
 import org.joinmastodon.android.ui.views.ComposeEditText;
 import org.joinmastodon.android.ui.views.CustomScrollView;
@@ -104,7 +116,10 @@ import org.joinmastodon.android.utils.ViewImageLoaderHolderTarget;
 import org.parceler.Parcels;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Consumer;
@@ -125,6 +140,8 @@ import me.grishka.appkit.utils.V;
 public class ComposeFragment extends MastodonToolbarFragment implements ComposeEditText.SelectionListener, CustomTransitionsFragment{
 
 	private static final int MEDIA_RESULT=717;
+	private static final int MEDIA_PERMISSION_RESULT=718;
+	private static final int CAMERA_CAPTURE_RESULT=719;
 	public static final int IMAGE_DESCRIPTION_RESULT=363;
 	private static final int AUTOCOMPLETE_ACCOUNT_RESULT=779;
 	private static final String TAG="ComposeFragment";
@@ -172,9 +189,37 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	private WindowManager wm;
 	private StatusPrivacy statusVisibility=StatusPrivacy.PUBLIC;
 	private StatusQuotePolicy statusQuotePolicy=StatusQuotePolicy.PUBLIC;
+	private int selectedNBWForumId;
+	private int resolvedNBWForumId=27;
+	private String aiRecommendedForumName;
+	private TextView newBabyWorldCardText, newBabyWorldCardAction;
+	private View newBabyWorldCard;
+	private View crisisCard;
+	private CrisisWarningViewController crisisWarningController;
+	private boolean crisisWarningDismissed;
+	private static final String[] CRISIS_KEYWORDS={"自杀", "自残", "死亡", "抑郁", "双向", "双相", "ADHD", "PTSD", "童年创伤", "不想活", "不想活了", "不想再活", "活不下去", "活着没意思", "活着没有意义", "想死", "去死", "求死", "寻死", "轻生", "结束生命", "结束自己的生命", "了结自己", "离开这个世界", "永远消失", "绝望", "没必要活", "没有活下去的理由", "不值得活", "死了算了", "一死了之", "结束一切", "解脱了", "撑不下去了", "不想醒来", "希望永远睡过去", "割腕", "割脉", "拿刀割自己", "划伤自己", "跳楼", "跳河", "撞车", "卧轨", "吞药", "服毒", "上吊", "自我伤害", "伤害自己", "伤害我自己"};
+	private int newBabyWorldBindingState;
+	private int newBabyWorldBindingRequestGeneration;
+	private int aiRecommendationRequestGeneration;
+	private boolean aiRecommendationInFlight;
+	private static final Set<String> dismissedNewBabyWorldCards=new HashSet<>();
+	private static final int BINDING_CHECKING=0;
+	private static final int BINDING_BOUND=1;
+	private static final int BINDING_UNBOUND=-1;
+	private static final int BINDING_CHECK_FAILED=-2;
 	private ComposeAutocompleteSpan currentAutocompleteSpan;
 	private FrameLayout mainEditTextWrap;
 	private ComposeLanguageAlertViewController.SelectedOption postLang;
+
+	// 位置选择
+	private static final int LOCATION_PROVINCE=0;
+	private static final int LOCATION_CITY=1;
+	private static final int LOCATION_DISTRICT=2;
+	private static final int LOCATION_NONE=3;
+	private int selectedLocationLevel=LOCATION_PROVINCE; // 默认展示省
+	private LinearLayout locationBtn;
+	private TextView locationText;
+	private LocationUtils.ResolvedLocation currentLocation;
 
 	private ComposeAutocompleteViewController autocompleteViewController;
 	private ComposePollViewController pollViewController=new ComposePollViewController(this);
@@ -195,6 +240,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	private Runnable discardConfirmationCallback=this::confirmDiscardDraftBackCallback;
 	private boolean prevHadDraft;
 	private boolean keyboardVisible;
+	private MediaPickerConfig pendingMediaPickerConfig;
 
 	public ComposeFragment(){
 		super(R.layout.toolbar_fragment_with_progressbar);
@@ -230,15 +276,20 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 			charLimit=500;
 
 		setTitle(editingStatus==null ? R.string.new_post : R.string.edit_post);
-		if(savedInstanceState!=null)
+		if(savedInstanceState!=null){
 			postLang=Parcels.unwrap(savedInstanceState.getParcelable("postLang"));
+		}
 
 		if(getArguments().containsKey("quote"))
 			quotedStatus=Parcels.unwrap(getArguments().getParcelable("quote"));
+		if(getArguments().containsKey("replyTo"))
+			replyTo=Parcels.unwrap(getArguments().getParcelable("replyTo"));
 	}
 
 	@Override
 	public void onDestroy(){
+		newBabyWorldBindingRequestGeneration++;
+		aiRecommendationRequestGeneration++;
 		super.onDestroy();
 		mediaViewController.cancelAllUploads();
 		removeBackCallback(emojiKeyboardHider);
@@ -282,6 +333,12 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 
 		View view=inflater.inflate(R.layout.fragment_compose, container, false);
 		mainLayout=view.findViewById(R.id.compose_main_ll);
+		newBabyWorldCard=view.findViewById(R.id.newbabyworld_card);
+		crisisCard=view.findViewById(R.id.compose_crisis_card);
+		crisisWarningController=new CrisisWarningViewController(view);
+		newBabyWorldCardText=view.findViewById(R.id.newbabyworld_card_text);
+		newBabyWorldCardAction=view.findViewById(R.id.newbabyworld_card_action);
+		newBabyWorldCardAction.setOnClickListener(v->onNewBabyWorldCardAction());
 		mainEditText=view.findViewById(R.id.toot_text);
 		mainEditTextWrap=view.findViewById(R.id.toot_text_wrap);
 		charCounter=view.findViewById(R.id.char_counter);
@@ -310,7 +367,27 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		replyWrap=view.findViewById(R.id.reply_wrap);
 		quotedPostWrap=view.findViewById(R.id.quoted_post_wrap);
 
-		mediaBtn.setOnClickListener(v->openFilePicker(false));
+		// 位置选择器初始化
+		locationBtn=view.findViewById(R.id.btn_location);
+		locationText=view.findViewById(R.id.location_text);
+		currentLocation=LocationUtils.getCachedLocation(getActivity());
+		if(replyTo==null){
+			// 非回复帖才显示位置选择器
+			locationBtn.setVisibility(View.VISIBLE);
+			updateLocationButton();
+			locationBtn.setOnClickListener(this::onLocationClick);
+			// 进入发帖页时若缓存为空但有定位权限，主动触发一次解析（异步，结果回调后刷新按钮）
+			if(currentLocation==null && LocationUtils.hasLocationPermission(getActivity())){
+				LocationUtils.fetchAndResolve(getActivity(), loc->{
+					if(loc!=null){
+						currentLocation=loc;
+						new android.os.Handler(android.os.Looper.getMainLooper()).post(()->updateLocationButton());
+					}
+				});
+			}
+		}
+
+		mediaBtn.setOnClickListener(v->openLocalMediaPicker());
 		if(UiUtils.isPhotoPickerAvailable()){
 			mediaBtn.setOnLongClickListener(v->{
 				openFilePicker(true);
@@ -374,13 +451,9 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 			spoilerBtn.setSelected(true);
 		}
 
-		if(editingStatus!=null && editingStatus.visibility!=null){
-			statusVisibility=editingStatus.visibility;
-			if(editingStatus.quoteApproval!=null){
-				statusQuotePolicy=editingStatus.quoteApproval.toQuotePolicy();
-			}
-		}
-		updateVisibilityButton(false);
+		statusVisibility=StatusPrivacy.PUBLIC;
+		updateNBWForumButton(false);
+		refreshNewBabyWorldBinding();
 
 		autocompleteViewController=new ComposeAutocompleteViewController(getActivity(), accountID);
 		autocompleteViewController.setCompletionSelectedListener(new ComposeAutocompleteViewController.AutocompleteListener(){
@@ -438,7 +511,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		pollViewController.onSaveInstanceState(outState);
 		mediaViewController.onSaveInstanceState(outState);
 		outState.putBoolean("hasSpoiler", hasSpoiler);
-		outState.putSerializable("visibility", statusVisibility);
+		outState.putInt("nbwForumId", selectedNBWForumId);
 		outState.putParcelable("postLang", Parcels.wrap(postLang));
 		if(currentAutocompleteSpan!=null){
 			Editable e=mainEditText.getText();
@@ -450,6 +523,137 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	@Override
 	public void onResume(){
 		super.onResume();
+		if(!creatingView)
+			refreshNewBabyWorldBinding();
+		// 位置权限刚授予后回到本页：刷新成 GPS 精确定位（替代 IP 属地缓存）
+		if(locationBtn!=null && locationBtn.getVisibility()==View.VISIBLE
+				&& LocationUtils.hasLocationPermission(getActivity())){
+			boolean needsGpsRefresh=currentLocation==null
+					|| currentLocation.district()==null; // IP 属地无 district
+			LocationUtils.ResolvedLocation cached=LocationUtils.getCachedLocation(getActivity());
+			if(needsGpsRefresh && (cached==null || cached.district()==null)){
+				LocationUtils.fetchAndResolve(getActivity(), loc->{
+					if(loc!=null){
+						currentLocation=loc;
+						new android.os.Handler(android.os.Looper.getMainLooper()).post(()->updateLocationButton());
+					}
+				});
+			}else if(cached!=null && (currentLocation==null || currentLocation.district()==null)){
+				currentLocation=cached;
+				updateLocationButton();
+			}
+		}
+	}
+
+	private void refreshNewBabyWorldBinding(){
+		// 回复帖不涉及宝宝新天地同步，不做绑定状态检测
+		if(replyTo!=null)
+			return;
+		final int requestGeneration=++newBabyWorldBindingRequestGeneration;
+		newBabyWorldBindingState=BINDING_CHECKING;
+		updateNewBabyWorldCard();
+		updatePublishButtonState();
+		new GetOwnAccount().setCallback(new Callback<>(){
+			@Override
+			public void onSuccess(Account account){
+				if(getActivity()==null || requestGeneration!=newBabyWorldBindingRequestGeneration)
+					return;
+				AccountSessionManager.getInstance().updateAccountInfo(accountID, account);
+				self=account;
+				newBabyWorldBindingState=TextUtils.isEmpty(account.nbwUsername) ? BINDING_UNBOUND : BINDING_BOUND;
+				getActivity().runOnUiThread(()->{
+					updateNewBabyWorldCard();
+					updatePublishButtonState();
+				});
+			}
+
+			@Override
+			public void onError(ErrorResponse error){
+				if(getActivity()==null || requestGeneration!=newBabyWorldBindingRequestGeneration)
+					return;
+				newBabyWorldBindingState=BINDING_CHECK_FAILED;
+				getActivity().runOnUiThread(()->{
+					updateNewBabyWorldCard();
+					updatePublishButtonState();
+				});
+			}
+		}).exec(accountID);
+	}
+
+	private void updateNewBabyWorldCard(){
+		if(newBabyWorldCard==null)
+			return;
+		// 回复帖不显示宝宝新天地绑定板块
+		if(replyTo!=null){
+			newBabyWorldCard.setVisibility(View.GONE);
+			return;
+		}
+		if(crisisWarningController!=null && crisisWarningController.isVisible()){
+			newBabyWorldCard.setVisibility(View.GONE);
+			return;
+		}
+		if(newBabyWorldBindingState==BINDING_BOUND && dismissedNewBabyWorldCards.contains(accountID)){
+			newBabyWorldCard.setVisibility(View.GONE);
+			return;
+		}
+		newBabyWorldCard.setVisibility(View.VISIBLE);
+		if(newBabyWorldBindingState==BINDING_BOUND){
+			newBabyWorldCardText.setText(getString(R.string.compose_newbabyworld_bound, self.nbwUsername));
+			newBabyWorldCardAction.setText(R.string.compose_newbabyworld_close);
+		}else if(newBabyWorldBindingState==BINDING_UNBOUND){
+			newBabyWorldCardText.setText(R.string.compose_newbabyworld_unbound);
+			newBabyWorldCardAction.setText(R.string.compose_newbabyworld_bind);
+		}else if(newBabyWorldBindingState==BINDING_CHECK_FAILED){
+			newBabyWorldCardText.setText(R.string.compose_newbabyworld_check_failed);
+			newBabyWorldCardAction.setText(R.string.compose_newbabyworld_retry);
+		}else{
+			newBabyWorldCardText.setText(R.string.compose_newbabyworld_checking);
+			newBabyWorldCardAction.setText(R.string.compose_newbabyworld_retry);
+		}
+	}
+
+	private boolean containsCrisisKeyword(String text){
+		if(TextUtils.isEmpty(text))
+			return false;
+		String normalized=text.toLowerCase(Locale.ROOT);
+		for(String keyword:CRISIS_KEYWORDS){
+			if(normalized.contains(keyword.toLowerCase(Locale.ROOT)))
+				return true;
+		}
+		return false;
+	}
+
+	private void updateCrisisWarning(CharSequence text){
+		if(crisisCard==null || crisisWarningDismissed)
+			return;
+		boolean show=containsCrisisKeyword(text==null ? "" : text.toString());
+		if(show)
+			crisisWarningController.show();
+		else
+			crisisWarningController.hide();
+		if(show)
+			newBabyWorldCard.setVisibility(View.GONE);
+		else
+			updateNewBabyWorldCard();
+	}
+
+	private void dismissCrisisWarning(){
+		crisisWarningDismissed=true;
+		crisisWarningController.hide();
+		updateNewBabyWorldCard();
+	}
+
+	private void onNewBabyWorldCardAction(){
+		if(newBabyWorldBindingState==BINDING_BOUND){
+			dismissedNewBabyWorldCards.add(accountID);
+			updateNewBabyWorldCard();
+		}else if(newBabyWorldBindingState==BINDING_UNBOUND){
+			Intent intent=new Intent(getActivity(), NBWPostRegisterActivity.class);
+			intent.putExtra("show_back", true);
+			startActivity(intent);
+		}else{
+			refreshNewBabyWorldBinding();
+		}
 	}
 
 	@Override
@@ -470,8 +674,10 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	@Override
 	public void onViewCreated(View view, Bundle savedInstanceState){
 		super.onViewCreated(view, savedInstanceState);
-		if(editingStatus==null)
-			loadDefaultStatusVisibility(savedInstanceState);
+		statusVisibility=StatusPrivacy.PUBLIC;
+		if(savedInstanceState!=null)
+			selectedNBWForumId=savedInstanceState.getInt("nbwForumId", 0);
+		updateNBWForumButton(false);
 		contentView.setSizeListener(emojiKeyboard::onContentViewSizeChanged);
 		InputMethodManager imm=getActivity().getSystemService(InputMethodManager.class);
 		mainEditText.requestFocus();
@@ -500,6 +706,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 
 			@Override
 			public void afterTextChanged(Editable s){
+				updateCrisisWarning(s);
 				if(s.length()==0){
 					updateCharCounter();
 					return;
@@ -555,6 +762,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 				updateDraftState();
 			}
 		});
+		updateCrisisWarning(mainEditText.getText());
 		spoilerEdit.addTextChangedListener(new SimpleTextWatcher(e->updateCharCounter()));
 		if(replyTo!=null){
 			InlineStatusStatusDisplayItem item=new InlineStatusStatusDisplayItem("reply", new StatusDisplayItem.NoOpCallbacks(getActivity()), getActivity(), replyTo, accountID, R.drawable.ic_reply_wght700_20px, getString(R.string.in_reply_to, replyTo.account.displayName));
@@ -672,6 +880,10 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	@Override
 	public boolean onOptionsItemSelected(MenuItem item){
 		if(item.getItemId()==R.id.publish){
+			if(newBabyWorldBindingState!=BINDING_BOUND){
+				refreshNewBabyWorldBinding();
+				return true;
+			}
 			if(GlobalUserPreferences.altTextReminders && editingStatus==null)
 				checkAltTextsAndPublish();
 			else
@@ -726,7 +938,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		uuid=null;
 		if(publishButton==null)
 			return;
-		publishButton.setEnabled((trimmedCharCount>0 || !mediaViewController.isEmpty()) && charCount<=charLimit && mediaViewController.getNonDoneAttachmentCount()==0 && (pollViewController.isEmpty() || pollViewController.getNonEmptyOptionsCount()>1));
+		publishButton.setEnabled(newBabyWorldBindingState==BINDING_BOUND && !aiRecommendationInFlight && (trimmedCharCount>0 || !mediaViewController.isEmpty()) && charCount<=charLimit && mediaViewController.getNonDoneAttachmentCount()==0 && (pollViewController.isEmpty() || pollViewController.getNonEmptyOptionsCount()>1));
 		updateDraftState();
 	}
 
@@ -794,6 +1006,89 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	}
 
 	private void publish(){
+		// 回复帖禁用宝宝新天地同步：不检测绑定、不调用 AI 推荐板块
+		if(replyTo!=null){
+			publishResolved();
+			return;
+		}
+		// 禁止同步宝宝新天地时跳过绑定检查
+		if(selectedNBWForumId!=-1 && newBabyWorldBindingState!=BINDING_BOUND){
+			refreshNewBabyWorldBinding();
+			return;
+		}
+		if(selectedNBWForumId==-1){
+			// 禁止同步宝宝新天地
+			resolvedNBWForumId=-1;
+			publishResolved();
+			return;
+		}
+		if(selectedNBWForumId!=0){
+			resolvedNBWForumId=selectedNBWForumId;
+			publishResolved();
+			return;
+		}
+		if(aiRecommendationInFlight)
+			return;
+		aiRecommendationInFlight=true;
+		updatePublishButtonState();
+		final int requestGeneration=++aiRecommendationRequestGeneration;
+		String content=mainEditText.getText().toString().trim();
+		new RecommendNBWForum(content).setCallback(new Callback<>(){
+			@Override
+			public void onSuccess(RecommendNBWForum.Response result){
+				if(getActivity()==null || requestGeneration!=aiRecommendationRequestGeneration)
+					return;
+				aiRecommendationInFlight=false;
+				updatePublishButtonState();
+				if(result.fallback || !isValidNBWForumId(result.fid)){
+					confirmDefaultNBWForumPublish();
+					return;
+				}
+				resolvedNBWForumId=result.fid;
+				aiRecommendedForumName=result.forumName;
+				selectedNBWForumId=0;
+				updateNBWForumButton(true);
+				publishResolved();
+			}
+
+			@Override
+			public void onError(ErrorResponse error){
+				if(getActivity()==null || requestGeneration!=aiRecommendationRequestGeneration)
+					return;
+				aiRecommendationInFlight=false;
+				updatePublishButtonState();
+				confirmDefaultNBWForumPublish();
+			}
+		}).exec(accountID);
+	}
+
+	private void confirmDefaultNBWForumPublish(){
+		new M3AlertDialogBuilder(getActivity())
+				.setTitle(R.string.compose_ai_recommend_failed_title)
+				.setMessage(R.string.compose_ai_recommend_failed_message)
+				.setPositiveButton(R.string.compose_ai_recommend_publish_default, (dialog, which)->{
+					selectedNBWForumId=27;
+					resolvedNBWForumId=27;
+					aiRecommendedForumName=null;
+					updateNBWForumButton(true);
+					publishResolved();
+				})
+				.setNegativeButton(R.string.cancel, null)
+				.show();
+	}
+
+	private boolean isValidNBWForumId(int fid){
+		return fid==28 || fid==27 || fid==26 || fid==3;
+	}
+
+	private void publishResolved(){
+		if(getActivity()==null)
+			return;
+		// 禁止同步宝宝新天地时跳过绑定检查（回复帖已禁用全部宝宝新天地功能）
+		if(replyTo==null && resolvedNBWForumId!=-1 && newBabyWorldBindingState!=BINDING_BOUND){
+			refreshNewBabyWorldBinding();
+			return;
+		}
 		Runnable publishAction=()->{
 			sendingOverlay=new View(getActivity());
 			WindowManager.LayoutParams overlayParams=new WindowManager.LayoutParams();
@@ -833,7 +1128,19 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		String text=mainEditText.getText().toString();
 		CreateStatus.Request req=new CreateStatus.Request();
 		req.status=text;
-		req.visibility=statusVisibility;
+		req.mentalCrisis=containsCrisisKeyword(text);
+		req.visibility=StatusPrivacy.PUBLIC;
+		// 回复帖不同步宝宝新天地，不携带版块字段
+		req.nbwFid=(replyTo!=null || resolvedNBWForumId==-1) ? null : resolvedNBWForumId;
+		// 位置信息（回复帖不携带）
+		if(replyTo==null){
+			LocationUtils.ResolvedLocation geo=getGeoForPost();
+			if(geo!=null){
+				req.geoProvince=geo.province();
+				req.geoCity=geo.city();
+				req.geoDistrict=geo.district();
+			}
+		}
 		if(!mediaViewController.isEmpty()){
 			req.mediaIds=mediaViewController.getAttachmentIDs();
 			req.mediaAttributes=mediaViewController.getAttachmentAttributes();
@@ -915,9 +1222,13 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		V.setVisibilityAnimated(sendProgress, View.GONE);
 		publishButton.setEnabled(true);
 		if(error instanceof MastodonErrorResponse me){
+			String message=me.error;
+			String mediaDebugInfo=mediaViewController.getUploadedAttachmentDebugInfo();
+			if(!TextUtils.isEmpty(mediaDebugInfo))
+				message+="\n\n上传图片返回 URL：\n"+mediaDebugInfo;
 			new M3AlertDialogBuilder(getActivity())
 					.setTitle(R.string.post_failed)
-					.setMessage(me.error)
+					.setMessage(message)
 					.setPositiveButton(R.string.retry, (dlg, btn)->publish())
 					.setNegativeButton(R.string.cancel, null)
 					.show();
@@ -1047,9 +1358,58 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		startActivityForResult(intent, MEDIA_RESULT);
 	}
 
+	private void openLocalMediaPicker(){
+		MediaPickerConfig config=new MediaPickerConfig();
+		config.maxCount=mediaViewController.getMaxAttachments()-mediaViewController.getMediaAttachmentsCount();
+		ArrayList<String> missing=new ArrayList<>();
+		if(Build.VERSION.SDK_INT>=33){
+			if(config.allowImages && getActivity().checkSelfPermission(Manifest.permission.READ_MEDIA_IMAGES)!=PackageManager.PERMISSION_GRANTED)
+				missing.add(Manifest.permission.READ_MEDIA_IMAGES);
+			if(config.allowVideos && getActivity().checkSelfPermission(Manifest.permission.READ_MEDIA_VIDEO)!=PackageManager.PERMISSION_GRANTED)
+				missing.add(Manifest.permission.READ_MEDIA_VIDEO);
+		}else if(!new MediaStoreLoader(getActivity()).hasPermission(config)){
+			missing.add(Manifest.permission.READ_EXTERNAL_STORAGE);
+		}
+		if(getActivity().checkSelfPermission(Manifest.permission.CAMERA)!=PackageManager.PERMISSION_GRANTED)
+			missing.add(Manifest.permission.CAMERA);
+		if(!missing.isEmpty()){
+			pendingMediaPickerConfig=config;
+			requestPermissions(missing.toArray(new String[0]), MEDIA_PERMISSION_RESULT);
+			return;
+		}
+		showLocalMediaPicker(config);
+	}
+
+	private void showLocalMediaPicker(MediaPickerConfig config){
+		new MediaPickerSheet(getActivity(), config, new MediaPickerSheet.Listener(){
+			@Override public void onMediaSelected(ArrayList<Uri> uris){
+				for(Uri uri:uris)
+					mediaViewController.addMediaAttachment(uri, null);
+			}
+			@Override public void onCameraRequested(){ openCameraForAttachment(); }
+		}).show();
+	}
+
+	private void openCameraForAttachment(){
+		startActivityForResult(MediaCameraContract.createIntent(getActivity(), true), CAMERA_CAPTURE_RESULT);
+	}
+
+	@Override
+	public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults){
+		super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+		if(requestCode==MEDIA_PERMISSION_RESULT){
+			MediaPickerConfig config=pendingMediaPickerConfig;
+			pendingMediaPickerConfig=null;
+			if(config!=null && new MediaStoreLoader(getActivity()).hasPermission(config))
+				showLocalMediaPicker(config);
+		}
+	}
+
 	@Override
 	public void onActivityResult(int requestCode, int resultCode, Intent data){
-		if(requestCode==MEDIA_RESULT && resultCode==Activity.RESULT_OK){
+		if(requestCode==CAMERA_CAPTURE_RESULT && resultCode==Activity.RESULT_OK && MediaCameraContract.getUri(data)!=null){
+			mediaViewController.addMediaAttachment(MediaCameraContract.getUri(data), null);
+		}else if(requestCode==MEDIA_RESULT && resultCode==Activity.RESULT_OK){
 			Uri single=data.getData();
 			if(single!=null){
 				mediaViewController.addMediaAttachment(single, null);
@@ -1090,87 +1450,102 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		}
 	}
 
-	private void onVisibilityClick(View v){
-		if(instance.supportsQuotePostAuthoring()){
-			ComposerVisibilitySheet sheet=new ComposerVisibilitySheet(getActivity(), statusVisibility, statusQuotePolicy,
-					true, quotedStatus!=null, quotedStatus==null ? StatusPrivacy.PUBLIC : quotedStatus.visibility, accountID, (s, visibility, policy)->{
-				if(statusVisibility!=visibility || statusQuotePolicy!=policy){
-					statusVisibility=visibility;
-					statusQuotePolicy=policy;
-					updateVisibilityButton(true);
-					if(quotedStatus!=null && visibility==StatusPrivacy.DIRECT){
-						mainEditText.append("\n\n"+quotedStatus.url);
-						removeQuote();
+	private void updateLocationButton(){
+		if(locationText==null) return;
+		String province=currentLocation!=null ? currentLocation.province() : getString(R.string.location_unknown);
+		switch(selectedLocationLevel){
+			case LOCATION_PROVINCE -> locationText.setText(getString(R.string.location_province, province));
+			case LOCATION_CITY -> {
+				String city=currentLocation!=null ? currentLocation.city() : null;
+				locationText.setText(getString(R.string.location_city, city!=null ? city : getString(R.string.location_unknown)));
+			}
+			case LOCATION_DISTRICT -> {
+				String district=currentLocation!=null ? currentLocation.district() : null;
+				locationText.setText(getString(R.string.location_district, district!=null ? district : getString(R.string.location_unknown)));
+			}
+			case LOCATION_NONE -> locationText.setText(R.string.location_none);
+		}
+	}
+
+	private void onLocationClick(View v){
+		ArrayList<ListItem<Integer>> items=new ArrayList<>();
+		ExtendedPopupMenu menu=new ExtendedPopupMenu(getActivity(), items);
+		String province=currentLocation!=null ? currentLocation.province() : getString(R.string.location_unknown);
+		String city=(currentLocation!=null && currentLocation.city()!=null) ? currentLocation.city() : getString(R.string.location_unknown);
+		String district=(currentLocation!=null && currentLocation.district()!=null) ? currentLocation.district() : getString(R.string.location_unknown);
+		boolean hasPermission=LocationUtils.hasLocationPermission(getActivity());
+		Consumer<ListItem<Integer>> onClick=item->{
+			selectedLocationLevel=item.parentObject;
+			menu.dismiss();
+			// 点击市/区但没有定位权限 → 弹出位置权限引导（同首次登录），用户同意后申请系统权限
+			if(selectedLocationLevel!=LOCATION_NONE && selectedLocationLevel!=LOCATION_PROVINCE && !hasPermission){
+				selectedLocationLevel=LOCATION_PROVINCE;
+				updateLocationButton();
+				new LocationPermissionSheet(getActivity(), getActivity(), null).show();
+				return;
+			}
+			updateLocationButton();
+			// 选择非省时如果没有位置数据，尝试获取
+			if(selectedLocationLevel!=LOCATION_NONE && selectedLocationLevel!=LOCATION_PROVINCE && currentLocation==null){
+				LocationUtils.fetchAndResolve(getActivity(), loc->{
+					if(loc!=null){
+						currentLocation=loc;
+						updateLocationButton();
 					}
-				}
-				return true;
-			});
-			sheet.show();
-		}else{
-			ArrayList<ListItem<StatusPrivacy>> items=new ArrayList<>();
-			ExtendedPopupMenu menu=new ExtendedPopupMenu(getActivity(), items);
-			Consumer<ListItem<StatusPrivacy>> onClick=i->{
-				if(statusVisibility!=i.parentObject){
-					statusVisibility=i.parentObject;
-					updateVisibilityButton(true);
-				}
-				menu.dismiss();
-			};
-			items.add(new ListItem<>(R.string.visibility_public, R.string.visibility_subtitle_public, R.drawable.ic_public_24px, StatusPrivacy.PUBLIC, onClick));
-			items.add(new ListItem<>(R.string.visibility_unlisted, R.string.visibility_subtitle_unlisted, R.drawable.ic_clear_night_24px, StatusPrivacy.UNLISTED, onClick));
-			items.add(new ListItem<>(R.string.visibility_followers_only, R.string.visibility_subtitle_followers, R.drawable.ic_lock_24px, StatusPrivacy.PRIVATE, onClick));
-			items.add(new ListItem<>(R.string.visibility_private, R.string.visibility_subtitle_private, R.drawable.ic_alternate_email_24px, StatusPrivacy.DIRECT, onClick));
-			menu.showAsDropDown(v);
-		}
+				});
+			}
+		};
+		// 用 String 构造器避免 %s 未格式化
+		items.add(new ListItem<>(getString(R.string.location_province, province), getString(R.string.location_province_desc), R.drawable.ic_fluent_location_12_filled, onClick, LOCATION_PROVINCE));
+		ListItem<Integer> cityItem=new ListItem<>(getString(R.string.location_city, city), hasPermission ? getString(R.string.location_city_desc) : getString(R.string.location_disabled_no_permission), R.drawable.ic_fluent_location_12_filled, onClick, LOCATION_CITY);
+		cityItem.isEnabled=hasPermission || (currentLocation!=null && currentLocation.city()!=null);
+		items.add(cityItem);
+		ListItem<Integer> districtItem=new ListItem<>(getString(R.string.location_district, district), hasPermission ? getString(R.string.location_district_desc) : getString(R.string.location_disabled_no_permission), R.drawable.ic_fluent_location_12_filled, onClick, LOCATION_DISTRICT);
+		districtItem.isEnabled=hasPermission || (currentLocation!=null && currentLocation.district()!=null);
+		items.add(districtItem);
+		items.add(new ListItem<>(getString(R.string.location_none), getString(R.string.location_none_desc), R.drawable.ic_fluent_location_12_regular, onClick, LOCATION_NONE));
+		menu.showAsDropDown(v);
 	}
 
-	private void loadDefaultStatusVisibility(Bundle savedInstanceState){
-		if(getArguments().containsKey("replyTo")){
-			replyTo=Parcels.unwrap(getArguments().getParcelable("replyTo"));
-			statusVisibility=replyTo.visibility;
-		}
-
-		// A saved privacy setting from a previous compose session wins over the reply visibility
-		if(savedInstanceState!=null){
-			statusVisibility=(StatusPrivacy) savedInstanceState.getSerializable("visibility");
-		}
-
-		Preferences prevPrefs=AccountSessionManager.getInstance().getAccount(accountID).preferences;
-		if(prevPrefs!=null){
-			applyPreferencesForPostVisibility(prevPrefs, savedInstanceState);
-		}
-		AccountSessionManager.getInstance().getAccount(accountID).reloadPreferences(prefs->{
-			applyPreferencesForPostVisibility(prefs, savedInstanceState);
-		});
+	/** 获取发帖时要发送的位置数据（根据用户选择级别） */
+	private LocationUtils.ResolvedLocation getGeoForPost(){
+		if(selectedLocationLevel==LOCATION_NONE) return null;
+		if(currentLocation==null) return null;
+		return switch(selectedLocationLevel){
+			case LOCATION_PROVINCE -> new LocationUtils.ResolvedLocation(currentLocation.province(), null, null);
+			case LOCATION_CITY -> new LocationUtils.ResolvedLocation(currentLocation.province(), currentLocation.city(), null);
+			case LOCATION_DISTRICT -> currentLocation;
+			default -> null;
+		};
 	}
 
-	private void applyPreferencesForPostVisibility(Preferences prefs, Bundle savedInstanceState){
-		if(quotedStatus!=null && quotedStatus.visibility==StatusPrivacy.UNLISTED){
-			statusVisibility=StatusPrivacy.UNLISTED;
-		}
-
-		// Only override the reply visibility if our preference is more private
-		if(prefs.postingDefaultVisibility.isLessVisibleThan(statusVisibility)){
-			statusVisibility=prefs.postingDefaultVisibility;
-		}
-
-		// A saved privacy setting from a previous compose session wins over all
-		if(savedInstanceState!=null){
-			statusVisibility=(StatusPrivacy) savedInstanceState.getSerializable("visibility");
-		}
-
-		if(prefs.postingDefaultQuotePolicy!=null)
-			statusQuotePolicy=prefs.postingDefaultQuotePolicy;
-
-		updateVisibilityButton(false);
+	private void onVisibilityClick(View v){
+		ArrayList<ListItem<Integer>> items=new ArrayList<>();
+		ExtendedPopupMenu menu=new ExtendedPopupMenu(getActivity(), items);
+		Consumer<ListItem<Integer>> onClick=item->{
+			selectedNBWForumId=item.parentObject;
+			aiRecommendedForumName=null;
+			updateNBWForumButton(true);
+			menu.dismiss();
+		};
+		items.add(new ListItem<>(R.string.nbw_forum_ai, R.string.nbw_forum_ai_subtitle, R.drawable.ic_fluent_wand_24_regular, 0, onClick));
+		items.add(new ListItem<>(R.string.nbw_forum_selfie, 0, R.drawable.ic_fluent_camera_24_regular, 28, onClick));
+		items.add(new ListItem<>(R.string.nbw_forum_share, 0, R.drawable.ic_fluent_share_24_regular, 27, onClick));
+		items.add(new ListItem<>(R.string.nbw_forum_novel, 0, R.drawable.ic_fluent_book_24_regular, 26, onClick));
+		items.add(new ListItem<>(R.string.nbw_forum_friends, 0, R.drawable.ic_fluent_group_24_regular, 3, onClick));
+		items.add(new ListItem<>(R.string.nbw_forum_none, R.string.nbw_forum_none_subtitle, R.drawable.ic_nbw, -1, onClick));
+		menu.showAsDropDown(v);
 	}
 
-	private void updateVisibilityButton(boolean animated){
+	private void updateNBWForumButton(boolean animated){
 		if(getActivity()==null)
 			return;
-		if(statusVisibility==null){ // TODO find out why this happens
-			statusVisibility=StatusPrivacy.PUBLIC;
+		// 回复帖不显示宝宝新天地板块选择器
+		if(replyTo!=null){
+			visibilityBtn.setVisibility(View.GONE);
+			return;
 		}
+		visibilityBtn.setVisibility(View.VISIBLE);
 		TextView visibilityText;
 		if(!animated){
 			visibilityText=visibilityCurrentText;
@@ -1186,40 +1561,24 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 			visibilityCurrentText.setVisibility(View.GONE);
 			visibilityCurrentText=visibilityText;
 		}
-		if(instance.supportsQuotePostAuthoring()){
-			visibilityText.setText(switch(statusVisibility){
-				case PUBLIC -> switch(statusQuotePolicy){
-					case PUBLIC -> R.string.compose_visibility_public_anyone;
-					case FOLLOWERS -> R.string.compose_visibility_public_limited;
-					case NOBODY -> R.string.compose_visibility_public_disabled;
-				};
-				case UNLISTED -> switch(statusQuotePolicy){
-					case PUBLIC -> R.string.compose_visibility_unlisted_anyone;
-					case FOLLOWERS -> R.string.compose_visibility_unlisted_limited;
-					case NOBODY -> R.string.compose_visibility_unlisted_disabled;
-				};
-				case PRIVATE -> R.string.visibility_followers_only;
-				case DIRECT -> R.string.visibility_private;
-				// MOSHIDON:
-				case LOCAL -> R.string.sk_local_only;
+		if(selectedNBWForumId==0 && !TextUtils.isEmpty(aiRecommendedForumName))
+			visibilityText.setText(getString(R.string.compose_ai_recommend_result, aiRecommendedForumName));
+		else
+			visibilityText.setText(switch(selectedNBWForumId){
+				case 28 -> R.string.nbw_forum_selfie;
+				case 27 -> R.string.nbw_forum_share;
+				case 26 -> R.string.nbw_forum_novel;
+				case 3 -> R.string.nbw_forum_friends;
+				case -1 -> R.string.nbw_forum_none;
+				default -> R.string.nbw_forum_ai;
 			});
-		}else{
-			visibilityText.setText(switch(statusVisibility){
-				case PUBLIC -> R.string.visibility_public;
-				case UNLISTED -> R.string.visibility_unlisted;
-				case PRIVATE -> R.string.visibility_followers_only;
-				case DIRECT -> R.string.visibility_private;
-				// MOSHIDON:
-				case LOCAL -> R.string.sk_local_only;
-			});
-		}
-		Drawable icon=getResources().getDrawable(switch(statusVisibility){
-			case PUBLIC -> R.drawable.ic_public_20px;
-			case UNLISTED -> R.drawable.ic_clear_night_20px;
-			case PRIVATE -> R.drawable.ic_group_20px;
-			case DIRECT -> R.drawable.ic_alternate_email_20px;
-			// MOSHIDON:
-			case LOCAL -> R.drawable.ic_fluent_eye_16_regular;
+		Drawable icon=getResources().getDrawable(switch(selectedNBWForumId){
+			case 28 -> R.drawable.ic_fluent_camera_24_regular;
+			case 27 -> R.drawable.ic_fluent_share_24_regular;
+			case 26 -> R.drawable.ic_fluent_book_24_regular;
+			case 3 -> R.drawable.ic_fluent_group_24_regular;
+			case -1 -> R.drawable.ic_nbw;
+			default -> R.drawable.ic_fluent_wand_24_regular;
 		}, getActivity().getTheme()).mutate();
 		icon.setBounds(0, 0, V.dp(18), V.dp(18));
 		icon.setTint(UiUtils.getThemeColor(getActivity(), R.attr.colorM3OnSurfaceVariant));

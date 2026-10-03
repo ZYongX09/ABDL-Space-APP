@@ -320,13 +320,15 @@ public class DiscoverFragment extends AppKitFragment implements ScrollableToTop{
 
 	@Override
 	public void onActivityResult(int requestCode, int resultCode, Intent data){
-		if(requestCode==SCAN_RESULT && resultCode==Activity.RESULT_OK && BarcodeScanner.isValidResult(data)){
-			Barcode code=BarcodeScanner.getResult(data);
-			if(code!=null){
-				if(code.rawValue.startsWith("https:") || code.rawValue.startsWith("http:")){
-					((MainActivity)getActivity()).handleURL(Uri.parse(code.rawValue), accountID);
-				}else{
-					Toast.makeText(getActivity(), R.string.link_not_supported, Toast.LENGTH_SHORT).show();
+		if(requestCode==SCAN_RESULT && resultCode==Activity.RESULT_OK && data!=null){
+			if(BarcodeScanner.isValidResult(data)){
+				Barcode code=BarcodeScanner.getResult(data);
+				if(code!=null){
+					if(code.rawValue.startsWith("https:") || code.rawValue.startsWith("http:")){
+						((MainActivity)getActivity()).handleURL(Uri.parse(code.rawValue), accountID);
+					}else{
+						Toast.makeText(getActivity(), R.string.link_not_supported, Toast.LENGTH_SHORT).show();
+					}
 				}
 			}
 		}

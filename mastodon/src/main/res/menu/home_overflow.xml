@@ -13,6 +13,15 @@
 			android:id="@+id/edit_timelines"
 			android:icon="@drawable/ic_fluent_edit_24_regular"
 			android:title="@string/sk_edit_timelines" />
+		<item
+			android:id="@+id/novel"
+			android:icon="@drawable/ic_fluent_book_24_regular"
+			android:title="@string/novel"
+			android:visible="false" />
+		<item
+			android:id="@+id/scan_qr"
+			android:icon="@drawable/ic_fluent_scan_24_regular"
+			android:title="@string/scan_qr" />
 	</group>
 	<group android:id="@+id/bottom">
 		<item

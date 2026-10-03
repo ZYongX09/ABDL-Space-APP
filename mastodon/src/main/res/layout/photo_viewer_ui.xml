@@ -28,6 +28,20 @@
 				android:background="@drawable/bg_photo_viewer_toolbar_button"
 				android:contentDescription="@string/back"/>
 
+			<TextView
+				android:id="@+id/btn_view_original"
+				android:layout_width="wrap_content"
+				android:layout_height="32dp"
+				android:layout_gravity="center_vertical|center_horizontal"
+				android:gravity="center"
+				android:paddingHorizontal="16dp"
+				android:text="@string/view_original"
+				android:textAppearance="@style/m3_label_large"
+				android:textColor="#fff"
+				android:background="@drawable/bg_view_original_pill"
+				android:visibility="gone"
+				tools:text="查看原图"/>
+
 			<ImageButton
 				android:id="@+id/btn_download"
 				android:layout_width="48dp"

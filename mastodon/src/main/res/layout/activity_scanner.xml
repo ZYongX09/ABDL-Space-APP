@@ -27,19 +27,25 @@
             android:scaleType="centerInside"
             android:contentDescription="Close" />
 
-        <TextView
+		<TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="扫描二维码"
             android:textColor="#FFFFFF"
             android:textSize="18sp"
-            android:textStyle="bold"
-            android:gravity="center" />
+			android:textStyle="bold"
+			android:gravity="center" />
 
-        <View
-            android:layout_width="40dp"
-            android:layout_height="40dp" />
+		<ImageButton
+			android:id="@+id/btn_gallery"
+			android:layout_width="40dp"
+			android:layout_height="40dp"
+			android:background="@android:color/transparent"
+			android:src="@drawable/ic_photo_library_wght700_20px"
+			android:scaleType="centerInside"
+			android:contentDescription="@string/scan_qr_from_image" />
+
     </LinearLayout>
 
     <LinearLayout
@@ -67,6 +73,35 @@
             android:textColor="#80FFFFFF"
             android:textSize="12sp"
             android:gravity="center" />
+
+        <LinearLayout
+            android:id="@+id/torch_container"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:visibility="gone"
+            android:padding="12dp">
+
+            <ImageButton
+                android:id="@+id/btn_torch"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="@android:color/transparent"
+                android:src="@drawable/ic_fluent_flashlight_off_24_filled"
+                android:scaleType="centerInside"
+                android:contentDescription="手电筒" />
+
+            <TextView
+                android:id="@+id/torch_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="打开手电筒"
+                android:textColor="#FFFFFF"
+                android:textSize="12sp" />
+        </LinearLayout>
     </LinearLayout>
 
 </FrameLayout>

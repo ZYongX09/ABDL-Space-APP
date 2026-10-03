@@ -60,11 +60,7 @@ public class MediaGridStatusDisplayItem extends StatusDisplayItem{
 		this.status=status;
 		sensitiveRevealed=!status.sensitive;
 		for(Attachment att:attachments){
-			requests.add(new UrlImageLoaderRequest(switch(att.type){
-				case IMAGE -> att.url;
-				case VIDEO, GIFV -> att.previewUrl;
-				default -> throw new IllegalStateException("Unexpected value: "+att.type);
-			}, 1000, 1000));
+			requests.add(new UrlImageLoaderRequest(MediaGridImageUrl.select(att.type, att.url, att.previewUrl), V.dp(500), V.dp(500)));
 		}
 	}
 
@@ -103,6 +99,7 @@ public class MediaGridStatusDisplayItem extends StatusDisplayItem{
 		private final TextView hideSensitiveButton;
 		private final TextView sensitiveText;
 		private boolean thereAreFailedImages;
+		private boolean automaticRetryRequested;
 
 		public Holder(Activity activity, ViewGroup parent){
 			super(new FrameLayoutThatOnlyMeasuresFirstChild(activity));
@@ -139,6 +136,7 @@ public class MediaGridStatusDisplayItem extends StatusDisplayItem{
 		@Override
 		public void onBind(MediaGridStatusDisplayItem item){
 			thereAreFailedImages=false;
+			automaticRetryRequested=false;
 			wrapper.setPaddingRelative(V.dp(item.fullWidth ? 16 : 64), 0, V.dp(16), V.dp(8));
 
 			layout.setTiledLayout(item.tiledLayout);
@@ -223,6 +221,10 @@ public class MediaGridStatusDisplayItem extends StatusDisplayItem{
 			if(index<controllers.size()){
 				controllers.get(index).showFailedOverlay();
 				thereAreFailedImages=true;
+				if(!automaticRetryRequested){
+					automaticRetryRequested=true;
+					item.callbacks.scheduleRetryFailedImages();
+				}
 			}
 		}
 

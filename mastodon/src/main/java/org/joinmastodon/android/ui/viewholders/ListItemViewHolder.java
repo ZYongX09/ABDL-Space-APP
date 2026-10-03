@@ -22,6 +22,7 @@ public abstract class ListItemViewHolder<T extends ListItem<?>> extends Bindable
 	protected final TextView subtitle;
 	protected final ImageView icon;
 	protected final LinearLayout view;
+	private final ColorStateList defaultIconTint;
 
 	public ListItemViewHolder(Context context, int layout, ViewGroup parent){
 		super(context, layout, parent);
@@ -29,6 +30,7 @@ public abstract class ListItemViewHolder<T extends ListItem<?>> extends Bindable
 		subtitle=findViewById(R.id.subtitle);
 		icon=findViewById(R.id.icon);
 		view=itemView instanceof LinearLayout ll ? ll : null;
+		defaultIconTint=icon==null ? null : icon.getImageTintList();
 	}
 
 	@Override
@@ -57,13 +59,19 @@ public abstract class ListItemViewHolder<T extends ListItem<?>> extends Bindable
 		if(item.colorOverrideAttr!=0){
 			int color=UiUtils.getThemeColor(view.getContext(), item.colorOverrideAttr);
 			title.setTextColor(color);
-			icon.setImageTintList(ColorStateList.valueOf(color));
+		}
+		if(icon!=null && item.iconRes!=0){
+			ColorStateList tint=item.iconTintEnabled ? defaultIconTint : null;
+			if(item.iconTintEnabled && item.colorOverrideAttr!=0)
+				tint=ColorStateList.valueOf(UiUtils.getThemeColor(view.getContext(), item.colorOverrideAttr));
+			icon.setImageTintList(tint);
 		}
 
 		view.setAlpha(item.isEnabled ? 1 : .4f);
 	}
 
 	protected void bindIcon(T item){
+		if(icon==null) return;
 		if(item.iconRes!=0){
 			icon.setVisibility(View.VISIBLE);
 			icon.setImageResource(item.iconRes);

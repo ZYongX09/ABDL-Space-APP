@@ -3,23 +3,18 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:clipToPadding="false"
-    android:paddingBottom="32dp">
+    android:fadeScrollbars="false"
+    android:scrollbars="vertical"
+    android:scrollbarSize="3dp"
+    android:scrollbarThumbVertical="@drawable/scrollbar_thumb_license"
+    android:scrollbarTrackVertical="@android:color/transparent"
+    android:overScrollMode="never">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:paddingHorizontal="16dp"
-        android:paddingTop="16dp">
-
-        <TextView
-            android:id="@+id/header_text"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textAppearance="@style/m3_body_small"
-            android:textColor="?android:attr/textColorSecondary"
-            android:lineSpacingExtra="4dp"
-            android:layout_marginBottom="12dp"/>
+        android:paddingBottom="24dp">
 
         <LinearLayout
             android:id="@+id/list_container"
@@ -27,5 +22,14 @@
             android:layout_height="wrap_content"
             android:orientation="vertical"/>
 
+        <TextView
+            android:id="@+id/footer_note"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="16dp"
+            android:layout_marginTop="12dp"
+            android:textAppearance="@style/m3_body_small"
+            android:textColor="?android:attr/textColorSecondary"
+            android:lineSpacingExtra="4dp"/>
     </LinearLayout>
 </ScrollView>

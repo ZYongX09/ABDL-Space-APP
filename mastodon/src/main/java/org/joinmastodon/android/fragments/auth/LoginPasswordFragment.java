@@ -24,7 +24,9 @@ import org.joinmastodon.android.ui.views.SpaceBackgroundView;
 
 import com.google.gson.Gson;
 
+import org.joinmastodon.android.BuildConfig;
 import org.joinmastodon.android.MainActivity;
+import org.joinmastodon.android.QQAuthActivity;
 import org.joinmastodon.android.R;
 import org.joinmastodon.android.api.requests.accounts.GetOwnAccount;
 import org.joinmastodon.android.api.session.AccountSessionManager;
@@ -76,6 +78,7 @@ public class LoginPasswordFragment extends AppKitFragment {
         TextView tvAgreement = view.findViewById(R.id.tv_agreement);
         TextView btnCodeLogin = view.findViewById(R.id.btn_code_login);
         View btnNBW = view.findViewById(R.id.btn_nbw);
+        View btnQQ = view.findViewById(R.id.btn_qq);
         View btnOAuth = view.findViewById(R.id.btn_oauth);
         TextView titleView = view.findViewById(R.id.title);
 
@@ -91,6 +94,7 @@ public class LoginPasswordFragment extends AppKitFragment {
             passwordEdit.setBackgroundResource(R.drawable.bg_input_dark);
             passwordEdit.setTextColor(Color.WHITE);
             btnNBW.setBackgroundResource(R.drawable.bg_social_dark);
+            btnQQ.setBackgroundResource(R.drawable.bg_social_dark);
             btnOAuth.setBackgroundResource(R.drawable.bg_social_dark);
         } else {
             titleView.setText(android.text.Html.fromHtml("<font color='#333333'>欢迎登录 </font><font color='#A1D9F7'>ABDL Space</font>"));
@@ -99,18 +103,16 @@ public class LoginPasswordFragment extends AppKitFragment {
             passwordEdit.setBackgroundResource(R.drawable.bg_input_light);
             passwordEdit.setTextColor(Color.BLACK);
             btnNBW.setBackgroundResource(R.drawable.bg_social_light);
+            btnQQ.setBackgroundResource(R.drawable.bg_social_light);
             btnOAuth.setBackgroundResource(R.drawable.bg_social_light);
         }
 
         // 协议文本
-        tvAgreement.setText(android.text.Html.fromHtml(
-            "我已阅读并同意<a href=\"https://abdl-space.top/agreement\">《用户协议》</a>和<a href=\"https://abdl-space.top/privacy\">《隐私政策》</a>"));
+        tvAgreement.setText(android.text.Html.fromHtml(getString(R.string.login_agreement_text)));
         tvAgreement.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());
 
-        // 点击整行切换复选框
         View agreementRow = view.findViewById(R.id.agreement_row);
         agreementRow.setOnClickListener(v -> cbAgreement.setChecked(!cbAgreement.isChecked()));
-        tvAgreement.setOnClickListener(v -> cbAgreement.setChecked(!cbAgreement.isChecked()));
 
         // 密码可见切换
         passwordEdit.setOnTouchListener((v, event) -> {
@@ -149,6 +151,9 @@ public class LoginPasswordFragment extends AppKitFragment {
                 Uri.parse("https://abdl-space.top/api/auth/nbw/mobile-start"));
             startActivity(intent);
         }));
+
+        btnQQ.setVisibility(BuildConfig.QQ_LOGIN_ENABLED ? View.VISIBLE : View.GONE);
+        btnQQ.setOnClickListener(v -> showQQConsentSheet());
 
         // OAuth 登录
         btnOAuth.setOnClickListener(v -> showConsentSheet(() -> {
@@ -266,25 +271,35 @@ public class LoginPasswordFragment extends AppKitFragment {
             });
     }
 
+    private void showQQConsentSheet() {
+        showConsentSheet(
+            getString(R.string.qq_consent_title),
+            getString(R.string.qq_consent_message),
+            R.drawable.ic_qq_login,
+            false,
+            () -> {
+                android.app.Activity activity = getActivity();
+                if (activity == null) return;
+                Intent intent = new Intent(activity, QQAuthActivity.class);
+                intent.putExtra(QQAuthActivity.EXTRA_MODE, QQAuthActivity.MODE_LOGIN);
+                intent.putExtra(QQAuthActivity.EXTRA_PERMISSION_CONFIRMED, true);
+                startActivity(intent);
+            });
+    }
+
     private void showConsentSheet(Runnable onConfirm) {
+        showConsentSheet(getString(R.string.consent_title), getString(R.string.consent_message), R.drawable.ic_description_24, true, onConfirm);
+    }
+
+    private void showConsentSheet(String titleText, String messageText, int iconRes, boolean iconTintEnabled, Runnable onConfirm) {
         android.app.Activity activity = getActivity();
         if (activity == null) return;
         View sheetView = LayoutInflater.from(activity).inflate(R.layout.sheet_qr_login, null);
         ImageView iconView = sheetView.findViewById(R.id.icon);
-        if (iconView == null) {
-            View header = sheetView.findViewById(R.id.sheet_title);
-            if (header != null && header.getParent() instanceof ViewGroup) {
-                ViewGroup parent = (ViewGroup) header.getParent();
-                for (int i = 0; i < parent.getChildCount(); i++) {
-                    if (parent.getChildAt(i) instanceof ImageView) {
-                        iconView = (ImageView) parent.getChildAt(i);
-                        break;
-                    }
-                }
-            }
-        }
         if (iconView != null) {
-            iconView.setImageResource(R.drawable.ic_description_24);
+            android.content.res.ColorStateList defaultIconTint = iconView.getImageTintList();
+            iconView.setImageResource(iconRes);
+            iconView.setImageTintList(iconTintEnabled ? defaultIconTint : null);
         }
         me.grishka.appkit.views.BottomSheet sheet = new me.grishka.appkit.views.BottomSheet(activity) {{
             setContentView(sheetView);
@@ -296,21 +311,19 @@ public class LoginPasswordFragment extends AppKitFragment {
 
             TextView title = sheetView.findViewById(R.id.sheet_title);
             TextView sessionInfo = sheetView.findViewById(R.id.qr_session_info);
-            title.setText("确认同意协议");
-            sessionInfo.setText(android.text.Html.fromHtml(
-                "登录前请仔细阅读<a href=\"https://abdl-space.top/agreement\">《用户协议》</a>" +
-                "和<a href=\"https://abdl-space.top/privacy\">《隐私政策》</a>，若您同意以上协议请点击确认按钮。"));
+            title.setText(titleText);
+            sessionInfo.setText(android.text.Html.fromHtml(messageText));
             sessionInfo.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());
 
             TextView authorizeBtn = sheetView.findViewById(R.id.btn_authorize);
             if (authorizeBtn != null) {
-                authorizeBtn.setText("确认");
+                authorizeBtn.setText(R.string.confirm);
             }
 
             sheetView.findViewById(R.id.btn_cancel).setOnClickListener(v -> dismiss());
             sheetView.findViewById(R.id.btn_authorize).setOnClickListener(v -> {
                 dismiss();
-                onConfirm.run();
+                if (isAdded() && !activity.isFinishing() && !activity.isDestroyed()) onConfirm.run();
             });
         }};
         sheet.show();

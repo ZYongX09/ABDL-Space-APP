@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+	xmlns:tools="http://schemas.android.com/tools"
+	android:layout_width="match_parent"
+	android:layout_height="match_parent"
+	android:orientation="vertical"
+	android:background="?attr/colorM3Surface">
+	<LinearLayout
+		android:id="@+id/toolbar"
+		android:layout_width="match_parent"
+		android:layout_height="64dp"
+		android:gravity="center_vertical"
+		android:orientation="horizontal"
+		android:paddingEnd="16dp">
+
+		<ImageButton
+			android:id="@+id/back_btn"
+			android:layout_width="48dp"
+			android:layout_height="48dp"
+			android:background="?android:attr/selectableItemBackgroundBorderless"
+			android:contentDescription="返回"
+			android:src="@drawable/ic_arrow_back_24" />
+
+		<TextView
+			android:layout_width="0dp"
+			android:layout_height="match_parent"
+			android:layout_weight="1"
+			android:gravity="center_vertical"
+			android:fontFamily="sans-serif-medium"
+			android:text="私信"
+			android:textColor="?attr/colorM3OnSurface"
+			android:textSize="20sp" />
+	</LinearLayout>
+
+	<androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+		android:id="@+id/swipe_refresh"
+		android:layout_width="match_parent"
+		android:layout_height="0dp"
+		android:layout_weight="1">
+
+		<FrameLayout
+			android:layout_width="match_parent"
+			android:layout_height="match_parent">
+
+			<androidx.recyclerview.widget.RecyclerView
+				android:id="@+id/recycler"
+				android:layout_width="match_parent"
+				android:layout_height="match_parent"
+				android:clipToPadding="false"
+				android:paddingBottom="8dp"
+				tools:listitem="@layout/item_conversation" />
+
+			<LinearLayout
+				android:id="@+id/empty_state"
+				android:layout_width="match_parent"
+				android:layout_height="match_parent"
+				android:gravity="center"
+				android:orientation="vertical"
+				android:visibility="gone">
+
+				<TextView
+					android:layout_width="wrap_content"
+					android:layout_height="wrap_content"
+					android:text="暂无私信"
+					android:textSize="16sp"
+					android:textColor="?attr/colorM3OnSurfaceVariant" />
+
+				<TextView
+					android:layout_width="wrap_content"
+					android:layout_height="wrap_content"
+					android:layout_marginTop="8dp"
+					android:text="可从用户主页发起私信"
+					android:textSize="14sp"
+					android:textColor="?attr/colorM3OnSurfaceVariant" />
+			</LinearLayout>
+
+		</FrameLayout>
+	</androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+</LinearLayout>

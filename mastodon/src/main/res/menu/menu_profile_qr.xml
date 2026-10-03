@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+	<item
+		android:id="@+id/action_qr_gallery"
+		android:icon="@drawable/ic_photo_library_wght700_20px"
+		android:title="@string/scan_qr_from_image"
+		android:showAsAction="always" />
+</menu>

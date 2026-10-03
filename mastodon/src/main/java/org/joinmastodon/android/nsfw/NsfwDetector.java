@@ -2,7 +2,11 @@ package org.joinmastodon.android.nsfw;
 
 import android.content.Context;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.ImageDecoder;
+import android.os.Build;
+import java.io.IOException;
+import java.io.InputStream;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
@@ -76,10 +80,7 @@ public class NsfwDetector {
 
         new Thread(() -> {
             try {
-                ImageDecoder.Source source = ImageDecoder.createSource(context.getContentResolver(), imageUri);
-                Bitmap bitmap = ImageDecoder.decodeBitmap(source, (decoder, info, src) -> {
-                    decoder.setAllocator(ImageDecoder.ALLOCATOR_SOFTWARE);
-                });
+                Bitmap bitmap = decodeImage(context, imageUri);
 
                 // 跳过太小的图片
                 if (bitmap.getWidth() < 50 || bitmap.getHeight() < 50) {
@@ -110,6 +111,19 @@ public class NsfwDetector {
                 mainHandler.post(() -> callback.onResult(0f, false));
             }
         }).start();
+    }
+
+    static Bitmap decodeImage(Context context, Uri imageUri) throws IOException {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            return ImageDecoder.decodeBitmap(ImageDecoder.createSource(context.getContentResolver(), imageUri),
+                    (decoder, info, src) -> decoder.setAllocator(ImageDecoder.ALLOCATOR_SOFTWARE));
+        }
+        try (InputStream input = context.getContentResolver().openInputStream(imageUri)) {
+            if (input == null) throw new IOException("Image stream unavailable");
+            Bitmap bitmap = BitmapFactory.decodeStream(input);
+            if (bitmap == null) throw new IOException("Unsupported image");
+            return bitmap;
+        }
     }
 
     /**

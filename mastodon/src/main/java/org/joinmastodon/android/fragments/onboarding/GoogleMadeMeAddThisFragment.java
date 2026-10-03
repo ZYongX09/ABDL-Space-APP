@@ -69,10 +69,10 @@ public class GoogleMadeMeAddThisFragment extends ToolbarFragment{
 		instance=Parcels.unwrap(getArguments().getParcelable("instance"));
 
 		items.add(new Item("Mastodon for Android Privacy Policy", getString(R.string.privacy_policy_explanation), "joinmastodon.org", "https://joinmastodon.org/android/privacy", "https://joinmastodon.org/favicon-32x32.png"));
-		loadServerDocument(instance.configuration.urls!=null && instance.configuration.urls.privacyPolicy!=null ? instance.configuration.urls.privacyPolicy : ("https://"+instance.getDomain()+"/terms"), 1);
-		if(instance.configuration.urls!=null && instance.configuration.urls.termsOfService!=null){
-			loadServerDocument(instance.configuration.urls.termsOfService, 2);
-		}
+		String privacyPolicy=instance.configuration.urls!=null ? instance.configuration.urls.privacyPolicy : null;
+		String termsOfService=instance.configuration.urls!=null ? instance.configuration.urls.termsOfService : null;
+		loadServerDocument(TextUtils.isEmpty(privacyPolicy) ? "https://"+instance.getDomain()+"/privacy" : privacyPolicy, 1);
+		loadServerDocument(TextUtils.isEmpty(termsOfService) ? "https://"+instance.getDomain()+"/terms" : termsOfService, 2);
 	}
 
 	@Override
