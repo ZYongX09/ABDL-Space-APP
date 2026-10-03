@@ -2,7 +2,7 @@
 
 ## Scope
 
-This change closes the unsupported-device settings bypass and adds process-local fallback for recoverable graphics/capture failures. It does not change the application version, publish a release, or replace existing APKs.
+This change closes the unsupported-device settings bypass and adds process-local fallback for recoverable graphics/capture failures. The follow-up local signed package keeps versionName 3.0.0 and increments versionCode to 31; it is not an online release. The protected root APK and QQ asset remain unchanged.
 
 ## Enablement
 
@@ -33,7 +33,10 @@ This change closes the unsupported-device settings bypass and adds process-local
 
 - Focused `:mastodon:testDebugUnitTest`: **169 executions, 0 failures, 0 errors, 0 skipped** across 15 suites.
 - `:mastodon:assembleDebug` passed; generated `mastodon/build/outputs/apk/debug/mastodon-debug.apk`.
-- `:mastodon:compileReleaseKotlin`, `:mastodon:compileReleaseJavaWithJavac`, and `:mastodon:processReleaseManifest` passed. No signed Release APK was produced.
+- `:mastodon:compileReleaseKotlin`, `:mastodon:compileReleaseJavaWithJavac`, and `:mastodon:processReleaseManifest` passed.
+- Follow-up `:mastodon:assembleRelease` passed. Signed local package: `mastodon/build/outputs/apk/release/ABDL-Space-3.0.0-code31-liquid-glass.apk`, 86,617,521 bytes; SHA-256 `8ca19243233495835f61acde85d1b638909a2568f5694e3d3ac8ded697badbbd`.
+- APK body verified as `top.abdl_space.app`, versionName 3.0.0/versionCode 31/minSdk 26/targetSdk 35. APK v2 signature verifies with existing certificate SHA-256 `fd2098a3d3493222c247a7ba2787ec48fd8f62d38e9432ed4d6290a057dea475`.
+- Assemble replaces the Gradle-managed release output directory: attempted in-directory backups were also cleared. Code30 was restored from the persistent security worktree. Code28 and the previous generic build-output APK were not recoverable from searched local copies. The protected repository-root old APK and QQ asset retain their original hashes; future backups must be outside Gradle-managed output directories.
 - `git diff --check` passed.
 - Build emitted existing Gradle deprecation/flatDir and D8 Kotlin-metadata rewrite warnings; they did not fail the build.
 
