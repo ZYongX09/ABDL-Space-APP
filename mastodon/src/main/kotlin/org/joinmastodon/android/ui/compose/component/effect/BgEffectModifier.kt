@@ -3,10 +3,11 @@
 
 package org.joinmastodon.android.ui.compose.component.effect
 
-import org.joinmastodon.android.ui.compose.utils.GraphicsSafety
+import org.joinmastodon.android.ui.compose.utils.BackgroundGraphicsSafety
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.drawscope.ContentDrawScope
 import androidx.compose.ui.node.DrawModifierNode
 import androidx.compose.ui.node.ModifierNodeElement
@@ -100,7 +101,7 @@ private class BgEffectNode(
     private var startOffset: Float = 0f
 
     override fun onAttach() {
-        if (playing && GraphicsSafety.isSupported()) startAnimation()
+        if (playing && BackgroundGraphicsSafety.isSupported()) startAnimation()
     }
 
     override fun onDetach() {
@@ -149,7 +150,7 @@ private class BgEffectNode(
             val minDeltaNanos = 1_000_000_000L / 60L
             val origin = withFrameNanos { it }
             var lastEmit = origin
-            while (isActive && GraphicsSafety.isSupported()) {
+            while (isActive && BackgroundGraphicsSafety.isSupported()) {
                 val now = withFrameNanos { it }
                 if (now - lastEmit < minDeltaNanos) continue
                 lastEmit = now
@@ -161,13 +162,14 @@ private class BgEffectNode(
 
     override fun ContentDrawScope.draw() {
         drawRect(surface)
-        if (effectBackground) {
+        // A software screenshot/capture frame cannot draw RuntimeShader, even on a supported GPU.
+        if (effectBackground && drawContext.canvas.nativeCanvas.isHardwareAccelerated) {
             val alphaValue = alpha()
             if (alphaValue > 0f) {
                 val drawHeight = if (isFullSize) size.height * 0.8f else size.height * 0.5f
 
                 val stage = colorStage()
-                GraphicsSafety.drawEffect(
+                BackgroundGraphicsSafety.drawEffect(
                     this, "background shader draw",
                     fallback = { drawRect(surface) },
                     onFailure = {
@@ -184,7 +186,7 @@ private class BgEffectNode(
                     painter.updatePointsAnim(animTime, preset)
                     drawRect(painter.brush, alpha = alphaValue)
                 }
-                if (!GraphicsSafety.isSupported()) {
+                if (!BackgroundGraphicsSafety.isSupported()) {
                     painter.clear()
                     animationJob?.cancel()
                     animationJob = null

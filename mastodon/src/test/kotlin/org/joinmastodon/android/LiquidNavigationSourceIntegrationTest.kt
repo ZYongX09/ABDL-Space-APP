@@ -8,19 +8,17 @@ class LiquidNavigationSourceIntegrationTest {
 	private fun source(path: String) = File(requireNotNull(System.getProperty("user.dir")), "src/main/java/org/joinmastodon/android/$path").readText()
 
 	@Test
-	fun preferencesAndSettingsUseSharedGateWithNullableHiddenItem() {
+	fun settingsCapabilityAndRequestedChoiceAreIndependentOfRuntimeFallback() {
 		val preferences = source("GlobalUserPreferences.java")
 		val settings = source("fragments/settings/SettingsDisplayFragment.java")
-		assertTrue(preferences.contains("return LiquidGlassCompatibility.isSupported();"))
-		assertTrue(preferences.contains("return isIosLiquidNavigationSupported() && useIosLiquidNavigation;"))
-		assertTrue(preferences.contains("if(!liquidSupported)\n\t\t\tuseIosLiquidNavigation=false;"))
+		assertTrue(preferences.contains("return LiquidGlassCompatibility.isSystemSupported();"))
+		assertTrue(preferences.contains("return LiquidGlassCompatibility.isSupported() && useIosLiquidNavigation;"))
 		assertTrue(preferences.contains("if(liquidSupported)\n\t\t\teditor.putBoolean(\"useIosLiquidNavigation\", useIosLiquidNavigation);"))
 		assertFalse(preferences.contains("putBoolean(\"useIosLiquidNavigation\", isIosLiquidNavigationEnabled())"))
 		assertTrue(settings.contains("if(GlobalUserPreferences.isIosLiquidNavigationSupported()){\n\t\t\titems.add(iosLiquidNavigationItem="))
-		assertTrue(settings.contains("if(iosLiquidNavigationItem!=null && GlobalUserPreferences.isIosLiquidNavigationSupported())"))
-		val writes = settings.lineSequence().filter { it.contains("GlobalUserPreferences.useIosLiquidNavigation=") }.toList()
-		assertEquals(2, writes.size)
-		assertTrue(writes.all { it.contains("GlobalUserPreferences.isIosLiquidNavigationSupported() &&") })
+		assertTrue(settings.contains("item->requestLiquidNavigation(!item.checked)"))
+		assertTrue(settings.contains("iosLiquidNavigationItem.checkedChangeListener=this::requestLiquidNavigation"))
+		assertFalse(settings.substringAfter("protected void onHidden(){").substringBefore("private void requestLiquidNavigation").contains("useIosLiquidNavigation="))
 	}
 
 	@Test
@@ -48,7 +46,7 @@ class LiquidNavigationSourceIntegrationTest {
 		val helper = source("ui/utils/LiquidGlassCompatibility.java")
 		val home = source("fragments/HomeFragment.java")
 		assertTrue(helper.contains("MAIN.post(notification)"))
-		assertTrue(helper.indexOf("sessionDisabled=true;") < helper.indexOf("MAIN.post(notification)"))
+		assertTrue(helper.indexOf("state.sessionDisabled=true;") < helper.indexOf("MAIN.post(notification)"))
 		assertFalse(helper.contains("SharedPreferences"))
 		assertFalse(home.contains("catch(Throwable"))
 		assertFalse(home.contains("catch(Error"))

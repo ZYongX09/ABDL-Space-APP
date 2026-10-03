@@ -21,6 +21,7 @@ import org.joinmastodon.android.events.StatusDisplaySettingsChangedEvent;
 import org.joinmastodon.android.model.viewmodel.CheckableListItem;
 import org.joinmastodon.android.model.viewmodel.ListItem;
 import org.joinmastodon.android.ui.M3AlertDialogBuilder;
+import org.joinmastodon.android.ui.utils.LiquidGlassCompatibility;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -40,6 +41,7 @@ public class SettingsDisplayFragment extends BaseSettingsFragment<Void>{
 	private ListItem<Void> colorItem;
 	private CheckableListItem<Void> trueBlackModeItem, iosLiquidNavigationItem;
 	private AccountLocalPreferences lp;
+	private AlertDialog liquidNavigationDialog;
 
 	@Override
 	public void onCreate(Bundle savedInstanceState){
@@ -66,14 +68,11 @@ public class SettingsDisplayFragment extends BaseSettingsFragment<Void>{
 		items.add(colorItem=new ListItem<>(getString(R.string.sk_settings_color_palette), getColorPaletteValue(), R.drawable.ic_fluent_color_24_regular, this::onColorClick));
 		items.add(trueBlackModeItem=new CheckableListItem<>(R.string.sk_settings_true_black, R.string.mo_setting_true_black_summary, CheckableListItem.Style.SWITCH, GlobalUserPreferences.trueBlackTheme, R.drawable.ic_fluent_dark_theme_24_regular, i->onTrueBlackModeClick(), true));
 		if(GlobalUserPreferences.isIosLiquidNavigationSupported()){
-			items.add(iosLiquidNavigationItem=new CheckableListItem<>(R.string.settings_ios_liquid_navigation, R.string.settings_ios_liquid_navigation_summary, CheckableListItem.Style.SWITCH, GlobalUserPreferences.isIosLiquidNavigationEnabled(), R.drawable.ic_fluent_navigation_24_regular, item->{
-				if(!GlobalUserPreferences.isIosLiquidNavigationSupported())
-					return;
-				toggleCheckableItem(item);
-				GlobalUserPreferences.useIosLiquidNavigation=GlobalUserPreferences.isIosLiquidNavigationSupported() && item.checked;
-				GlobalUserPreferences.save();
-				E.post(new StatusDisplaySettingsChangedEvent(accountID));
-			}));
+			items.add(iosLiquidNavigationItem=new CheckableListItem<>(R.string.settings_ios_liquid_navigation,
+					LiquidGlassCompatibility.isSupported() ? R.string.settings_ios_liquid_navigation_summary : R.string.settings_liquid_glass_runtime_fallback,
+					CheckableListItem.Style.SWITCH, GlobalUserPreferences.useIosLiquidNavigation, R.drawable.ic_fluent_navigation_24_regular,
+					item->requestLiquidNavigation(!item.checked)));
+			iosLiquidNavigationItem.checkedChangeListener=this::requestLiquidNavigation;
 		}
 
 		items.add(showCWsItem=new CheckableListItem<>(R.string.settings_show_cws, 0, CheckableListItem.Style.SWITCH, GlobalUserPreferences.showCWs, R.drawable.ic_warning_24px, this::toggleCheckableItem));
@@ -103,10 +102,74 @@ public class SettingsDisplayFragment extends BaseSettingsFragment<Void>{
 		GlobalUserPreferences.hideSensitiveMedia=hideSensitiveMediaItem.checked;
 		GlobalUserPreferences.showInteractionCounts=interactionCountsItem.checked;
 		GlobalUserPreferences.customEmojiInNames=emojiInNamesItem.checked;
-		if(iosLiquidNavigationItem!=null && GlobalUserPreferences.isIosLiquidNavigationSupported())
-			GlobalUserPreferences.useIosLiquidNavigation=GlobalUserPreferences.isIosLiquidNavigationSupported() && iosLiquidNavigationItem.checked;
+		dismissLiquidNavigationDialog();
 		GlobalUserPreferences.save();
 		E.post(new StatusDisplaySettingsChangedEvent(accountID));
+	}
+
+	private void requestLiquidNavigation(boolean enabled){
+		if(iosLiquidNavigationItem==null || !GlobalUserPreferences.isIosLiquidNavigationSupported())
+			return;
+		rebindItem(iosLiquidNavigationItem);
+		if(liquidNavigationDialog!=null || iosLiquidNavigationItem.checked==enabled)
+			return;
+		if(enabled && LiquidGlassCompatibility.shouldWarnAboutPerformance()){
+			liquidNavigationDialog=new M3AlertDialogBuilder(getActivity())
+					.setTitle(R.string.settings_liquid_glass_performance_title)
+					.setMessage(R.string.settings_liquid_glass_performance_message)
+					.setNegativeButton(R.string.cancel, null)
+					.setPositiveButton(R.string.settings_liquid_glass_enable_anyway, (dialog, which)->{
+						if(liquidNavigationDialog!=dialog || !isAdded() || isHidden())
+							return;
+						liquidNavigationDialog=null;
+						setLiquidNavigation(true);
+					})
+					.create();
+			AlertDialog dialog=liquidNavigationDialog;
+			dialog.setOnDismissListener(ignored->{
+				if(liquidNavigationDialog==dialog)
+					liquidNavigationDialog=null;
+			});
+			dialog.show();
+		}else{
+			setLiquidNavigation(enabled);
+		}
+	}
+
+	private void setLiquidNavigation(boolean enabled){
+		iosLiquidNavigationItem.checked=enabled;
+		GlobalUserPreferences.useIosLiquidNavigation=enabled;
+		GlobalUserPreferences.save();
+		boolean available=LiquidGlassCompatibility.isSupported();
+		iosLiquidNavigationItem.subtitleRes=available ? R.string.settings_ios_liquid_navigation_summary : R.string.settings_liquid_glass_runtime_fallback;
+		rebindItem(iosLiquidNavigationItem);
+		E.post(new StatusDisplaySettingsChangedEvent(accountID));
+		if(enabled && !available){
+			liquidNavigationDialog=new M3AlertDialogBuilder(getActivity())
+					.setTitle(R.string.settings_ios_liquid_navigation)
+					.setMessage(R.string.settings_liquid_glass_runtime_fallback)
+					.setPositiveButton(R.string.ok, null)
+					.create();
+			AlertDialog dialog=liquidNavigationDialog;
+			dialog.setOnDismissListener(ignored->{
+				if(liquidNavigationDialog==dialog)
+					liquidNavigationDialog=null;
+			});
+			dialog.show();
+		}
+	}
+
+	private void dismissLiquidNavigationDialog(){
+		AlertDialog dialog=liquidNavigationDialog;
+		liquidNavigationDialog=null;
+		if(dialog!=null)
+			dialog.dismiss();
+	}
+
+	@Override
+	public void onPause(){
+		dismissLiquidNavigationDialog();
+		super.onPause();
 	}
 
 	private int getAppearanceValue(){

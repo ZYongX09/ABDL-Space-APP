@@ -51,6 +51,9 @@ import org.joinmastodon.android.ui.compose.component.blend.ColorBlendToken
 import org.joinmastodon.android.ui.compose.component.effect.BgEffectBackground
 import org.joinmastodon.android.ui.compose.ui.isInDarkTheme
 import org.joinmastodon.android.ui.compose.utils.BlurredBar
+import org.joinmastodon.android.ui.compose.utils.PageBlurGraphicsSafety
+import org.joinmastodon.android.ui.compose.utils.PageTextureBlur
+import org.joinmastodon.android.ui.compose.utils.safeBackdropRecording
 import org.joinmastodon.android.ui.compose.utils.pageContentPadding
 import org.joinmastodon.android.ui.compose.utils.pageScrollModifiers
 import org.joinmastodon.android.ui.compose.utils.rememberBlurBackdrop
@@ -66,10 +69,11 @@ import top.yukonga.miuix.kmp.basic.VerticalScrollBar
 import top.yukonga.miuix.kmp.basic.rememberScrollBarAdapter
 import top.yukonga.miuix.kmp.blur.BlendColorEntry
 import top.yukonga.miuix.kmp.blur.BlurBlendMode
+import top.yukonga.miuix.kmp.blur.BlurColors
 import top.yukonga.miuix.kmp.blur.BlurDefaults
+import top.yukonga.miuix.kmp.blur.LayerBackdrop
 import top.yukonga.miuix.kmp.blur.isRuntimeShaderSupported
 import top.yukonga.miuix.kmp.blur.layerBackdrop
-import top.yukonga.miuix.kmp.blur.textureBlur
 import top.yukonga.miuix.kmp.interfaces.ExperimentalScrollBarApi
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -118,7 +122,9 @@ fun AboutPage(
 			}
 		},
 	) { innerPadding ->
-		Box(modifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier) {
+		Box(modifier = if (backdrop != null) Modifier.safeBackdropRecording(PageBlurGraphicsSafety) {
+			Modifier.layerBackdrop(backdrop)
+		} else Modifier) {
 			AboutContent(
 				padding = PaddingValues(
 					top = innerPadding.calculateTopPadding(),
@@ -194,7 +200,9 @@ private fun AboutContent(
 		isOs3Effect = true,
 		isFullSize = false,
 		modifier = Modifier.fillMaxSize(),
-		bgModifier = if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier,
+		bgModifier = if (backdrop != null) Modifier.safeBackdropRecording(PageBlurGraphicsSafety) {
+			Modifier.layerBackdrop(backdrop)
+		} else Modifier,
 		alpha = { 1f - scrollProgressProvider() },
 	) {
 		Column(
@@ -228,7 +236,14 @@ private fun AboutContent(
 					contentDescription = null,
 				)
 			}
-			Text(
+			PageTextureBlur(
+				backdrop = backdrop,
+				shape = RoundedCornerShape(16.dp),
+				blurRadius = 150f,
+				noiseCoefficient = noiseCoefficient,
+				colors = BlurDefaults.blurColors(blendColors = logoBlend),
+				contentBlendMode = ComposeBlendMode.DstIn,
+				fallbackColor = Color.Transparent,
 				modifier = Modifier
 					.padding(top = 12.dp, bottom = 5.dp)
 					.graphicsLayer {
@@ -236,26 +251,15 @@ private fun AboutContent(
 						alpha = 1 - progress
 						scaleX = 1 - progress * 0.05f
 						scaleY = 1 - progress * 0.05f
-					}
-					.then(
-						if (backdrop != null) {
-							Modifier.textureBlur(
-								backdrop = backdrop,
-								shape = RoundedCornerShape(16.dp),
-								blurRadius = 150f,
-								noiseCoefficient = noiseCoefficient,
-								colors = BlurDefaults.blurColors(blendColors = logoBlend),
-								contentBlendMode = ComposeBlendMode.DstIn,
-							)
-						} else {
-							Modifier
-						},
-					),
-				text = "ABDL Space",
-				color = MiuixTheme.colorScheme.onBackground,
-				fontWeight = FontWeight.Bold,
-				fontSize = 35.sp,
-			)
+					},
+			) {
+				Text(
+					text = "ABDL Space",
+					color = MiuixTheme.colorScheme.onBackground,
+					fontWeight = FontWeight.Bold,
+					fontSize = 35.sp,
+				)
+			}
 			Text(
 				modifier = Modifier
 					.fillMaxWidth()
@@ -304,42 +308,32 @@ private fun AboutContent(
 					Spacer(Modifier.fillParentMaxHeight())
 					Column(modifier = Modifier.padding(bottom = scrollPadding.calculateBottomPadding())) {
 						AboutCard(
-							backdropAvailable = backdrop != null,
+							backdrop = backdrop,
 							modifier = Modifier.padding(horizontal = 12.dp),
-							blurModifier = if (backdrop != null) {
-								Modifier.textureBlur(
-									backdrop = backdrop,
-									shape = RoundedCornerShape(16.dp),
-									blurRadius = blurRadius,
-									noiseCoefficient = noiseCoefficient,
-									colors = BlurDefaults.blurColors(
-										blendColors = cardBlend,
-										brightness = brightness,
-										contrast = contrast,
-										saturation = saturation,
-									),
-								)
-							} else Modifier,
+							blurRadius = blurRadius,
+							noiseCoefficient = noiseCoefficient,
+							colors = BlurDefaults.blurColors(
+								blendColors = cardBlend,
+								brightness = brightness,
+								contrast = contrast,
+								saturation = saturation,
+							),
 						) {
 							ArrowPreference(title = "官方网站", endActions = { ValueText("abdl-space.top") }, onClick = { uriHandler.openUri("https://abdl-space.top") })
 							ArrowPreference(title = "源代码", endActions = { ValueText("GitHub") }, onClick = { uriHandler.openUri("https://github.com/ZYongX09/ABDL-Space-APP") })
 							ArrowPreference(title = "博客", onClick = { uriHandler.openUri("https://zhx-blog.top") })
 						}
 						AboutCard(
-							backdropAvailable = backdrop != null,
+							backdrop = backdrop,
 							modifier = Modifier.padding(horizontal = 12.dp).padding(top = 12.dp),
-							blurModifier = if (backdrop != null) Modifier.textureBlur(
-								backdrop = backdrop,
-								shape = RoundedCornerShape(16.dp),
-								blurRadius = blurRadius,
-								noiseCoefficient = noiseCoefficient,
-								colors = BlurDefaults.blurColors(
-									blendColors = cardBlend,
-									brightness = brightness,
-									contrast = contrast,
-									saturation = saturation,
-								),
-							) else Modifier,
+							blurRadius = blurRadius,
+							noiseCoefficient = noiseCoefficient,
+							colors = BlurDefaults.blurColors(
+								blendColors = cardBlend,
+								brightness = brightness,
+								contrast = contrast,
+								saturation = saturation,
+							),
 						) {
 								ArrowPreference(title = "用户协议", onClick = { uriHandler.openUri("https://abdl-space.top/terms") })
 								ArrowPreference(title = "隐私政策", onClick = { uriHandler.openUri("https://abdl-space.top/privacy") })
@@ -366,19 +360,26 @@ private fun AboutContent(
 
 @Composable
 private fun AboutCard(
-	backdropAvailable: Boolean,
+	backdrop: LayerBackdrop?,
 	modifier: Modifier,
-	blurModifier: Modifier,
+	blurRadius: Float,
+	noiseCoefficient: Float,
+	colors: BlurColors,
 	content: @Composable ColumnScope.() -> Unit,
 ) {
-	Card(
-		modifier = modifier.then(blurModifier),
-		colors = CardDefaults.defaultColors(
-			if (backdropAvailable) Color.Transparent else MiuixTheme.colorScheme.surfaceContainer,
-			Color.Transparent,
-		),
-		content = content,
-	)
+	val fallbackColor = MiuixTheme.colorScheme.surfaceContainer
+	val cardColors = CardDefaults.defaultColors(Color.Transparent, Color.Transparent)
+	PageTextureBlur(
+		backdrop = backdrop,
+		modifier = modifier,
+		shape = RoundedCornerShape(16.dp),
+		blurRadius = blurRadius,
+		noiseCoefficient = noiseCoefficient,
+		colors = colors,
+		fallbackColor = fallbackColor,
+	) {
+		Card(colors = cardColors, content = content)
+	}
 }
 
 @Composable

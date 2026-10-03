@@ -6,6 +6,7 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.RectF;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.view.View;
@@ -112,6 +113,218 @@ public class BackdropCaptureFrameLayoutTest{
 		Bitmap shared=(Bitmap)field(view, "captureBitmap");
 		assertEquals(7, shared.getHeight());
 		assertEquals(Bitmap.Config.ARGB_8888, shared.getConfig());
+	}
+
+	@Test
+	public void highResolutionCaptureDownsamplesOnlyIntermediateAndKeepsNativeStripGeometry() throws Exception{
+		Harness view=new Harness(context);
+		view.addView(new SamplingGrid(context));
+		layout(view, 1440, 3200);
+		view.setCaptureHeights(2000, 300);
+		Bitmap[] delivered=new Bitmap[2];
+		int[] calls={0};
+		view.setCaptureListener((top, bottom)->{
+			delivered[0]=top;
+			delivered[1]=bottom;
+			calls[0]++;
+		});
+
+		view.render(acceleratedCanvas(1, 1));
+
+		Bitmap shared=(Bitmap)field(view, "captureBitmap");
+		assertEquals(720, shared.getWidth());
+		assertEquals(1600, shared.getHeight());
+		assertEquals(Bitmap.Config.RGB_565, shared.getConfig());
+		assertStripGeometryAndColors(delivered, 1440, 2000, 300);
+		assertEquals(15_552_000L, field(view, "captureBufferBytes"));
+		assertWithinBudget(view);
+		Bitmap top=delivered[0], bottom=delivered[1];
+
+		view.render(acceleratedCanvas(1, 1));
+
+		assertEquals(2, calls[0]);
+		assertSame(shared, field(view, "captureBitmap"));
+		assertSame(top, delivered[0]);
+		assertSame(bottom, delivered[1]);
+		assertEquals(0, CompatibilityShadow.reports);
+	}
+
+	@Test
+	public void roundedSamplingDimensionsDoNotStretchOrShiftStripCoordinates() throws Exception{
+		Harness view=new Harness(context);
+		SamplingGrid child=new SamplingGrid(context);
+		view.addView(child);
+		layout(view, 1441, 3201);
+		view.setCaptureHeights(2001, 301);
+		Bitmap[] delivered=new Bitmap[2];
+		view.setCaptureListener((top, bottom)->{
+			delivered[0]=top;
+			delivered[1]=bottom;
+		});
+
+		view.render(acceleratedCanvas(1, 1));
+
+		Bitmap shared=(Bitmap)field(view, "captureBitmap");
+		assertEquals(721, shared.getWidth());
+		assertEquals(1601, shared.getHeight());
+		assertStripGeometryAndColors(delivered, 1441, 2001, 301);
+		// Compare strip edges with an unclipped native RGB565 reference. Quantization may
+		// change a channel slightly, but tolerating it must not hide a cleared-gap blend.
+		Bitmap reference=Bitmap.createBitmap(shared.getWidth(), shared.getHeight(), Bitmap.Config.RGB_565);
+		Canvas referenceCanvas=new Canvas(reference);
+		referenceCanvas.scale(shared.getWidth()/1441f, shared.getHeight()/3201f);
+		child.draw(referenceCanvas);
+		Paint filter=new Paint(Paint.FILTER_BITMAP_FLAG);
+		Bitmap edge=Bitmap.createBitmap(1441, 1, Bitmap.Config.ARGB_8888);
+		Canvas edgeCanvas=new Canvas(edge);
+		edgeCanvas.drawBitmap(reference, null, new RectF(0, -2000, 1441, 1201), filter);
+		for(int x:new int[]{1441/4, 1440})
+			assertEquals("Top boundary must not sample the cleared gap", edge.getPixel(x, 0), delivered[0].getPixel(x, 2000));
+		edge.eraseColor(Color.TRANSPARENT);
+		edgeCanvas.drawBitmap(reference, null, new RectF(0, -2900, 1441, 301), filter);
+		for(int x:new int[]{1441/4, 1440})
+			assertEquals("Bottom boundary must not sample the cleared gap", edge.getPixel(x, 0), delivered[1].getPixel(x, 0));
+		assertWithinBudget(view);
+		assertEquals(0, CompatibilityShadow.reports);
+	}
+
+	@Test
+	public void largerStripsUseQuarterSamplingWithNoExtraFullHeightResamplingBitmap() throws Exception{
+		Harness view=new Harness(context);
+		view.addView(new SamplingGrid(context));
+		layout(view, 1440, 3200);
+		view.setCaptureHeights(2000, 800);
+		Bitmap[] delivered=new Bitmap[2];
+		view.setCaptureListener((top, bottom)->{
+			delivered[0]=top;
+			delivered[1]=bottom;
+		});
+
+		view.render(acceleratedCanvas(1, 1));
+
+		Bitmap shared=(Bitmap)field(view, "captureBitmap");
+		assertEquals(360, shared.getWidth());
+		assertEquals(800, shared.getHeight());
+		assertStripGeometryAndColors(delivered, 1440, 2000, 800);
+		assertEquals(16_704_000L, field(view, "captureBufferBytes"));
+		assertWithinBudget(view);
+		assertEquals(0, CompatibilityShadow.reports);
+	}
+
+	@Test
+	public void highResolutionBottomOnlyStillUsesASmallNativeArgbIntermediate() throws Exception{
+		Harness view=new Harness(context);
+		view.addView(new SamplingGrid(context));
+		layout(view, 1440, 3200);
+		view.setCaptureHeights(0, 300);
+		Bitmap[] delivered=new Bitmap[2];
+		view.setCaptureListener((top, bottom)->{
+			delivered[0]=top;
+			delivered[1]=bottom;
+		});
+
+		view.render(acceleratedCanvas(1, 1));
+
+		assertNull(delivered[0]);
+		assertBottomGeometryAndColors(delivered[1], 1440, 300, false);
+		Bitmap shared=(Bitmap)field(view, "captureBitmap");
+		assertEquals(1440, shared.getWidth());
+		assertEquals(300, shared.getHeight());
+		assertEquals(Bitmap.Config.ARGB_8888, shared.getConfig());
+		assertEquals(3_456_000L, field(view, "captureBufferBytes"));
+		assertWithinBudget(view);
+		assertEquals(0, CompatibilityShadow.reports);
+	}
+
+	@Test
+	public void downsampledBottomOnlyScalesBeforeRootRelativeTranslation() throws Exception{
+		Harness view=new Harness(context);
+		view.addView(new SamplingGrid(context));
+		layout(view, 2048, 4096);
+		view.setCaptureHeights(0, 1800);
+		Bitmap[] delivered=new Bitmap[2];
+		view.setCaptureListener((top, bottom)->{
+			delivered[0]=top;
+			delivered[1]=bottom;
+		});
+
+		view.render(acceleratedCanvas(1, 1));
+
+		assertNull(delivered[0]);
+		assertBottomGeometryAndColors(delivered[1], 2048, 1800, false);
+		Bitmap shared=(Bitmap)field(view, "captureBitmap");
+		assertEquals(512, shared.getWidth());
+		assertEquals(450, shared.getHeight());
+		assertEquals(Bitmap.Config.ARGB_8888, shared.getConfig());
+		assertEquals(15_667_200L, field(view, "captureBufferBytes"));
+		assertWithinBudget(view);
+		assertEquals(0, CompatibilityShadow.reports);
+	}
+
+	@Test
+	public void exactBudgetUsesNativeSamplingAndOneColumnOverUsesHalfSampling() throws Exception{
+		assertEquals(16L*1024*1024, BackdropCaptureFrameLayout.CAPTURE_MEMORY_BUDGET_BYTES);
+		for(int width:new int[]{1024, 1025}){
+			Harness view=new Harness(context);
+			view.addView(new Bands(context));
+			layout(view, width, 4096);
+			view.setCaptureHeights(1024, 1024);
+			Bitmap[] delivered=new Bitmap[2];
+			view.setCaptureListener((top, bottom)->{
+				delivered[0]=top;
+				delivered[1]=bottom;
+			});
+
+			view.render(acceleratedCanvas(1, 1));
+
+			Bitmap shared=(Bitmap)field(view, "captureBitmap");
+			assertEquals(width==1024 ? 1024 : 513, shared.getWidth());
+			assertEquals(width==1024 ? 4096 : 2048, shared.getHeight());
+			assertEquals(width, delivered[0].getWidth());
+			assertEquals(1024, delivered[0].getHeight());
+			assertEquals(width, delivered[1].getWidth());
+			assertEquals(1024, delivered[1].getHeight());
+			assertEquals(Color.RED, delivered[0].getPixel(width-1, 1023));
+			assertEquals(Color.BLUE, delivered[1].getPixel(width-1, 0));
+			if(width==1024)
+				assertEquals(BackdropCaptureFrameLayout.CAPTURE_MEMORY_BUDGET_BYTES, field(view, "captureBufferBytes"));
+			assertWithinBudget(view);
+			view.setCaptureListener(null);
+		}
+		assertEquals(0, CompatibilityShadow.reports);
+	}
+
+	@Test
+	public void retainedSoftwareCopyIsReservedBeforeSelectingSamplingScale() throws Exception{
+		Harness view=new Harness(context);
+		TrackingImage image=image(view);
+		view.addView(new Bands(context));
+		layout(view, 1024, 4096);
+		view.setCaptureHeights(1024, 1024);
+		Bitmap original=((BitmapDrawable)image.original).getBitmap();
+		Bitmap retained=original.copy(Bitmap.Config.ARGB_8888, false);
+		@SuppressWarnings("unchecked")
+		Map<Bitmap, Bitmap> cache=(Map<Bitmap, Bitmap>)field(view, "softwareBitmapCache");
+		cache.put(original, retained);
+		Bitmap[] delivered=new Bitmap[2];
+		view.setCaptureListener((top, bottom)->{
+			delivered[0]=top;
+			delivered[1]=bottom;
+		});
+
+		view.render(acceleratedCanvas(1, 1));
+
+		Bitmap shared=(Bitmap)field(view, "captureBitmap");
+		assertEquals(512, shared.getWidth());
+		assertEquals(2048, shared.getHeight());
+		assertNotNull(delivered[0]);
+		assertNotNull(delivered[1]);
+		assertSame(retained, cache.get(original));
+		assertEquals((long)retained.getAllocationByteCount(), field(view, "softwareBitmapCacheBytes"));
+		assertEquals(0, view.copies);
+		assertSame(image.original, image.getDrawable());
+		assertWithinBudget(view);
+		assertEquals(0, CompatibilityShadow.reports);
 	}
 
 	@Test
@@ -390,20 +603,43 @@ public class BackdropCaptureFrameLayoutTest{
 
 	@Test
 	public void oversizedAndExtremeBoundsFailBeforeAllocatingCaptureBuffers() throws Exception{
-		int[][] sizes={{2048, 4096}, {Integer.MAX_VALUE, Integer.MAX_VALUE}};
+		int[][] sizes={{2048, 4096, Integer.MAX_VALUE, Integer.MAX_VALUE},
+				{Integer.MAX_VALUE, Integer.MAX_VALUE, Integer.MAX_VALUE, Integer.MAX_VALUE},
+				{Integer.MAX_VALUE, 40, 1, 0}, {20, Integer.MAX_VALUE, 0, 7},
+				{BackdropCaptureFrameLayout.MAX_CAPTURE_DIMENSION+1, 40, 1, 0},
+				{20, BackdropCaptureFrameLayout.MAX_CAPTURE_DIMENSION+1, 0, 7}};
 		for(int[] size:sizes){
 			CompatibilityShadow.supported=true;
 			Harness view=new Harness(context);
 			view.layout(0, 0, size[0], size[1]);
-			view.setCaptureHeights(Integer.MAX_VALUE, Integer.MAX_VALUE);
-			view.setCaptureListener((top, bottom)->fail("Over-budget capture must not deliver"));
+			view.setCaptureHeights(size[2], size[3]);
+			view.setCaptureListener((top, bottom)->fail("Over-budget or extreme capture must not deliver"));
 
 			view.render(acceleratedCanvas(1, 1));
 
+			assertTrue(CompatibilityShadow.failure instanceof IllegalStateException);
 			assertTrue(CompatibilityShadow.failure.getMessage().contains("16 MiB"));
+			assertEquals(0, view.copies);
 			assertStopped(view);
 		}
-		assertEquals(2, CompatibilityShadow.reports);
+		assertEquals(sizes.length, CompatibilityShadow.reports);
+	}
+
+	@Test
+	public void captureDoesNotDownsampleBeyondTheBoundEvenWhenEighthSamplingWouldFit() throws Exception{
+		Harness view=new Harness(context);
+		view.layout(0, 0, 1440, 3200);
+		view.setCaptureHeights(2000, 850);
+		view.setCaptureListener((top, bottom)->fail("Capture cannot shrink without bound"));
+		long outputBytes=1440L*(2000+850)*4;
+		assertTrue(outputBytes+360L*800*2>BackdropCaptureFrameLayout.CAPTURE_MEMORY_BUDGET_BYTES);
+		assertTrue(outputBytes+180L*400*2<BackdropCaptureFrameLayout.CAPTURE_MEMORY_BUDGET_BYTES);
+
+		view.render(acceleratedCanvas(1, 1));
+
+		assertEquals(1, CompatibilityShadow.reports);
+		assertTrue(CompatibilityShadow.failure.getMessage().contains("bounded downsampling"));
+		assertStopped(view);
 	}
 
 	@Test
@@ -427,6 +663,47 @@ public class BackdropCaptureFrameLayoutTest{
 	}
 
 	@Test
+	public void downsamplingCannotBypassTheBudgetForANewSoftwareCopy() throws Exception{
+		Harness view=new Harness(context);
+		TrackingImage first=image(view);
+		TrackingImage second=new TrackingImage(context);
+		second.setOriginal(new BitmapDrawable(context.getResources(), Bitmap.createBitmap(600, 600, Bitmap.Config.ARGB_8888)));
+		view.addView(second);
+		layout(view, 1440, 3200);
+		view.setCaptureHeights(2000, 300);
+		view.setCaptureListener((top, bottom)->fail("New copy cannot overrun downsampled capture budget"));
+
+		view.render(acceleratedCanvas(1, 1));
+
+		assertEquals(1, view.copies); // The large second copy must be rejected before allocation.
+		assertEquals(1, first.restores);
+		assertSame(first.original, first.getDrawable());
+		assertSame(second.original, second.getDrawable());
+		assertTrue(CompatibilityShadow.failure.getMessage().contains("software copy"));
+		assertStopped(view);
+	}
+
+	@Test
+	public void unexpectedlyLargeSoftwareCopyAllocationIsCheckedAndNeverCached() throws Exception{
+		Harness view=new Harness(context);
+		TrackingImage first=image(view);
+		TrackingImage second=image(view);
+		view.oversizedCopyAt=2;
+		layout(view, 1440, 3200);
+		view.setCaptureHeights(2000, 300);
+		view.setCaptureListener((top, bottom)->fail("Actual copy allocation cannot overrun the budget"));
+
+		view.render(acceleratedCanvas(1, 1));
+
+		assertEquals(2, view.copies);
+		assertSame(first.original, first.getDrawable());
+		assertSame(second.original, second.getDrawable());
+		assertEquals(1, first.restores);
+		assertTrue(CompatibilityShadow.failure.getMessage().contains("software copy"));
+		assertStopped(view);
+	}
+
+	@Test
 	public void ordinaryDispatchDrawFailureIsNotMaskedOrReported() throws Exception{
 		Harness view=new Harness(context);
 		Bands child=new Bands(context);
@@ -445,6 +722,72 @@ public class BackdropCaptureFrameLayoutTest{
 		}
 		assertEquals(0, CompatibilityShadow.reports);
 		assertEquals(0, child.softwareDraws);
+		assertFalse((boolean)field(view, "capturing"));
+	}
+
+	private static void assertStripGeometryAndColors(Bitmap[] delivered, int width, int topHeight, int bottomHeight){
+		Bitmap top=delivered[0];
+		assertNotNull(top);
+		assertEquals(width, top.getWidth());
+		assertEquals(topHeight, top.getHeight());
+		assertEquals(Bitmap.Config.ARGB_8888, top.getConfig());
+		assertSampledColor(Color.RED, top, width/4, 20, true);
+		assertSampledColor(Color.RED, top, width/4, 399, true);
+		assertSampledColor(Color.GREEN, top, width/4, 601, true);
+		assertSampledColor(Color.BLUE, top, width/4, 1800, true);
+		assertSampledColor(Color.BLUE, top, width/4, topHeight-1, true);
+		assertSampledColor(Color.CYAN, top, width-1, 1800, true);
+		assertSampledColor(Color.CYAN, top, width-1, topHeight-1, true);
+		// Original-size marker detects an unscaled, stretched or vertically shifted output.
+		assertSampledColor(Color.WHITE, top, 260, 860, true);
+		assertSampledColor(Color.GREEN, top, 380, 860, true);
+		assertSampledColor(Color.GREEN, top, 260, 1000, true);
+		assertBottomGeometryAndColors(delivered[1], width, bottomHeight, true);
+	}
+
+	private static void assertBottomGeometryAndColors(Bitmap bottom, int width, int height, boolean rgb565){
+		assertNotNull(bottom);
+		assertEquals(width, bottom.getWidth());
+		assertEquals(height, bottom.getHeight());
+		assertEquals(Bitmap.Config.ARGB_8888, bottom.getConfig());
+		assertSampledColor(Color.BLUE, bottom, width/4, 0, rgb565);
+		assertSampledColor(Color.CYAN, bottom, width-1, 0, rgb565);
+		assertSampledColor(Color.YELLOW, bottom, width/4, height-1, rgb565);
+		assertSampledColor(Color.MAGENTA, bottom, width-1, height-1, rgb565);
+		assertSampledColor(Color.BLUE, bottom, width/4, height-150, rgb565);
+		assertSampledColor(Color.YELLOW, bottom, width/4, height-50, rgb565);
+		assertSampledColor(Color.CYAN, bottom, width-1, height-150, rgb565);
+		assertSampledColor(Color.MAGENTA, bottom, width-1, height-50, rgb565);
+	}
+
+	private static void assertSampledColor(int expected, Bitmap bitmap, int x, int y, boolean rgb565){
+		int actual=bitmap.getPixel(x, y);
+		String position="Sample at ("+x+", "+y+")";
+		// RGB565 quantization plus native bilinear rounding may vary within one channel step.
+		// Alpha, geometry and ARGB-only samples remain exact; no general color-distance slack.
+		assertEquals(position+" alpha", Color.alpha(expected), Color.alpha(actual));
+		if(!rgb565){
+			assertEquals(position, expected, actual);
+			return;
+		}
+		assertEquals(position+" red", (double)Color.red(expected), Color.red(actual), 8);
+		assertEquals(position+" green", (double)Color.green(expected), Color.green(actual), 4);
+		assertEquals(position+" blue", (double)Color.blue(expected), Color.blue(actual), 8);
+	}
+
+	private static void assertWithinBudget(Harness view) throws Exception{
+		long bufferBytes=0;
+		for(String name:new String[]{"captureBitmap", "topCaptureBitmap", "bottomCaptureBitmap"}){
+			Bitmap bitmap=(Bitmap)field(view, name);
+			if(bitmap!=null)
+				bufferBytes+=bitmap.getAllocationByteCount();
+		}
+		long cacheBytes=0;
+		for(Object value:((Map<?, ?>)field(view, "softwareBitmapCache")).values())
+			cacheBytes+=((Bitmap)value).getAllocationByteCount();
+		assertEquals(bufferBytes, field(view, "captureBufferBytes"));
+		assertEquals(cacheBytes, field(view, "softwareBitmapCacheBytes"));
+		assertTrue(bufferBytes+cacheBytes<=BackdropCaptureFrameLayout.CAPTURE_MEMORY_BUDGET_BYTES);
 		assertFalse((boolean)field(view, "capturing"));
 	}
 
@@ -493,7 +836,7 @@ public class BackdropCaptureFrameLayoutTest{
 	private static class Harness extends BackdropCaptureFrameLayout{
 		boolean attached=true;
 		boolean forceCopies;
-		int copies, copyFailureAt, nullCopyAt, invalidations;
+		int copies, copyFailureAt, nullCopyAt, oversizedCopyAt, invalidations;
 		Throwable copyFailure;
 
 		Harness(Context context){
@@ -523,6 +866,8 @@ public class BackdropCaptureFrameLayoutTest{
 				raise(copyFailure);
 			if(copies==nullCopyAt)
 				return null;
+			if(copies==oversizedCopyAt)
+				return Bitmap.createBitmap(600, 600, Bitmap.Config.ARGB_8888);
 			return super.copyHardwareBitmap(bitmap);
 		}
 
@@ -565,6 +910,36 @@ public class BackdropCaptureFrameLayoutTest{
 			canvas.drawRect(0, 0, getWidth(), getHeight()/2f, paint);
 			paint.setColor(Color.BLUE);
 			canvas.drawRect(0, getHeight()/2f, getWidth(), getHeight(), paint);
+		}
+	}
+
+	private static class SamplingGrid extends View{
+		SamplingGrid(Context context){
+			super(context);
+			setLayoutParams(new FrameLayout.LayoutParams(-1, -1));
+			setWillNotDraw(false);
+		}
+
+		@Override
+		protected void onDraw(Canvas canvas){
+			Paint paint=new Paint();
+			float split=getWidth()/2f;
+			paint.setColor(Color.BLUE);
+			canvas.drawRect(0, 0, split, getHeight(), paint);
+			paint.setColor(Color.CYAN);
+			canvas.drawRect(split, 0, getWidth(), getHeight(), paint);
+			paint.setColor(Color.RED);
+			canvas.drawRect(0, 0, split, 500, paint);
+			paint.setColor(Color.MAGENTA);
+			canvas.drawRect(split, 0, getWidth(), 500, paint);
+			paint.setColor(Color.GREEN);
+			canvas.drawRect(0, 500, getWidth(), 1600, paint);
+			paint.setColor(Color.YELLOW);
+			canvas.drawRect(0, getHeight()-100, split, getHeight(), paint);
+			paint.setColor(Color.MAGENTA);
+			canvas.drawRect(split, getHeight()-100, getWidth(), getHeight(), paint);
+			paint.setColor(Color.WHITE);
+			canvas.drawRect(200, 800, 320, 920, paint);
 		}
 	}
 

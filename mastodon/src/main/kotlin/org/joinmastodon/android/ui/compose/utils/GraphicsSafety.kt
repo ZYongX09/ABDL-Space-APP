@@ -19,8 +19,12 @@ import androidx.compose.ui.platform.InspectorInfo
 import org.joinmastodon.android.ui.utils.LiquidGlassCompatibility
 
 /** Java/Kotlin graphics failures only; native driver/RenderThread crashes cannot be caught here. */
-internal object GraphicsSafety {
-    fun isSupported(): Boolean = LiquidGlassCompatibility.isSupported()
+internal open class GraphicsEffectSafety(private val effect: LiquidGlassCompatibility.Effect) {
+    fun isSupported(): Boolean = LiquidGlassCompatibility.isSupported(effect)
+
+    fun addFailureListener(listener: Runnable) = LiquidGlassCompatibility.addFailureListener(effect, listener)
+    fun removeFailureListener(listener: Runnable) = LiquidGlassCompatibility.removeFailureListener(effect, listener)
+    fun reportFailure(operation: String, error: Throwable) = LiquidGlassCompatibility.reportFailure(effect, operation, error)
 
     /** Never enclose a composable invocation or application content in this operation. */
     fun <T> guarded(
@@ -46,7 +50,7 @@ internal object GraphicsSafety {
 
     private fun failed(operation: String, error: Throwable, onFailure: () -> Unit) {
         // Disable first, before cleanup/fallback. Notifications are deferred by the Java helper.
-        LiquidGlassCompatibility.reportFailure(operation, error)
+        reportFailure(operation, error)
         cleanup("$operation cleanup", onFailure)
     }
 
@@ -55,11 +59,11 @@ internal object GraphicsSafety {
         try {
             block()
         } catch (error: RuntimeException) {
-            LiquidGlassCompatibility.reportFailure(operation, error)
+            reportFailure(operation, error)
         } catch (error: LinkageError) {
-            LiquidGlassCompatibility.reportFailure(operation, error)
+            reportFailure(operation, error)
         } catch (error: OutOfMemoryError) {
-            LiquidGlassCompatibility.reportFailure(operation, error)
+            reportFailure(operation, error)
         }
     }
 
@@ -88,16 +92,20 @@ internal object GraphicsSafety {
     }
 }
 
+internal object GraphicsSafety : GraphicsEffectSafety(LiquidGlassCompatibility.Effect.NAVIGATION)
+internal object BackgroundGraphicsSafety : GraphicsEffectSafety(LiquidGlassCompatibility.Effect.BACKGROUND)
+internal object PageBlurGraphicsSafety : GraphicsEffectSafety(LiquidGlassCompatibility.Effect.PAGE_BLUR)
+
 /** Observe deferred failure notifications; draw-time guards always consult the live session flag. */
 @Composable
-internal fun rememberGraphicsEffectsSupported(): Boolean {
-    var failed by remember { mutableStateOf(false) }
-    DisposableEffect(Unit) {
+internal fun rememberGraphicsEffectsSupported(safety: GraphicsEffectSafety = GraphicsSafety): Boolean {
+    var failed by remember(safety) { mutableStateOf(false) }
+    DisposableEffect(safety) {
         val listener = Runnable { failed = true }
-        LiquidGlassCompatibility.addFailureListener(listener)
-        onDispose { LiquidGlassCompatibility.removeFailureListener(listener) }
+        safety.addFailureListener(listener)
+        onDispose { safety.removeFailureListener(listener) }
     }
-    return !failed && GraphicsSafety.isSupported()
+    return !failed && safety.isSupported()
 }
 
 /**
@@ -107,11 +115,12 @@ internal fun rememberGraphicsEffectsSupported(): Boolean {
 internal fun Modifier.safeGraphicsEffect(
     operation: String,
     fallback: DrawScope.() -> Unit,
+    safety: GraphicsEffectSafety = GraphicsSafety,
     factory: () -> Modifier,
-): Modifier = then(GraphicsSafety.guarded(operation, fallback = { Modifier.drawBehind(fallback) }) {
+): Modifier = then(safety.guarded(operation, fallback = { Modifier.drawBehind(fallback) }) {
     Modifier.drawWithContent {
         val effectScope = this
-        GraphicsSafety.drawEffect(this, operation, fallback) { effectScope.drawContent() }
+        safety.drawEffect(this, operation, fallback) { effectScope.drawContent() }
     }.then(factory())
 })
 
@@ -123,8 +132,9 @@ internal fun Modifier.safeGraphicsEffect(
 internal fun Modifier.safeBackdropEffect(
     operation: String,
     fallback: DrawScope.() -> Unit,
+    safety: GraphicsEffectSafety = GraphicsSafety,
     factory: (enabled: Boolean) -> Modifier,
-): Modifier = safeGraphicsEffect(operation, fallback) {
+): Modifier = safeGraphicsEffect(operation, fallback, safety) {
     val disabled = factory(false).foldIn(null as ModifierNodeElement<*>?) { found, element ->
         check(found == null && element is ModifierNodeElement<*>) { "Expected one backdrop node" }
         element as ModifierNodeElement<*>
@@ -136,15 +146,16 @@ internal fun Modifier.safeBackdropEffect(
     checkNotNull(disabled)
     checkNotNull(enabled)
     check(disabled.javaClass == enabled.javaClass)
-    SafeBackdropElement(operation, disabled, enabled)
+    SafeBackdropElement(operation, disabled, enabled, safety)
 }
 
 private data class SafeBackdropElement(
     val operation: String,
     val disabled: ModifierNodeElement<*>,
     val enabled: ModifierNodeElement<*>,
+    val safety: GraphicsEffectSafety,
 ) : ModifierNodeElement<SafeBackdropNode>() {
-    override fun create() = SafeBackdropNode(operation, disabled, enabled)
+    override fun create() = SafeBackdropNode(operation, disabled, enabled, safety)
     override fun update(node: SafeBackdropNode) = node.update(disabled, enabled)
     override fun InspectorInfo.inspectableProperties() { name = "safeBackdropNode" }
 }
@@ -153,6 +164,7 @@ private class SafeBackdropNode(
     private val operation: String,
     private var disabled: ModifierNodeElement<*>,
     private var enabled: ModifierNodeElement<*>,
+    private val safety: GraphicsEffectSafety,
 ) : DelegatingNode() {
     private var effectNode: Modifier.Node? = null
 
@@ -167,11 +179,11 @@ private class SafeBackdropNode(
     @Suppress("UNCHECKED_CAST")
     private fun enable() {
         val node = effectNode ?: return
-        GraphicsSafety.guarded("$operation enable", fallback = {}) {
+        safety.guarded("$operation enable", fallback = {}) {
             (enabled as ModifierNodeElement<Modifier.Node>).update(node)
         }
         // The child completed attachment, so this removal has valid lifecycle flags.
-        if (!GraphicsSafety.isSupported()) release()
+        if (!safety.isSupported()) release()
     }
 
     fun update(off: ModifierNodeElement<*>, on: ModifierNodeElement<*>) {
@@ -186,13 +198,13 @@ private class SafeBackdropNode(
             undelegate(node)
             effectNode = null
         } catch (error: RuntimeException) {
-            LiquidGlassCompatibility.reportFailure("$operation detach", error)
+            safety.reportFailure("$operation detach", error)
             throw error
         } catch (error: LinkageError) {
-            LiquidGlassCompatibility.reportFailure("$operation detach", error)
+            safety.reportFailure("$operation detach", error)
             throw error
         } catch (error: OutOfMemoryError) {
-            LiquidGlassCompatibility.reportFailure("$operation detach", error)
+            safety.reportFailure("$operation detach", error)
             throw error
         }
         // Opaque child detach exceptions cannot safely be recovered using Compose public APIs.
@@ -205,23 +217,32 @@ private class SafeBackdropNode(
 private class ContentDrawFailure(val original: Throwable) : Error(null, null, false, false)
 
 /** For layerBackdrop recording: disabled sessions bypass recording but still draw content. */
-internal fun Modifier.safeBackdropRecording(factory: () -> Modifier): Modifier = then(
-    GraphicsSafety.guarded("backdrop recording construction", fallback = { Modifier }) {
+internal fun Modifier.safeBackdropRecording(
+    safety: GraphicsEffectSafety = GraphicsSafety,
+    factory: () -> Modifier,
+): Modifier = then(
+    safety.guarded("backdrop recording construction", fallback = { Modifier }) {
         val element = factory().foldIn(null as ModifierNodeElement<*>?) { found, value ->
             check(found == null && value is ModifierNodeElement<*>) { "Expected one recording node" }
             value as ModifierNodeElement<*>
         }
-        SafeRecordingElement(checkNotNull(element))
+        SafeRecordingElement(checkNotNull(element), safety)
     },
 )
 
-private data class SafeRecordingElement(val element: ModifierNodeElement<*>) : ModifierNodeElement<SafeRecordingNode>() {
-    override fun create() = SafeRecordingNode(element)
-    override fun update(node: SafeRecordingNode) = node.update(element)
+private data class SafeRecordingElement(
+    val element: ModifierNodeElement<*>,
+    val safety: GraphicsEffectSafety,
+) : ModifierNodeElement<SafeRecordingNode>() {
+    override fun create() = SafeRecordingNode(element, safety)
+    override fun update(node: SafeRecordingNode) = node.update(element, safety)
     override fun InspectorInfo.inspectableProperties() { name = "safeBackdropRecording" }
 }
 
-private class SafeRecordingNode(private var element: ModifierNodeElement<*>) : DelegatingNode(), DrawModifierNode {
+private class SafeRecordingNode(
+    private var element: ModifierNodeElement<*>,
+    private var safety: GraphicsEffectSafety,
+) : DelegatingNode(), DrawModifierNode {
     private var recorder: Modifier.Node? = null
 
     override fun onAttach() {
@@ -232,14 +253,15 @@ private class SafeRecordingNode(private var element: ModifierNodeElement<*>) : D
     }
 
     @Suppress("UNCHECKED_CAST")
-    fun update(value: ModifierNodeElement<*>) {
+    fun update(value: ModifierNodeElement<*>, safety: GraphicsEffectSafety) {
         element = value
+        this.safety = safety
         recorder?.let { (value as ModifierNodeElement<Modifier.Node>).update(it) }
     }
 
     override fun ContentDrawScope.draw() {
         val node = recorder as? DrawModifierNode
-        if (!GraphicsSafety.isSupported() || node == null) {
+        if (!safety.isSupported() || node == null) {
             drawContent()
             return
         }
@@ -260,7 +282,7 @@ private class SafeRecordingNode(private var element: ModifierNodeElement<*>) : D
             }
         }
         try {
-            GraphicsSafety.drawEffect(this, "backdrop recording", fallback = {
+            safety.drawEffect(this, "backdrop recording", fallback = {
                 if (!contentDrawn) originalScope.drawContent()
             }) {
                 with(node) { contentScope.draw() }

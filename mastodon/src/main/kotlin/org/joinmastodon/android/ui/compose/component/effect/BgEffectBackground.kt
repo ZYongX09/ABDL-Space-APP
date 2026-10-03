@@ -16,7 +16,7 @@ import androidx.compose.ui.Modifier
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import androidx.compose.foundation.background
-import org.joinmastodon.android.ui.compose.utils.GraphicsSafety
+import org.joinmastodon.android.ui.compose.utils.BackgroundGraphicsSafety
 import org.joinmastodon.android.ui.compose.utils.rememberGraphicsEffectsSupported
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import org.joinmastodon.android.ui.compose.ui.isInDarkTheme
@@ -34,16 +34,21 @@ fun BgEffectBackground(
     alpha: () -> Float = { 1f },
     content: @Composable (BoxScope.() -> Unit),
 ) {
-    val shaderSupported = rememberGraphicsEffectsSupported()
+    val shaderSupported = rememberGraphicsEffectsSupported(BackgroundGraphicsSafety)
     val surface = MiuixTheme.colorScheme.surface
     val painter = if (shaderSupported && effectBackground) remember(isOs3Effect) {
-        GraphicsSafety.guarded("background painter construction", fallback = { null }) {
+        BackgroundGraphicsSafety.guarded("background painter construction", fallback = { null }) {
             BgEffectPainter(isOs3Effect).takeIf { it.prepare() }
         }
     } else null
-    if (painter == null || !GraphicsSafety.isSupported()) {
+    if (painter == null || !BackgroundGraphicsSafety.isSupported()) {
         painter?.clear()
-        Box(modifier = modifier.background(surface), content = content)
+        Box(modifier = modifier) {
+            // Keep the page-blur source alive even when only the background shader failed.
+            // This empty child records the plain surface; application content is its sibling.
+            Spacer(Modifier.fillMaxSize().then(bgModifier).background(surface))
+            content()
+        }
         return
     }
     Box(
@@ -64,7 +69,7 @@ fun BgEffectBackground(
             if (!animatesColors) return@LaunchedEffect
 
             var targetStage = floor(colorStage.value) + 1f
-            while (isActive && GraphicsSafety.isSupported()) {
+            while (isActive && BackgroundGraphicsSafety.isSupported()) {
                 delay((preset.colorInterpPeriod * 500).toLong())
                 colorStage.animateTo(
                     targetValue = targetStage,

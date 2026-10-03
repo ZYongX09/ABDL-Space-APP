@@ -457,6 +457,10 @@
 	<string name="settings_display">显示</string>
 	<string name="settings_ios_liquid_navigation">液态玻璃模式</string>
 	<string name="settings_ios_liquid_navigation_summary">在主界面使用悬浮液态玻璃导航栏，支持拖拽展开菜单，毛玻璃效果更沉浸</string>
+	<string name="settings_liquid_glass_performance_title">性能提示</string>
+	<string name="settings_liquid_glass_performance_message">你的 Android 系统支持液态玻璃，但设备可供应用使用的内存较有限。开启后可能出现卡顿、耗电增加或发热。你仍可尝试开启，并随时在“显示”设置中关闭。</string>
+	<string name="settings_liquid_glass_enable_anyway">仍然开启</string>
+	<string name="settings_liquid_glass_runtime_fallback">液态玻璃在本次运行中未能安全工作，主界面已回退为经典布局。你的选择已保留，完全退出并重新打开应用后会再次尝试；关于页动态背景会独立检查，不受此次回退影响。</string>
 	<string name="settings_filters">过滤器</string>
 	<string name="settings_server_explanation">概览、规则与管理员</string>
 	<!-- %s is the app name (ABDL Space, key app_name). I made it a placeholder so everything Just Works™ with forks -->

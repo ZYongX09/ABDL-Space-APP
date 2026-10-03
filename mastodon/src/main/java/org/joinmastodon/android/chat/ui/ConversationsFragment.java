@@ -63,8 +63,11 @@ public class ConversationsFragment extends Fragment implements WindowInsetsAware
 		ImageButton backBtn=root.findViewById(R.id.back_btn);
 		backBtn.setImageTintList(ColorStateList.valueOf(UiUtils.getThemeColor(getActivity(), R.attr.colorM3OnSurface)));
 		backBtn.setOnClickListener(v->getActivity().onBackPressed());
-		if(isTabMode)
+		if(isTabMode){
 			backBtn.setVisibility(View.GONE);
+			int horizontalPadding=toolbar.getPaddingEnd();
+			toolbar.setPaddingRelative(horizontalPadding, toolbar.getPaddingTop(), horizontalPadding, toolbar.getPaddingBottom());
+		}
 		recyclerView.setLayoutManager(new LinearLayoutManager(getActivity()));
 		adapter = new ConversationsAdapter();
 		recyclerView.setAdapter(adapter);
@@ -83,7 +86,7 @@ public class ConversationsFragment extends Fragment implements WindowInsetsAware
 	}
 
 	private void applyBottomPadding(){
-		recyclerView.setPadding(recyclerView.getPaddingLeft(), recyclerView.getPaddingTop(), recyclerView.getPaddingRight(), baseRecyclerBottomPadding+navBarInset);
+		recyclerView.setPaddingRelative(recyclerView.getPaddingStart(), recyclerView.getPaddingTop(), recyclerView.getPaddingEnd(), baseRecyclerBottomPadding+navBarInset);
 	}
 
 	public void onApplyWindowInsets(WindowInsets insets) {
@@ -91,7 +94,7 @@ public class ConversationsFragment extends Fragment implements WindowInsetsAware
 			return;
 		int top=insets.getSystemWindowInsetTop();
 		int bottom=insets.getStableInsetBottom();
-		toolbar.setPadding(toolbar.getPaddingLeft(), top, toolbar.getPaddingRight(), 0);
+		toolbar.setPaddingRelative(toolbar.getPaddingStart(), top, toolbar.getPaddingEnd(), 0);
 		ViewGroup.LayoutParams lp=toolbar.getLayoutParams();
 		lp.height=baseToolbarHeight+top;
 		toolbar.setLayoutParams(lp);
