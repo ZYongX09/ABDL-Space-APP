@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+	xmlns:app="http://schemas.android.com/apk/res-auto"
 	xmlns:tools="http://schemas.android.com/tools"
 	android:id="@+id/tabbar_wrap"
 	android:layout_width="match_parent"
@@ -23,32 +24,32 @@
 			android:paddingHorizontal="4dp"
 			android:contentDescription="@string/home_timeline">
 
-			<ImageView
+			<org.joinmastodon.android.ui.views.ItshoverNavigationIconView
 				android:layout_width="28dp"
 				android:layout_height="28dp"
 				android:layout_gravity="center"
-				android:scaleType="center"
 				android:importantForAccessibility="no"
-				android:tint="@color/tab_bar_icon"
-				android:src="@drawable/ic_tab_home"/>
+				android:duplicateParentState="true"
+				app:iconType="home"
+				app:iconTint="@color/tab_bar_icon"/>
 		</FrameLayout>
 
 		<FrameLayout
-			android:id="@+id/tab_search"
+			android:id="@id/tab_messages"
 			android:layout_width="0dp"
 			android:layout_height="match_parent"
 			android:layout_weight="1"
 			android:paddingHorizontal="4dp"
-			android:contentDescription="@string/search_hint">
+			android:contentDescription="@string/messages">
 
 			<ImageView
 				android:layout_width="28dp"
 				android:layout_height="28dp"
 				android:layout_gravity="center"
-				android:scaleType="center"
 				android:importantForAccessibility="no"
-				android:tint="@color/tab_bar_icon"
-				android:src="@drawable/ic_tab_search"/>
+				android:duplicateParentState="true"
+				android:src="@drawable/ic_tab_messages"
+				android:tint="@color/tab_bar_icon"/>
 		</FrameLayout>
 
 		<FrameLayout
@@ -59,14 +60,14 @@
 			android:paddingHorizontal="4dp"
 			android:contentDescription="@string/diaper">
 
-			<ImageView
+			<org.joinmastodon.android.ui.views.ItshoverNavigationIconView
 				android:layout_width="28dp"
 				android:layout_height="28dp"
 				android:layout_gravity="center"
-				android:scaleType="center"
 				android:importantForAccessibility="no"
-				android:tint="@color/tab_bar_icon"
-				android:src="@drawable/ic_tab_rating"/>
+				android:duplicateParentState="true"
+				app:iconType="star"
+				app:iconTint="@color/tab_bar_icon"/>
 
 			<TextView
 				android:id="@+id/diaper_new_feature_badge"
@@ -87,23 +88,6 @@
 				tools:visibility="visible"/>
 		</FrameLayout>
 
-		<FrameLayout
-			android:id="@+id/tab_friend_request"
-			android:layout_width="0dp"
-			android:layout_height="match_parent"
-			android:layout_weight="1"
-			android:paddingHorizontal="4dp"
-			android:contentDescription="@string/friend_request">
-
-			<ImageView
-				android:layout_width="28dp"
-				android:layout_height="28dp"
-				android:layout_gravity="center"
-				android:scaleType="center"
-				android:importantForAccessibility="no"
-				android:tint="@color/tab_bar_icon"
-				android:src="@drawable/ic_tab_dream"/>
-		</FrameLayout>
 
 		<FrameLayout
 			android:id="@+id/tab_profile"

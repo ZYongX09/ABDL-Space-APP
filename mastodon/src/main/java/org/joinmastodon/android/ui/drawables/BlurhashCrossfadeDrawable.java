@@ -73,6 +73,10 @@ public class BlurhashCrossfadeDrawable extends Drawable{
 		invalidateSelf();
 	}
 
+	public Drawable getImageDrawable(){
+		return imageDrawable;
+	}
+
 	@Override
 	public void draw(@NonNull Canvas canvas){
 		if(imageDrawable!=null && blurhashAlpha<1f){
@@ -132,6 +136,10 @@ public class BlurhashCrossfadeDrawable extends Drawable{
 	}
 
 	public void setCrossfadeAlpha(float alpha){
+		if(currentAnim!=null){
+			currentAnim.cancel();
+			currentAnim=null;
+		}
 		blurhashAlpha=alpha;
 		invalidateSelf();
 	}

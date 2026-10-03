@@ -124,7 +124,7 @@ public class QRLoginBottomSheet extends BottomSheet {
 			.enqueue(new okhttp3.Callback(){
 				@Override
 				public void onFailure(Call call, IOException e){
-					getContext().getMainExecutor().execute(() -> {
+					androidx.core.content.ContextCompat.getMainExecutor(getContext()).execute(() -> {
 						try{ progress.dismiss(); }catch(Exception ignored){}
 						Toast.makeText(getContext(), "授权失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
 					});
@@ -133,7 +133,7 @@ public class QRLoginBottomSheet extends BottomSheet {
 				@Override
 				public void onResponse(Call call, Response response) throws IOException{
 					String body = response.body() != null ? response.body().string() : "";
-					getContext().getMainExecutor().execute(() -> {
+					androidx.core.content.ContextCompat.getMainExecutor(getContext()).execute(() -> {
 						try{ progress.dismiss(); }catch(Exception ignored){}
 						dismiss();
 						if(response.isSuccessful()){

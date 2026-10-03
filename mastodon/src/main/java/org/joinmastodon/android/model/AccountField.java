@@ -32,6 +32,9 @@ public class AccountField extends BaseModel{
 	public transient CharSequence parsedValue, parsedName;
 	public transient CustomEmojiSpan[] valueEmojis, nameEmojis;
 	public transient ArrayList<UrlImageLoaderRequest> emojiRequests;
+	/** Synthetic native baby-verification row; never sent back by profile editing. */
+	public transient boolean babyVerification;
+	public transient String babyVerificationUrl;
 
 	@Override
 	public String toString(){

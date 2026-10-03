@@ -1,6 +1,7 @@
 package org.joinmastodon.android.fragments.settings;
 
 import android.content.Context;
+import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
@@ -71,9 +72,11 @@ public class SettingsMainFragment extends BaseSettingsFragment<Object>{
 		items.addAll(List.of(
 				new ListItem<>(R.string.settings_add_account, 0, R.drawable.ic_add_24px, this::onAddAccountClick),
 
-				new SectionHeaderListItem(R.string.settings_app_settings),
-				new ListItem<>(R.string.settings_behavior, 0, R.drawable.ic_tune_24px, this::onBehaviorClick),
-				new ListItem<>(R.string.settings_display, 0, R.drawable.ic_style_24px, this::onDisplayClick)
+					new SectionHeaderListItem(R.string.settings_app_settings),
+					new ListItem<>(R.string.settings_behavior, 0, R.drawable.ic_tune_24px, this::onBehaviorClick),
+					new ListItem<>(R.string.settings_display, 0, R.drawable.ic_style_24px, this::onDisplayClick),
+					new ListItem<>(R.string.settings__security, 0, R.drawable.ic_fluent_lock_shield_24_regular, this::onSecurityClick)
+
 
 		));
 		if(AccountSessionManager.get(accountID).isEligibleForDonations()){
@@ -128,7 +131,7 @@ public class SettingsMainFragment extends BaseSettingsFragment<Object>{
 	@Override
 	public void onViewCreated(View view, Bundle savedInstanceState){
 		super.onViewCreated(view, savedInstanceState);
-		if(GithubSelfUpdater.needSelfUpdating()){
+		if(GithubSelfUpdater.isSupported()){
 			updateUpdateBanner();
 		}
 	}
@@ -160,8 +163,14 @@ public class SettingsMainFragment extends BaseSettingsFragment<Object>{
 		Nav.go(getActivity(), SettingsDisplayFragment.class, makeFragmentArgs());
 	}
 
+	private void onSecurityClick(ListItem<?> item_){
+		startActivity(new Intent(getActivity(), org.joinmastodon.android.security.ui.SecurityActivity.class));
+	}
+
 	private void onAboutClick(ListItem<?> item_){
-		Nav.go(getActivity(), SettingsAboutAppFragment.class, makeFragmentArgs());
+		Intent intent=new Intent(getActivity(), ComposeAboutActivity.class);
+		intent.putExtra(ComposeAboutActivity.EXTRA_ACCOUNT_ID, accountID);
+		startActivity(intent);
 	}
 
 	private void onCheckUpdatesClick(ListItem<?> item_){

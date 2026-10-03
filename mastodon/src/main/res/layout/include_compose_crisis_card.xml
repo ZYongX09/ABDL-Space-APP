@@ -1,0 +1,77 @@
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/compose_crisis_card"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginHorizontal="16dp"
+    android:layout_marginTop="8dp"
+    android:layout_marginBottom="4dp"
+    android:padding="16dp"
+    android:background="@drawable/bg_compose_crisis_card"
+    android:visibility="gone">
+
+    <ImageView
+        android:id="@+id/compose_crisis_icon"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_marginEnd="16dp"
+        android:background="@drawable/white_circle"
+        android:backgroundTint="?colorM3Error"
+        android:padding="8dp"
+        android:src="@drawable/ic_fluent_warning_24_filled"
+        android:tint="?colorM3OnError"
+        android:importantForAccessibility="no" />
+
+    <TextView
+        android:id="@+id/compose_crisis_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_toEndOf="@id/compose_crisis_icon"
+        android:textAppearance="@style/m3_title_medium"
+        android:textColor="?colorM3OnErrorContainer"
+        android:text="@string/compose_crisis_title" />
+
+    <TextView
+        android:id="@+id/compose_crisis_message"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/compose_crisis_title"
+        android:layout_toEndOf="@id/compose_crisis_icon"
+        android:layout_marginTop="2dp"
+        android:textAppearance="@style/m3_body_medium"
+        android:textColor="?colorM3OnErrorContainer"
+        android:text="@string/compose_crisis_message" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="28dp"
+        android:layout_below="@id/compose_crisis_message"
+        android:layout_toEndOf="@id/compose_crisis_icon"
+        android:layout_marginTop="8dp"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/compose_crisis_close"
+            android:layout_width="wrap_content"
+            android:layout_height="28dp"
+            android:minWidth="0dp"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="4dp"
+            android:text="@string/compose_crisis_close"
+            android:textColor="?colorM3Error"
+            android:textAppearance="@style/m3_label_large"
+            style="@style/Widget.Mastodon.M3.Button.Text" />
+
+        <Button
+            android:id="@+id/compose_crisis_help"
+            android:layout_width="wrap_content"
+            android:layout_height="28dp"
+            android:layout_marginStart="8dp"
+            android:minWidth="0dp"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="4dp"
+            android:background="@drawable/bg_compose_crisis_button"
+            android:text="@string/compose_crisis_help"
+            android:textColor="?colorM3OnError"
+            android:textAppearance="@style/m3_label_large" />
+    </LinearLayout>
+</RelativeLayout>

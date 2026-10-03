@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- Copyright (c) Two Factor Authentication Service, Inc. -->
+<!-- Source: https://github.com/twofas/2fas-android/blob/119ead28ed8d3d2215afd8f55428c1586401149b/core/locale/src/main/res/values-sv-rSE/strings.xml -->
+<!-- Modified for ABDL Space, 2026. -->
+<resources>
+    <string name="security__change_pin">Ändra PIN-kod</string>
+    <string name="security__enter_current_pin">Ange nuvarande PIN-kod</string>
+    <string name="security__pin_error_incorrect">Felaktig PIN-kod! Vänligen försök igen.</string>
+    <string name="security__disable_pin">Inaktivera PIN-kod</string>
+    <string name="biometric_dialog_auth_title">Verifiera din identitet</string>
+    <string name="biometric_dialog_auth_subtitle">Bekräfta med fingeravtryck eller ansiktsigenkänning</string>
+    <string name="biometric_dialog_auth_cancel">Använd PIN-kod</string>
+    <string name="settings__security">Säkerhet</string>
+    <string name="settings__pin_code">PIN-kod</string>
+    <string name="settings__biometrics">Biometri</string>
+    <string name="settings__option_fingerprint">Biometrisk låsning</string>
+    <string name="settings__option_fingerprint_description">För att aktivera biometri behöver du först ställa in en PIN-kod.</string>
+    <string name="settings__settings">Inställningar</string>
+    <string name="settings__app_blocking">Inställningar för nedlåsning</string>
+    <string name="settings__limit_of_trials">Antal misslyckade försök</string>
+    <string name="settings__no_limit">Obegränsad</string>
+    <string name="settings__how_many_attempts_footer">Välj hur många misslyckade försök att ange PIN-koden som ska krävas innan appen låses ned (tidslängden kan ändras nedan).</string>
+    <string name="settings__block_for">Tid för nedlåsning</string>
+    <string name="settings__block_for_footer">Välj hur länge appen ska vara nedlåst.</string>
+    <string name="biometric_dialog_setup_title">Aktivera biometri</string>
+    <string name="biometric_dialog_setup_cancel">Avbryt</string>
+    <string name="commons__no">Nej</string>
+    <string name="commons__yes">Ja</string>
+    <string name="security__create_pin">Välj PIN-kod</string>
+    <string name="settings__pin_4_digits">4-siffrig</string>
+    <string name="settings__pin_6_digits">6-siffrig</string>
+    <string name="settings__select_pin_length">Välj längd på PIN-kod</string>
+    <string name="security__enter_your_new_pin">Välj en %s PIN-kod</string>
+    <string name="security__confirm_new_pin">Upprepa ny PIN-kod</string>
+    <string name="security_error_no_match">PIN-koderna stämmer inte överens! Vänligen försök igen.</string>
+    <string name="settings__3_minutes">3 minuter</string>
+    <string name="settings__5_minutes">5 minuter</string>
+    <string name="settings__10_minutes">10 minuter</string>
+    <string name="security__too_many_attempts_try_again_after">För många försök har gjorts. Försök igen om %s minuter.</string>
+</resources>

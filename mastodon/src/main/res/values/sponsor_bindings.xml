@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+	<item name="sponsor_username_binding" type="id" />
+	<item name="sponsor_plan_hint" type="id" />
+</resources>

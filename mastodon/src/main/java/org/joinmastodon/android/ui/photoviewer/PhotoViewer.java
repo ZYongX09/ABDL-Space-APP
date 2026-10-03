@@ -70,6 +70,8 @@ import org.joinmastodon.android.api.session.AccountSessionManager;
 import org.joinmastodon.android.events.StatusCountersUpdatedEvent;
 import org.joinmastodon.android.fragments.BaseStatusListFragment;
 import org.joinmastodon.android.fragments.ComposeFragment;
+import org.joinmastodon.android.fragments.sponsors.SponsorCenterFragment;
+import org.joinmastodon.android.sponsors.SponsorOriginalGate;
 import org.joinmastodon.android.model.Attachment;
 import org.joinmastodon.android.model.Status;
 import org.joinmastodon.android.model.StatusPrivacy;
@@ -79,6 +81,7 @@ import org.joinmastodon.android.ui.drawables.VideoPlayerSeekBarThumbDrawable;
 import org.joinmastodon.android.ui.utils.BlurHashDecoder;
 import org.joinmastodon.android.ui.utils.UiUtils;
 import org.joinmastodon.android.ui.views.WindowRootFrameLayout;
+import org.joinmastodon.android.utils.BroadcastCompat;
 import org.parceler.Parcels;
 
 import java.io.File;
@@ -86,8 +89,10 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import androidx.annotation.NonNull;
@@ -97,7 +102,9 @@ import androidx.recyclerview.widget.RecyclerView;
 import androidx.viewpager2.widget.ViewPager2;
 import me.grishka.appkit.Nav;
 import me.grishka.appkit.imageloader.ImageCache;
+import me.grishka.appkit.imageloader.ImageLoaderCallback;
 import me.grishka.appkit.imageloader.ViewImageLoader;
+import me.grishka.appkit.imageloader.requests.ImageLoaderRequest;
 import me.grishka.appkit.imageloader.requests.UrlImageLoaderRequest;
 import me.grishka.appkit.utils.BindableViewHolder;
 import me.grishka.appkit.utils.CubicBezierInterpolator;
@@ -136,6 +143,20 @@ public class PhotoViewer implements ZoomPanView.Listener{
 	private View videoControls;
 	private TextView altText;
 	private ImageButton backButton, downloadButton;
+	private TextView viewOriginalBtn;
+	// “查看原图”：默认只显示预览图；点击后经 ImageCache 下载原图（带进度），
+	// 完成后替换显示并隐藏按钮。已加载过的页在翻回时直接显示原图。
+	private final Set<Integer> originalLoadedPositions=new HashSet<>();
+	private int originalDownloadPosition=-1;
+	private ImageCache.PendingImageRequest originalDownloadRequest;
+	private SponsorOriginalGate originalGate;
+	private long mediaGeneration;
+	private boolean closing, dismissed;
+	private Attachment pendingPermissionAttachment;
+	private long pendingPermissionGeneration;
+	private final android.content.SharedPreferences.OnSharedPreferenceChangeListener originalAccountListener=(prefs, key)->{
+		if("lastActiveAccount".equals(key)) invalidateOriginalWork();
+	};
 	private View bottomBar;
 	private View postActions;
 	private View replyBtn, boostBtn, favoriteBtn, shareBtn, bookmarkBtn;
@@ -276,6 +297,8 @@ public class PhotoViewer implements ZoomPanView.Listener{
 		backButton.setOnClickListener(v->onStartSwipeToDismissTransition(0));
 		downloadButton=uiOverlay.findViewById(R.id.btn_download);
 		downloadButton.setOnClickListener(v->saveCurrentFile());
+		viewOriginalBtn=uiOverlay.findViewById(R.id.btn_view_original);
+		viewOriginalBtn.setOnClickListener(v->startOriginalDownload());
 		bottomBar=uiOverlay.findViewById(R.id.bottom_bar);
 		postActions=uiOverlay.findViewById(R.id.post_actions);
 		
@@ -304,6 +327,7 @@ public class PhotoViewer implements ZoomPanView.Listener{
 		altText.setOnClickListener(v->showAltTextSheet());
 		updateAltText();
 		updateBackgroundColor(currentIndex, 0);
+		updateViewOriginalButton();
 
 		if(status==null){
 			bottomBar.setVisibility(View.GONE);
@@ -409,11 +433,20 @@ public class PhotoViewer implements ZoomPanView.Listener{
 		});
 		videoSeekBar.setThumb(new VideoPlayerSeekBarThumbDrawable());
 
+		originalGate=new SponsorOriginalGate(activity, accountID, ()->!closing && !dismissed && windowView.isAttachedToWindow()
+				&& (parentFragment==null || accountID.equals(parentFragment.getAccountID())), this::updateOriginalControls, ()->{
+			onDismissed(); // Nav must not leave the full-screen WindowManager overlay over the center.
+			Bundle args=new Bundle();
+			args.putString("account", accountID);
+			Nav.go(activity, SponsorCenterFragment.class, args);
+		});
+		activity.getSharedPreferences("account_manager", Context.MODE_PRIVATE).registerOnSharedPreferenceChangeListener(originalAccountListener);
 		E.register(this);
 	}
 
 	public void removeMenu(){
 		downloadButton.setVisibility(View.GONE);
+		viewOriginalBtn.setVisibility(View.GONE);
 	}
 
 	@Override
@@ -444,6 +477,9 @@ public class PhotoViewer implements ZoomPanView.Listener{
 
 	@Override
 	public void onStartSwipeToDismissTransition(float velocityY){
+		if(closing || dismissed) return;
+		closing=true;
+		invalidateOriginalWork();
 		pauseVideo();
 		// stop receiving input events to allow the user to interact with the underlying UI while the animation is still running
 		WindowManager.LayoutParams wlp=(WindowManager.LayoutParams) windowView.getLayoutParams();
@@ -481,6 +517,10 @@ public class PhotoViewer implements ZoomPanView.Listener{
 
 	@Override
 	public void onDismissed(){
+		if(dismissed) return;
+		dismissed=true;
+		closing=true;
+		invalidateOriginalWork();
 		if(!players.isEmpty()){
 			// MediaPlayer::release can block and cause an ANR sometimes, e.g. if called during DNS resolution, at least on some system versions.
 			// This allows it to take its time to time out.
@@ -497,6 +537,7 @@ public class PhotoViewer implements ZoomPanView.Listener{
 		if(receiverRegistered){
 			activity.unregisterReceiver(downloadCompletedReceiver);
 		}
+		activity.getSharedPreferences("account_manager", Context.MODE_PRIVATE).unregisterOnSharedPreferenceChangeListener(originalAccountListener);
 		E.unregister(this);
 	}
 
@@ -562,6 +603,7 @@ public class PhotoViewer implements ZoomPanView.Listener{
 	}
 
 	private void onPageChanged(int index){
+		if(currentIndex!=index) invalidateOriginalWork();
 		currentIndex=index;
 		Attachment att=attachments.get(index);
 		V.setVisibilityAnimated(videoControls, att.type==Attachment.Type.VIDEO ? View.VISIBLE : View.GONE);
@@ -572,6 +614,7 @@ public class PhotoViewer implements ZoomPanView.Listener{
 			updateVideoTimeText(0);
 		}
 		updateAltText();
+		updateViewOriginalButton();
 	}
 
 	private void updateAltText(){
@@ -583,6 +626,159 @@ public class PhotoViewer implements ZoomPanView.Listener{
 			altText.setText(att.description);
 			altText.setMaxLines(att.type==Attachment.Type.VIDEO ? 3 : 4);
 		}
+	}
+
+	/**
+	 * “查看原图”药丸按钮的可见性与文案：仅图片页且原图尚未缓存/未加载时显示。
+	 */
+	private void updateViewOriginalButton(){
+		Attachment att=attachments.get(currentIndex);
+		boolean show=att.type==Attachment.Type.IMAGE
+				&& !originalLoadedPositions.contains(currentIndex)
+				&& !isOriginalCached(att);
+		V.setVisibilityAnimated(viewOriginalBtn, show ? View.VISIBLE : View.GONE);
+		if(show){
+			boolean downloading=originalDownloadPosition==currentIndex;
+			// 授权校验（身份/额度网络请求）期间同样占用按钮：改文案提示正在通信，避免误以为卡住
+			boolean verifying=originalGate!=null && originalGate.isBusy() && !downloading;
+			viewOriginalBtn.setEnabled(!downloading && !verifying);
+			viewOriginalBtn.setText(verifying ? R.string.verifying_original
+					: downloading ? R.string.downloading_original
+					: R.string.view_original);
+		}
+	}
+
+	private boolean isOriginalCached(Attachment att){
+		UrlImageLoaderRequest req=new UrlImageLoaderRequest(att.url);
+		ImageCache cache=ImageCache.getInstance(activity);
+		if(cache.isInTopCache(req))
+			return true;
+		try{
+			return cache.isInCache(req);
+		}catch(Exception x){
+			return false;
+		}
+	}
+
+	private void invalidateOriginalWork(){
+		mediaGeneration++;
+		pendingPermissionAttachment=null;
+		if(originalDownloadRequest!=null){ originalDownloadRequest.cancel(); originalDownloadRequest=null; }
+		originalDownloadPosition=-1;
+		if(originalGate!=null) originalGate.cancel();
+	}
+
+	private void updateOriginalControls(){
+		if(closing || dismissed) return;
+		updateViewOriginalButton();
+		boolean busy=originalDownloadPosition!=-1 || originalGate!=null && originalGate.isBusy();
+		downloadButton.setEnabled(!busy);
+		if(busy) viewOriginalBtn.setEnabled(false);
+	}
+
+	private boolean sameMedia(long generation, int position, Attachment att){
+		return !closing && !dismissed && !activity.isFinishing() && !activity.isDestroyed() && generation==mediaGeneration
+				&& pager.getCurrentItem()==position && attachments.get(position)==att
+				&& accountID.equals(AccountSessionManager.getInstance().getLastActiveAccountID())
+				&& AccountSessionManager.getInstance().tryGetAccount(accountID)!=null
+				&& (parentFragment==null || accountID.equals(parentFragment.getAccountID()));
+	}
+
+	private void startOriginalDownload(){
+		int position=pager.getCurrentItem();
+		Attachment att=attachments.get(position);
+		if(att.type!=Attachment.Type.IMAGE || originalDownloadPosition!=-1 || originalGate==null || originalGate.isBusy()) return;
+		if(!isAcceptableImageUrl(att.url)) return;
+		long generation=mediaGeneration;
+		Runnable download=()->{
+			if(sameMedia(generation, position, att)) downloadOriginal(att, position, generation);
+		};
+		if(isOriginalCached(att)) download.run();
+		else originalGate.authorize(att.id, att.url, download);
+	}
+
+	private void downloadOriginal(Attachment att, int position, long generation){
+		originalDownloadPosition=position;
+		updateOriginalControls();
+		viewOriginalBtn.setText(R.string.downloading_original);
+		UrlImageLoaderRequest req=new UrlImageLoaderRequest(att.url);
+		// 与保存原文件的磁盘缓存为同一 ImageCache 键：下载原图后“保存”可直接复用
+		originalDownloadRequest=ImageCache.getInstance(activity).get(req, (loaded, total)->windowView.post(()->{
+			if(!sameMedia(generation, position, att) || originalDownloadPosition!=position) return;
+			if(total>0) viewOriginalBtn.setText(activity.getString(R.string.downloading_original_percent, Math.round(loaded*100f/total)));
+		}), new ImageLoaderCallback(){
+			@Override
+			public void onImageLoaded(ImageLoaderRequest r, Drawable d){
+				windowView.post(()->{
+					if(sameMedia(generation, position, att)) onOriginalLoaded(position, d);
+				});
+			}
+
+			@Override
+			public void onImageLoadingFailed(ImageLoaderRequest r, Throwable x){
+				Log.w(TAG, "viewOriginal: download failed", x);
+				windowView.post(()->{
+					if(!sameMedia(generation, position, att)) return;
+					originalDownloadPosition=-1;
+					originalDownloadRequest=null;
+					updateOriginalControls();
+					Toast.makeText(activity, R.string.error, Toast.LENGTH_SHORT).show();
+				});
+			}
+		}, true);
+	}
+
+	private void onOriginalLoaded(int position, Drawable d){
+		originalDownloadPosition=-1;
+		originalDownloadRequest=null;
+		originalLoadedPositions.add(position);
+		updateOriginalControls();
+		if(position==currentIndex)
+			V.setVisibilityAnimated(viewOriginalBtn, View.GONE);
+		else
+			updateViewOriginalButton();
+		if(d==null)
+			return;
+		RecyclerView rv=(RecyclerView) pager.getChildAt(0);
+		if(rv.findViewHolderForAdapterPosition(position) instanceof PhotoViewHolder holder){
+			holder.setImageDrawable(d);
+			holder.zoomPanView.updateLayout();
+		}
+	}
+
+	/**
+	 * 仅允许 http/https，且拒绝 localhost、环回、私有与保留地址（下载前的安全校验）。
+	 */
+	private static boolean isAcceptableImageUrl(String url){
+		Uri uri=Uri.parse(url);
+		String scheme=uri.getScheme();
+		if(scheme==null || !(scheme.equalsIgnoreCase("http") || scheme.equalsIgnoreCase("https")))
+			return false;
+		String host=uri.getHost();
+		if(TextUtils.isEmpty(host))
+			return false;
+		String h=host.toLowerCase(Locale.ROOT);
+		if(h.equals("localhost") || h.endsWith(".localhost") || h.equals("0.0.0.0"))
+			return false;
+		if(h.contains(":")) // IPv6 字面量：仅拒绝环回与链路本地
+			return !(h.equals("[::1]") || h.equals("::1") || h.startsWith("[fe80") || h.startsWith("fe80"));
+		String[] parts=h.split("\\.");
+		if(parts.length==4){
+			try{
+				int a=Integer.parseInt(parts[0]), b=Integer.parseInt(parts[1]);
+				int c=Integer.parseInt(parts[2]), d=Integer.parseInt(parts[3]);
+				if(a==0 || a==127 || a==10) return false;
+				if(a==192 && b==168) return false;
+				if(a==172 && b>=16 && b<=31) return false;
+				if(a==169 && b==254) return false;
+				if(a==100 && b>=64 && b<=127) return false;
+				if(a>=224) return false;
+				if(b<0 || b>255 || c<0 || c>255 || d<0 || d>255) return false;
+			}catch(NumberFormatException x){
+				return false;
+			}
+		}
+		return true;
 	}
 
 	private void updateBackgroundColor(int position, float positionOffset){
@@ -701,24 +897,31 @@ public class PhotoViewer implements ZoomPanView.Listener{
 	}
 
 	public void onPause(){
+		// A system permission dialog may pause the host. Keep only its captured attachment;
+		// page changes, account switches and close still invalidate it before the result is used.
+		if(pendingPermissionAttachment==null) invalidateOriginalWork();
+		else if(originalGate!=null) originalGate.cancel();
 		pauseVideo();
 	}
 
 	private void saveCurrentFile(){
-		if(Build.VERSION.SDK_INT>=29){
-			doSaveCurrentFile();
+		if(closing || dismissed || originalGate==null || originalGate.isBusy() || originalDownloadPosition!=-1) return;
+		Attachment att=attachments.get(pager.getCurrentItem());
+		if(Build.VERSION.SDK_INT<29 && activity.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)!=PackageManager.PERMISSION_GRANTED){
+			pendingPermissionAttachment=att;
+			pendingPermissionGeneration=mediaGeneration;
+			listener.onRequestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE});
 		}else{
-			if(activity.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)!=PackageManager.PERMISSION_GRANTED){
-				listener.onRequestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE});
-			}else{
-				doSaveCurrentFile();
-			}
+			doSaveCurrentFile(att);
 		}
 	}
 
 	public void onRequestPermissionsResult(String[] permissions, int[] results){
-		if(results[0]==PackageManager.PERMISSION_GRANTED){
-			doSaveCurrentFile();
+		Attachment att=pendingPermissionAttachment;
+		pendingPermissionAttachment=null;
+		if(att==null || !sameMedia(pendingPermissionGeneration, pager.getCurrentItem(), att)) return;
+		if(results.length>0 && results[0]==PackageManager.PERMISSION_GRANTED){
+			doSaveCurrentFile(att);
 		}else if(!activity.shouldShowRequestPermissionRationale(Manifest.permission.WRITE_EXTERNAL_STORAGE)){
 			new M3AlertDialogBuilder(activity)
 					.setTitle(R.string.permission_required)
@@ -787,13 +990,13 @@ public class PhotoViewer implements ZoomPanView.Listener{
 		return cr.insert(MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY), values);
 	}
 
-	private void doSaveCurrentFile(){
-		Attachment att=attachments.get(pager.getCurrentItem());
+	private void doSaveCurrentFile(Attachment att){
+		if(closing || dismissed || originalGate==null || originalGate.isBusy() || originalDownloadPosition!=-1) return;
 		if(att.type==Attachment.Type.IMAGE){
 			UrlImageLoaderRequest req=new UrlImageLoaderRequest(att.url);
 			try{
 				File file=ImageCache.getInstance(activity).getFile(req);
-				if(file==null){
+				if(file==null || !file.isFile() || file.length()==0){
 					saveViaDownloadManager(att);
 					return;
 				}
@@ -834,16 +1037,27 @@ public class PhotoViewer implements ZoomPanView.Listener{
 	}
 
 	private void saveViaDownloadManager(Attachment att){
+		if(closing || dismissed || !isAcceptableImageUrl(att.url)) return;
+		if(att.type!=Attachment.Type.IMAGE){ enqueueDownload(att); return; }
+		if(originalGate==null || originalGate.isBusy()) return;
+		final int position=pager.getCurrentItem();
+		final long generation=mediaGeneration;
+		originalGate.authorize(att.id, att.url, ()->{
+			if(sameMedia(generation, position, att)) enqueueDownload(att);
+		});
+	}
+
+	private void enqueueDownload(Attachment att){
+		if(closing || dismissed || !isAcceptableImageUrl(att.url)) return;
 		Uri uri=Uri.parse(att.url);
 		DownloadManager.Request req=new DownloadManager.Request(uri);
 		req.allowScanningByMediaScanner();
 		req.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
 		req.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, uri.getLastPathSegment());
-		if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.TIRAMISU)
-			activity.registerReceiver(downloadCompletedReceiver, new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE), Context.RECEIVER_EXPORTED);
-		else
-			activity.registerReceiver(downloadCompletedReceiver, new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE));
-		receiverRegistered=true;
+		if(!receiverRegistered){
+			BroadcastCompat.registerSystemReceiver(activity, downloadCompletedReceiver, new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE));
+			receiverRegistered=true;
+		}
 		lastDownloadID=activity.getSystemService(DownloadManager.class).enqueue(req);
 		new Snackbar.Builder(activity)
 				.setText(R.string.downloading)
@@ -1066,7 +1280,21 @@ public class PhotoViewer implements ZoomPanView.Listener{
 				params.width=1920;
 				params.height=1080;
 			}
-			ViewImageLoader.load(this, currentDrawable, new UrlImageLoaderRequest(item.url, maxImageDimensions, maxImageDimensions), false);
+			// 默认只加载预览图；用户点击“查看原图”完成后（或原图已在本会话加载过）才加载原图
+			int position=getAbsoluteAdapterPosition();
+			UrlImageLoaderRequest req;
+				if(isOriginalCached(item)){
+					req=new UrlImageLoaderRequest(item.url);
+				}else{
+					originalLoadedPositions.remove(position);
+					// No preview must not silently fetch an uncached original without authorization.
+					if(TextUtils.isEmpty(item.previewUrl)){
+						setImageDrawable(currentDrawable);
+						return;
+					}
+					req=new UrlImageLoaderRequest(item.previewUrl, maxImageDimensions, maxImageDimensions);
+				}
+				ViewImageLoader.load(this, currentDrawable, req, false);
 		}
 
 		@Override

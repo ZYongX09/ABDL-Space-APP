@@ -1,0 +1,275 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+	android:id="@+id/verification_scroll"
+	android:layout_width="match_parent"
+	android:layout_height="match_parent"
+	android:background="?colorVerificationBackground"
+	android:clipToPadding="false"
+	android:fillViewport="true">
+
+	<org.joinmastodon.android.ui.views.MaxWidthFrameLayout
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:layout_gravity="center_horizontal"
+		android:maxWidth="@dimen/verification_content_max_width">
+
+		<LinearLayout
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:orientation="vertical"
+			android:paddingStart="@dimen/verification_page_horizontal_margin"
+			android:paddingTop="40dp"
+			android:paddingEnd="@dimen/verification_page_horizontal_margin"
+			android:paddingBottom="@dimen/verification_page_bottom_padding">
+
+			<TextView
+				android:id="@+id/verification_hero_title"
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:text="@string/verification_hero_title"
+				android:textAppearance="@style/TextAppearance.Mastodon.Verification.Hero"/>
+
+			<TextView
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:layout_marginTop="10dp"
+				android:text="@string/verification_hero_body"
+				android:textAppearance="@style/TextAppearance.Mastodon.Verification.Body"/>
+
+			<org.joinmastodon.android.ui.views.BabyVerificationProgressView
+				android:id="@+id/verification_progress_steps"
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:layout_marginTop="28dp"
+				android:background="@drawable/bg_verification_progress"
+				android:paddingStart="6dp"
+				android:paddingEnd="6dp"/>
+
+			<FrameLayout
+				android:id="@+id/verification_state_host"
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:layout_marginTop="20dp">
+
+				<LinearLayout
+					android:id="@+id/verification_loading_state"
+					android:layout_width="match_parent"
+					android:layout_height="wrap_content"
+					android:background="@drawable/bg_verification_card"
+					android:gravity="center"
+					android:minHeight="176dp"
+					android:orientation="vertical"
+					android:paddingStart="@dimen/verification_card_padding_horizontal"
+					android:paddingTop="@dimen/verification_card_padding_vertical"
+					android:paddingEnd="@dimen/verification_card_padding_horizontal"
+					android:paddingBottom="@dimen/verification_card_padding_vertical">
+
+					<ProgressBar
+						android:layout_width="wrap_content"
+						android:layout_height="wrap_content"
+						android:indeterminateTint="?colorVerificationPrimary"/>
+
+					<TextView
+						android:id="@+id/verification_loading_text"
+						android:layout_width="wrap_content"
+						android:layout_height="wrap_content"
+						android:layout_marginTop="16dp"
+						android:accessibilityLiveRegion="polite"
+						android:text="@string/verification_status_loading"
+						android:textAppearance="@style/TextAppearance.Mastodon.Verification.Body"/>
+				</LinearLayout>
+
+				<LinearLayout
+					android:id="@+id/verification_form_card"
+					android:layout_width="match_parent"
+					android:layout_height="wrap_content"
+					android:background="@drawable/bg_verification_card"
+					android:orientation="vertical"
+					android:paddingStart="@dimen/verification_card_padding_horizontal"
+					android:paddingTop="@dimen/verification_card_padding_vertical"
+					android:paddingEnd="@dimen/verification_card_padding_horizontal"
+					android:paddingBottom="@dimen/verification_card_padding_vertical"
+					android:visibility="gone">
+
+					<TextView
+						android:layout_width="wrap_content"
+						android:layout_height="wrap_content"
+						android:text="@string/verification_information_kicker"
+						android:textAppearance="@style/TextAppearance.Mastodon.Verification.Kicker"/>
+
+					<TextView
+						android:id="@+id/verification_quota_title"
+						android:layout_width="match_parent"
+						android:layout_height="wrap_content"
+						android:layout_marginTop="18dp"
+						android:text="@string/verification_quota_title"
+						android:textAppearance="@style/TextAppearance.Mastodon.Verification.Title"/>
+
+					<TextView
+						android:id="@+id/verification_quota_value"
+						android:layout_width="match_parent"
+						android:layout_height="wrap_content"
+						android:layout_marginTop="12dp"
+						android:textAppearance="@style/TextAppearance.Mastodon.Verification.Supporting"/>
+
+					<TextView
+						android:id="@+id/verification_form_label"
+						android:layout_width="match_parent"
+						android:layout_height="wrap_content"
+						android:layout_marginTop="20dp"
+						android:labelFor="@id/verification_qq_input"
+						android:text="@string/verification_form_label"
+						android:textAppearance="@style/TextAppearance.Mastodon.Verification.Label"/>
+
+					<EditText
+						android:id="@+id/verification_qq_input"
+						style="@style/Widget.Mastodon.Verification.EditText"
+						android:layout_width="match_parent"
+						android:layout_height="wrap_content"
+						android:layout_marginTop="14dp"
+						android:autofillHints=""
+						android:hint="@string/verification_qq_placeholder"
+						android:imeOptions="actionDone|flagNoPersonalizedLearning"
+						android:importantForAutofill="noExcludeDescendants"
+						android:inputType="number"
+						android:maxLength="20"
+						android:saveEnabled="false"/>
+
+					<CheckBox
+						android:id="@+id/verification_adult_confirm"
+						android:layout_width="match_parent"
+						android:layout_height="wrap_content"
+						android:layout_marginTop="10dp"
+						android:buttonTint="@color/verification_checkbox_tint"
+						android:gravity="center_vertical"
+						android:minHeight="48dp"
+						android:saveEnabled="false"
+						android:text="@string/verification_adult_confirm"
+						android:textColor="?colorVerificationTextPrimary"
+						android:textSize="16sp"/>
+
+					<Button
+						android:id="@+id/verification_start_button"
+						style="@style/Widget.Mastodon.Verification.PrimaryButton"
+						android:layout_width="match_parent"
+						android:layout_height="wrap_content"
+						android:layout_marginTop="8dp"
+						android:enabled="false"
+						android:text="@string/verification_start"/>
+
+					<TextView
+						android:id="@+id/verification_form_note"
+						android:layout_width="match_parent"
+						android:layout_height="wrap_content"
+						android:layout_marginTop="14dp"
+						android:text="@string/verification_privacy_note"
+						android:textAppearance="@style/TextAppearance.Mastodon.Verification.Note"/>
+				</LinearLayout>
+
+				<LinearLayout
+					android:id="@+id/verification_message_card"
+					android:layout_width="match_parent"
+					android:layout_height="wrap_content"
+					android:background="@drawable/bg_verification_card"
+					android:orientation="vertical"
+					android:paddingStart="@dimen/verification_card_padding_horizontal"
+					android:paddingTop="@dimen/verification_card_padding_vertical"
+					android:paddingEnd="@dimen/verification_card_padding_horizontal"
+					android:paddingBottom="@dimen/verification_card_padding_vertical"
+					android:visibility="gone">
+
+					<TextView
+						android:id="@+id/verification_message_kicker"
+						android:layout_width="wrap_content"
+						android:layout_height="wrap_content"
+						android:text="@string/verification_information_kicker"
+						android:textAppearance="@style/TextAppearance.Mastodon.Verification.Kicker"/>
+
+					<TextView
+						android:id="@+id/verification_message_title"
+						android:layout_width="match_parent"
+						android:layout_height="wrap_content"
+						android:layout_marginTop="18dp"
+						android:accessibilityLiveRegion="polite"
+						android:textAppearance="@style/TextAppearance.Mastodon.Verification.Title"/>
+
+					<TextView
+						android:id="@+id/verification_message_body"
+						android:layout_width="match_parent"
+						android:layout_height="wrap_content"
+						android:layout_marginTop="12dp"
+						android:textAppearance="@style/TextAppearance.Mastodon.Verification.Body"/>
+
+					<ProgressBar
+						android:id="@+id/verification_message_progress"
+						style="?android:attr/progressBarStyleHorizontal"
+						android:layout_width="match_parent"
+						android:layout_height="4dp"
+						android:layout_marginTop="20dp"
+						android:indeterminate="true"
+						android:indeterminateTint="?colorVerificationPrimary"
+						android:visibility="gone"/>
+
+					<Button
+						android:id="@+id/verification_message_primary"
+						style="@style/Widget.Mastodon.Verification.PrimaryButton"
+						android:layout_width="match_parent"
+						android:layout_height="wrap_content"
+						android:layout_marginTop="20dp"
+						android:visibility="gone"/>
+
+					<Button
+						android:id="@+id/verification_message_secondary"
+						style="@style/Widget.Mastodon.Verification.SecondaryButton"
+						android:layout_width="match_parent"
+						android:layout_height="wrap_content"
+						android:layout_marginTop="8dp"
+						android:visibility="gone"/>
+				</LinearLayout>
+			</FrameLayout>
+
+			<LinearLayout
+				android:id="@+id/verification_security_card"
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:layout_marginTop="26dp"
+				android:background="@drawable/bg_verification_security"
+				android:gravity="center_vertical"
+				android:minHeight="74dp"
+				android:orientation="horizontal"
+				android:paddingStart="16dp"
+				android:paddingTop="14dp"
+				android:paddingEnd="16dp"
+				android:paddingBottom="14dp">
+
+				<ImageView
+					android:layout_width="24dp"
+					android:layout_height="24dp"
+					android:importantForAccessibility="no"
+					android:src="@drawable/ic_fluent_shield_checkmark_24_regular"
+					android:tint="?colorVerificationPrimary"/>
+
+				<LinearLayout
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					android:layout_marginStart="12dp"
+					android:layout_weight="1"
+					android:orientation="vertical">
+
+					<TextView
+						android:layout_width="match_parent"
+						android:layout_height="wrap_content"
+						android:text="@string/verification_security_title"
+						android:textAppearance="@style/TextAppearance.Mastodon.Verification.SecurityTitle"/>
+
+					<TextView
+						android:layout_width="match_parent"
+						android:layout_height="wrap_content"
+						android:layout_marginTop="4dp"
+						android:text="@string/verification_security_body"
+						android:textAppearance="@style/TextAppearance.Mastodon.Verification.SecurityBody"/>
+				</LinearLayout>
+			</LinearLayout>
+		</LinearLayout>
+	</org.joinmastodon.android.ui.views.MaxWidthFrameLayout>
+</ScrollView>

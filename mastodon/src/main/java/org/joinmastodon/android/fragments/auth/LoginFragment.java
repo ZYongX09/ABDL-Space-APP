@@ -84,8 +84,7 @@ public class LoginFragment extends ToolbarFragment {
 
 		// 设置协议文本超链接
 		TextView tvAgreement = view.findViewById(R.id.tv_agreement);
-		tvAgreement.setText(android.text.Html.fromHtml(
-			"在登录前您需要仔细阅读<a href=\"https://abdl-space.top/agreement\">《用户协议》</a>和<a href=\"https://abdl-space.top/privacy\">《隐私政策》</a>"));
+			tvAgreement.setText(android.text.Html.fromHtml(getString(R.string.legacy_login_agreement_text)));
 		tvAgreement.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());
 
 		loginButton.setOnClickListener(v -> showConsentSheet(this::attemptLogin));
@@ -256,10 +255,8 @@ public class LoginFragment extends ToolbarFragment {
 
 			TextView title = sheetView.findViewById(R.id.sheet_title);
 			TextView sessionInfo = sheetView.findViewById(R.id.qr_session_info);
-			title.setText("确认同意协议");
-			sessionInfo.setText(android.text.Html.fromHtml(
-				"登录前请仔细阅读<a href=\"https://abdl-space.top/agreement\">《用户协议》</a>" +
-				"和<a href=\"https://abdl-space.top/privacy\">《隐私政策》</a>，若您同意以上协议请点击确认按钮。"));
+				title.setText(R.string.consent_title);
+				sessionInfo.setText(android.text.Html.fromHtml(getString(R.string.consent_message)));
 			sessionInfo.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());
 
 			// 改"授权"按钮为"确认"

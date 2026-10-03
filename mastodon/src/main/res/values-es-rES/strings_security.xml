@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- Copyright (c) Two Factor Authentication Service, Inc. -->
+<!-- Source: https://github.com/twofas/2fas-android/blob/119ead28ed8d3d2215afd8f55428c1586401149b/core/locale/src/main/res/values-es-rES/strings.xml -->
+<!-- Modified for ABDL Space, 2026. -->
+<resources>
+    <string name="security__change_pin">Cambiar PIN</string>
+    <string name="security__enter_current_pin">Por favor ingresa tu PIN actual</string>
+    <string name="security__pin_error_incorrect">¡PIN incorrecto! Por favor, inténtalo de nuevo</string>
+    <string name="security__disable_pin">Desactivar PIN</string>
+    <string name="biometric_dialog_auth_title">Autenticar</string>
+    <string name="biometric_dialog_auth_subtitle">Usa tus credenciales biométricas</string>
+    <string name="biometric_dialog_auth_cancel">Usar el código PIN esta vez</string>
+    <string name="settings__security">Seguridad</string>
+    <string name="settings__pin_code">Código PIN</string>
+    <string name="settings__biometrics">Datos Biométricos</string>
+    <string name="settings__option_fingerprint">Bloqueo biométrico</string>
+    <string name="settings__option_fingerprint_description">Para habilitar el bloqueo por biometría, debes activar y establecer un código PIN.</string>
+    <string name="settings__settings">Configuración</string>
+    <string name="settings__app_blocking">Configuración de bloqueo</string>
+    <string name="settings__limit_of_trials">Máximo intentos fallidos</string>
+    <string name="settings__no_limit">Sin límite</string>
+    <string name="settings__how_many_attempts_footer">Establece el número máximo de intentos fallidos de introducir el código de acceso antes de bloquear la aplicación (el tiempo de bloqueo se puede cambiar más abajo).\n</string>
+    <string name="settings__block_for">Tiempo de bloqueo</string>
+    <string name="settings__block_for_footer">Selecciona el tiempo en el que la aplicación estará bloqueada.</string>
+    <string name="biometric_dialog_setup_title">Permitir Autenticación</string>
+    <string name="biometric_dialog_setup_cancel">Cancelar</string>
+    <string name="commons__no">No</string>
+    <string name="commons__yes">Sí</string>
+    <string name="security__create_pin">Crear PIN</string>
+    <string name="settings__pin_4_digits">Código de 4 dígitos</string>
+    <string name="settings__pin_6_digits">Código de 6 dígitos</string>
+    <string name="settings__select_pin_length">Seleccionar longitud del PIN</string>
+    <string name="security__enter_your_new_pin">Por favor, ingresa tu nuevo código PIN de %s</string>
+    <string name="security__confirm_new_pin">Por favor confirma tu nuevo PIN</string>
+    <string name="security_error_no_match">¡El PIN no coincide! Inténtalo de nuevo.</string>
+    <string name="settings__3_minutes">3 minutos</string>
+    <string name="settings__5_minutes">5 minutos</string>
+    <string name="settings__10_minutes">10 minutos</string>
+    <string name="security__too_many_attempts_try_again_after">¡Haz hecho muchos intentos! Inténtalo de nuevo después de %s minutos.</string>
+</resources>

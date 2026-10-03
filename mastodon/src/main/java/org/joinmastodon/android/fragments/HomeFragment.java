@@ -5,6 +5,7 @@ import android.app.AlertDialog;
 import android.app.Fragment;
 import android.app.NotificationManager;
 import android.app.assist.AssistContent;
+import android.content.Intent;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.LayoutInflater;
@@ -12,6 +13,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
 import android.view.WindowInsets;
+import android.view.Gravity;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -30,20 +32,35 @@ import org.joinmastodon.android.api.session.AccountSession;
 import org.joinmastodon.android.api.session.AccountSessionManager;
 import org.joinmastodon.android.events.NotificationsMarkerUpdatedEvent;
 import org.joinmastodon.android.events.StatusDisplaySettingsChangedEvent;
+import org.joinmastodon.android.chat.ui.ConversationsFragment;
 import org.joinmastodon.android.fragments.diapers.DiaperListFragment;
-import org.joinmastodon.android.fragments.discover.DiscoverFragment;
 import org.joinmastodon.android.fragments.onboarding.OnboardingFollowSuggestionsFragment;
 import org.joinmastodon.android.model.Account;
 import org.joinmastodon.android.model.Instance;
 import org.joinmastodon.android.model.Notification;
 import org.joinmastodon.android.model.NotificationType;
 import org.joinmastodon.android.ui.M3AlertDialogBuilder;
+import org.joinmastodon.android.ui.sheets.LocationPermissionSheet;
+import org.joinmastodon.android.ui.utils.LocationUtils;
+import org.joinmastodon.android.ui.utils.LiquidGlassCompatibility;
+import org.joinmastodon.android.ui.utils.OemUtils;
 import org.joinmastodon.android.ui.OutlineProviders;
+import org.joinmastodon.android.ui.compose.navigation.HomeLiquidNavigationController;
+import org.joinmastodon.android.ui.compose.navigation.HomeLiquidToolbarController;
+import org.joinmastodon.android.ui.compose.navigation.HomeToolbarComposeMenuItem;
 import org.joinmastodon.android.ui.sheets.AccountSwitcherSheet;
 import org.joinmastodon.android.ui.utils.UiUtils;
+import org.joinmastodon.android.ui.views.BackdropCaptureFrameLayout;
 import org.joinmastodon.android.ui.views.TabBar;
 import org.joinmastodon.android.utils.ObjectIdComparator;
 import org.parceler.Parcels;
+
+import static org.joinmastodon.android.ui.compose.navigation.HomeLiquidToolbarModelKt.homeToolbarCaptureHeightDp;
+
+import top.yukonga.miuix.kmp.icon.MiuixIcons;
+
+import static top.yukonga.miuix.kmp.icon.extended.ContactsBookKt.getContactsBook;
+import static top.yukonga.miuix.kmp.icon.extended.NotesKt.getNotes;
 
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -68,18 +85,33 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 	private static final String FEATURE_DIALOG_SEEN_KEY="featureDialogSeen_"+DIAPER_FEATURE_VERSION;
 	private FragmentRootLinearLayout content;
 	private HomeTabFragment homeTabFragment;
-	private DiscoverFragment searchFragment;
+	private ConversationsFragment conversationsFragment;
 	private ProfileFragment profileFragment;
-	private FriendRequestListFragment friendRequestFragment;
 	private DiaperListFragment diaperListFragment;
+	private BackdropCaptureFrameLayout fragmentContainer;
+	private FrameLayout navigationHost;
+	private FrameLayout toolbarHost;
 	private TabBar tabBar;
 	private View tabBarWrap;
 	private ImageView tabBarAvatar;
+	private HomeLiquidNavigationController liquidNavigationController;
+	private HomeLiquidToolbarController liquidToolbarController;
+	private int bottomSystemInset;
+	private int topSystemInset;
+	private boolean liquidToolbarMenuOpen;
+	private boolean liquidHardwareVerified;
+	private boolean liquidCaptureStarted;
+	private Runnable liquidStartupRunnable;
+	private Runnable liquidFailureListener;
+	private View.OnAttachStateChangeListener liquidAttachListener;
 	@IdRes
 	private int currentTab=R.id.tab_home;
 	private TextView notificationsBadge;
 	private TextView diaperNewFeatureBadge;
+	private String unreadNotificationsBadgeText;
+	private boolean diaperFeatureBadgeVisible;
 	private AlertDialog featureDialog;
+	private AlertDialog autoStartGuideDialog;
 
 	private String accountID;
 
@@ -99,14 +131,12 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 			homeTabFragment.setArguments(args);
 			args=new Bundle(args);
 			args.putBoolean("noAutoLoad", true);
-			searchFragment=new DiscoverFragment();
-			searchFragment.setArguments(args);
-			friendRequestFragment=new FriendRequestListFragment();
-			friendRequestFragment.setArguments(args);
+			conversationsFragment=new ConversationsFragment();
+			conversationsFragment.setArguments(args);
 			args=new Bundle(args);
 			diaperListFragment=new DiaperListFragment();
-			diaperListFragment.setArguments(args);
-			args=new Bundle(args);
+		diaperListFragment.setArguments(args);
+		args=new Bundle(args);
 			args.putParcelable("profileAccount", Parcels.wrap(AccountSessionManager.getInstance().getAccount(accountID).self));
 			args.putBoolean("noAutoLoad", true);
 			profileFragment=new ProfileFragment();
@@ -124,10 +154,35 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 
 	@Override
 	public void onDestroyView(){
+		LiquidGlassCompatibility.removeFailureListener(liquidFailureListener);
+		liquidFailureListener=null;
+		cancelLiquidStartup();
+		stopLiquidCapture();
+		if(content!=null && liquidAttachListener!=null)
+			content.removeOnAttachStateChangeListener(liquidAttachListener);
+		liquidAttachListener=null;
+		liquidHardwareVerified=false;
+		disposeLiquidNavigation();
+		disposeLiquidToolbar();
+		if(homeTabFragment!=null)
+			homeTabFragment.setLiquidToolbarController(null);
 		if(featureDialog!=null){
 			featureDialog.dismiss();
 			featureDialog=null;
 		}
+		if(autoStartGuideDialog!=null){
+			autoStartGuideDialog.dismiss();
+			autoStartGuideDialog=null;
+		}
+		content=null;
+		navigationHost=null;
+		toolbarHost=null;
+		fragmentContainer=null;
+		tabBar=null;
+		tabBarWrap=null;
+		tabBarAvatar=null;
+		notificationsBadge=null;
+		diaperNewFeatureBadge=null;
 		super.onDestroyView();
 	}
 
@@ -136,41 +191,59 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 	public View onCreateView(LayoutInflater inflater, @Nullable ViewGroup container, Bundle savedInstanceState){
 		content=new FragmentRootLinearLayout(getActivity());
 		content.setOrientation(LinearLayout.VERTICAL);
+		FrameLayout homeLayout=new FrameLayout(getActivity());
+		content.addView(homeLayout, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
 
-		FrameLayout fragmentContainer=new FrameLayout(getActivity());
+		fragmentContainer=new BackdropCaptureFrameLayout(getActivity());
 		fragmentContainer.setId(me.grishka.appkit.R.id.fragment_wrap);
-		android.animation.LayoutTransition layoutTransition=new android.animation.LayoutTransition();
-		layoutTransition.enableTransitionType(android.animation.LayoutTransition.CHANGE_APPEARING);
-		layoutTransition.enableTransitionType(android.animation.LayoutTransition.CHANGE_DISAPPEARING);
-		layoutTransition.setDuration(android.animation.LayoutTransition.CHANGE_APPEARING, 200);
-		layoutTransition.setDuration(android.animation.LayoutTransition.CHANGE_DISAPPEARING, 200);
-		fragmentContainer.setLayoutTransition(layoutTransition);
-		content.addView(fragmentContainer, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+		homeLayout.addView(fragmentContainer, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
-		inflater.inflate(R.layout.tab_bar, content);
-		tabBar=content.findViewById(R.id.tabbar);
-		tabBar.setListeners(this::onTabSelected, this::onTabLongClick);
-		tabBarWrap=content.findViewById(R.id.tabbar_wrap);
+		toolbarHost=new FrameLayout(getActivity());
+		FrameLayout.LayoutParams toolbarLayoutParams=new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.TOP);
+		homeLayout.addView(toolbarHost, toolbarLayoutParams);
 
-		tabBarAvatar=tabBar.findViewById(R.id.tab_profile_ava);
-		tabBarAvatar.setOutlineProvider(OutlineProviders.OVAL);
-		tabBarAvatar.setClipToOutline(true);
-		Account self=AccountSessionManager.getInstance().getAccount(accountID).self;
-		ViewImageLoader.loadWithoutAnimation(tabBarAvatar, null, new UrlImageLoaderRequest(self.avatar, V.dp(24), V.dp(24)));
+		navigationHost=new FrameLayout(getActivity());
+		FrameLayout.LayoutParams navigationLayoutParams=new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM);
+		homeLayout.addView(navigationHost, navigationLayoutParams);
+		navigationHost.addOnLayoutChangeListener((v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom)->{
+			if(fragmentContainer!=null)
+				updateCaptureHeights();
+		});
+		FragmentRootLinearLayout ownedContent=content;
+		liquidFailureListener=()->{
+			if(content!=ownedContent || !ownedContent.isAttachedToWindow() || getActivity()==null)
+				return;
+			restoreClassicNavigation();
+		};
+		LiquidGlassCompatibility.addFailureListener(liquidFailureListener);
+		liquidAttachListener=new View.OnAttachStateChangeListener(){
+			@Override
+			public void onViewAttachedToWindow(View view){
+				if(!GlobalUserPreferences.isIosLiquidNavigationEnabled())
+					restoreClassicNavigation();
+				else
+					scheduleLiquidStartup();
+			}
 
-		notificationsBadge=tabBar.findViewById(R.id.notifications_badge);
-		notificationsBadge.setVisibility(View.GONE);
-		diaperNewFeatureBadge=tabBar.findViewById(R.id.diaper_new_feature_badge);
-		updateDiaperNewFeatureBadge();
+			@Override
+			public void onViewDetachedFromWindow(View view){
+				cancelLiquidStartup();
+				stopLiquidCapture();
+				liquidHardwareVerified=false;
+			}
+		};
+		content.addOnAttachStateChangeListener(liquidAttachListener);
+		createNavigationBar(inflater);
+		if(savedInstanceState==null)
+			createLiquidToolbar();
 
 		if(savedInstanceState==null){
 			getChildFragmentManager().beginTransaction()
 					.add(me.grishka.appkit.R.id.fragment_wrap, homeTabFragment)
-					.add(me.grishka.appkit.R.id.fragment_wrap, searchFragment).hide(searchFragment)
-					.add(me.grishka.appkit.R.id.fragment_wrap, friendRequestFragment).hide(friendRequestFragment)
+					.add(me.grishka.appkit.R.id.fragment_wrap, conversationsFragment).hide(conversationsFragment)
 					.add(me.grishka.appkit.R.id.fragment_wrap, diaperListFragment).hide(diaperListFragment)
 					.add(me.grishka.appkit.R.id.fragment_wrap, profileFragment).hide(profileFragment)
-					.commit();
+					.commitNow();
 
 			String defaultTab=getArguments().getString("tab");
 			if("notifications".equals(defaultTab)){
@@ -186,7 +259,7 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 				});
 			}
 		}
-		tabBar.selectTab(currentTab);
+		selectTabInNavigation(currentTab);
 
 		return content;
 	}
@@ -195,25 +268,40 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 	public void onViewStateRestored(Bundle savedInstanceState){
 		super.onViewStateRestored(savedInstanceState);
 
-		// MOSHIDON: we must restore the homeTabFragment
-		if(savedInstanceState==null /*|| homeTabFragment!=null*/)
+		if(savedInstanceState==null)
 			return;
-		homeTabFragment=(HomeTabFragment) getChildFragmentManager().getFragment(savedInstanceState, "homeTabFragment");
-		searchFragment=(DiscoverFragment) getChildFragmentManager().getFragment(savedInstanceState, "searchFragment");
-		friendRequestFragment=(FriendRequestListFragment) getChildFragmentManager().getFragment(savedInstanceState, "friendRequestFragment");
-		diaperListFragment=(DiaperListFragment) getChildFragmentManager().getFragment(savedInstanceState, "diaperListFragment");
-		profileFragment=(ProfileFragment) getChildFragmentManager().getFragment(savedInstanceState, "profileFragment");
-		currentTab=savedInstanceState.getInt("selectedTab");
-		tabBar.selectTab(currentTab);
+		homeTabFragment=(HomeTabFragment) restoreChildFragment(savedInstanceState, "homeTabFragment");
+		conversationsFragment=(ConversationsFragment) restoreChildFragment(savedInstanceState, "conversationsFragment");
+		diaperListFragment=(DiaperListFragment) restoreChildFragment(savedInstanceState, "diaperListFragment");
+		profileFragment=(ProfileFragment) restoreChildFragment(savedInstanceState, "profileFragment");
+		Fragment legacySearch=restoreChildFragment(savedInstanceState, "searchFragment");
+		Fragment legacyFriend=restoreChildFragment(savedInstanceState, "friendRequestFragment");
+		if(conversationsFragment==null){
+			Bundle args=new Bundle();
+			args.putString("account", accountID);
+			args.putBoolean("noAutoLoad", true);
+			conversationsFragment=new ConversationsFragment();
+			conversationsFragment.setArguments(args);
+		}
+		currentTab=normalizeTab(savedInstanceState.getInt("selectedTab", R.id.tab_home));
+		android.app.FragmentTransaction transaction=getChildFragmentManager().beginTransaction();
+		if(!conversationsFragment.isAdded())
+			transaction.add(me.grishka.appkit.R.id.fragment_wrap, conversationsFragment);
+		if(legacySearch!=null && legacySearch.isAdded())
+			transaction.remove(legacySearch);
+		if(legacyFriend!=null && legacyFriend.isAdded())
+			transaction.remove(legacyFriend);
 		Fragment current=fragmentForTab(currentTab);
-		getChildFragmentManager().beginTransaction()
-				.hide(homeTabFragment)
-				.hide(searchFragment)
-				.hide(friendRequestFragment)
+		transaction.hide(homeTabFragment)
+				.hide(conversationsFragment)
 				.hide(diaperListFragment)
 				.hide(profileFragment)
 				.show(current)
 				.commit();
+		createLiquidToolbar();
+		selectTabInNavigation(currentTab);
+		updateLiquidToolbarVisibility();
+		scheduleLiquidStartup();
 		maybeTriggerLoading(current);
 	}
 
@@ -235,52 +323,62 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 
 	@Override
 	public void onApplyWindowInsets(WindowInsets insets){
-		if(Build.VERSION.SDK_INT>=27){
-			int inset=insets.getSystemWindowInsetBottom();
-			tabBarWrap.setPadding(0, 0, 0, inset>0 ? Math.max(inset, V.dp(24)) : 0);
-			super.onApplyWindowInsets(insets.replaceSystemWindowInsets(insets.getSystemWindowInsetLeft(), 0, insets.getSystemWindowInsetRight(), 0));
-		}else{
-			super.onApplyWindowInsets(insets.replaceSystemWindowInsets(insets.getSystemWindowInsetLeft(), 0, insets.getSystemWindowInsetRight(), insets.getSystemWindowInsetBottom()));
-		}
+		bottomSystemInset=insets.getSystemWindowInsetBottom();
+		topSystemInset=insets.getSystemWindowInsetTop();
+		applyNavigationBottomInset();
+		applyLiquidToolbarInsets();
+		super.onApplyWindowInsets(insets.replaceSystemWindowInsets(insets.getSystemWindowInsetLeft(), 0, insets.getSystemWindowInsetRight(), 0));
 		WindowInsets topOnlyInsets=insets.replaceSystemWindowInsets(0, insets.getSystemWindowInsetTop(), 0, 0);
 		homeTabFragment.onApplyWindowInsets(topOnlyInsets);
-		searchFragment.onApplyWindowInsets(topOnlyInsets);
-		friendRequestFragment.onApplyWindowInsets(topOnlyInsets);
+		conversationsFragment.onApplyWindowInsets(topOnlyInsets);
 		diaperListFragment.onApplyWindowInsets(topOnlyInsets);
 		profileFragment.onApplyWindowInsets(topOnlyInsets);
 	}
 
+	private static int normalizeTab(@IdRes int tab){
+		if(tab==R.id.tab_search)
+			return R.id.tab_messages;
+		if(tab==R.id.tab_friend_request)
+			return R.id.tab_home;
+		if(tab==R.id.tab_home || tab==R.id.tab_messages || tab==R.id.tab_diaper || tab==R.id.tab_profile)
+			return tab;
+		return R.id.tab_home;
+	}
+
+	private Fragment restoreChildFragment(Bundle state, String key){
+		try{
+			return getChildFragmentManager().getFragment(state, key);
+		}catch(Exception ignored){
+			return null;
+		}
+	}
+
 	private Fragment fragmentForTab(@IdRes int tab){
+		tab=normalizeTab(tab);
 		if(tab==R.id.tab_home){
 			return homeTabFragment;
-		}else if(tab==R.id.tab_search){
-			return searchFragment;
-		}else if(tab==R.id.tab_friend_request){
-			return friendRequestFragment;
+		}else if(tab==R.id.tab_messages){
+			return conversationsFragment;
 		}else if(tab==R.id.tab_diaper){
 			return diaperListFragment;
-		}else if(tab==R.id.tab_profile){
+		}else{
 			return profileFragment;
 		}
-		throw new IllegalArgumentException();
 	}
 
 	public void setCurrentTab(@IdRes int tab){
+		tab=normalizeTab(tab);
 		if(tab==currentTab)
 			return;
-		tabBar.selectTab(tab);
+		selectTabInNavigation(tab);
 		onTabSelected(tab);
 	}
 
 	private void onTabSelected(@IdRes int tab){
+		tab=normalizeTab(tab);
 		Fragment newFragment=fragmentForTab(tab);
 		if(tab==R.id.tab_diaper)
 			markDiaperFeatureSeen();
-
-		// MOSHIDON:
-		if(tab==R.id.tab_search && R.id.tab_search==currentTab){
-			searchFragment.openSearch();
-		}
 
 		if(tab==currentTab){
 			if(newFragment instanceof ScrollableToTop scrollable)
@@ -292,47 +390,45 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 			.beginTransaction()
 			.hide(fragmentForTab(currentTab))
 			.show(newFragment)
-			.commit();
+			.commitNow();
 		maybeTriggerLoading(newFragment);
 		currentTab=tab;
+		updateLiquidToolbarVisibility();
 		((FragmentStackActivity)getActivity()).invalidateSystemBarColors(this);
 	}
 
 	private void updateDiaperNewFeatureBadge(){
 		String version=BuildConfig.VERSION_NAME.split("-", 2)[0];
-		boolean visible=DIAPER_FEATURE_VERSION.equals(version)
+		diaperFeatureBadgeVisible=DIAPER_FEATURE_VERSION.equals(version)
 				&& !GlobalUserPreferences.getPrefs().getBoolean(DIAPER_FEATURE_SEEN_KEY, false);
-		diaperNewFeatureBadge.setVisibility(visible ? View.VISIBLE : View.GONE);
+		if(liquidNavigationController!=null)
+			liquidNavigationController.setDiaperBadgeVisible(diaperFeatureBadgeVisible);
+		else if(diaperNewFeatureBadge!=null)
+			diaperNewFeatureBadge.setVisibility(diaperFeatureBadgeVisible ? View.VISIBLE : View.GONE);
 	}
 
 	private void markDiaperFeatureSeen(){
-		if(diaperNewFeatureBadge==null || diaperNewFeatureBadge.getVisibility()!=View.VISIBLE)
+		if(!diaperFeatureBadgeVisible)
 			return;
 		GlobalUserPreferences.getPrefs().edit().putBoolean(DIAPER_FEATURE_SEEN_KEY, true).apply();
-		diaperNewFeatureBadge.setVisibility(View.GONE);
+		diaperFeatureBadgeVisible=false;
+		if(liquidNavigationController!=null)
+			liquidNavigationController.setDiaperBadgeVisible(false);
+		else if(diaperNewFeatureBadge!=null)
+			diaperNewFeatureBadge.setVisibility(View.GONE);
 	}
 
 	private void maybeTriggerLoading(Fragment newFragment){
 		if(newFragment instanceof LoaderFragment lf){
 			if(!lf.loaded && !lf.dataLoading)
 				lf.loadData();
-		}else if(newFragment instanceof DiscoverFragment){
-			((DiscoverFragment) newFragment).loadData();
+		}else if(newFragment instanceof ConversationsFragment){
+			((ConversationsFragment) newFragment).loadData();
 		}
 	}
 
 	private boolean onTabLongClick(@IdRes int tab){
-		if(tab==R.id.tab_search){
-			if(currentTab!=R.id.tab_search){
-				// MOSHIDON: I don't know why using setCurrentTab leads to visual glitches
-				// when initially loading the fragment. This solves it somehow
-				onTabSelected(R.id.tab_search);
-				tabBar.selectTab(R.id.tab_search);
-			}
-			searchFragment.openSearch();
-			return true;
-		}
-
+		tab=normalizeTab(tab);
 		if(tab==R.id.tab_profile){
 			ArrayList<String> options=new ArrayList<>();
 			for(AccountSession session:AccountSessionManager.getInstance().getLoggedInAccounts()){
@@ -341,25 +437,18 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 			new AccountSwitcherSheet(getActivity(), this).show();
 			return true;
 		}
-		if(tab==R.id.tab_home && BuildConfig.DEBUG){
-			Bundle args=new Bundle();
-			args.putString("account", accountID);
-			Nav.go(getActivity(), OnboardingFollowSuggestionsFragment.class, args);
-		}
 		return false;
 	}
 
 	@Override
 	public void onSaveInstanceState(Bundle outState){
 		super.onSaveInstanceState(outState);
-		outState.putInt("selectedTab", currentTab);
+		outState.putInt("selectedTab", normalizeTab(currentTab));
 
 		// MOSHIDON: we use the isAdded because of user themes
 		if (homeTabFragment.isAdded()) getChildFragmentManager().putFragment(outState, "homeTabFragment", homeTabFragment);
 
-		if (searchFragment.isAdded()) getChildFragmentManager().putFragment(outState, "searchFragment", searchFragment);
-
-		if (friendRequestFragment.isAdded()) getChildFragmentManager().putFragment(outState, "friendRequestFragment", friendRequestFragment);
+		if (conversationsFragment.isAdded()) getChildFragmentManager().putFragment(outState, "conversationsFragment", conversationsFragment);
 
 		if (diaperListFragment.isAdded()) getChildFragmentManager().putFragment(outState, "diaperListFragment", diaperListFragment);
 
@@ -370,7 +459,56 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 	protected void onShown(){
 		super.onShown();
 		showFeatureDialogIfNeeded();
+		// 引导序列：位置权限 → 关闭后 2s → 开启实时通知
+		// 同一版本只完整引导一次；用版本键控制升级用户也会重新触发
+		showSetupGuideSequence();
 		reloadNotificationsForUnreadCount();
+	}
+
+	/**
+	 * 引导序列编排（版本相关）：
+	 * 1. 若本版本引导已完成则跳过
+	 * 2. 若未授权位置权限 → 立即展示位置权限 sheet，dismiss 后 postDelayed(2s) 触发实时通知引导
+	 * 3. 若已授权 → 2s 后直接进入实时通知引导
+	 */
+	private void showSetupGuideSequence(){
+		if(getActivity()==null) return;
+		String version=BuildConfig.VERSION_NAME;
+		String setupDoneKey="setupGuideDone_"+version;
+		if(GlobalUserPreferences.getPrefs().getBoolean(setupDoneKey, false)) return;
+		boolean hasLocation=LocationUtils.hasLocationPermission(getActivity());
+		if(!hasLocation){
+			// 立即展示位置权限 sheet，dismiss 后 2s 触发实时通知
+			try{
+				new LocationPermissionSheet(getActivity(), getActivity(), ()->{
+					if(getActivity()==null || getActivity().isFinishing()) return;
+					getActivity().getWindow().getDecorView().postDelayed(()->{
+						showAutoStartGuideIfNeeded();
+						markSetupGuideDoneIfPossible(version, setupDoneKey);
+					}, 2000);
+				}).show();
+				LocationUtils.fetchProvinceFromIP(getActivity(), null);
+				return;
+			}catch(Exception ignored){}
+		}
+		// 已授权或位置 sheet 弹出失败 → 2s 后弹实时通知引导
+		getActivity().getWindow().getDecorView().postDelayed(()->{
+			showAutoStartGuideIfNeeded();
+			markSetupGuideDoneIfPossible(version, setupDoneKey);
+		}, 2000);
+	}
+
+	/**
+	 * 当 autoStart guide 不需要展示（OTHER 厂商或已展示过）时，标记本版本引导完成
+	 */
+	private void markSetupGuideDoneIfPossible(String version, String setupDoneKey){
+		org.joinmastodon.android.ui.utils.OemUtils.Vendor vendor=org.joinmastodon.android.ui.utils.OemUtils.detectVendor();
+		boolean autoStartShown=GlobalUserPreferences.getPrefs().getBoolean("autoStartGuideShown_"+version, false);
+		// OTHER vendor 永远不会展示 autoStart guide → 直接标记完成
+		// 非 OTHER 且尚未展示：等真正 dismiss 后再标记（见 showAutoStartGuideIfNeeded 内部逻辑）
+		if(vendor==org.joinmastodon.android.ui.utils.OemUtils.Vendor.OTHER || autoStartShown){
+			GlobalUserPreferences.getPrefs().edit().putBoolean(setupDoneKey, true).apply();
+		}
 	}
 
 	private void showFeatureDialogIfNeeded(){
@@ -390,6 +528,37 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 				.create();
 		featureDialog.setOnDismissListener(dialog->featureDialog=null);
 		featureDialog.show();
+	}
+
+	private void showAutoStartGuideIfNeeded(){
+		if(autoStartGuideDialog!=null || getActivity()==null)
+			return;
+		org.joinmastodon.android.ui.utils.OemUtils.Vendor vendor=org.joinmastodon.android.ui.utils.OemUtils.detectVendor();
+		if(vendor==org.joinmastodon.android.ui.utils.OemUtils.Vendor.OTHER)
+			return;
+		if(org.joinmastodon.android.ui.utils.OemUtils.isAutoStartGranted())
+			return;
+		if(GlobalUserPreferences.getPrefs().getBoolean("autoStartGuideShown_"+BuildConfig.VERSION_NAME, false))
+			return;
+		autoStartGuideDialog=new M3AlertDialogBuilder(getActivity())
+				.setTitle("开启实时通知")
+				.setMessage("您当前使用的是"+vendor.displayName+"手机，需要允许后台运行才能尽可能保证您能实时收到通知")
+				.setPositiveButton("去设置", (dialog, which)->{
+					GlobalUserPreferences.getPrefs().edit().putBoolean("autoStartGuideShown_"+BuildConfig.VERSION_NAME, true).apply();
+					startActivity(new Intent(getActivity(), org.joinmastodon.android.ui.NotificationGuideActivity.class));
+				})
+				.setNegativeButton("以后再说", (dialog, which)->
+						GlobalUserPreferences.getPrefs().edit().putBoolean("autoStartGuideShown_"+BuildConfig.VERSION_NAME, true).apply())
+				.setCancelable(false)
+				.create();
+		autoStartGuideDialog.setOnDismissListener(dialog->{
+			autoStartGuideDialog=null;
+			// 引导序列完成标记（autoStart guide 已 dismiss）
+			GlobalUserPreferences.getPrefs().edit()
+					.putBoolean("setupGuideDone_"+BuildConfig.VERSION_NAME, true)
+					.apply();
+		});
+		autoStartGuideDialog.show();
 	}
 
 	private void reloadNotificationsForUnreadCount(){
@@ -455,15 +624,19 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 	}
 
 	private void updateUnreadNotificationsBadge(int count, boolean more){
-		String badgeText=count==0 ? null : String.format(more ? "%d+" : "%d", count);
-		if(count==0){
-			notificationsBadge.setVisibility(View.GONE);
-		}else{
-			notificationsBadge.setVisibility(View.VISIBLE);
-			notificationsBadge.setText(badgeText);
+		unreadNotificationsBadgeText=count==0 ? null : String.format(more ? "%d+" : "%d", count);
+		if(liquidNavigationController!=null){
+			liquidNavigationController.setUnreadBadge(unreadNotificationsBadgeText);
+		}else if(notificationsBadge!=null){
+			if(count==0){
+				notificationsBadge.setVisibility(View.GONE);
+			}else{
+				notificationsBadge.setVisibility(View.VISIBLE);
+				notificationsBadge.setText(unreadNotificationsBadgeText);
+			}
 		}
 		if(profileFragment!=null)
-			profileFragment.setUnreadNotificationsBadge(badgeText);
+			profileFragment.setUnreadNotificationsBadge(unreadNotificationsBadgeText);
 	}
 
 	@Subscribe
@@ -478,10 +651,277 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 	public void onStatusDisplaySettingsChanged(StatusDisplaySettingsChangedEvent ev){
 		if(!ev.accountID.equals(accountID))
 			return;
+		if(navigationHost!=null && getActivity()!=null){
+			if(!GlobalUserPreferences.isIosLiquidNavigationEnabled())
+				restoreClassicNavigation();
+			else
+				scheduleLiquidStartup();
+		}
 
 		// FIXME: figure this out
 //		if(homeTabFragment.loaded)
 //			homeTabFragment.rebuildAllDisplayItems();
+	}
+
+	private void cancelLiquidStartup(){
+		if(content!=null && liquidStartupRunnable!=null)
+			content.removeCallbacks(liquidStartupRunnable);
+		liquidStartupRunnable=null;
+	}
+
+	private void stopLiquidCapture(){
+		liquidCaptureStarted=false;
+		if(fragmentContainer!=null){
+			fragmentContainer.setCaptureListener(null);
+			fragmentContainer.setCaptureHeights(0, 0);
+		}
+	}
+
+	private void disposeLiquidNavigation(){
+		HomeLiquidNavigationController controller=liquidNavigationController;
+		liquidNavigationController=null;
+		if(controller!=null){
+			try{
+				controller.dispose();
+			}catch(RuntimeException | LinkageError | OutOfMemoryError error){
+				LiquidGlassCompatibility.reportFailure("dispose home liquid navigation", error);
+			}
+		}
+	}
+
+	private void disposeLiquidToolbar(){
+		HomeLiquidToolbarController controller=liquidToolbarController;
+		liquidToolbarController=null;
+		liquidToolbarMenuOpen=false;
+		if(controller!=null){
+			try{
+				controller.dispose();
+			}catch(RuntimeException | LinkageError | OutOfMemoryError error){
+				LiquidGlassCompatibility.reportFailure("dispose home liquid toolbar", error);
+			}
+		}
+	}
+
+	private void restoreClassicNavigation(){
+		cancelLiquidStartup();
+		stopLiquidCapture();
+		liquidHardwareVerified=false;
+		if(content==null || navigationHost==null || toolbarHost==null || getActivity()==null)
+			return;
+		createNavigationBar(LayoutInflater.from(getActivity()));
+		createLiquidToolbar();
+	}
+
+	private void scheduleLiquidStartup(){
+		cancelLiquidStartup();
+		if(content==null || fragmentContainer==null || !content.isAttachedToWindow()
+				|| !GlobalUserPreferences.isIosLiquidNavigationEnabled())
+			return;
+		FragmentRootLinearLayout ownedContent=content;
+		BackdropCaptureFrameLayout ownedContainer=fragmentContainer;
+		liquidStartupRunnable=new Runnable(){
+			@Override
+			public void run(){
+				if(liquidStartupRunnable!=this)
+					return;
+				liquidStartupRunnable=null;
+				if(content!=ownedContent || fragmentContainer!=ownedContainer || getActivity()==null
+						|| !ownedContent.isAttachedToWindow() || !ownedContainer.isAttachedToWindow())
+					return;
+				if(!GlobalUserPreferences.isIosLiquidNavigationEnabled()){
+					restoreClassicNavigation();
+					return;
+				}
+				// isHardwareAccelerated is meaningful only after attachment; check the actual view.
+				if(!ownedContainer.isHardwareAccelerated()){
+					stopLiquidCapture();
+					LiquidGlassCompatibility.reportFailure("home hardware acceleration",
+							new IllegalStateException("Attached home view is software rendered"));
+					return;
+				}
+				liquidHardwareVerified=true;
+				try{
+					if(liquidNavigationController==null)
+						createNavigationBar(LayoutInflater.from(getActivity()));
+					if(!GlobalUserPreferences.isIosLiquidNavigationEnabled() || liquidNavigationController==null)
+						return;
+					if(liquidToolbarController==null && homeTabFragment!=null)
+						createLiquidToolbar();
+					if(!GlobalUserPreferences.isIosLiquidNavigationEnabled())
+						return;
+					HomeLiquidNavigationController ownedNavigation=liquidNavigationController;
+					HomeLiquidToolbarController ownedToolbar=liquidToolbarController;
+					ownedContainer.setCaptureListener((top, bottom)->{
+						if(content!=ownedContent || fragmentContainer!=ownedContainer || !ownedContainer.isAttachedToWindow()
+								|| liquidNavigationController!=ownedNavigation || liquidToolbarController!=ownedToolbar
+								|| !GlobalUserPreferences.isIosLiquidNavigationEnabled())
+							return;
+						try{
+							if(top!=null && currentTab==R.id.tab_home && ownedToolbar!=null)
+								ownedToolbar.setBackdropBitmap(top);
+							if(bottom!=null)
+								ownedNavigation.setBackdropBitmap(bottom);
+						}catch(RuntimeException | LinkageError | OutOfMemoryError error){
+							stopLiquidCapture();
+							LiquidGlassCompatibility.reportFailure("home backdrop update", error);
+						}
+					});
+					liquidCaptureStarted=true;
+					updateCaptureHeights();
+				}catch(RuntimeException | LinkageError | OutOfMemoryError error){
+					stopLiquidCapture();
+					LiquidGlassCompatibility.reportFailure("start home liquid glass", error);
+				}
+			}
+		};
+		ownedContent.post(liquidStartupRunnable);
+	}
+
+	private void createNavigationBar(LayoutInflater inflater){
+		cancelLiquidStartup();
+		stopLiquidCapture();
+		disposeLiquidNavigation();
+		navigationHost.removeAllViews();
+		tabBar=null;
+		tabBarWrap=null;
+		tabBarAvatar=null;
+		notificationsBadge=null;
+		diaperNewFeatureBadge=null;
+
+		Account self=AccountSessionManager.getInstance().getAccount(accountID).self;
+		if(GlobalUserPreferences.isIosLiquidNavigationEnabled() && liquidHardwareVerified){
+			try{
+				liquidNavigationController=new HomeLiquidNavigationController(getActivity(), currentTab, self.avatar, this::onTabSelected, this::onTabLongClick);
+				navigationHost.addView(liquidNavigationController.getView(), new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+			}catch(RuntimeException | LinkageError | OutOfMemoryError error){
+				LiquidGlassCompatibility.reportFailure("create home liquid navigation", error);
+				disposeLiquidNavigation();
+				navigationHost.removeAllViews();
+			}
+		}
+		if(liquidNavigationController==null){
+			fragmentContainer.setCaptureListener(null);
+			inflater.inflate(R.layout.tab_bar, navigationHost, true);
+			tabBar=navigationHost.findViewById(R.id.tabbar);
+			tabBar.setListeners(this::onTabSelected, this::onTabLongClick);
+			tabBarWrap=navigationHost.findViewById(R.id.tabbar_wrap);
+			tabBarAvatar=tabBar.findViewById(R.id.tab_profile_ava);
+			tabBarAvatar.setOutlineProvider(OutlineProviders.OVAL);
+			tabBarAvatar.setClipToOutline(true);
+			ViewImageLoader.loadWithoutAnimation(tabBarAvatar, null, new UrlImageLoaderRequest(self.avatar, V.dp(24), V.dp(24)));
+			notificationsBadge=tabBar.findViewById(R.id.notifications_badge);
+			diaperNewFeatureBadge=tabBar.findViewById(R.id.diaper_new_feature_badge);
+		}
+		selectTabInNavigation(currentTab);
+		if(liquidNavigationController!=null)
+			liquidNavigationController.setUnreadBadge(unreadNotificationsBadgeText);
+		else if(notificationsBadge!=null){
+			notificationsBadge.setVisibility(unreadNotificationsBadgeText==null ? View.GONE : View.VISIBLE);
+			notificationsBadge.setText(unreadNotificationsBadgeText);
+		}
+		updateDiaperNewFeatureBadge();
+		applyNavigationBottomInset();
+		updateCaptureHeights();
+	}
+
+	private void createLiquidToolbar(){
+		disposeLiquidToolbar();
+		toolbarHost.removeAllViews();
+		if(homeTabFragment==null)
+			return;
+		if(!GlobalUserPreferences.isIosLiquidNavigationEnabled() || !liquidHardwareVerified){
+			homeTabFragment.setLiquidToolbarController(null);
+			toolbarHost.setVisibility(View.GONE);
+			updateCaptureHeights();
+			return;
+		}
+		try{
+			liquidToolbarController=new HomeLiquidToolbarController(
+					getActivity(),
+					homeTabFragment::onLiquidTimelineSelected,
+					homeTabFragment::onLiquidNewPosts,
+					homeTabFragment::onLiquidCompose,
+					homeTabFragment::onLiquidMenuItem,
+					homeTabFragment::openSearch
+			);
+
+			List<HomeToolbarComposeMenuItem> composeItems=new ArrayList<>();
+			composeItems.add(new HomeToolbarComposeMenuItem(R.id.compose_post, getString(R.string.compose_menu_post), getNotes(MiuixIcons.INSTANCE)));
+			composeItems.add(new HomeToolbarComposeMenuItem(R.id.compose_friend_request, getString(R.string.compose_menu_friend_request), getContactsBook(MiuixIcons.INSTANCE)));
+			liquidToolbarController.setComposeMenu(composeItems);
+
+			liquidToolbarController.setMenuOpenListener(open->{
+				liquidToolbarMenuOpen=open;
+				updateCaptureHeights();
+			});
+			liquidToolbarController.setContentTouchTarget(fragmentContainer);
+			toolbarHost.addView(liquidToolbarController.getView(), new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+			homeTabFragment.setLiquidToolbarController(liquidToolbarController);
+			applyLiquidToolbarInsets();
+			updateLiquidToolbarVisibility();
+			updateCaptureHeights();
+		}catch(RuntimeException | LinkageError | OutOfMemoryError error){
+			stopLiquidCapture();
+			LiquidGlassCompatibility.reportFailure("create home liquid toolbar", error);
+			disposeLiquidToolbar();
+			toolbarHost.removeAllViews();
+			toolbarHost.setVisibility(View.GONE);
+			homeTabFragment.setLiquidToolbarController(null);
+		}
+	}
+
+	private void applyLiquidToolbarInsets(){
+		if(liquidToolbarController!=null)
+			liquidToolbarController.setStatusBarInset(topSystemInset);
+		updateCaptureHeights();
+	}
+
+	private void updateLiquidToolbarVisibility(){
+		boolean homeVisible=GlobalUserPreferences.isIosLiquidNavigationEnabled() && liquidToolbarController!=null && currentTab==R.id.tab_home;
+		if(toolbarHost!=null)
+			toolbarHost.setVisibility(homeVisible ? View.VISIBLE : View.GONE);
+		if(liquidToolbarController!=null)
+			liquidToolbarController.getView().setVisibility(homeVisible ? View.VISIBLE : View.GONE);
+		if(!homeVisible && liquidToolbarController!=null)
+			liquidToolbarController.closeMenu();
+		updateCaptureHeights();
+	}
+
+	private void updateCaptureHeights(){
+		if(fragmentContainer==null)
+			return;
+		boolean liquid=GlobalUserPreferences.isIosLiquidNavigationEnabled() && liquidNavigationController!=null;
+		int topHeight=0;
+		if(liquid && liquidCaptureStarted && toolbarHost!=null && toolbarHost.getVisibility()==View.VISIBLE && currentTab==R.id.tab_home && liquidToolbarController!=null)
+			topHeight=topSystemInset+V.dp(homeToolbarCaptureHeightDp(liquidToolbarMenuOpen));
+		int bottomHeight=navigationHost==null ? 0 : navigationHost.getHeight();
+		fragmentContainer.setCaptureHeights(topHeight, liquid && liquidCaptureStarted ? bottomHeight : 0);
+		if(homeTabFragment!=null)
+			homeTabFragment.setLiquidNavBottomInset(liquid ? bottomHeight : 0);
+	}
+
+	public boolean onBackPressed(){
+		return liquidToolbarController!=null && liquidToolbarController.onBackPressed();
+	}
+
+	private void selectTabInNavigation(@IdRes int tab){
+		tab=normalizeTab(tab);
+		if(liquidNavigationController!=null)
+			liquidNavigationController.setSelectedTab(tab);
+		else if(tabBar!=null)
+			tabBar.selectTab(tab);
+	}
+
+	private void applyNavigationBottomInset(){
+		if(liquidNavigationController!=null)
+			liquidNavigationController.setBottomInset(bottomSystemInset);
+		else if(tabBarWrap!=null)
+			tabBarWrap.setPadding(0, 0, 0, bottomSystemInset>0 ? Math.max(bottomSystemInset, V.dp(24)) : 0);
+		int navOverlay=GlobalUserPreferences.isIosLiquidNavigationEnabled() && liquidNavigationController!=null ? 0 : V.dp(56)+(bottomSystemInset>0 ? bottomSystemInset : 0);
+		if(homeTabFragment!=null)
+			homeTabFragment.setFabBottomInset(navOverlay);
+		if(conversationsFragment!=null)
+			conversationsFragment.setTabBarBottomInset(navOverlay);
 	}
 
 	@Override

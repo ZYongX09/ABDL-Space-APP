@@ -3,61 +3,53 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="vertical"
-    android:paddingHorizontal="16dp"
-    android:paddingVertical="12dp"
-    android:background="@drawable/bg_card"
+    android:layout_marginHorizontal="12dp"
+    android:layout_marginTop="12dp"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:minHeight="56dp"
+    android:paddingStart="16dp"
+    android:paddingEnd="12dp"
+    android:paddingTop="10dp"
+    android:paddingBottom="10dp"
+    android:background="@drawable/bg_license_card"
+    android:foreground="?android:attr/selectableItemBackground"
     android:clickable="true"
-    android:focusable="true"
-    android:foreground="?android:attr/selectableItemBackground">
+    android:focusable="true">
 
     <LinearLayout
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical">
+        android:layout_weight="1"
+        android:orientation="vertical">
 
         <TextView
             android:id="@+id/lib_name"
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
             android:textAppearance="@style/m3_title_small"
             android:textColor="?android:attr/textColorPrimary"
             android:singleLine="true"
             android:ellipsize="end"
-            tools:text="Library Name"/>
+            tools:text="OkHttp"/>
 
         <TextView
-            android:id="@+id/lib_license"
-            android:layout_width="wrap_content"
+            android:id="@+id/lib_summary"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:paddingHorizontal="8dp"
-            android:paddingVertical="2dp"
-            android:textAppearance="@style/m3_label_small"
-            android:textColor="#2196F3"
-            android:background="@drawable/bg_license_badge"
-            tools:text="Apache 2.0"/>
+            android:layout_marginTop="2dp"
+            android:textAppearance="@style/m3_body_small"
+            android:textColor="?attr/colorM3OnSurfaceVariant"
+            android:singleLine="true"
+            android:ellipsize="end"
+            tools:text="3.14.9, Apache-2.0"/>
     </LinearLayout>
 
-    <TextView
-        android:id="@+id/lib_description"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:textAppearance="@style/m3_body_small"
-        android:textColor="?android:attr/textColorSecondary"
-        tools:text="Description text"/>
-
-    <TextView
-        android:id="@+id/lib_url"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:textAppearance="@style/m3_label_small"
-        android:textColor="#2196F3"
-        android:singleLine="true"
-        android:ellipsize="end"
-        tools:text="https://github.com/..."/>
-
+    <ImageView
+        android:layout_width="16dp"
+        android:layout_height="16dp"
+        android:layout_marginStart="8dp"
+        android:importantForAccessibility="no"
+        android:src="@drawable/ic_arrow_right_24px"
+        android:tint="?attr/colorM3OnSurfaceVariant"/>
 </LinearLayout>

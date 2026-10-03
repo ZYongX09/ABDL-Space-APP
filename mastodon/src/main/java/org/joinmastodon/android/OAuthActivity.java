@@ -33,11 +33,26 @@ import me.grishka.appkit.api.Callback;
 import me.grishka.appkit.api.ErrorResponse;
 
 public class OAuthActivity extends Activity{
+	private Uri consumedCallback;
+
 	@Override
 	protected void onCreate(@Nullable Bundle savedInstanceState){
 		UiUtils.setUserPreferredTheme(this);
 		super.onCreate(savedInstanceState);
+		org.joinmastodon.android.security.AppSecurity.runAfterUnlock(this, this::processCallback);
+	}
+
+	@Override
+	protected void onNewIntent(Intent intent){
+		super.onNewIntent(intent);
+		setIntent(intent);
+		org.joinmastodon.android.security.AppSecurity.runAfterUnlock(this, this::processCallback);
+	}
+
+	private void processCallback(){
 		Uri uri=getIntent().getData();
+		if(uri!=null && uri.equals(consumedCallback)) return;
+		consumedCallback=uri;
 		if(uri==null){
 			finish();
 			return;
@@ -81,9 +96,12 @@ public class OAuthActivity extends Activity{
 				intent.putExtra("nbw_token", nbwToken);
 			}
 			intent.putExtra("nbw_user", nbwUser);
-			AccountSession session=AccountSessionManager.getInstance().getLastActiveAccount();
-			if(session!=null)
-				intent.putExtra("account", session.getID());
+			intent.putExtra("nbw_token", nbwToken);
+			if(!AccountSessionManager.getInstance().getLoggedInAccounts().isEmpty()){
+				AccountSession session=AccountSessionManager.getInstance().getLastActiveAccount();
+				if(session!=null)
+					intent.putExtra("account", session.getID());
+			}
 			intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
 			startActivity(intent);
 			finish();

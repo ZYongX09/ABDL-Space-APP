@@ -5,15 +5,25 @@
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:gravity="center_horizontal"
-    android:paddingVertical="24dp"
+    android:paddingTop="40dp"
+    android:paddingBottom="32dp"
     android:paddingHorizontal="16dp">
 
-    <ImageView
-        android:id="@+id/about_icon"
-        android:layout_width="64dp"
-        android:layout_height="64dp"
-        android:importantForAccessibility="no"
-        tools:src="@drawable/ic_ntf_logo"/>
+    <FrameLayout
+        android:layout_width="88dp"
+        android:layout_height="88dp"
+        android:background="@drawable/bg_about_icon">
+
+        <ImageView
+            android:id="@+id/about_icon"
+            android:layout_width="74dp"
+            android:layout_height="74dp"
+            android:layout_gravity="center"
+            android:importantForAccessibility="no"
+            android:scaleType="fitCenter"
+            tools:src="@drawable/ic_ntf_logo"/>
+
+    </FrameLayout>
 
     <TextView
         android:id="@+id/about_name"
@@ -21,17 +31,19 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="12dp"
         android:textAppearance="@style/m3_title_large"
-        android:textColor="?android:attr/textColorPrimary"
+        android:textColor="?colorM3OnBackground"
+        android:textSize="28sp"
         android:textStyle="bold"
+        android:letterSpacing="0.01"
         tools:text="ABDL Space"/>
 
     <TextView
         android:id="@+id/about_version"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:textAppearance="@style/m3_body_small"
-        android:textColor="?android:attr/textColorSecondary"
+        android:layout_marginTop="6dp"
+        android:textAppearance="@style/m3_body_medium"
+        android:textColor="?colorM3OnSurfaceVariant"
         tools:text="v1.0.0 (1)"/>
 
 </LinearLayout>

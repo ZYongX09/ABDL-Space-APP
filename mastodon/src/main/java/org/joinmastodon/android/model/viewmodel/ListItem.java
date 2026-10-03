@@ -17,6 +17,7 @@ public class ListItem<T>{
 	@DrawableRes
 	public int iconRes;
 	public int colorOverrideAttr;
+	public boolean iconTintEnabled=true;
 	public boolean dividerAfter;
 	private Consumer<ListItem<T>> onClick;
 	public boolean isEnabled=true;

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<me.grishka.appkit.views.FragmentRootLinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+	android:layout_width="match_parent"
+	android:layout_height="match_parent"
+	android:background="?colorVerificationBackground"
+	android:orientation="vertical">
+
+	<LinearLayout
+		android:layout_width="match_parent"
+		android:layout_height="65dp"
+		android:background="?colorVerificationTopSurface"
+		android:orientation="vertical">
+
+		<Toolbar
+			android:id="@+id/toolbar"
+			android:layout_width="match_parent"
+			android:layout_height="64dp"
+			android:background="?colorVerificationTopSurface"
+			android:contentInsetStartWithNavigation="0dp"
+			android:popupTheme="?android:attr/actionBarPopupTheme"
+			android:subtitleTextAppearance="?android:attr/subtitleTextAppearance"
+			android:theme="?android:attr/actionBarTheme"
+			android:titleMarginEnd="0dp"
+			android:titleMarginStart="0dp"
+			android:titleTextAppearance="@style/TextAppearance.Mastodon.Verification.Toolbar"/>
+
+		<View
+			android:layout_width="match_parent"
+			android:layout_height="1dp"
+			android:background="?colorVerificationProgressOutline"/>
+	</LinearLayout>
+
+	<FrameLayout
+		android:id="@+id/appkit_content"
+		android:layout_width="match_parent"
+		android:layout_height="0dp"
+		android:layout_weight="1"/>
+</me.grishka.appkit.views.FragmentRootLinearLayout>

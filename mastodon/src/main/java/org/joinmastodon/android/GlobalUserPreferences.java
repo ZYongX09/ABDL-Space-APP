@@ -5,6 +5,7 @@ import static org.joinmastodon.android.api.session.AccountLocalPreferences.Color
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.os.Build;
 
 import com.google.gson.JsonSyntaxException;
 
@@ -12,6 +13,7 @@ import org.joinmastodon.android.api.session.AccountLocalPreferences;
 import org.joinmastodon.android.api.session.AccountSession;
 import org.joinmastodon.android.api.session.AccountSessionManager;
 import org.joinmastodon.android.model.Account;
+import org.joinmastodon.android.ui.utils.LiquidGlassCompatibility;
 
 import java.lang.reflect.Type;
 
@@ -66,6 +68,7 @@ public class GlobalUserPreferences{
 	public static boolean showPostsWithoutAlt;
 	public static boolean showMediaPreview;
 	public static boolean removeTrackingParams;
+	public static boolean useIosLiquidNavigation;
 
 	// MOSHIDON: we changed this to public, because otherwise we can't export the settings
 	public static SharedPreferences getPrefs(){
@@ -118,7 +121,7 @@ public class GlobalUserPreferences{
 		overlayMedia=prefs.getBoolean("overlayMedia", false);
 		showSuicideHelp=prefs.getBoolean("showSuicideHelp", true);
 		underlinedLinks=prefs.getBoolean("underlinedLinks", true);
-		color=AccountLocalPreferences.ColorPreference.valueOf(prefs.getString("color", AccountLocalPreferences.ColorPreference.BLUE.name()));
+		color=AccountLocalPreferences.ColorPreference.valueOf(prefs.getString("color", AccountLocalPreferences.ColorPreference.NORD.name()));
 		likeIcon=prefs.getBoolean("likeIcon", false);
 		uniformNotificationIcon=prefs.getBoolean("uniformNotificationIcon", false);
 		showDividers =prefs.getBoolean("showDividers", false);
@@ -134,6 +137,11 @@ public class GlobalUserPreferences{
 		showPostsWithoutAlt=prefs.getBoolean("showPostsWithoutAlt", true);
 		showMediaPreview=prefs.getBoolean("showMediaPreview", true);
 		removeTrackingParams=prefs.getBoolean("removeTrackingParams", true);
+		boolean hasIosLiquidNavigationPreference=prefs.contains("useIosLiquidNavigation");
+		boolean storedIosLiquidNavigationPreference=prefs.getBoolean("useIosLiquidNavigation", true);
+		useIosLiquidNavigation=isIosLiquidNavigationSupported()
+				&& resolveIosLiquidNavigationEnabled(Build.VERSION.SDK_INT, hasIosLiquidNavigationPreference, storedIosLiquidNavigationPreference);
+		// Unsupported devices/sessions must not erase the user's saved choice.
 //		enhanceTextSize=prefs.getBoolean("enhanceTextSize", false);
 
 
@@ -152,8 +160,30 @@ public class GlobalUserPreferences{
 		}
 	}
 
+	static boolean resolveIosLiquidNavigationEnabled(int sdkInt, boolean hasExplicitPreference, boolean storedPreference){
+		if(sdkInt<Build.VERSION_CODES.TIRAMISU)
+			return false;
+		return hasExplicitPreference ? storedPreference : true;
+	}
+
+	public static boolean isIosLiquidNavigationSupported(){
+		return LiquidGlassCompatibility.isSupported();
+	}
+
+	public static boolean isIosLiquidNavigationEnabled(){
+		return isIosLiquidNavigationSupported() && useIosLiquidNavigation;
+	}
+
 	public static void save(){
-		getPrefs().edit()
+		boolean liquidSupported=isIosLiquidNavigationSupported();
+		if(!liquidSupported)
+			useIosLiquidNavigation=false;
+		SharedPreferences.Editor editor=getPrefs().edit();
+		// Save the requested choice only when usable. In particular, a session failure
+		// followed by an unrelated save must not permanently disable liquid navigation.
+		if(liquidSupported)
+			editor.putBoolean("useIosLiquidNavigation", useIosLiquidNavigation);
+		editor
 				.putBoolean("playGifs", playGifs)
 				.putBoolean("useCustomTabs", useCustomTabs)
 				.putInt("theme", theme.ordinal())
@@ -210,6 +240,7 @@ public class GlobalUserPreferences{
 				.putBoolean("showPostsWithoutAlt", showPostsWithoutAlt)
 				.putBoolean("showMediaPreview", showMediaPreview)
 				.putBoolean("removeTrackingParams", removeTrackingParams)
+
 //				.putBoolean("enhanceTextSize", enhanceTextSize)
 
 				.apply();

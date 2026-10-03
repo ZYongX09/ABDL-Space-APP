@@ -47,10 +47,21 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
+
+import java.io.IOException;
+
+import okhttp3.Call;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
 import android.widget.Toolbar;
 
+import com.squareup.otto.Subscribe;
+
 import org.joinmastodon.android.BuildConfig;
+import org.joinmastodon.android.E;
 import org.joinmastodon.android.GlobalUserPreferences;
+import org.joinmastodon.android.MainActivity;
 import org.joinmastodon.android.R;
 import org.joinmastodon.android.api.MastodonAPIRequest;
 import org.joinmastodon.android.api.requests.accounts.GetAccountByID;
@@ -61,6 +72,9 @@ import org.joinmastodon.android.api.requests.accounts.SetAccountFollowed;
 import org.joinmastodon.android.api.requests.accounts.SetPrivateNote;
 import org.joinmastodon.android.api.requests.accounts.UpdateAccountCredentials;
 import org.joinmastodon.android.api.session.AccountSessionManager;
+import org.joinmastodon.android.chat.ChatController;
+import org.joinmastodon.android.chat.ChatEvents;
+import org.joinmastodon.android.chat.model.Conversation;
 import org.joinmastodon.android.fragments.account_list.FamiliarFollowerListFragment;
 import org.joinmastodon.android.fragments.account_list.FollowerListFragment;
 import org.joinmastodon.android.fragments.account_list.FollowingListFragment;
@@ -78,6 +92,7 @@ import org.joinmastodon.android.ui.SingleImagePhotoViewerListener;
 import org.joinmastodon.android.ui.Snackbar;
 import org.joinmastodon.android.ui.photoviewer.AvatarCropper;
 import org.joinmastodon.android.ui.photoviewer.PhotoViewer;
+import org.joinmastodon.android.ui.sheets.BadgeExplainerSheet;
 import org.joinmastodon.android.ui.sheets.DecentralizationExplainerSheet;
 import org.joinmastodon.android.ui.tabs.TabLayout;
 import org.joinmastodon.android.ui.tabs.TabLayoutMediator;
@@ -148,6 +163,9 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 	private View nameEditWrap, bioEditWrap;
 	private View tabsDivider;
 	private View actionButtonWrap;
+	private View nbwSourceNotice;
+	private LinearLayout badgeContainer;
+	private OkHttpClient badgeHttpClient;
 	private CustomDrawingOrderLinearLayout scrollableContent;
 	private ImageButton qrCodeButton;
 	private ProgressBar innerProgress;
@@ -177,6 +195,7 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 	private Animator tabBarColorAnim;
 	private MenuItem editSaveMenuItem;
 	private TextView profileNotificationsBadge;
+	private TextView profileMessagesBadge;
 	private String unreadNotificationsBadgeText;
 	private boolean savingEdits;
 	private Runnable editModeBackCallback=this::onEditModeBackCallback;
@@ -189,6 +208,7 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 	@Override
 	public void onCreate(Bundle savedInstanceState){
 		super.onCreate(savedInstanceState);
+		E.register(this);
 		if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.N)
 			setRetainInstance(true);
 
@@ -215,6 +235,7 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 	@Override
 	public void onDestroy(){
 		super.onDestroy();
+		E.unregister(this);
 		for(APIRequest<?> req:relationshipRequests)
 			req.cancel();
 		relationshipRequests.clear();
@@ -252,6 +273,9 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 		countersLayout=content.findViewById(R.id.profile_counters);
 		tabsDivider=content.findViewById(R.id.tabs_divider);
 		actionButtonWrap=content.findViewById(R.id.profile_action_btn_wrap);
+		nbwSourceNotice=content.findViewById(R.id.nbw_source_notice);
+		badgeContainer=content.findViewById(R.id.badge_container);
+		badgeHttpClient=new OkHttpClient();
 		scrollableContent=content.findViewById(R.id.scrollable_content);
 		qrCodeButton=content.findViewById(R.id.qr_code);
 		innerProgress=content.findViewById(R.id.profile_progress);
@@ -662,6 +686,8 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 		innerProgress.setVisibility(View.VISIBLE);
 		this.username.setText(username);
 		name.setText(username);
+		org.joinmastodon.android.sponsors.SponsorUsername.apply(name, null, accountID);
+		org.joinmastodon.android.sponsors.SponsorUsername.apply(this.username, null, accountID);
 		usernameDomain.setText(domain);
 		avatar.setImageResource(R.drawable.image_placeholder);
 		cover.setImageResource(R.drawable.image_placeholder);
@@ -693,6 +719,8 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 			HtmlParser.parseCustomEmoji(ssb, account.emojis);
 		name.setText(ssb);
 		setTitle(ssb);
+		org.joinmastodon.android.sponsors.SponsorUsername.apply(name, account, accountID);
+		org.joinmastodon.android.sponsors.SponsorUsername.apply(username, account, accountID);
 
 		boolean isSelf=AccountSessionManager.getInstance().isSelf(accountID, account);
 
@@ -728,6 +756,7 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 		UiUtils.loadCustomEmojiInTextView(bio);
 
 		if(AccountSessionManager.getInstance().isSelf(accountID, account)){
+			nbwSourceNotice.setVisibility(View.GONE);
 			actionButton.setText(R.string.edit_profile);
 			TypedArray ta=actionButton.getContext().obtainStyledAttributes(R.style.Widget_Mastodon_M3_Button_Tonal, new int[]{android.R.attr.background});
 			actionButton.setBackground(ta.getDrawable(0));
@@ -737,6 +766,8 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 			ta.recycle();
 		}else{
 			actionButton.setVisibility(View.GONE);
+			actionProgress.setVisibility(View.GONE);
+			nbwSourceNotice.setVisibility(isNBWAccount() ? View.VISIBLE : View.GONE);
 		}
 
 		fields.clear();
@@ -746,7 +777,25 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 		joined.parsedValue=joined.value=DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).format(LocalDateTime.ofInstant(account.createdAt, ZoneId.systemDefault()));
 		fields.add(joined);
 
-		for(AccountField field:account.fields){
+		AccountField ipLocation=new AccountField();
+		ipLocation.parsedName=ipLocation.name=getString(R.string.profile_ip_location);
+		String province=account.lastStatusProvince;
+		ipLocation.parsedValue=ipLocation.value=(province!=null && !province.isEmpty())
+				? province
+				: getString(R.string.location_unknown);
+			fields.add(ipLocation);
+
+			if(account.babyVerification!=null && account.babyVerification.verified && account.babyVerification.certificateUrl!=null){
+				AccountField verification=new AccountField();
+				verification.name=getString(R.string.verification_profile_item); verification.parsedName=verification.name;
+				verification.value=getString(R.string.verification_profile_item_value); verification.parsedValue=verification.value;
+				verification.babyVerification=true;
+				verification.babyVerificationUrl=account.babyVerification.certificateUrl;
+				verification.nameEmojis=new CustomEmojiSpan[0]; verification.valueEmojis=new CustomEmojiSpan[0]; verification.emojiRequests=new ArrayList<>();
+				fields.add(verification);
+			}
+
+			for(AccountField field:account.fields){
 			field.parsedValue=ssb=HtmlParser.parse(field.value, account.emojis, Collections.emptyList(), Collections.emptyList(), accountID, account, getActivity());
 			field.valueEmojis=ssb.getSpans(0, ssb.length(), CustomEmojiSpan.class);
 			ssb=new SpannableStringBuilder(field.name);
@@ -766,6 +815,98 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 		if(aboutFragment!=null){
 			aboutFragment.setFields(fields);
 		}
+
+		loadBadges();
+	}
+
+	private void loadBadges(){
+		if(account==null || account.id==null) return;
+		String userId=account.id;
+		if(userId.startsWith("nbw_")) return;
+
+		badgeContainer.removeAllViews();
+		badgeContainer.setVisibility(View.GONE);
+
+		badgeHttpClient.newCall(new Request.Builder().url("https://api.abdl-space.top/api/users/"+userId+"/badges").get().build())
+			.enqueue(new okhttp3.Callback(){
+				@Override
+				public void onFailure(Call call, IOException e){}
+
+				@Override
+				public void onResponse(Call call, Response response) throws IOException{
+					if(!response.isSuccessful()) return;
+					String body=response.body()!=null ? response.body().string() : "";
+					try{
+						com.google.gson.JsonObject json=new com.google.gson.JsonParser().parse(body).getAsJsonObject();
+						com.google.gson.JsonArray badges=json.getAsJsonArray("badges");
+						if(badges==null || badges.size()==0) return;
+
+						getActivity().runOnUiThread(()->{
+							// 现有徽章展示方式（个人中心 pill 列表 & 用户名后圆形图标）已移除；
+							// 本人 profile 改为“展示徽章选择器”：点选一枚作为用户名旁展示的徽章，再点取消。
+							if(!isOwnProfile)
+								return;
+							badgeContainer.removeAllViews();
+							for(int i=0;i<badges.size();i++){
+								com.google.gson.JsonObject badge=badges.get(i).getAsJsonObject();
+								String key=badge.has("key") ? badge.get("key").getAsString() : "";
+								String bName=badge.has("name") ? badge.get("name").getAsString() : "";
+								String color=badge.has("color") ? badge.get("color").getAsString() : "#7C4DFF";
+								boolean displayed=badge.has("displayed") && badge.get("displayed").getAsBoolean();
+
+								android.widget.TextView pill=new android.widget.TextView(getActivity());
+								pill.setText(bName+(displayed ? " ✓" : ""));
+								int bgColor=parseBadgeColor(color);
+								android.graphics.drawable.GradientDrawable bg=new android.graphics.drawable.GradientDrawable();
+								bg.setCornerRadius(V.dp(8));
+								bg.setColor(bgColor);
+								pill.setBackground(bg);
+								pill.setTextColor(org.joinmastodon.android.ui.text.BadgeSpan.foregroundColorFor(bgColor));
+								pill.setTextSize(11);
+								pill.setTypeface(pill.getTypeface(), android.graphics.Typeface.BOLD);
+								pill.setPadding(V.dp(8), V.dp(3), V.dp(8), V.dp(3));
+								LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+								params.setMargins(0, 0, V.dp(8), V.dp(4));
+								badgeContainer.addView(pill, params);
+
+								boolean currentlyDisplayed=displayed;
+								pill.setOnClickListener(v->{
+									setDisplayedBadge(key, currentlyDisplayed ? null : key);
+								});
+							}
+							badgeContainer.setVisibility(View.VISIBLE);
+						});
+					}catch(Exception ignored){}
+				}
+			});
+	}
+
+	private void setDisplayedBadge(String badgeKey, String newKey){
+		String token=AccountSessionManager.getInstance().getAccount(accountID).token.accessToken;
+		okhttp3.RequestBody reqBody=okhttp3.RequestBody.create(
+				okhttp3.MediaType.parse("application/json; charset=utf-8"),
+				"{\"badge_key\":"+(newKey==null ? "null" : ("\""+newKey+"\""))+"}");
+		okhttp3.Request request=new Request.Builder()
+				.url("https://api.abdl-space.top/api/users/"+account.id+"/badges/display")
+				.header("Authorization", "Bearer "+token)
+				.post(reqBody)
+				.build();
+		badgeHttpClient.newCall(request).enqueue(new okhttp3.Callback(){
+			@Override
+			public void onFailure(Call call, IOException e){}
+			@Override
+			public void onResponse(Call call, Response response) throws IOException{
+				if(response.isSuccessful()){
+					getActivity().runOnUiThread(()->loadBadges());
+				}
+			}
+		});
+	}
+
+	private int parseBadgeColor(String color){
+		if(color==null || color.length()!=7 || color.charAt(0)!='#') return 0xFF7C4DFF;
+		try{ return (int)(0xFF000000L | Long.parseLong(color.substring(1), 16)); }
+		catch(NumberFormatException e){ return 0xFF7C4DFF; }
 	}
 
 	private void updateToolbar(){
@@ -804,6 +945,12 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 			profileNotificationsBadge=actionView.findViewById(R.id.profile_notifications_badge);
 			actionView.setOnClickListener(v->openNotifications());
 			updateProfileNotificationsBadge();
+			MenuItem messagesItem=menu.findItem(R.id.messages_action);
+			View messagesActionView=LayoutInflater.from(getActivity()).inflate(R.layout.action_home_messages, getToolbar(), false);
+			messagesItem.setActionView(messagesActionView);
+			profileMessagesBadge=messagesActionView.findViewById(R.id.messages_badge);
+			messagesActionView.setOnClickListener(v->openConversations());
+			updateProfileMessagesBadge();
 			return;
 		}
 
@@ -837,6 +984,16 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 		int id=item.getItemId();
 		if(id==R.id.share){
 			UiUtils.openSystemShareSheet(getActivity(), account);
+		}else if(id==R.id.messages_action){
+			openConversations();
+		}else if(id==R.id.send_message){
+			Intent chatIntent=new Intent(getActivity(), MainActivity.class);
+			chatIntent.putExtra("navigate_to", "chat");
+			chatIntent.putExtra("peer_id", account.id!=null ? Long.parseLong(account.id) : 0);
+			chatIntent.putExtra("peer_name", account.displayName!=null ? account.displayName : account.username);
+			chatIntent.putExtra("peer_avatar", account.avatar);
+			chatIntent.putExtra("account", accountID);
+			startActivity(chatIntent);
 		}else if(id==R.id.mute){
 			confirmToggleMuted();
 		}else if(id==R.id.block){
@@ -915,6 +1072,50 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 		profileNotificationsBadge.setText(visible ? unreadNotificationsBadgeText : "");
 	}
 
+	private void openConversations(){
+		Intent intent=new Intent(getActivity(), MainActivity.class);
+		intent.putExtra("navigate_to", "conversations");
+		intent.putExtra("account", accountID);
+		startActivity(intent);
+	}
+
+	private void updateProfileMessagesBadge(){
+		if(profileMessagesBadge==null || accountID==null)
+			return;
+		int unread=0;
+		for(Conversation conversation:ChatController.getInstance(accountID).getStorage().listConversations(accountID))
+			unread+=Math.max(0, conversation.unreadCount);
+		profileMessagesBadge.setVisibility(unread>0 ? View.VISIBLE : View.GONE);
+		profileMessagesBadge.setText(unread>99 ? "99+" : String.valueOf(unread));
+	}
+
+	@Subscribe
+	public void onSponsorChanged(org.joinmastodon.android.events.SponsorChangedEvent event){
+		if(accountID==null || !accountID.equals(event.accountID) || account==null) return;
+		var session=AccountSessionManager.getInstance().tryGetAccount(accountID);
+		if(session==null || session.self==null || !account.id.equals(session.self.id)) return;
+		account.sponsor=session.self.sponsor;
+		if(getActivity()!=null && name!=null && username!=null){
+			org.joinmastodon.android.sponsors.SponsorUsername.apply(name, account, accountID);
+			org.joinmastodon.android.sponsors.SponsorUsername.apply(username, account, accountID);
+		}
+	}
+
+	@Subscribe
+	public void onConversationsUpdated(ChatEvents.ConversationsUpdatedEvent event){
+		updateProfileMessagesBadge();
+	}
+
+	@Subscribe
+	public void onNewChatMessage(ChatEvents.NewChatMessageEvent event){
+		updateProfileMessagesBadge();
+	}
+
+	@Subscribe
+	public void onChatMessageRead(ChatEvents.MessageReadEvent event){
+		updateProfileMessagesBadge();
+	}
+
 	private void openNotifications(){
 		Bundle args=new Bundle();
 		args.putString("account", accountID);
@@ -977,14 +1178,26 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 
 	private void updateRelationship(){
 		invalidateOptionsMenu();
-		actionButton.setVisibility(View.VISIBLE);
-		UiUtils.setRelationshipToActionButtonM3(relationship, actionButton);
-		actionProgress.setIndeterminateTintList(actionButton.getTextColors());
-		followsYouView.setVisibility(relationship.followedBy ? View.VISIBLE : View.GONE);
+		if(isNBWAccount()){
+			actionButton.setVisibility(View.GONE);
+			actionProgress.setVisibility(View.GONE);
+			nbwSourceNotice.setVisibility(View.VISIBLE);
+			followsYouView.setVisibility(View.GONE);
+		}else{
+			nbwSourceNotice.setVisibility(View.GONE);
+			actionButton.setVisibility(View.VISIBLE);
+			UiUtils.setRelationshipToActionButtonM3(relationship, actionButton);
+			actionProgress.setIndeterminateTintList(actionButton.getTextColors());
+			followsYouView.setVisibility(relationship.followedBy ? View.VISIBLE : View.GONE);
+		}
 
 		// MOSHIDON: private note stuff!
 		showPrivateNote();
 		UiUtils.beginLayoutTransition(scrollableContent);
+	}
+
+	private boolean isNBWAccount(){
+		return account!=null && account.id!=null && account.id.startsWith("nbw_");
 	}
 
 	private void updateFamiliarFollowers(){
@@ -1088,7 +1301,11 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 	}
 
 	private RecyclerView getScrollableRecyclerView(){
-		return getFragmentForPage(pager.getCurrentItem()).getView().findViewById(R.id.list);
+		if(pager==null)
+			return null;
+		Fragment fragment=getFragmentForPage(pager.getCurrentItem());
+		View view=fragment==null ? null : fragment.getView();
+		return view==null ? null : view.findViewById(R.id.list);
 	}
 
 	private void onActionButtonClick(View v){
@@ -1436,8 +1653,11 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 
 	@Override
 	public void scrollToTop(){
-		getScrollableRecyclerView().scrollToPosition(0);
-		scrollView.smoothScrollTo(0, 0);
+		RecyclerView list=getScrollableRecyclerView();
+		if(list!=null)
+			list.scrollToPosition(0);
+		if(scrollView!=null)
+			scrollView.smoothScrollTo(0, 0);
 	}
 
 	private void onFollowersOrFollowingClick(View v){

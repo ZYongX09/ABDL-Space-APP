@@ -80,6 +80,7 @@ import java.util.stream.Collectors;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.browser.customtabs.CustomTabsIntent;
+import org.joinmastodon.android.novel.NovelAccountDataCleaner;
 import me.grishka.appkit.api.APIRequest;
 import me.grishka.appkit.api.Callback;
 import me.grishka.appkit.api.ErrorResponse;
@@ -202,6 +203,8 @@ public class AccountSessionManager{
 
 	public void removeAccount(String id){
 		AccountSession session=getAccount(id);
+		NovelAccountDataCleaner.revoke(id, ()->sessions.remove(id));
+		NovelAccountDataCleaner.clean(MastodonApp.context, id);
 		session.getCacheController().closeDatabase();
 		MastodonApp.context.deleteDatabase(id+".db");
 		MastodonApp.context.getSharedPreferences(id, 0).edit().clear().commit();
@@ -214,8 +217,7 @@ public class AccountSessionManager{
 				new File(prefsDir, id+".xml").delete();
 			}
 		}
-		sessions.remove(id);
-		if(lastActiveAccountID.equals(id)){
+		if(id.equals(lastActiveAccountID)){
 			if(sessions.isEmpty())
 				lastActiveAccountID=null;
 			else

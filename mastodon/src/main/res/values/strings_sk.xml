@@ -155,6 +155,7 @@
     <string name="sk_edit_list_title">Edit list</string>
     <string name="sk_your_lists">Your lists</string>
     <string name="sk_timeline_home">Home</string>
+    <string name="sk_timeline_nbw">宝宝新天地</string>
     <string name="sk_timeline_local">Local</string>
     <string name="sk_timeline_federated">Federation</string>
     <string name="sk_timeline_bubble">Bubble</string>
@@ -438,7 +439,8 @@
 	<string name="sk_poll_multiple_choice">Multiple choices</string>
 	<string name="sk_poll_show_results">Show results</string>
 	<string name="sk_poll_hide_results">Hide results</string>
-	<string name="open_source_licenses">Open Source Licenses</string>
+	<string name="open_source_licenses">Third Party Licenses</string>
+	<string name="third_party_licenses_footer">This list covers selected open-source libraries resolved for the release runtime, adapted source and artwork, and the desugaring runtime. Components are grouped only when their versions match; it is not a complete inventory of transitive dependencies.\nSource adaptations are not binary dependencies. Retain upstream copyright, license and applicable NOTICE files when redistributing; this summary is not a replacement for the full license texts.\nProprietary SDKs, including JPush and QQ Connect, are governed by their official agreements and are not listed as open-source libraries.</string>
 	<string name="support_us">Support Us</string>
 	<string name="support_us_message">If ABDL Space has been helpful to you, feel free to support us! You can donate via Afdian (爱发电).</string>
 	<string name="settings_about_website">Official Website</string>

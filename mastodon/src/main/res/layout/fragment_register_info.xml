@@ -54,15 +54,23 @@
                 android:paddingEnd="24dp"
                 android:paddingBottom="24dp">
 
-                <TextView
+                <EditText
                     android:id="@+id/tv_email"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
+                    android:layout_height="56dp"
                     android:layout_marginBottom="20dp"
-                    android:text="user@example.com"
-                    android:textSize="15sp"
-                    android:textColor="?colorM3OnSurfaceVariant"
-                    android:gravity="center" />
+                    android:background="@drawable/bg_input_light"
+                    android:hint="邮箱"
+                    android:inputType="textEmailAddress"
+                    android:singleLine="true"
+                    android:textSize="16sp"
+                    android:textColor="?colorM3OnSurface"
+                    android:textColorHint="?colorM3OnSurfaceVariant"
+                    android:drawableStart="@drawable/ic_email_24"
+                    android:drawablePadding="12dp"
+                    android:drawableTint="?colorM3OnSurfaceVariant"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp" />
 
                 <EditText
                     android:id="@+id/username_edit"
