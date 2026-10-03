@@ -40,6 +40,10 @@ This change closes the unsupported-device settings bypass and adds process-local
 - `git diff --check` passed.
 - Build emitted existing Gradle deprecation/flatDir and D8 Kotlin-metadata rewrite warnings; they did not fail the build.
 
+## Subsequent formal publication (2026-10-03)
+
+The local-only statements above describe the original build. The exact signed code31 APK was subsequently renamed to `ABDL-Space-3.0.0-31.apk` and published without rebuilding. Full online-download SHA-256 matched the original artifact. See [formal release record](../../release-3.0.0-31-2026-10-03.md) for the URL, metadata, repository merge, and outstanding acceptance boundaries.
+
 ## Verification boundaries
 
 Focused tests cover API 26–35 preference behavior, low-RAM gating, preserved saved choices, deferred notifications, guarded fallback pixels, disabled-first attachment/update cleanup, removal/recreation, recording/content-error behavior, capture coordinates, memory bounds, conversion/restoration failures, and navigation/menu regressions.
