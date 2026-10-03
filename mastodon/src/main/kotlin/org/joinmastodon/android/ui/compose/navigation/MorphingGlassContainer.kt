@@ -53,7 +53,10 @@ import org.joinmastodon.android.ui.compose.ui.isInDarkTheme
 import top.yukonga.miuix.kmp.blur.Backdrop
 import top.yukonga.miuix.kmp.blur.blur
 import top.yukonga.miuix.kmp.blur.drawBackdrop
-import top.yukonga.miuix.kmp.blur.isRuntimeShaderSupported
+import androidx.compose.ui.graphics.drawOutline
+import org.joinmastodon.android.ui.compose.utils.GraphicsSafety
+import org.joinmastodon.android.ui.compose.utils.safeBackdropEffect
+import org.joinmastodon.android.ui.compose.utils.rememberGraphicsEffectsSupported
 import kotlin.math.hypot
 
 /** Shared by the rendered toolbar menus, outside-touch gate and drag selection. */
@@ -180,6 +183,7 @@ internal fun MorphingGlassContainer(
 	val shape = RoundedCornerShape(radius)
 	val contentScale = menuSpec.enterScaleFrom + (1f - menuSpec.enterScaleFrom) * enterFraction.value.coerceIn(0f, 1f)
 	val squircleEnabled = isSquircleEnabled()
+	val graphicsSupported = rememberGraphicsEffectsSupported()
 	Box(
 		modifier = modifier
 			.width(width)
@@ -193,23 +197,6 @@ internal fun MorphingGlassContainer(
 					pivotFractionY = 0f,
 				)
 			}
-			.then(
-				if(isRuntimeShaderSupported()) Modifier.drawBackdrop(
-					backdrop = backdrop,
-					shape = { shape },
-					effects = {
-						vibrancy()
-						val blurRadius = homeLiquidToolbarVisualSpec().blurRadiusDp.dp.toPx()
-						blur(blurRadius, blurRadius)
-					lens(
-						refractionHeight = lerp(18.dp.toPx(), 10.dp.toPx(), cp),
-						refractionAmount = lerp(20.dp.toPx(), 12.dp.toPx(), cp),
-					)
-				},
-				highlight = { outlineHighlight.value.copy(alpha = lerp(0.82f, 0.68f, cp)) },
-					onDrawSurface = { drawRect(surface) },
-				) else Modifier.background(surface, shape),
-			)
 			.clip(shape)
 			.then(if(enableDragSelection) Modifier.pointerInput(Unit) {
 				awaitEachGesture {
@@ -260,6 +247,33 @@ internal fun MorphingGlassContainer(
 			.clickable(interactionSource = interactionSource, indication = null, onClick = onClick),
 		contentAlignment = Alignment.TopStart,
 	) {
+		// Empty effect child: content drawing is deliberately outside the safety boundary.
+		Box(Modifier.matchParentSize().then(
+			if(graphicsSupported) Modifier.safeBackdropEffect(
+				operation = "morphing glass backdrop",
+				fallback = { drawOutline(shape.createOutline(size, layoutDirection, this), surface.copy(alpha = 1f)) },
+			) { enabled ->
+				Modifier.drawBackdrop(
+					enabled = enabled,
+					backdrop = backdrop,
+					shape = { shape },
+					effects = {
+					    GraphicsSafety.guarded("backdrop effects callback", fallback = { renderEffect = null }) {
+						vibrancy()
+						val blurRadius = homeLiquidToolbarVisualSpec().blurRadiusDp.dp.toPx()
+						blur(blurRadius, blurRadius)
+						lens(
+							refractionHeight = lerp(18.dp.toPx(), 10.dp.toPx(), cp),
+							refractionAmount = lerp(20.dp.toPx(), 12.dp.toPx(), cp),
+						)
+
+					    }
+					},
+					highlight = { outlineHighlight.value.copy(alpha = lerp(0.82f, 0.68f, cp)) },
+					onDrawSurface = { drawRect(surface) },
+				)
+			} else Modifier.background(surface.copy(alpha = 1f), shape),
+		))
 		Box(
 			modifier = Modifier.graphicsLayer {
 				alpha = (1f - cp * 1.8f).coerceIn(0f, 1f)

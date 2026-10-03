@@ -3,6 +3,7 @@
 
 package org.joinmastodon.android.ui.compose.component.effect
 
+import org.joinmastodon.android.ui.compose.utils.GraphicsSafety
 import androidx.compose.ui.graphics.Brush
 import top.yukonga.miuix.kmp.blur.RuntimeShader
 import top.yukonga.miuix.kmp.blur.asBrush
@@ -13,12 +14,20 @@ internal class BgEffectPainter(
     private val isOs3: Boolean = true,
 ) {
 
-    val runtimeShader by lazy {
-        val shaderCode = if (isOs3) OS3_BG_FRAG else OS2_BG_FRAG
-        RuntimeShader(shaderCode).also {
-            initStaticUniforms(it)
+    private var shader: RuntimeShader? = null
+
+    // Called in remember's non-composable calculation, not lazily on the first draw.
+    fun prepare(): Boolean {
+        shader = GraphicsSafety.guarded("background shader construction", fallback = { null }) {
+            RuntimeShader(if (isOs3) OS3_BG_FRAG else OS2_BG_FRAG).also(::initStaticUniforms)
         }
+        return shader != null
     }
+
+    fun clear() { shader = null }
+
+    private val runtimeShader: RuntimeShader
+        get() = checkNotNull(shader)
 
     val brush: Brush get() = runtimeShader.asBrush()
 

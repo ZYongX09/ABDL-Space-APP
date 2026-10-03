@@ -5,6 +5,7 @@ package org.joinmastodon.android.ui.compose.navigation.liquid
 
 // Adapted from Kyant0/AndroidLiquidGlass — https://github.com/Kyant0/AndroidLiquidGlass (Apache 2.0).
 
+import org.joinmastodon.android.ui.compose.utils.GraphicsSafety
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
 import androidx.compose.ui.Modifier
@@ -93,15 +94,22 @@ private class InnerShadowNode(
     override val shouldAutoInvalidate: Boolean = false
 
     private var shadowLayer: GraphicsLayer? = null
-    private val paint = Paint()
-    private val clipPath = Path()
+    private var paint: Paint? = null
+    private var clipPath: Path? = null
     private var prevRadius = Float.NaN
 
     override fun ContentDrawScope.draw() {
         drawContent()
 
+        if (!GraphicsSafety.isSupported()) {
+            releaseLayer()
+            return
+        }
         val shadow = shadow() ?: return
-        val layer = shadowLayer ?: return
+        GraphicsSafety.drawEffect(this, "liquid glass inner shadow", onFailure = { releaseLayer() }) {
+        val layer = shadowLayer ?: return@drawEffect
+        val paint = this@InnerShadowNode.paint ?: Paint().also { this@InnerShadowNode.paint = it }
+        val clipPath = this@InnerShadowNode.clipPath ?: Path().also { this@InnerShadowNode.clipPath = it }
 
         val radius = shadow.radius.toPx()
         val offsetX = shadow.offset.x.toPx()
@@ -126,37 +134,48 @@ private class InnerShadowNode(
         layer.record {
             drawContext.canvas.let { canvas ->
                 canvas.save()
-                canvas.clipPath(clipPath)
-                canvas.drawOutline(outline, paint)
-                canvas.translate(offsetX, offsetY)
-                canvas.drawOutline(outline, ShadowMaskPaint)
-                canvas.translate(-offsetX, -offsetY)
-                canvas.restore()
+                try {
+                    canvas.clipPath(clipPath)
+                    canvas.drawOutline(outline, paint)
+                    canvas.translate(offsetX, offsetY)
+                    canvas.drawOutline(outline, Paint().apply { blendMode = BlendMode.Clear })
+                } finally {
+                    canvas.restore()
+                }
             }
         }
 
         drawContext.canvas.let { canvas ->
             canvas.save()
-            canvas.clipPath(clipPath)
-            drawLayer(layer)
-            canvas.restore()
+            try {
+                canvas.clipPath(clipPath)
+                drawLayer(layer)
+            } finally {
+                canvas.restore()
+            }
+        }
         }
     }
 
     override fun onAttach() {
-        shadowLayer = requireGraphicsContext().createGraphicsLayer().apply {
-            compositingStrategy = CompositingStrategy.Offscreen
+        GraphicsSafety.guarded("inner shadow layer construction", fallback = {}, onFailure = { releaseLayer() }) {
+            val layer = requireGraphicsContext().createGraphicsLayer()
+            // Retain before configuring so a configuration failure can release the allocation.
+            shadowLayer = layer
+            layer.compositingStrategy = CompositingStrategy.Offscreen
         }
     }
 
-    override fun onDetach() {
-        shadowLayer?.let { layer ->
+    private fun releaseLayer() {
+        val layer = shadowLayer
+        shadowLayer = null
+        paint = null
+        clipPath = null
+        prevRadius = Float.NaN
+        if (layer != null) GraphicsSafety.cleanup("inner shadow release") {
             requireGraphicsContext().releaseGraphicsLayer(layer)
-            shadowLayer = null
         }
     }
-}
 
-private val ShadowMaskPaint: Paint = Paint().apply {
-    blendMode = BlendMode.Clear
+    override fun onDetach() = releaseLayer()
 }

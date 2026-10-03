@@ -9,7 +9,7 @@ import androidx.compose.foundation.shape.CornerBasedShape
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.util.fastCoerceAtMost
 import top.yukonga.miuix.kmp.blur.BackdropEffectScope
-import top.yukonga.miuix.kmp.blur.isRuntimeShaderSupported
+import org.joinmastodon.android.ui.compose.utils.GraphicsSafety
 import top.yukonga.miuix.kmp.blur.runtimeShaderEffect
 
 /**
@@ -26,7 +26,7 @@ fun BackdropEffectScope.lens(
     depthEffect: Boolean = false,
     chromaticAberration: Float = 0f,
 ) {
-    if (!isRuntimeShaderSupported()) return
+    if (!GraphicsSafety.isSupported()) return
     if (refractionHeight <= 0f || refractionAmount <= 0f) return
 
     if (padding < refractionAmount) {
@@ -52,6 +52,7 @@ fun BackdropEffectScope.lens(
     val scaledRefractionAmount = refractionAmount / sf
     val scaledRadii = FloatArray(radii.size) { radii[it] / sf }
 
+    GraphicsSafety.guarded("liquid glass lens", fallback = { renderEffect = null }) {
     runtimeShaderEffect(
         key = key,
         shaderString = shaderString,
@@ -66,6 +67,7 @@ fun BackdropEffectScope.lens(
         if (dispersionEnabled) {
             setFloatUniform("chromaticAberration", chromaticAberration)
         }
+    }
     }
 }
 

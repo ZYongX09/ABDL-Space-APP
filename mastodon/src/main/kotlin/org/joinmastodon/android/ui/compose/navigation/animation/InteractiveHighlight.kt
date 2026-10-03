@@ -21,7 +21,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.blur.RuntimeShader
 import top.yukonga.miuix.kmp.blur.asBrush
-import top.yukonga.miuix.kmp.blur.isRuntimeShaderSupported
+import org.joinmastodon.android.ui.compose.utils.GraphicsSafety
 
 internal class InteractiveHighlight(
     private val animationScope: CoroutineScope,
@@ -37,8 +37,9 @@ internal class InteractiveHighlight(
 
     // Smoothstep press spot; without runtime shader support, falls back to a radialGradient
     // approximation (linear instead of S-curve falloff — barely distinguishable).
-    private val spotShader: RuntimeShader? =
-        if (isRuntimeShaderSupported()) RuntimeShader(SPOT_SHADER) else null
+    private var spotShader: RuntimeShader? = GraphicsSafety.guarded(
+        "press highlight shader construction", fallback = { null },
+    ) { RuntimeShader(SPOT_SHADER) }
 
     val modifier: Modifier = Modifier.drawWithContent {
         val progress = pressProgressAnimation.value
@@ -54,27 +55,33 @@ internal class InteractiveHighlight(
                 y = pos.y.coerceIn(0f, size.height),
             )
             val spotColor = Color.White.copy(alpha = 0.12f * progress)
-            if (spotShader != null) {
-                spotShader.setColorUniform("color", spotColor)
-                spotShader.setFloatUniform("radius", radius)
-                spotShader.setFloatUniform("position", center.x, center.y)
-                drawRect(
-                    brush = spotShader.asBrush(),
-                    blendMode = BlendMode.Plus,
-                )
-            } else {
-                drawRect(
-                    brush = Brush.radialGradient(
-                        colorStops = arrayOf(
-                            0.0f to spotColor,
-                            0.5f to spotColor,
-                            1.0f to Color.White.copy(alpha = 0f),
+            val shader = spotShader
+            if (!GraphicsSafety.isSupported()) spotShader = null
+            GraphicsSafety.drawEffect(
+                scope = this,
+                operation = "press highlight draw",
+                onFailure = { spotShader = null },
+                fallback = {
+                    drawRect(
+                        brush = Brush.radialGradient(
+                            colorStops = arrayOf(
+                                0.0f to spotColor,
+                                0.5f to spotColor,
+                                1.0f to Color.White.copy(alpha = 0f),
+                            ),
+                            center = center,
+                            radius = radius,
                         ),
-                        center = center,
-                        radius = radius,
-                    ),
-                    blendMode = BlendMode.Plus,
-                )
+                        blendMode = BlendMode.Plus,
+                    )
+                },
+            ) {
+                if (shader != null) {
+                    shader.setColorUniform("color", spotColor)
+                    shader.setFloatUniform("radius", radius)
+                    shader.setFloatUniform("position", center.x, center.y)
+                    drawRect(brush = shader.asBrush(), blendMode = BlendMode.Plus)
+                }
             }
         }
         drawContent()

@@ -15,7 +15,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
-import top.yukonga.miuix.kmp.blur.isRuntimeShaderSupported
+import androidx.compose.foundation.background
+import org.joinmastodon.android.ui.compose.utils.GraphicsSafety
+import org.joinmastodon.android.ui.compose.utils.rememberGraphicsEffectsSupported
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import org.joinmastodon.android.ui.compose.ui.isInDarkTheme
 import org.joinmastodon.android.ui.compose.utils.shouldShowSplitPane
@@ -32,20 +34,23 @@ fun BgEffectBackground(
     alpha: () -> Float = { 1f },
     content: @Composable (BoxScope.() -> Unit),
 ) {
-    val shaderSupported = remember {
-        org.joinmastodon.android.ui.compose.utils.supportsRuntimeGraphicsEffects() && isRuntimeShaderSupported()
-    }
-    if (!shaderSupported) {
-        Box(modifier = modifier, content = content)
+    val shaderSupported = rememberGraphicsEffectsSupported()
+    val surface = MiuixTheme.colorScheme.surface
+    val painter = if (shaderSupported && effectBackground) remember(isOs3Effect) {
+        GraphicsSafety.guarded("background painter construction", fallback = { null }) {
+            BgEffectPainter(isOs3Effect).takeIf { it.prepare() }
+        }
+    } else null
+    if (painter == null || !GraphicsSafety.isSupported()) {
+        painter?.clear()
+        Box(modifier = modifier.background(surface), content = content)
         return
     }
     Box(
         modifier = modifier,
     ) {
-        val surface = MiuixTheme.colorScheme.surface
         val deviceType = if (shouldShowSplitPane()) DeviceType.PAD else DeviceType.PHONE
         val isDarkTheme = isInDarkTheme()
-        val painter = remember(isOs3Effect) { BgEffectPainter(isOs3Effect) }
 
         val preset = remember(deviceType, isDarkTheme, isOs3Effect) {
             BgEffectConfig.get(deviceType, isDarkTheme, isOs3Effect)
@@ -59,7 +64,7 @@ fun BgEffectBackground(
             if (!animatesColors) return@LaunchedEffect
 
             var targetStage = floor(colorStage.value) + 1f
-            while (isActive) {
+            while (isActive && GraphicsSafety.isSupported()) {
                 delay((preset.colorInterpPeriod * 500).toLong())
                 colorStage.animateTo(
                     targetValue = targetStage,

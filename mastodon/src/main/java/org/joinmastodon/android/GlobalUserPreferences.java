@@ -13,6 +13,7 @@ import org.joinmastodon.android.api.session.AccountLocalPreferences;
 import org.joinmastodon.android.api.session.AccountSession;
 import org.joinmastodon.android.api.session.AccountSessionManager;
 import org.joinmastodon.android.model.Account;
+import org.joinmastodon.android.ui.utils.LiquidGlassCompatibility;
 
 import java.lang.reflect.Type;
 
@@ -138,9 +139,9 @@ public class GlobalUserPreferences{
 		removeTrackingParams=prefs.getBoolean("removeTrackingParams", true);
 		boolean hasIosLiquidNavigationPreference=prefs.contains("useIosLiquidNavigation");
 		boolean storedIosLiquidNavigationPreference=prefs.getBoolean("useIosLiquidNavigation", true);
-		useIosLiquidNavigation=resolveIosLiquidNavigationEnabled(Build.VERSION.SDK_INT, hasIosLiquidNavigationPreference, storedIosLiquidNavigationPreference);
-		if(Build.VERSION.SDK_INT<Build.VERSION_CODES.TIRAMISU && (!hasIosLiquidNavigationPreference || storedIosLiquidNavigationPreference))
-			prefs.edit().putBoolean("useIosLiquidNavigation", false).apply();
+		useIosLiquidNavigation=isIosLiquidNavigationSupported()
+				&& resolveIosLiquidNavigationEnabled(Build.VERSION.SDK_INT, hasIosLiquidNavigationPreference, storedIosLiquidNavigationPreference);
+		// Unsupported devices/sessions must not erase the user's saved choice.
 //		enhanceTextSize=prefs.getBoolean("enhanceTextSize", false);
 
 
@@ -166,7 +167,7 @@ public class GlobalUserPreferences{
 	}
 
 	public static boolean isIosLiquidNavigationSupported(){
-		return Build.VERSION.SDK_INT>=Build.VERSION_CODES.TIRAMISU;
+		return LiquidGlassCompatibility.isSupported();
 	}
 
 	public static boolean isIosLiquidNavigationEnabled(){
@@ -174,7 +175,15 @@ public class GlobalUserPreferences{
 	}
 
 	public static void save(){
-		getPrefs().edit()
+		boolean liquidSupported=isIosLiquidNavigationSupported();
+		if(!liquidSupported)
+			useIosLiquidNavigation=false;
+		SharedPreferences.Editor editor=getPrefs().edit();
+		// Save the requested choice only when usable. In particular, a session failure
+		// followed by an unrelated save must not permanently disable liquid navigation.
+		if(liquidSupported)
+			editor.putBoolean("useIosLiquidNavigation", useIosLiquidNavigation);
+		editor
 				.putBoolean("playGifs", playGifs)
 				.putBoolean("useCustomTabs", useCustomTabs)
 				.putInt("theme", theme.ordinal())
@@ -230,8 +239,7 @@ public class GlobalUserPreferences{
 				.putBoolean("enableDeleteNotifications", enableDeleteNotifications)
 				.putBoolean("showPostsWithoutAlt", showPostsWithoutAlt)
 				.putBoolean("showMediaPreview", showMediaPreview)
-					.putBoolean("removeTrackingParams", removeTrackingParams)
-					.putBoolean("useIosLiquidNavigation", isIosLiquidNavigationEnabled())
+				.putBoolean("removeTrackingParams", removeTrackingParams)
 
 //				.putBoolean("enhanceTextSize", enhanceTextSize)
 

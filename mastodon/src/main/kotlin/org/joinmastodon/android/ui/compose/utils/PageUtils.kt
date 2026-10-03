@@ -30,7 +30,8 @@ import top.yukonga.miuix.kmp.blur.BlurDefaults
 import top.yukonga.miuix.kmp.blur.LayerBackdrop
 import top.yukonga.miuix.kmp.blur.isRuntimeShaderSupported
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
-import top.yukonga.miuix.kmp.blur.textureBlur
+import top.yukonga.miuix.kmp.blur.drawBackdrop
+import top.yukonga.miuix.kmp.blur.textureBlurEffect
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
@@ -114,7 +115,8 @@ fun AdaptiveTopAppBar(
 @Composable
 fun rememberBlurBackdrop(): LayerBackdrop? {
     val appState = LocalAppState.current
-    if (!appState.enableBlur || !supportsRuntimeGraphicsEffects() || !isRuntimeShaderSupported()) return null
+    val supported = rememberGraphicsEffectsSupported()
+    if (!appState.enableBlur || !supported) return null
     val surfaceColor = MiuixTheme.colorScheme.surface
     return rememberLayerBackdrop {
         drawRect(surfaceColor)
@@ -129,23 +131,31 @@ fun BlurredBar(
     scrollBehavior: ScrollBehavior? = null,
     content: @Composable () -> Unit,
 ) {
-    val blurActive = supportsRuntimeGraphicsEffects() && blurEnabled && backdrop != null
-    Box(
-        modifier = if (blurActive) {
-            Modifier.textureBlur(
-                backdrop = backdrop,
-                shape = RectangleShape,
-                blurRadius = 25f,
-                colors = BlurDefaults.blurColors(
-                    blendColors = listOf(
-                        BlendColorEntry(color = MiuixTheme.colorScheme.surface.copy(0.8f)),
-                    ),
-                ),
-            )
-        } else {
-            Modifier
-        },
-    ) {
+    val supported = rememberGraphicsEffectsSupported()
+    val blurActive = supported && blurEnabled && backdrop != null
+    val surface = MiuixTheme.colorScheme.surface
+    // Material/theme reads are composable; calculate them before the guarded factory.
+    val colors = BlurDefaults.blurColors(
+        blendColors = listOf(BlendColorEntry(color = surface.copy(0.8f))),
+    )
+    Box {
+        Box(Modifier.matchParentSize().then(
+            if (blurActive && backdrop != null) Modifier.safeBackdropEffect(
+                operation = "page bar texture blur",
+                fallback = { drawRect(surface) },
+            ) { enabled ->
+                Modifier.drawBackdrop(
+                    enabled = enabled,
+                    backdrop = backdrop,
+                    shape = { RectangleShape },
+                    effects = {
+                        GraphicsSafety.guarded("page texture effects callback", fallback = { renderEffect = null }) {
+                            textureBlurEffect(25f, 25f, BlurDefaults.NoiseCoefficient, colors)
+                        }
+                    },
+                )
+            } else Modifier,
+        ))
         content()
     }
 }

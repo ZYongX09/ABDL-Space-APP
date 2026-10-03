@@ -3,6 +3,7 @@
 
 package org.joinmastodon.android.ui.compose.component.effect
 
+import org.joinmastodon.android.ui.compose.utils.GraphicsSafety
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -99,7 +100,7 @@ private class BgEffectNode(
     private var startOffset: Float = 0f
 
     override fun onAttach() {
-        if (playing) startAnimation()
+        if (playing && GraphicsSafety.isSupported()) startAnimation()
     }
 
     override fun onDetach() {
@@ -148,7 +149,7 @@ private class BgEffectNode(
             val minDeltaNanos = 1_000_000_000L / 60L
             val origin = withFrameNanos { it }
             var lastEmit = origin
-            while (isActive) {
+            while (isActive && GraphicsSafety.isSupported()) {
                 val now = withFrameNanos { it }
                 if (now - lastEmit < minDeltaNanos) continue
                 lastEmit = now
@@ -165,14 +166,29 @@ private class BgEffectNode(
             if (alphaValue > 0f) {
                 val drawHeight = if (isFullSize) size.height * 0.8f else size.height * 0.5f
 
-                painter.updateResolution(size.width, size.height)
-                painter.updateBoundIfNeeded(drawHeight, size.height, size.width)
-                painter.updatePresetIfNeeded(deviceType, isDarkTheme)
-                painter.updateColors(preset, colorStage())
-                painter.updateAnimTime(animTime)
-                painter.updatePointsAnim(animTime, preset)
-
-                drawRect(painter.brush, alpha = alphaValue)
+                val stage = colorStage()
+                GraphicsSafety.drawEffect(
+                    this, "background shader draw",
+                    fallback = { drawRect(surface) },
+                    onFailure = {
+                        painter.clear()
+                        animationJob?.cancel()
+                        animationJob = null
+                    },
+                ) {
+                    painter.updateResolution(size.width, size.height)
+                    painter.updateBoundIfNeeded(drawHeight, size.height, size.width)
+                    painter.updatePresetIfNeeded(deviceType, isDarkTheme)
+                    painter.updateColors(preset, stage)
+                    painter.updateAnimTime(animTime)
+                    painter.updatePointsAnim(animTime, preset)
+                    drawRect(painter.brush, alpha = alphaValue)
+                }
+                if (!GraphicsSafety.isSupported()) {
+                    painter.clear()
+                    animationJob?.cancel()
+                    animationJob = null
+                }
             }
         }
         drawContent()
