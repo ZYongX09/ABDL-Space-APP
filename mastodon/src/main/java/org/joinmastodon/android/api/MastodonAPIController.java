@@ -131,9 +131,7 @@ public class MastodonAPIController{
 					return;
 				Request.Builder builder=new Request.Builder()
 						.url(req.getURL().toString())
-						.method(req.getMethod(), req.getRequestBody())
-						.header("User-Agent", "MastodonAndroid/"+BuildConfig.VERSION_NAME)
-						.header("X-App-Version-Code", String.valueOf(BuildConfig.VERSION_CODE));
+						.method(req.getMethod(), req.getRequestBody());
 
 				String token=null;
 				if(session!=null)
@@ -152,6 +150,11 @@ public class MastodonAPIController{
 						builder.header(header.getKey(), header.getValue());
 					}
 				}
+
+				// Native build identity is mandatory, even when a request supplies its own headers.
+				// Keep the MastodonAndroid/ prefix compatible with backend native-client detection.
+				builder.header("User-Agent", "MastodonAndroid/"+BuildConfig.VERSION_NAME)
+						.header("X-App-Version-Code", String.valueOf(BuildConfig.VERSION_CODE));
 
 				Request hreq=builder.build();
 					OkHttpClient selectedClient=req.requiresSystemTrust() ? systemTrustSensitiveHttpClient : req.isSensitiveRequest() ? sensitiveHttpClient : httpClient;
