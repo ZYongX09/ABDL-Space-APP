@@ -109,7 +109,7 @@ class HomeLiquidNavigationController(
 		bottomInsetState = insetPx.coerceAtLeast(0)
 	}
 
-	fun setBackdropBitmap(bitmap: Bitmap) {
+	fun setBackdropBitmap(bitmap: Bitmap?) {
 		backdrop.update(bitmap)
 	}
 

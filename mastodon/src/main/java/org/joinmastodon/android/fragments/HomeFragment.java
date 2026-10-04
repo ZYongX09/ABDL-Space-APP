@@ -732,10 +732,9 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 							|| liquidNavigationController!=ownedNavigation || liquidToolbarController!=ownedToolbar
 							|| !GlobalUserPreferences.isIosLiquidNavigationEnabled())
 						return;
-					if(top!=null && currentTab==R.id.tab_home && ownedToolbar!=null)
-						ownedToolbar.setBackdropBitmap(top);
-					if(bottom!=null)
-						ownedNavigation.setBackdropBitmap(bottom);
+					if(ownedToolbar!=null)
+						ownedToolbar.setBackdropBitmap(currentTab==R.id.tab_home ? top : null);
+					ownedNavigation.setBackdropBitmap(bottom);
 				});
 				liquidCaptureStarted=true;
 				updateCaptureHeights();
