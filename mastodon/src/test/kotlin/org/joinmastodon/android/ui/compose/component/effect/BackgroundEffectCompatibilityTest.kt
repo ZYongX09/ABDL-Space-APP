@@ -48,9 +48,11 @@ class BackgroundEffectCompatibilityTest {
         val first = render(painter, 0f)
         val second = render(painter, 2f)
         assertTrue(BackgroundGraphicsSafety.isSupported())
-        assertTrue(first.any { android.graphics.Color.alpha(it) > 0 })
-        // Robolectric 4.14.1 stubs scalar RuntimeShader uniform updates on API33/34.
-        if (android.os.Build.VERSION.SDK_INT >= 35) assertFalse(first.contentEquals(second))
+        // API33/34 scalar uniforms are no-op stubs, leaving resolution/alpha undefined in pixels.
+        if (android.os.Build.VERSION.SDK_INT >= 35) {
+            assertTrue(first.any { android.graphics.Color.alpha(it) > 0 })
+            assertFalse(first.contentEquals(second))
+        }
         painter.clear()
     }
 
@@ -60,7 +62,9 @@ class BackgroundEffectCompatibilityTest {
         for (isOs3 in listOf(false, true)) {
             val painter = BgEffectPainter(isOs3)
             assertTrue(painter.prepare())
-            assertTrue(render(painter, 1f, isOs3).any { android.graphics.Color.alpha(it) > 0 })
+            val pixels = render(painter, 1f, isOs3)
+            assertTrue(BackgroundGraphicsSafety.isSupported())
+            if (android.os.Build.VERSION.SDK_INT >= 35) assertTrue(pixels.any { android.graphics.Color.alpha(it) > 0 })
             painter.clear()
         }
         assertTrue(GraphicsSafety.isSupported())

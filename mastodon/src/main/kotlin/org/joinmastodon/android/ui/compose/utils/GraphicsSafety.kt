@@ -125,38 +125,42 @@ internal fun Modifier.safeGraphicsEffect(
 })
 
 /**
- * Only for drawBackdrop/textureBlur's single node: disabled attachment performs no graphics
- * allocation. Enable via an update AFTER Compose finishes the child's attach lifecycle.
- * Other modifier nodes must stay outside this factory; it is not a generic lifecycle catch.
+ * For drawBackdrop/textureBlur's terminal effect node, including drawBackdrop's layer prefix.
+ * Preserve that prefix and attach the effect disabled before its guarded enable update.
+ * This is not a generic lifecycle catch for arbitrary modifier chains.
  */
 internal fun Modifier.safeBackdropEffect(
     operation: String,
     fallback: DrawScope.() -> Unit,
     safety: GraphicsEffectSafety = GraphicsSafety,
     factory: (enabled: Boolean) -> Modifier,
-): Modifier = safeGraphicsEffect(operation, fallback, safety) {
-    val disabled = factory(false).foldIn(null as ModifierNodeElement<*>?) { found, element ->
-        check(found == null && element is ModifierNodeElement<*>) { "Expected one backdrop node" }
-        element as ModifierNodeElement<*>
+): Modifier = then(safety.guarded(operation, fallback = { Modifier.drawBehind(fallback) }) {
+    val disabled = factory(false).backdropElements()
+    val enabled = factory(true).backdropElements()
+    check(disabled.isNotEmpty() && disabled.size == enabled.size) { "Mismatched backdrop chains" }
+    disabled.indices.forEach { index ->
+        check(disabled[index].javaClass == enabled[index].javaClass) { "Mismatched backdrop nodes" }
     }
-    val enabled = factory(true).foldIn(null as ModifierNodeElement<*>?) { found, element ->
-        check(found == null && element is ModifierNodeElement<*>) { "Expected one backdrop node" }
-        element as ModifierNodeElement<*>
+    // miuix adds graphicsLayer before its effect when layerBlock is supplied; keep its transform.
+    enabled.dropLast(1).fold(Modifier as Modifier) { prefix, element -> prefix.then(element) }
+        .then(SafeBackdropElement(operation, disabled.last(), enabled.last(), safety, fallback))
+})
+
+private fun Modifier.backdropElements(): List<ModifierNodeElement<*>> =
+    foldIn(mutableListOf()) { elements, element ->
+        check(element is ModifierNodeElement<*>) { "Expected backdrop node elements" }
+        elements.apply { add(element) }
     }
-    checkNotNull(disabled)
-    checkNotNull(enabled)
-    check(disabled.javaClass == enabled.javaClass)
-    SafeBackdropElement(operation, disabled, enabled, safety)
-}
 
 private data class SafeBackdropElement(
     val operation: String,
     val disabled: ModifierNodeElement<*>,
     val enabled: ModifierNodeElement<*>,
     val safety: GraphicsEffectSafety,
+    val fallback: DrawScope.() -> Unit,
 ) : ModifierNodeElement<SafeBackdropNode>() {
-    override fun create() = SafeBackdropNode(operation, disabled, enabled, safety)
-    override fun update(node: SafeBackdropNode) = node.update(disabled, enabled)
+    override fun create() = SafeBackdropNode(operation, disabled, enabled, safety, fallback)
+    override fun update(node: SafeBackdropNode) = node.update(disabled, enabled, fallback)
     override fun InspectorInfo.inspectableProperties() { name = "safeBackdropNode" }
 }
 
@@ -165,8 +169,16 @@ private class SafeBackdropNode(
     private var disabled: ModifierNodeElement<*>,
     private var enabled: ModifierNodeElement<*>,
     private val safety: GraphicsEffectSafety,
-) : DelegatingNode() {
+    private var fallback: DrawScope.() -> Unit,
+) : DelegatingNode(), DrawModifierNode {
     private var effectNode: Modifier.Node? = null
+
+    override fun ContentDrawScope.draw() {
+        val node = effectNode as? DrawModifierNode
+        safety.drawEffect(this, operation, fallback) {
+            if (node != null) with(node) { this@draw.draw() }
+        }
+    }
 
     override fun onAttach() {
         // Do not swallow disabled lifecycle failures: Compose has not set its detach flag yet.
@@ -186,9 +198,10 @@ private class SafeBackdropNode(
         if (!safety.isSupported()) release()
     }
 
-    fun update(off: ModifierNodeElement<*>, on: ModifierNodeElement<*>) {
+    fun update(off: ModifierNodeElement<*>, on: ModifierNodeElement<*>, fallback: DrawScope.() -> Unit) {
         disabled = off
         enabled = on
+        this.fallback = fallback
         enable()
     }
 
