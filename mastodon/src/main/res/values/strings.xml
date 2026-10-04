@@ -498,6 +498,10 @@
 	<string name="settings_display">Display</string>
 	<string name="settings_ios_liquid_navigation">Liquid glass mode</string>
 	<string name="settings_ios_liquid_navigation_summary">Use the floating liquid glass navigation bar on the home screen, with drag-to-open menus and a more immersive glass look</string>
+	<string name="settings_liquid_glass_performance_title">Performance notice</string>
+	<string name="settings_liquid_glass_performance_message">Your Android version supports liquid glass, but this device has limited app memory. Enabling it may cause stuttering, increased power use or heating. You can still try it and turn it off in Display settings at any time.</string>
+	<string name="settings_liquid_glass_enable_anyway">Enable anyway</string>
+	<string name="settings_liquid_glass_runtime_fallback">Liquid glass could not run safely in this app session, so the home screen is using the classic layout. Your choice is saved. Close the app completely and reopen it to retry; the About background is checked separately.</string>
 	<string name="settings_filters">Filters</string>
 	<string name="settings_server_explanation">Overview, rules, moderators</string>
 	<!-- %s is the app name (ABDL Space, key app_name). I made it a placeholder so everything Just Works™ with forks -->

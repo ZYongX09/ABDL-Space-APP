@@ -45,17 +45,36 @@ class GraphicsSafetyTest {
 
     @After fun tearDown() { reset() }
 
-    @Test fun evaluateRejectsOldApiLowRamAndDisabledSession() {
+    @Test fun evaluateRejectsOnlyOldApiAndFailedEffectNotLowRam() {
         for (sdk in listOf(26, 32, 33, 35)) {
-            for (lowRam in listOf(false, true)) {
-                for (disabled in listOf(false, true)) {
-                    assertEquals(sdk >= 33 && !lowRam && !disabled,
-                        LiquidGlassCompatibility.evaluate(sdk, lowRam, disabled))
-                }
+            for (disabled in listOf(false, true)) {
+                assertEquals(sdk >= 33 && !disabled, LiquidGlassCompatibility.evaluate(sdk, disabled))
             }
         }
         shadowOf(MastodonApp.context.getSystemService(ActivityManager::class.java)).setIsLowRamDevice(true)
-        assertFalse(GraphicsSafety.isSupported())
+        assertTrue(LiquidGlassCompatibility.shouldWarnAboutPerformance())
+        assertTrue(GraphicsSafety.isSupported())
+        assertTrue(BackgroundGraphicsSafety.isSupported())
+    }
+
+    @Test fun failuresAndNotificationsAreIsolatedByEffect() {
+        val effects = listOf(GraphicsSafety, BackgroundGraphicsSafety, PageBlurGraphicsSafety)
+        for (failedEffect in effects) {
+            reset()
+            val notifications = IntArray(effects.size)
+            val listeners = effects.mapIndexed { index, effect ->
+                Runnable { notifications[index]++ }.also(effect::addFailureListener)
+            }
+            failedEffect.guarded("isolated failure", fallback = {}) { throw IllegalStateException("test") }
+            assertTrue(LiquidGlassCompatibility.isSystemSupported())
+            effects.forEach { effect -> assertEquals(effect !== failedEffect, effect.isSupported()) }
+            assertTrue(notifications.all { it == 0 })
+            shadowOf(Looper.getMainLooper()).idle()
+            effects.forEachIndexed { index, effect ->
+                assertEquals(if (effect === failedEffect) 1 else 0, notifications[index])
+                effect.removeFailureListener(listeners[index])
+            }
+        }
     }
 
     @Test fun normalOperationPassesThroughWithoutFallbackOrCleanup() {

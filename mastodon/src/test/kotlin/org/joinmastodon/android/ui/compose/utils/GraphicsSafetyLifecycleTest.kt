@@ -1,6 +1,7 @@
 package org.joinmastodon.android.ui.compose.utils
 
 import android.app.ActivityManager
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.mutableStateOf
@@ -28,6 +29,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import org.joinmastodon.android.CompatibilityTestApplication
 import org.joinmastodon.android.MastodonApp
+import org.joinmastodon.android.ui.compose.component.effect.BgEffectBackground
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
@@ -192,6 +194,134 @@ class GraphicsSafetyLifecycleTest {
         assertTrue(GraphicsSafety.isSupported())
         bitmap.recycle()
     }
+
+    @Test fun backgroundFailureKeepsPageBlurRecordingInPlainSurfaceFallback() {
+        BackgroundGraphicsSafety.reportFailure("background shader", IllegalArgumentException("test"))
+        var records = 0
+        var contentDraws = 0
+        compose.setContent {
+            renderView = LocalView.current
+            BgEffectBackground(
+                dynamicBackground = false,
+                modifier = Modifier.size(24.dp).testTag("effect"),
+                bgModifier = Modifier.safeBackdropRecording(PageBlurGraphicsSafety) {
+                    RecordingProbeElement { records++ }
+                },
+            ) {
+                Box(Modifier.size(24.dp).drawWithContent { contentDraws++; drawRect(Color.Blue) })
+            }
+        }
+        compose.waitForIdle()
+        assertRenderedColor(Color.Blue)
+        assertTrue("Plain background must still be recorded for page blur", records > 0)
+        assertTrue(contentDraws > 0)
+        assertFalse(BackgroundGraphicsSafety.isSupported())
+        assertTrue(PageBlurGraphicsSafety.isSupported())
+        assertTrue(GraphicsSafety.isSupported())
+    }
+
+    @Test fun pageBlurRecordingFailureDoesNotDisableBackgroundOrNavigation() {
+        var attempts = 0
+        var contentDraws = 0
+        compose.setContent {
+            renderView = LocalView.current
+            Box(Modifier.size(24.dp).testTag("effect")
+                .safeBackdropRecording(PageBlurGraphicsSafety) {
+                    RecordingProbeElement { attempts++; throw IllegalArgumentException("page recording") }
+                }
+                .drawWithContent { contentDraws++; drawRect(Color.Blue) })
+        }
+        compose.waitForIdle()
+        assertRenderedColor(Color.Blue)
+        assertEquals(1, attempts)
+        assertTrue(contentDraws > 0)
+        assertFalse(PageBlurGraphicsSafety.isSupported())
+        assertTrue(BackgroundGraphicsSafety.isSupported())
+        assertTrue(GraphicsSafety.isSupported())
+    }
+
+    @Test fun pageBlurEnableFailureReleasesNodeWithoutCrossDomainFailure() {
+        var detached = false
+        var contentDraws = 0
+        compose.setContent {
+            renderView = LocalView.current
+            Box(Modifier.size(24.dp).testTag("effect")) {
+                Box(Modifier.matchParentSize().safeBackdropEffect(
+                    "page texture probe",
+                    fallback = { drawRect(Color.Red) },
+                    safety = PageBlurGraphicsSafety,
+                ) { enabled -> ProbeElement(enabled = enabled, failUpdate = true, detached = { detached = true }) })
+                Box(Modifier.size(24.dp).drawWithContent { contentDraws++; drawRect(Color.Blue) })
+            }
+        }
+        compose.waitForIdle()
+        assertRenderedColor(Color.Blue)
+        assertTrue(detached)
+        assertTrue(contentDraws > 0)
+        assertFalse(PageBlurGraphicsSafety.isSupported())
+        assertTrue(BackgroundGraphicsSafety.isSupported())
+        assertTrue(GraphicsSafety.isSupported())
+    }
+
+    @Test fun pageBlurRecordingIsIndependentOfNavigationFailure() {
+        GraphicsSafety.reportFailure("navigation shader", IllegalArgumentException("test"))
+        var records = 0
+        compose.setContent {
+            renderView = LocalView.current
+            Box(Modifier.size(24.dp).testTag("effect")
+                .safeBackdropRecording(PageBlurGraphicsSafety) { RecordingProbeElement { records++ } }
+                .background(Color.Blue))
+        }
+        compose.waitForIdle()
+        assertRenderedColor(Color.Blue)
+        assertTrue(records > 0)
+        assertTrue(PageBlurGraphicsSafety.isSupported())
+        assertTrue(BackgroundGraphicsSafety.isSupported())
+        assertFalse(GraphicsSafety.isSupported())
+    }
+
+    @Test fun softwareScreenshotDoesNotDisableBackgroundShader() {
+        compose.setContent {
+            renderView = LocalView.current
+            BgEffectBackground(dynamicBackground = false, modifier = Modifier.size(24.dp).testTag("effect")) {
+                Box(Modifier.size(24.dp).background(Color.Blue))
+            }
+        }
+        compose.waitForIdle()
+        assertRenderedColor(Color.Blue) // View.draw uses a software Canvas.
+        assertTrue(BackgroundGraphicsSafety.isSupported())
+        assertTrue(PageBlurGraphicsSafety.isSupported())
+        assertTrue(GraphicsSafety.isSupported())
+    }
+
+    @Test fun aboutPageUsesGuardedRecordingAndEmptyTextureChildren() {
+        val about = source("src/main/kotlin/org/joinmastodon/android/ui/compose/AboutPage.kt")
+        val page = source("src/main/kotlin/org/joinmastodon/android/ui/compose/utils/PageUtils.kt")
+        val background = source("src/main/kotlin/org/joinmastodon/android/ui/compose/component/effect/BgEffectBackground.kt")
+        assertEquals(2, Regex("safeBackdropRecording\\(PageBlurGraphicsSafety\\)").findAll(about).count())
+        assertFalse(about.contains("Modifier.textureBlur("))
+        assertTrue(about.contains("contentBlendMode = ComposeBlendMode.DstIn"))
+        assertTrue(about.contains("fallbackColor = Color.Transparent"))
+        assertEquals(2, Regex("\\n\\s*AboutCard\\(").findAll(about).count())
+        val texture = page.substring(page.indexOf("internal fun PageTextureBlur("), page.indexOf("fun BlurredBar("))
+        assertTrue(texture.contains("Spacer(Modifier.matchParentSize().safeBackdropEffect("))
+        assertTrue(texture.contains("safety = PageBlurGraphicsSafety"))
+        assertTrue(texture.contains("enabled = enabled"))
+        assertTrue(texture.contains("colors = colors"))
+        assertTrue(texture.contains("blurRadius = blurRadius"))
+        assertTrue(texture.contains("noiseCoefficient = noiseCoefficient"))
+        assertTrue(texture.contains("maskPaint"))
+        assertTrue(texture.contains("CompositingStrategy.Offscreen"))
+        val effectFactory = texture.substring(texture.indexOf(") { enabled ->"), texture.indexOf("Box(Modifier.drawWithContent"))
+        assertFalse(effectFactory.contains("MiuixTheme"))
+        assertFalse(effectFactory.contains("content()"))
+        val plainFallback = background.substring(background.indexOf("if (painter == null"), background.indexOf("    Box(\n"))
+        assertTrue(plainFallback.contains("Spacer(Modifier.fillMaxSize().then(bgModifier).background(surface))"))
+        assertTrue(plainFallback.contains("content()"))
+    }
+
+    private fun source(path: String): String = listOf(Paths.get(path), Paths.get("mastodon/$path"))
+        .first { Files.exists(it) }.let(Files::readString)
 
     @Test fun noBlurBarLeavesCallerBackgroundUntouched() {
         // Source contract for the false branch: an opaque background here breaks About's

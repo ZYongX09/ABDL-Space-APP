@@ -880,7 +880,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	@Override
 	public boolean onOptionsItemSelected(MenuItem item){
 		if(item.getItemId()==R.id.publish){
-			if(newBabyWorldBindingState!=BINDING_BOUND){
+			if(needsNewBabyWorldBinding() && newBabyWorldBindingState!=BINDING_BOUND){
 				refreshNewBabyWorldBinding();
 				return true;
 			}
@@ -934,11 +934,15 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		updatePublishButtonState();
 	}
 
+	private boolean needsNewBabyWorldBinding(){
+		return replyTo==null && selectedNBWForumId!=-1;
+	}
+
 	public void updatePublishButtonState(){
 		uuid=null;
 		if(publishButton==null)
 			return;
-		publishButton.setEnabled(newBabyWorldBindingState==BINDING_BOUND && !aiRecommendationInFlight && (trimmedCharCount>0 || !mediaViewController.isEmpty()) && charCount<=charLimit && mediaViewController.getNonDoneAttachmentCount()==0 && (pollViewController.isEmpty() || pollViewController.getNonEmptyOptionsCount()>1));
+		publishButton.setEnabled((!needsNewBabyWorldBinding() || newBabyWorldBindingState==BINDING_BOUND) && !aiRecommendationInFlight && (trimmedCharCount>0 || !mediaViewController.isEmpty()) && charCount<=charLimit && mediaViewController.getNonDoneAttachmentCount()==0 && (pollViewController.isEmpty() || pollViewController.getNonEmptyOptionsCount()>1));
 		updateDraftState();
 	}
 
@@ -1012,7 +1016,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 			return;
 		}
 		// 禁止同步宝宝新天地时跳过绑定检查
-		if(selectedNBWForumId!=-1 && newBabyWorldBindingState!=BINDING_BOUND){
+		if(needsNewBabyWorldBinding() && newBabyWorldBindingState!=BINDING_BOUND){
 			refreshNewBabyWorldBinding();
 			return;
 		}
@@ -1526,6 +1530,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 			selectedNBWForumId=item.parentObject;
 			aiRecommendedForumName=null;
 			updateNBWForumButton(true);
+			updatePublishButtonState();
 			menu.dismiss();
 		};
 		items.add(new ListItem<>(R.string.nbw_forum_ai, R.string.nbw_forum_ai_subtitle, R.drawable.ic_fluent_wand_24_regular, 0, onClick));

@@ -2,6 +2,7 @@ package org.joinmastodon.android
 
 import android.os.Build
 import org.joinmastodon.android.ui.compose.utils.supportsRuntimeGraphicsEffects
+import org.joinmastodon.android.ui.compose.component.effect.BgEffectPainter
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -15,6 +16,10 @@ class GraphicsCompatibilityTest {
 	@Test fun lowerApiCannotEnterRuntimeShaderPath() {
 		assertEquals(Build.VERSION.SDK_INT >= 33, supportsRuntimeGraphicsEffects())
 		if (Build.VERSION.SDK_INT < 33) assertFalse(isRuntimeShaderSupported())
+	}
+
+	@Test fun backgroundPainterNeverInitializesRuntimeShaderOnOldSdk() {
+		if (Build.VERSION.SDK_INT < 33) assertFalse(BgEffectPainter(true).prepare())
 	}
 
 	@Test fun blurTypesLoadWithoutInitializingRuntimeEffects() {

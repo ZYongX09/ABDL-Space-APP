@@ -20,7 +20,10 @@ class LiquidNavigationPreferencesCompatibilityTest {
 	fun setup() {
 		resetCompatibility()
 		MastodonApp.context = RuntimeEnvironment.getApplication()
-		shadowOf(MastodonApp.context.getSystemService(ActivityManager::class.java)).setIsLowRamDevice(false)
+		shadowOf(MastodonApp.context.getSystemService(ActivityManager::class.java)).apply {
+			setIsLowRamDevice(false)
+			setMemoryClass(256)
+		}
 		GlobalUserPreferences.getPrefs().edit().clear().putBoolean("perAccountMigrationDone", true).commit()
 	}
 
@@ -55,16 +58,17 @@ class LiquidNavigationPreferencesCompatibilityTest {
 	}
 
 	@Test
-	fun lowRamNormalizesMemoryButPreservesStoredChoice() {
+	fun lowRamKeepsSupportedEntryAndExplicitChoiceWithPerformanceWarning() {
 		val prefs = GlobalUserPreferences.getPrefs()
 		prefs.edit().putBoolean("useIosLiquidNavigation", true).commit()
 		shadowOf(MastodonApp.context.getSystemService(ActivityManager::class.java)).setIsLowRamDevice(true)
 		GlobalUserPreferences.load()
-		assertFalse(GlobalUserPreferences.isIosLiquidNavigationSupported())
-		assertFalse(GlobalUserPreferences.useIosLiquidNavigation)
-		GlobalUserPreferences.useIosLiquidNavigation = true
+		assertTrue(LiquidGlassCompatibility.shouldWarnAboutPerformance())
+		assertEquals(Build.VERSION.SDK_INT >= 33, GlobalUserPreferences.isIosLiquidNavigationSupported())
+		assertEquals(Build.VERSION.SDK_INT >= 33, GlobalUserPreferences.useIosLiquidNavigation)
+		assertEquals(Build.VERSION.SDK_INT >= 33, GlobalUserPreferences.isIosLiquidNavigationEnabled())
 		GlobalUserPreferences.save()
-		assertFalse(GlobalUserPreferences.useIosLiquidNavigation)
+		assertEquals(Build.VERSION.SDK_INT >= 33, GlobalUserPreferences.useIosLiquidNavigation)
 		assertTrue(prefs.getBoolean("useIosLiquidNavigation", false))
 	}
 
@@ -77,7 +81,8 @@ class LiquidNavigationPreferencesCompatibilityTest {
 		assertFalse(GlobalUserPreferences.isIosLiquidNavigationEnabled())
 		GlobalUserPreferences.showCWs = !GlobalUserPreferences.showCWs
 		GlobalUserPreferences.save()
-		assertFalse(GlobalUserPreferences.useIosLiquidNavigation)
+		assertEquals(Build.VERSION.SDK_INT >= 33, GlobalUserPreferences.useIosLiquidNavigation)
+		assertEquals(Build.VERSION.SDK_INT >= 33, GlobalUserPreferences.isIosLiquidNavigationSupported())
 		assertTrue(prefs.getBoolean("useIosLiquidNavigation", false))
 		assertFalse(prefs.contains("sessionDisabled"))
 		resetCompatibility()
@@ -86,11 +91,29 @@ class LiquidNavigationPreferencesCompatibilityTest {
 	}
 
 	@Test
-	fun missingPreferenceIsNotWrittenAsFalseDuringUnsupportedSave() {
+	fun sessionFailureSaveStoresRequestedChoiceOnlyOnSupportedSdk() {
 		GlobalUserPreferences.load()
 		LiquidGlassCompatibility.reportFailure("test startup", OutOfMemoryError("test"))
 		GlobalUserPreferences.save()
-		assertFalse(GlobalUserPreferences.getPrefs().contains("useIosLiquidNavigation"))
+		assertEquals(Build.VERSION.SDK_INT >= 33, GlobalUserPreferences.getPrefs().contains("useIosLiquidNavigation"))
+		if (Build.VERSION.SDK_INT >= 33) assertTrue(GlobalUserPreferences.getPrefs().getBoolean("useIosLiquidNavigation", false))
+	}
+
+	@Test
+	fun limitedMemoryDefaultsOffUntilUserConfirmsButDoesNotHideEntry() {
+		shadowOf(MastodonApp.context.getSystemService(ActivityManager::class.java)).setIsLowRamDevice(true)
+		GlobalUserPreferences.load()
+		assertFalse(GlobalUserPreferences.useIosLiquidNavigation)
+		assertEquals(Build.VERSION.SDK_INT >= 33, GlobalUserPreferences.isIosLiquidNavigationSupported())
+	}
+
+	@Test
+	fun smallAppHeapWarnsWithoutDisablingExplicitChoice() {
+		shadowOf(MastodonApp.context.getSystemService(ActivityManager::class.java)).setMemoryClass(128)
+		assertTrue(LiquidGlassCompatibility.shouldWarnAboutPerformance())
+		GlobalUserPreferences.getPrefs().edit().putBoolean("useIosLiquidNavigation", true).commit()
+		GlobalUserPreferences.load()
+		assertEquals(Build.VERSION.SDK_INT >= 33, GlobalUserPreferences.isIosLiquidNavigationEnabled())
 	}
 
 	@Test
@@ -104,9 +127,11 @@ class LiquidNavigationPreferencesCompatibilityTest {
 	}
 
 	@Test
-	fun missingApplicationContextFailsClosed() {
+	fun systemCapabilityDoesNotDependOnApplicationContext() {
 		MastodonApp.context = null
-		assertFalse(LiquidGlassCompatibility.isSupported())
+		assertEquals(Build.VERSION.SDK_INT >= 33, LiquidGlassCompatibility.isSupported())
+		assertEquals(Build.VERSION.SDK_INT >= 33, GlobalUserPreferences.isIosLiquidNavigationSupported())
+		assertFalse(LiquidGlassCompatibility.shouldWarnAboutPerformance())
 	}
 
 	private fun resetCompatibility() {

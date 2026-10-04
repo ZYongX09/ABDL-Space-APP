@@ -9,74 +9,111 @@ import android.util.Log;
 
 import org.joinmastodon.android.MastodonApp;
 
+import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 
-/** Process-local compatibility gate. Attached-view hardware checks belong to the UI owner. */
+/** Attached-view hardware checks belong to the UI owner, not the settings capability gate. */
 public final class LiquidGlassCompatibility{
+	public enum Effect{
+		NAVIGATION, BACKGROUND, PAGE_BLUR
+	}
+
 	private static final String TAG="LiquidGlassCompatibility";
 	private static final Object LOCK=new Object();
 	private static final Handler MAIN=new Handler(Looper.getMainLooper());
-	private static final Map<Runnable, Runnable> failureListeners=new LinkedHashMap<>();
-	private static volatile boolean sessionDisabled;
+	private static final Map<Effect, SessionState> sessions=new EnumMap<>(Effect.class);
+
+	static{
+		for(Effect effect:Effect.values())
+			sessions.put(effect, new SessionState());
+	}
+
+	private static class SessionState{
+		final Map<Runnable, Runnable> failureListeners=new LinkedHashMap<>();
+		volatile boolean sessionDisabled;
+	}
 
 	private LiquidGlassCompatibility(){}
 
-	public static boolean evaluate(int sdkInt, boolean lowRam, boolean sessionDisabled){
-		return sdkInt>=Build.VERSION_CODES.TIRAMISU && !lowRam && !sessionDisabled;
+	public static boolean isSystemSupported(){
+		return Build.VERSION.SDK_INT>=Build.VERSION_CODES.TIRAMISU;
 	}
 
-	public static boolean isSupported(){
-		if(Build.VERSION.SDK_INT<Build.VERSION_CODES.TIRAMISU || sessionDisabled)
-			return false;
+	public static boolean evaluate(int sdkInt, boolean sessionDisabled){
+		return sdkInt>=Build.VERSION_CODES.TIRAMISU && !sessionDisabled;
+	}
+
+	public static boolean shouldWarnAboutPerformance(){
 		Context context=MastodonApp.context;
 		if(context==null)
 			return false;
 		ActivityManager manager=context.getSystemService(ActivityManager.class);
-		return manager!=null && evaluate(Build.VERSION.SDK_INT, manager.isLowRamDevice(), sessionDisabled);
+		return manager!=null && (manager.isLowRamDevice() || manager.getMemoryClass()<=128);
 	}
 
-	/** Disable immediately, but notify on the main queue, never inside a drawing callback. */
+	public static boolean isSupported(){
+		return isSupported(Effect.NAVIGATION);
+	}
+
+	public static boolean isSupported(Effect effect){
+		return evaluate(Build.VERSION.SDK_INT, sessions.get(effect).sessionDisabled);
+	}
+
 	public static void reportFailure(String operation, Throwable error){
+		reportFailure(Effect.NAVIGATION, operation, error);
+	}
+
+	/** Disable only the affected effect, then notify on the main queue, never during drawing. */
+	public static void reportFailure(Effect effect, String operation, Throwable error){
 		Objects.requireNonNull(error, "error");
-		// Only these recoverable graphics errors may be converted into a classic-UI fallback.
 		if(error instanceof Error fatal && !(fatal instanceof LinkageError) && !(fatal instanceof OutOfMemoryError))
 			throw fatal;
 		synchronized(LOCK){
-			if(sessionDisabled)
+			SessionState state=sessions.get(effect);
+			if(state.sessionDisabled)
 				return;
-			sessionDisabled=true;
-			Log.w(TAG, "Liquid glass disabled for this session: "+operation, error);
-			for(Runnable notification:failureListeners.values())
+			state.sessionDisabled=true;
+			Log.w(TAG, effect+" disabled for this session: "+operation, error);
+			for(Runnable notification:state.failureListeners.values())
 				MAIN.post(notification);
 		}
 	}
 
 	public static void addFailureListener(Runnable listener){
+		addFailureListener(Effect.NAVIGATION, listener);
+	}
+
+	public static void addFailureListener(Effect effect, Runnable listener){
 		Objects.requireNonNull(listener, "listener");
 		synchronized(LOCK){
-			if(failureListeners.containsKey(listener))
+			SessionState state=sessions.get(effect);
+			if(state.failureListeners.containsKey(listener))
 				return;
 			Runnable notification=new Runnable(){
 				@Override
 				public void run(){
 					synchronized(LOCK){
-						if(failureListeners.get(listener)!=this)
+						if(state.failureListeners.get(listener)!=this)
 							return;
 					}
 					listener.run();
 				}
 			};
-			failureListeners.put(listener, notification);
-			if(sessionDisabled)
+			state.failureListeners.put(listener, notification);
+			if(state.sessionDisabled)
 				MAIN.post(notification);
 		}
 	}
 
 	public static void removeFailureListener(Runnable listener){
+		removeFailureListener(Effect.NAVIGATION, listener);
+	}
+
+	public static void removeFailureListener(Effect effect, Runnable listener){
 		synchronized(LOCK){
-			Runnable notification=failureListeners.remove(listener);
+			Runnable notification=sessions.get(effect).failureListeners.remove(listener);
 			if(notification!=null)
 				MAIN.removeCallbacks(notification);
 		}
@@ -85,10 +122,12 @@ public final class LiquidGlassCompatibility{
 	// Package-private, for isolated compatibility tests only; never used by production callers.
 	static void resetForTests(){
 		synchronized(LOCK){
-			for(Runnable notification:failureListeners.values())
-				MAIN.removeCallbacks(notification);
-			failureListeners.clear();
-			sessionDisabled=false;
+			for(SessionState state:sessions.values()){
+				for(Runnable notification:state.failureListeners.values())
+					MAIN.removeCallbacks(notification);
+				state.failureListeners.clear();
+				state.sessionDisabled=false;
+			}
 		}
 	}
 }

@@ -3,8 +3,10 @@ package org.joinmastodon.android.ui.views;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
+import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.PorterDuff;
+import android.graphics.RectF;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
@@ -25,10 +27,13 @@ public class BackdropCaptureFrameLayout extends FrameLayout{
 		void onCaptured(Bitmap top, Bitmap bottom);
 	}
 
-	// Keep the existing full-height RGB565 sampling layout, but fall back to classic
-	// above 16 MiB for our intermediate, output strips and cached software copies.
+	// Bound the intermediate, native-size output strips and cached software copies together.
+	// Consumers draw at bitmap pixel size, so only the intermediate may be downsampled.
 	// This bounds our retained buffers, not bitmaps still held by Compose consumers.
 	static final long CAPTURE_MEMORY_BUDGET_BYTES=16L*1024*1024;
+	static final int MAX_CAPTURE_DOWNSAMPLE=4;
+	// Also reject enormous, skinny views that fit the byte budget but are unsafe to resample.
+	static final int MAX_CAPTURE_DIMENSION=8192;
 
 	private int topCaptureHeight;
 	private int bottomCaptureHeight;
@@ -150,35 +155,54 @@ public class BackdropCaptureFrameLayout extends FrameLayout{
 
 		int generation=captureGeneration;
 		CaptureListener listener=captureListener;
-		int actualTopHeight=Math.min(topCaptureHeight, getHeight());
-		int actualBottomHeight=Math.min(bottomCaptureHeight, getHeight());
-		int sharedHeight=actualTopHeight>0 ? getHeight() : actualBottomHeight;
+		int width=getWidth(), height=getHeight();
+		int actualTopHeight=Math.min(topCaptureHeight, height);
+		int actualBottomHeight=Math.min(bottomCaptureHeight, height);
+		int sharedHeight=actualTopHeight>0 ? height : actualBottomHeight;
 		Bitmap.Config sharedConfig=actualTopHeight>0 ? Bitmap.Config.RGB_565 : Bitmap.Config.ARGB_8888;
 		Throwable failure=null;
 		capturing=true;
 		try{
+			if(width>MAX_CAPTURE_DIMENSION || height>MAX_CAPTURE_DIMENSION)
+				throw new IllegalStateException("Backdrop capture exceeds safe dimensions for the 16 MiB bitmap budget");
 			updateSoftwareBitmapCacheBytes();
-			// Divide before multiplying by width so even extreme view dimensions cannot overflow.
-			long bytesPerColumn=(long)sharedHeight*(actualTopHeight>0 ? 2 : 4)
-					+(long)actualTopHeight*4+(long)actualBottomHeight*4;
-			if(getWidth()>CAPTURE_MEMORY_BUDGET_BYTES/bytesPerColumn)
+			long available=CAPTURE_MEMORY_BUDGET_BYTES-softwareBitmapCacheBytes;
+			// Outputs must retain their root-pixel size: setBackdropBitmap has no scale metadata.
+			// Divide before multiplying, and reserve cached software copies before choosing a scale.
+			long outputBytesPerColumn=((long)actualTopHeight+actualBottomHeight)*4;
+			if(available<=0 || width>available/outputBytesPerColumn)
 				throw new IllegalStateException("Backdrop capture exceeds the 16 MiB bitmap budget");
-			long requiredBytes=getWidth()*bytesPerColumn;
-			if(requiredBytes>CAPTURE_MEMORY_BUDGET_BYTES-softwareBitmapCacheBytes)
-				throw new IllegalStateException("Backdrop capture exceeds the 16 MiB bitmap budget");
+			long outputBytes=width*outputBytesPerColumn;
+			long sharedBudget=available-outputBytes;
+			int downsample=1, sharedWidth=0, sampledHeight=0;
+			long requiredBytes=0;
+			// At most half or quarter resolution, not an unbounded shrink-until-it-fits loop.
+			for(;downsample<=MAX_CAPTURE_DOWNSAMPLE;downsample*=2){
+				int candidateWidth=(width+downsample-1)/downsample;
+				int candidateHeight=(sharedHeight+downsample-1)/downsample;
+				long sharedBytesPerColumn=(long)candidateHeight*(actualTopHeight>0 ? 2 : 4);
+				if(candidateWidth<=sharedBudget/sharedBytesPerColumn){
+					sharedWidth=candidateWidth;
+					sampledHeight=candidateHeight;
+					requiredBytes=outputBytes+candidateWidth*sharedBytesPerColumn;
+					break;
+				}
+			}
+			if(sharedWidth==0)
+				throw new IllegalStateException("Backdrop capture exceeds the 16 MiB bitmap budget at bounded downsampling");
 
-			if(captureBitmap==null || captureBitmap.getWidth()!=getWidth() || captureBitmap.getHeight()!=sharedHeight || captureBitmap.getConfig()!=sharedConfig
-					|| (actualTopHeight>0 && (topCaptureBitmap==null || topCaptureBitmap.getHeight()!=actualTopHeight))
-					|| (actualBottomHeight>0 && (bottomCaptureBitmap==null || bottomCaptureBitmap.getHeight()!=actualBottomHeight))){
+			if(captureBitmap==null || captureBitmap.getWidth()!=sharedWidth || captureBitmap.getHeight()!=sampledHeight || captureBitmap.getConfig()!=sharedConfig
+					|| (actualTopHeight>0 && (topCaptureBitmap==null || topCaptureBitmap.getWidth()!=width || topCaptureBitmap.getHeight()!=actualTopHeight))
+					|| (actualBottomHeight>0 && (bottomCaptureBitmap==null || bottomCaptureBitmap.getWidth()!=width || bottomCaptureBitmap.getHeight()!=actualBottomHeight))){
 				captureBitmap=null;
 				topCaptureBitmap=null;
 				bottomCaptureBitmap=null;
 				captureBufferBytes=requiredBytes;
-				captureBitmap=Bitmap.createBitmap(getWidth(), sharedHeight, sharedConfig);
+				captureBitmap=Bitmap.createBitmap(sharedWidth, sampledHeight, sharedConfig);
 				if(actualTopHeight>0)
-					topCaptureBitmap=Bitmap.createBitmap(getWidth(), actualTopHeight, Bitmap.Config.ARGB_8888);
+					topCaptureBitmap=Bitmap.createBitmap(width, actualTopHeight, Bitmap.Config.ARGB_8888);
 				if(actualBottomHeight>0)
-					bottomCaptureBitmap=Bitmap.createBitmap(getWidth(), actualBottomHeight, Bitmap.Config.ARGB_8888);
+					bottomCaptureBitmap=Bitmap.createBitmap(width, actualBottomHeight, Bitmap.Config.ARGB_8888);
 			}
 			captureBufferBytes=(long)captureBitmap.getAllocationByteCount()
 					+(topCaptureBitmap==null ? 0 : topCaptureBitmap.getAllocationByteCount())
@@ -193,26 +217,41 @@ public class BackdropCaptureFrameLayout extends FrameLayout{
 				Canvas captureCanvas=new Canvas(shared);
 				captureCanvas.drawColor(0, PorterDuff.Mode.CLEAR);
 				captureCanvas.save();
+				// Use the actual rounded dimensions, and the inverse mapping when drawing strips.
+				// Scale before translating the bottom-only pass so its origin remains root-relative.
+				captureCanvas.scale(sharedWidth/(float)width, sampledHeight/(float)sharedHeight);
 				if(actualTopHeight>0){
 					Path capturePath=new Path();
-					capturePath.addRect(0, 0, getWidth(), actualTopHeight, Path.Direction.CW);
+					// Bilinear filtering needs both source pixels fully painted. With rounded scale
+					// a one-pixel halo can still cut the outer pixel's coverage; reserve two.
+					int guard=downsample>1 ? 2*downsample : 0;
+					capturePath.addRect(0, 0, width, Math.min(height, actualTopHeight+guard), Path.Direction.CW);
 					if(actualBottomHeight>0)
-						capturePath.addRect(0, getHeight()-actualBottomHeight, getWidth(), getHeight(), Path.Direction.CW);
+						capturePath.addRect(0, Math.max(0, height-actualBottomHeight-guard), width, height, Path.Direction.CW);
 					captureCanvas.clipPath(capturePath);
 				}else{
-					captureCanvas.translate(0, -(getHeight()-actualBottomHeight));
+					captureCanvas.translate(0, -(height-actualBottomHeight));
 				}
 				super.dispatchDraw(captureCanvas);
 				captureCanvas.restore();
+				Paint resamplePaint=downsample>1 ? new Paint(Paint.FILTER_BITMAP_FLAG) : null;
 				if(actualTopHeight>0){
 					Canvas topCanvas=new Canvas(top);
 					topCanvas.drawColor(0, PorterDuff.Mode.CLEAR);
-					topCanvas.drawBitmap(shared, 0, 0, null);
+					if(downsample==1)
+						topCanvas.drawBitmap(shared, 0, 0, null);
+					else
+						topCanvas.drawBitmap(shared, null, new RectF(0, 0, width, sharedHeight), resamplePaint);
 				}
 				if(actualBottomHeight>0){
 					Canvas bottomCanvas=new Canvas(bottom);
 					bottomCanvas.drawColor(0, PorterDuff.Mode.CLEAR);
-					bottomCanvas.drawBitmap(shared, 0, actualTopHeight>0 ? -(getHeight()-actualBottomHeight) : 0, null);
+					int offset=actualTopHeight>0 ? height-actualBottomHeight : 0;
+					if(downsample==1)
+						bottomCanvas.drawBitmap(shared, 0, -offset, null);
+					else
+						// Map the whole sampled image; no rounded crop or full-height upscaled copy.
+						bottomCanvas.drawBitmap(shared, null, new RectF(0, -offset, width, sharedHeight-offset), resamplePaint);
 				}
 			}
 		}catch(RuntimeException | LinkageError | OutOfMemoryError error){

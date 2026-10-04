@@ -139,9 +139,9 @@ public class GlobalUserPreferences{
 		removeTrackingParams=prefs.getBoolean("removeTrackingParams", true);
 		boolean hasIosLiquidNavigationPreference=prefs.contains("useIosLiquidNavigation");
 		boolean storedIosLiquidNavigationPreference=prefs.getBoolean("useIosLiquidNavigation", true);
-		useIosLiquidNavigation=isIosLiquidNavigationSupported()
-				&& resolveIosLiquidNavigationEnabled(Build.VERSION.SDK_INT, hasIosLiquidNavigationPreference, storedIosLiquidNavigationPreference);
-		// Unsupported devices/sessions must not erase the user's saved choice.
+		useIosLiquidNavigation=resolveIosLiquidNavigationEnabled(Build.VERSION.SDK_INT, hasIosLiquidNavigationPreference, storedIosLiquidNavigationPreference)
+				&& (hasIosLiquidNavigationPreference || !LiquidGlassCompatibility.shouldWarnAboutPerformance());
+		// Runtime fallback must not change the user's requested preference.
 //		enhanceTextSize=prefs.getBoolean("enhanceTextSize", false);
 
 
@@ -167,11 +167,11 @@ public class GlobalUserPreferences{
 	}
 
 	public static boolean isIosLiquidNavigationSupported(){
-		return LiquidGlassCompatibility.isSupported();
+		return LiquidGlassCompatibility.isSystemSupported();
 	}
 
 	public static boolean isIosLiquidNavigationEnabled(){
-		return isIosLiquidNavigationSupported() && useIosLiquidNavigation;
+		return LiquidGlassCompatibility.isSupported() && useIosLiquidNavigation;
 	}
 
 	public static void save(){
@@ -179,8 +179,7 @@ public class GlobalUserPreferences{
 		if(!liquidSupported)
 			useIosLiquidNavigation=false;
 		SharedPreferences.Editor editor=getPrefs().edit();
-		// Save the requested choice only when usable. In particular, a session failure
-		// followed by an unrelated save must not permanently disable liquid navigation.
+		// Old systems preserve the disk choice; runtime failures never overwrite it.
 		if(liquidSupported)
 			editor.putBoolean("useIosLiquidNavigation", useIosLiquidNavigation);
 		editor
