@@ -42,7 +42,6 @@ import org.joinmastodon.android.model.NotificationType;
 import org.joinmastodon.android.ui.M3AlertDialogBuilder;
 import org.joinmastodon.android.ui.sheets.LocationPermissionSheet;
 import org.joinmastodon.android.ui.utils.LocationUtils;
-import org.joinmastodon.android.ui.utils.LiquidGlassCompatibility;
 import org.joinmastodon.android.ui.utils.OemUtils;
 import org.joinmastodon.android.ui.OutlineProviders;
 import org.joinmastodon.android.ui.compose.navigation.HomeLiquidNavigationController;
@@ -102,7 +101,6 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 	private boolean liquidHardwareVerified;
 	private boolean liquidCaptureStarted;
 	private Runnable liquidStartupRunnable;
-	private Runnable liquidFailureListener;
 	private View.OnAttachStateChangeListener liquidAttachListener;
 	@IdRes
 	private int currentTab=R.id.tab_home;
@@ -154,8 +152,6 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 
 	@Override
 	public void onDestroyView(){
-		LiquidGlassCompatibility.removeFailureListener(liquidFailureListener);
-		liquidFailureListener=null;
 		cancelLiquidStartup();
 		stopLiquidCapture();
 		if(content!=null && liquidAttachListener!=null)
@@ -209,13 +205,6 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 			if(fragmentContainer!=null)
 				updateCaptureHeights();
 		});
-		FragmentRootLinearLayout ownedContent=content;
-		liquidFailureListener=()->{
-			if(content!=ownedContent || !ownedContent.isAttachedToWindow() || getActivity()==null)
-				return;
-			restoreClassicNavigation();
-		};
-		LiquidGlassCompatibility.addFailureListener(liquidFailureListener);
 		liquidAttachListener=new View.OnAttachStateChangeListener(){
 			@Override
 			public void onViewAttachedToWindow(View view){
@@ -680,26 +669,16 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 	private void disposeLiquidNavigation(){
 		HomeLiquidNavigationController controller=liquidNavigationController;
 		liquidNavigationController=null;
-		if(controller!=null){
-			try{
-				controller.dispose();
-			}catch(RuntimeException | LinkageError | OutOfMemoryError error){
-				LiquidGlassCompatibility.reportFailure("dispose home liquid navigation", error);
-			}
-		}
+		if(controller!=null)
+			controller.dispose();
 	}
 
 	private void disposeLiquidToolbar(){
 		HomeLiquidToolbarController controller=liquidToolbarController;
 		liquidToolbarController=null;
 		liquidToolbarMenuOpen=false;
-		if(controller!=null){
-			try{
-				controller.dispose();
-			}catch(RuntimeException | LinkageError | OutOfMemoryError error){
-				LiquidGlassCompatibility.reportFailure("dispose home liquid toolbar", error);
-			}
-		}
+		if(controller!=null)
+			controller.dispose();
 	}
 
 	private void restoreClassicNavigation(){
@@ -734,44 +713,32 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 				}
 				// isHardwareAccelerated is meaningful only after attachment; check the actual view.
 				if(!ownedContainer.isHardwareAccelerated()){
-					stopLiquidCapture();
-					LiquidGlassCompatibility.reportFailure("home hardware acceleration",
-							new IllegalStateException("Attached home view is software rendered"));
+					restoreClassicNavigation();
 					return;
 				}
 				liquidHardwareVerified=true;
-				try{
-					if(liquidNavigationController==null)
-						createNavigationBar(LayoutInflater.from(getActivity()));
-					if(!GlobalUserPreferences.isIosLiquidNavigationEnabled() || liquidNavigationController==null)
+				if(liquidNavigationController==null)
+					createNavigationBar(LayoutInflater.from(getActivity()));
+				if(!GlobalUserPreferences.isIosLiquidNavigationEnabled() || liquidNavigationController==null)
+					return;
+				if(liquidToolbarController==null && homeTabFragment!=null)
+					createLiquidToolbar();
+				if(!GlobalUserPreferences.isIosLiquidNavigationEnabled())
+					return;
+				HomeLiquidNavigationController ownedNavigation=liquidNavigationController;
+				HomeLiquidToolbarController ownedToolbar=liquidToolbarController;
+				ownedContainer.setCaptureListener((top, bottom)->{
+					if(content!=ownedContent || fragmentContainer!=ownedContainer || !ownedContainer.isAttachedToWindow()
+							|| liquidNavigationController!=ownedNavigation || liquidToolbarController!=ownedToolbar
+							|| !GlobalUserPreferences.isIosLiquidNavigationEnabled())
 						return;
-					if(liquidToolbarController==null && homeTabFragment!=null)
-						createLiquidToolbar();
-					if(!GlobalUserPreferences.isIosLiquidNavigationEnabled())
-						return;
-					HomeLiquidNavigationController ownedNavigation=liquidNavigationController;
-					HomeLiquidToolbarController ownedToolbar=liquidToolbarController;
-					ownedContainer.setCaptureListener((top, bottom)->{
-						if(content!=ownedContent || fragmentContainer!=ownedContainer || !ownedContainer.isAttachedToWindow()
-								|| liquidNavigationController!=ownedNavigation || liquidToolbarController!=ownedToolbar
-								|| !GlobalUserPreferences.isIosLiquidNavigationEnabled())
-							return;
-						try{
-							if(top!=null && currentTab==R.id.tab_home && ownedToolbar!=null)
-								ownedToolbar.setBackdropBitmap(top);
-							if(bottom!=null)
-								ownedNavigation.setBackdropBitmap(bottom);
-						}catch(RuntimeException | LinkageError | OutOfMemoryError error){
-							stopLiquidCapture();
-							LiquidGlassCompatibility.reportFailure("home backdrop update", error);
-						}
-					});
-					liquidCaptureStarted=true;
-					updateCaptureHeights();
-				}catch(RuntimeException | LinkageError | OutOfMemoryError error){
-					stopLiquidCapture();
-					LiquidGlassCompatibility.reportFailure("start home liquid glass", error);
-				}
+					if(top!=null && currentTab==R.id.tab_home && ownedToolbar!=null)
+						ownedToolbar.setBackdropBitmap(top);
+					if(bottom!=null)
+						ownedNavigation.setBackdropBitmap(bottom);
+				});
+				liquidCaptureStarted=true;
+				updateCaptureHeights();
 			}
 		};
 		ownedContent.post(liquidStartupRunnable);
@@ -790,14 +757,8 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 
 		Account self=AccountSessionManager.getInstance().getAccount(accountID).self;
 		if(GlobalUserPreferences.isIosLiquidNavigationEnabled() && liquidHardwareVerified){
-			try{
-				liquidNavigationController=new HomeLiquidNavigationController(getActivity(), currentTab, self.avatar, this::onTabSelected, this::onTabLongClick);
-				navigationHost.addView(liquidNavigationController.getView(), new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-			}catch(RuntimeException | LinkageError | OutOfMemoryError error){
-				LiquidGlassCompatibility.reportFailure("create home liquid navigation", error);
-				disposeLiquidNavigation();
-				navigationHost.removeAllViews();
-			}
+			liquidNavigationController=new HomeLiquidNavigationController(getActivity(), currentTab, self.avatar, this::onTabSelected, this::onTabLongClick);
+			navigationHost.addView(liquidNavigationController.getView(), new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 		}
 		if(liquidNavigationController==null){
 			fragmentContainer.setCaptureListener(null);
@@ -835,39 +796,30 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 			updateCaptureHeights();
 			return;
 		}
-		try{
-			liquidToolbarController=new HomeLiquidToolbarController(
-					getActivity(),
-					homeTabFragment::onLiquidTimelineSelected,
-					homeTabFragment::onLiquidNewPosts,
-					homeTabFragment::onLiquidCompose,
-					homeTabFragment::onLiquidMenuItem,
-					homeTabFragment::openSearch
-			);
+		liquidToolbarController=new HomeLiquidToolbarController(
+				getActivity(),
+				homeTabFragment::onLiquidTimelineSelected,
+				homeTabFragment::onLiquidNewPosts,
+				homeTabFragment::onLiquidCompose,
+				homeTabFragment::onLiquidMenuItem,
+				homeTabFragment::openSearch
+		);
 
-			List<HomeToolbarComposeMenuItem> composeItems=new ArrayList<>();
-			composeItems.add(new HomeToolbarComposeMenuItem(R.id.compose_post, getString(R.string.compose_menu_post), getNotes(MiuixIcons.INSTANCE)));
-			composeItems.add(new HomeToolbarComposeMenuItem(R.id.compose_friend_request, getString(R.string.compose_menu_friend_request), getContactsBook(MiuixIcons.INSTANCE)));
-			liquidToolbarController.setComposeMenu(composeItems);
+		List<HomeToolbarComposeMenuItem> composeItems=new ArrayList<>();
+		composeItems.add(new HomeToolbarComposeMenuItem(R.id.compose_post, getString(R.string.compose_menu_post), getNotes(MiuixIcons.INSTANCE)));
+		composeItems.add(new HomeToolbarComposeMenuItem(R.id.compose_friend_request, getString(R.string.compose_menu_friend_request), getContactsBook(MiuixIcons.INSTANCE)));
+		liquidToolbarController.setComposeMenu(composeItems);
 
-			liquidToolbarController.setMenuOpenListener(open->{
-				liquidToolbarMenuOpen=open;
-				updateCaptureHeights();
-			});
-			liquidToolbarController.setContentTouchTarget(fragmentContainer);
-			toolbarHost.addView(liquidToolbarController.getView(), new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-			homeTabFragment.setLiquidToolbarController(liquidToolbarController);
-			applyLiquidToolbarInsets();
-			updateLiquidToolbarVisibility();
+		liquidToolbarController.setMenuOpenListener(open->{
+			liquidToolbarMenuOpen=open;
 			updateCaptureHeights();
-		}catch(RuntimeException | LinkageError | OutOfMemoryError error){
-			stopLiquidCapture();
-			LiquidGlassCompatibility.reportFailure("create home liquid toolbar", error);
-			disposeLiquidToolbar();
-			toolbarHost.removeAllViews();
-			toolbarHost.setVisibility(View.GONE);
-			homeTabFragment.setLiquidToolbarController(null);
-		}
+		});
+		liquidToolbarController.setContentTouchTarget(fragmentContainer);
+		toolbarHost.addView(liquidToolbarController.getView(), new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+		homeTabFragment.setLiquidToolbarController(liquidToolbarController);
+		applyLiquidToolbarInsets();
+		updateLiquidToolbarVisibility();
+		updateCaptureHeights();
 	}
 
 	private void applyLiquidToolbarInsets(){

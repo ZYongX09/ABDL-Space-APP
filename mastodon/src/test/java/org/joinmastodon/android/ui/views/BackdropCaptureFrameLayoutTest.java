@@ -37,25 +37,15 @@ import static org.junit.Assert.*;
 public class BackdropCaptureFrameLayoutTest{
 	private Context context;
 
-	// Predicate and main-thread notification behavior belong to the helper's own tests.
+	// SDK capability behavior belongs to the helper's own tests.
 	// Only the capability gate is simulated here; capture uses real native software canvases.
 	@Implements(LiquidGlassCompatibility.class)
 	public static class CompatibilityShadow{
 		static boolean supported;
-		static int reports;
-		static Throwable failure;
 
 		@Implementation
 		protected static boolean isSupported(){
 			return supported;
-		}
-
-		@Implementation
-		protected static void reportFailure(String operation, Throwable error){
-			assertEquals("backdrop capture", operation);
-			reports++;
-			failure=error;
-			supported=false;
 		}
 	}
 
@@ -63,8 +53,6 @@ public class BackdropCaptureFrameLayoutTest{
 	public void setUp(){
 		context=RuntimeEnvironment.getApplication();
 		CompatibilityShadow.supported=true;
-		CompatibilityShadow.reports=0;
-		CompatibilityShadow.failure=null;
 	}
 
 	@Test
@@ -146,7 +134,7 @@ public class BackdropCaptureFrameLayoutTest{
 		assertSame(shared, field(view, "captureBitmap"));
 		assertSame(top, delivered[0]);
 		assertSame(bottom, delivered[1]);
-		assertEquals(0, CompatibilityShadow.reports);
+		assertTrue(CompatibilityShadow.supported);
 	}
 
 	@Test
@@ -185,7 +173,7 @@ public class BackdropCaptureFrameLayoutTest{
 		for(int x:new int[]{1441/4, 1440})
 			assertEquals("Bottom boundary must not sample the cleared gap", edge.getPixel(x, 0), delivered[1].getPixel(x, 0));
 		assertWithinBudget(view);
-		assertEquals(0, CompatibilityShadow.reports);
+		assertTrue(CompatibilityShadow.supported);
 	}
 
 	@Test
@@ -208,7 +196,7 @@ public class BackdropCaptureFrameLayoutTest{
 		assertStripGeometryAndColors(delivered, 1440, 2000, 800);
 		assertEquals(16_704_000L, field(view, "captureBufferBytes"));
 		assertWithinBudget(view);
-		assertEquals(0, CompatibilityShadow.reports);
+		assertTrue(CompatibilityShadow.supported);
 	}
 
 	@Test
@@ -233,7 +221,7 @@ public class BackdropCaptureFrameLayoutTest{
 		assertEquals(Bitmap.Config.ARGB_8888, shared.getConfig());
 		assertEquals(3_456_000L, field(view, "captureBufferBytes"));
 		assertWithinBudget(view);
-		assertEquals(0, CompatibilityShadow.reports);
+		assertTrue(CompatibilityShadow.supported);
 	}
 
 	@Test
@@ -258,7 +246,7 @@ public class BackdropCaptureFrameLayoutTest{
 		assertEquals(Bitmap.Config.ARGB_8888, shared.getConfig());
 		assertEquals(15_667_200L, field(view, "captureBufferBytes"));
 		assertWithinBudget(view);
-		assertEquals(0, CompatibilityShadow.reports);
+		assertTrue(CompatibilityShadow.supported);
 	}
 
 	@Test
@@ -291,7 +279,7 @@ public class BackdropCaptureFrameLayoutTest{
 			assertWithinBudget(view);
 			view.setCaptureListener(null);
 		}
-		assertEquals(0, CompatibilityShadow.reports);
+		assertTrue(CompatibilityShadow.supported);
 	}
 
 	@Test
@@ -324,16 +312,16 @@ public class BackdropCaptureFrameLayoutTest{
 		assertEquals(0, view.copies);
 		assertSame(image.original, image.getDrawable());
 		assertWithinBudget(view);
-		assertEquals(0, CompatibilityShadow.reports);
+		assertTrue(CompatibilityShadow.supported);
 	}
 
 	@Test
-	public void customChildSoftwareDrawFailuresStopCaptureWithoutBreakingNormalUi() throws Exception{
+	public void customChildSoftwareDrawFailuresPropagateRestoreResourcesAndAllowRetry() throws Exception{
 		Throwable[] errors={new IllegalArgumentException("software draw"),
 				new NoClassDefFoundError("software effect"), new OutOfMemoryError("software draw")};
 		for(Throwable error:errors){
-			CompatibilityShadow.supported=true;
 			Harness view=new Harness(context);
+			TrackingImage image=image(view);
 			Bands child=new Bands(context);
 			child.softwareFailure=error;
 			view.addView(child);
@@ -342,17 +330,19 @@ public class BackdropCaptureFrameLayoutTest{
 			int[] calls={0};
 			view.setCaptureListener((top, bottom)->calls[0]++);
 
-			view.render(acceleratedCanvas(20, 40));
+			assertSame(error, assertThrows(error.getClass(), ()->view.render(acceleratedCanvas(20, 40))));
 
-			assertSame(error, CompatibilityShadow.failure);
+			assertSame(image.original, image.getDrawable());
 			assertEquals(0, calls[0]);
 			assertEquals(1, child.softwareDraws);
-			assertStopped(view);
+			assertRetryableAfterFailure(view);
+			child.softwareFailure=null;
 			view.render(acceleratedCanvas(20, 40));
 			assertEquals(2, child.hardwareDraws);
-			assertEquals(1, child.softwareDraws);
+			assertEquals(2, child.softwareDraws);
+			assertEquals(1, calls[0]);
 		}
-		assertEquals(3, CompatibilityShadow.reports);
+		assertTrue(CompatibilityShadow.supported);
 	}
 
 	@Test
@@ -395,7 +385,6 @@ public class BackdropCaptureFrameLayoutTest{
 			actualBytes+=bitmap.getAllocationByteCount();
 		}
 		assertEquals(actualBytes, bytes.getLong(view));
-		assertEquals(0, CompatibilityShadow.reports);
 		assertTrue(CompatibilityShadow.supported);
 	}
 
@@ -413,15 +402,15 @@ public class BackdropCaptureFrameLayoutTest{
 		int[] calls={0};
 		view.setCaptureListener((top, bottom)->calls[0]++);
 
-		view.render(acceleratedCanvas(20, 40));
+		UnsatisfiedLinkError actual=assertThrows(UnsatisfiedLinkError.class, ()->view.render(acceleratedCanvas(20, 40)));
 
 		assertEquals(2, view.copies);
 		assertEquals(1, first.restores);
 		assertSame(firstOriginal, first.getDrawable());
 		assertSame(secondOriginal, second.getDrawable());
 		assertEquals(0, calls[0]);
-		assertSame(view.copyFailure, CompatibilityShadow.failure);
-		assertStopped(view);
+		assertSame(view.copyFailure, actual);
+		assertRetryableAfterFailure(view);
 	}
 
 	@Test
@@ -435,15 +424,40 @@ public class BackdropCaptureFrameLayoutTest{
 		int[] calls={0};
 		view.setCaptureListener((top, bottom)->calls[0]++);
 
-		view.render(acceleratedCanvas(20, 40));
+		IllegalStateException actual=assertThrows(IllegalStateException.class, ()->view.render(acceleratedCanvas(20, 40)));
 
 		assertEquals(1, first.restores);
 		assertEquals(1, second.restores);
 		assertSame(first.original, first.getDrawable());
 		assertSame(second.original, second.getDrawable());
 		assertEquals(0, calls[0]);
-		assertTrue(CompatibilityShadow.failure instanceof IllegalStateException);
-		assertStopped(view);
+		assertRetryableAfterFailure(view);
+		assertTrue(actual.getMessage().contains("setter failed while restoring"));
+	}
+
+	@Test
+	public void softwareFailureRemainsPrimaryWhenDrawableRestorationAlsoFails() throws Exception{
+		Harness view=new Harness(context);
+		TrackingImage first=image(view);
+		TrackingImage second=image(view);
+		second.failRestore=true;
+		Bands child=new Bands(context);
+		IllegalArgumentException error=new IllegalArgumentException("original software draw");
+		child.softwareFailure=error;
+		view.addView(child);
+		layout(view, 20, 40);
+		view.setCaptureHeights(7, 7);
+		view.setCaptureListener((top, bottom)->fail("Failed draw must not deliver"));
+
+		assertSame(error, assertThrows(IllegalArgumentException.class, ()->view.render(acceleratedCanvas(20, 40))));
+
+		assertEquals(1, first.restores);
+		assertEquals(1, second.restores);
+		assertSame(first.original, first.getDrawable());
+		assertSame(second.original, second.getDrawable());
+		assertEquals(1, error.getSuppressed().length);
+		assertEquals("setter failed while restoring", error.getSuppressed()[0].getMessage());
+		assertRetryableAfterFailure(view);
 	}
 
 	@Test
@@ -456,13 +470,14 @@ public class BackdropCaptureFrameLayoutTest{
 		view.setCaptureHeights(7, 7);
 		view.setCaptureListener((top, bottom)->fail("Replacement failure must not deliver"));
 
-		view.render(acceleratedCanvas(20, 40));
+		IllegalStateException actual=assertThrows(IllegalStateException.class, ()->view.render(acceleratedCanvas(20, 40)));
 
 		assertSame(first.original, first.getDrawable());
 		assertSame(second.original, second.getDrawable());
 		assertEquals(1, first.restores);
 		assertEquals(1, second.restores);
-		assertStopped(view);
+		assertRetryableAfterFailure(view);
+		assertTrue(actual.getMessage().contains("setter failed after replacement"));
 	}
 
 	@Test
@@ -484,13 +499,11 @@ public class BackdropCaptureFrameLayoutTest{
 			assertSame(error, actual);
 		}
 		assertSame(image.original, image.getDrawable());
-		assertTrue(((List<?>)field(view, "restoreDrawables")).isEmpty());
-		assertFalse((boolean)field(view, "capturing"));
-		assertEquals(0, CompatibilityShadow.reports);
+		assertRetryableAfterFailure(view);
 	}
 
 	@Test
-	public void nullSoftwareCopyFailsCleanlyAndRestoresEarlierReplacement() throws Exception{
+	public void nullSoftwareCopyPropagatesAndRestoresEarlierReplacement() throws Exception{
 		Harness view=new Harness(context);
 		TrackingImage first=image(view);
 		image(view);
@@ -499,12 +512,12 @@ public class BackdropCaptureFrameLayoutTest{
 		view.setCaptureHeights(7, 7);
 		view.setCaptureListener((top, bottom)->fail("Null copy must not be delivered"));
 
-		view.render(acceleratedCanvas(20, 40));
+		IllegalStateException actual=assertThrows(IllegalStateException.class, ()->view.render(acceleratedCanvas(20, 40)));
 
 		assertSame(first.original, first.getDrawable());
 		assertEquals(1, first.restores);
-		assertTrue(CompatibilityShadow.failure.getMessage().contains("returned null"));
-		assertStopped(view);
+		assertRetryableAfterFailure(view);
+		assertTrue(actual.getMessage().contains("returned null"));
 	}
 
 	@Test
@@ -538,7 +551,7 @@ public class BackdropCaptureFrameLayoutTest{
 			assertEquals(1, calls[0]);
 			assertEquals(invalidations, view.invalidations);
 		}
-		assertEquals(0, CompatibilityShadow.reports);
+		assertTrue(CompatibilityShadow.supported);
 	}
 
 	@Test
@@ -557,32 +570,38 @@ public class BackdropCaptureFrameLayoutTest{
 		assertEquals(1, child.softwareDraws);
 		assertSame(image.original, image.getDrawable());
 		assertStopped(view);
-		assertEquals(0, CompatibilityShadow.reports);
+		assertTrue(CompatibilityShadow.supported);
 	}
 
 	@Test
-	public void listenerFailureDropsOwnRefsButDoesNotRecycleDeliveredBitmap() throws Exception{
+	public void listenerFailurePropagatesDropsOwnRefsAndDoesNotRecycleDeliveredBitmap() throws Exception{
 		Harness view=new Harness(context);
+		TrackingImage image=image(view);
 		view.addView(new Bands(context));
 		layout(view, 20, 40);
 		view.setCaptureHeights(7, 7);
 		Bitmap[] delivered=new Bitmap[1];
+		OutOfMemoryError error=new OutOfMemoryError("Compose consumer");
 		view.setCaptureListener((top, bottom)->{
 			delivered[0]=top;
-			throw new OutOfMemoryError("Compose consumer");
+			throw error;
 		});
 
-		view.render(acceleratedCanvas(20, 40));
+		assertSame(error, assertThrows(OutOfMemoryError.class, ()->view.render(acceleratedCanvas(20, 40))));
 
 		assertNotNull(delivered[0]);
 		assertFalse(delivered[0].isRecycled());
 		assertEquals(Color.RED, delivered[0].getPixel(10, 1));
-		assertStopped(view);
-		assertTrue(CompatibilityShadow.failure instanceof OutOfMemoryError);
+		assertSame(image.original, image.getDrawable());
+		assertRetryableAfterFailure(view);
+		int[] calls={0};
+		view.setCaptureListener((top, bottom)->calls[0]++);
+		view.render(acceleratedCanvas(20, 40));
+		assertEquals(1, calls[0]);
 	}
 
 	@Test
-	public void softwareWindowCanvasAndUnsupportedSessionDoNotStartCapture() throws Exception{
+	public void softwareWindowAndUnsupportedSdkDoNotCaptureOrPermanentlyDisableIt() throws Exception{
 		Harness view=new Harness(context);
 		Bands child=new Bands(context);
 		view.addView(child);
@@ -592,17 +611,24 @@ public class BackdropCaptureFrameLayoutTest{
 		view.render(new Canvas(Bitmap.createBitmap(20, 40, Bitmap.Config.ARGB_8888)));
 		assertEquals(1, child.softwareDraws); // ordinary UI pass only
 		assertStopped(view);
-		assertEquals(1, CompatibilityShadow.reports);
+		assertTrue(CompatibilityShadow.supported);
 
-		view.setCaptureListener((top, bottom)->fail("Disabled session must not capture"));
+		CompatibilityShadow.supported=false;
+		view.setCaptureListener((top, bottom)->fail("Unsupported SDK must not capture"));
 		view.render(acceleratedCanvas(20, 40));
 		assertEquals(1, child.softwareDraws);
 		assertStopped(view);
-		assertEquals(1, CompatibilityShadow.reports);
+
+		CompatibilityShadow.supported=true;
+		int[] calls={0};
+		view.setCaptureListener((top, bottom)->calls[0]++);
+		view.render(acceleratedCanvas(20, 40));
+		assertEquals(1, calls[0]);
+		assertEquals(2, child.softwareDraws);
 	}
 
 	@Test
-	public void oversizedAndExtremeBoundsFailBeforeAllocatingCaptureBuffers() throws Exception{
+	public void oversizedAndExtremeBoundsStopLocallyBeforeAllocatingCaptureBuffers() throws Exception{
 		int[][] sizes={{2048, 4096, Integer.MAX_VALUE, Integer.MAX_VALUE},
 				{Integer.MAX_VALUE, Integer.MAX_VALUE, Integer.MAX_VALUE, Integer.MAX_VALUE},
 				{Integer.MAX_VALUE, 40, 1, 0}, {20, Integer.MAX_VALUE, 0, 7},
@@ -617,12 +643,18 @@ public class BackdropCaptureFrameLayoutTest{
 
 			view.render(acceleratedCanvas(1, 1));
 
-			assertTrue(CompatibilityShadow.failure instanceof IllegalStateException);
-			assertTrue(CompatibilityShadow.failure.getMessage().contains("16 MiB"));
 			assertEquals(0, view.copies);
 			assertStopped(view);
+			assertTrue(CompatibilityShadow.supported);
+			layout(view, 20, 40);
+			view.setCaptureHeights(7, 7);
+			int[] calls={0};
+			view.setCaptureListener((top, bottom)->calls[0]++);
+			view.render(acceleratedCanvas(20, 40));
+			assertEquals(1, calls[0]);
+			assertWithinBudget(view);
 		}
-		assertEquals(sizes.length, CompatibilityShadow.reports);
+		assertTrue(CompatibilityShadow.supported);
 	}
 
 	@Test
@@ -637,8 +669,7 @@ public class BackdropCaptureFrameLayoutTest{
 
 		view.render(acceleratedCanvas(1, 1));
 
-		assertEquals(1, CompatibilityShadow.reports);
-		assertTrue(CompatibilityShadow.failure.getMessage().contains("bounded downsampling"));
+		assertTrue(CompatibilityShadow.supported);
 		assertStopped(view);
 	}
 
@@ -658,8 +689,8 @@ public class BackdropCaptureFrameLayoutTest{
 
 		assertEquals(0, view.copies);
 		assertSame(image.original, image.getDrawable());
-		assertTrue(CompatibilityShadow.failure.getMessage().contains("software copy"));
 		assertStopped(view);
+		assertTrue(CompatibilityShadow.supported);
 	}
 
 	@Test
@@ -679,8 +710,8 @@ public class BackdropCaptureFrameLayoutTest{
 		assertEquals(1, first.restores);
 		assertSame(first.original, first.getDrawable());
 		assertSame(second.original, second.getDrawable());
-		assertTrue(CompatibilityShadow.failure.getMessage().contains("software copy"));
 		assertStopped(view);
+		assertTrue(CompatibilityShadow.supported);
 	}
 
 	@Test
@@ -699,12 +730,12 @@ public class BackdropCaptureFrameLayoutTest{
 		assertSame(first.original, first.getDrawable());
 		assertSame(second.original, second.getDrawable());
 		assertEquals(1, first.restores);
-		assertTrue(CompatibilityShadow.failure.getMessage().contains("software copy"));
 		assertStopped(view);
+		assertTrue(CompatibilityShadow.supported);
 	}
 
 	@Test
-	public void ordinaryDispatchDrawFailureIsNotMaskedOrReported() throws Exception{
+	public void ordinaryDispatchDrawFailureIsNotMasked() throws Exception{
 		Harness view=new Harness(context);
 		Bands child=new Bands(context);
 		IllegalStateException error=new IllegalStateException("ordinary UI draw");
@@ -720,7 +751,7 @@ public class BackdropCaptureFrameLayoutTest{
 		}catch(IllegalStateException actual){
 			assertSame(error, actual);
 		}
-		assertEquals(0, CompatibilityShadow.reports);
+		assertTrue(CompatibilityShadow.supported);
 		assertEquals(0, child.softwareDraws);
 		assertFalse((boolean)field(view, "capturing"));
 	}
@@ -822,6 +853,16 @@ public class BackdropCaptureFrameLayoutTest{
 
 	private static void assertStopped(Harness view) throws Exception{
 		assertNull(field(view, "captureListener"));
+		assertCaptureResourcesReleased(view);
+	}
+
+	private static void assertRetryableAfterFailure(Harness view) throws Exception{
+		assertTrue(CompatibilityShadow.supported);
+		assertNotNull(field(view, "captureListener"));
+		assertCaptureResourcesReleased(view);
+	}
+
+	private static void assertCaptureResourcesReleased(Harness view) throws Exception{
 		assertNull(field(view, "captureBitmap"));
 		assertNull(field(view, "topCaptureBitmap"));
 		assertNull(field(view, "bottomCaptureBitmap"));

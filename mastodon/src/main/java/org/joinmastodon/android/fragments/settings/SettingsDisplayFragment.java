@@ -69,7 +69,7 @@ public class SettingsDisplayFragment extends BaseSettingsFragment<Void>{
 		items.add(trueBlackModeItem=new CheckableListItem<>(R.string.sk_settings_true_black, R.string.mo_setting_true_black_summary, CheckableListItem.Style.SWITCH, GlobalUserPreferences.trueBlackTheme, R.drawable.ic_fluent_dark_theme_24_regular, i->onTrueBlackModeClick(), true));
 		if(GlobalUserPreferences.isIosLiquidNavigationSupported()){
 			items.add(iosLiquidNavigationItem=new CheckableListItem<>(R.string.settings_ios_liquid_navigation,
-					LiquidGlassCompatibility.isSupported() ? R.string.settings_ios_liquid_navigation_summary : R.string.settings_liquid_glass_runtime_fallback,
+					R.string.settings_ios_liquid_navigation_summary,
 					CheckableListItem.Style.SWITCH, GlobalUserPreferences.useIosLiquidNavigation, R.drawable.ic_fluent_navigation_24_regular,
 					item->requestLiquidNavigation(!item.checked)));
 			iosLiquidNavigationItem.checkedChangeListener=this::requestLiquidNavigation;
@@ -140,23 +140,8 @@ public class SettingsDisplayFragment extends BaseSettingsFragment<Void>{
 		iosLiquidNavigationItem.checked=enabled;
 		GlobalUserPreferences.useIosLiquidNavigation=enabled;
 		GlobalUserPreferences.save();
-		boolean available=LiquidGlassCompatibility.isSupported();
-		iosLiquidNavigationItem.subtitleRes=available ? R.string.settings_ios_liquid_navigation_summary : R.string.settings_liquid_glass_runtime_fallback;
 		rebindItem(iosLiquidNavigationItem);
 		E.post(new StatusDisplaySettingsChangedEvent(accountID));
-		if(enabled && !available){
-			liquidNavigationDialog=new M3AlertDialogBuilder(getActivity())
-					.setTitle(R.string.settings_ios_liquid_navigation)
-					.setMessage(R.string.settings_liquid_glass_runtime_fallback)
-					.setPositiveButton(R.string.ok, null)
-					.create();
-			AlertDialog dialog=liquidNavigationDialog;
-			dialog.setOnDismissListener(ignored->{
-				if(liquidNavigationDialog==dialog)
-					liquidNavigationDialog=null;
-			});
-			dialog.show();
-		}
 	}
 
 	private void dismissLiquidNavigationDialog(){

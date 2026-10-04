@@ -2,6 +2,7 @@ package org.joinmastodon.android
 
 import android.app.ActivityManager
 import android.os.Build
+import org.joinmastodon.android.ui.compose.utils.GraphicsSafety
 import org.joinmastodon.android.ui.utils.LiquidGlassCompatibility
 import org.junit.After
 import org.junit.Assert.*
@@ -18,7 +19,6 @@ import org.robolectric.annotation.Config
 class LiquidNavigationPreferencesCompatibilityTest {
 	@Before
 	fun setup() {
-		resetCompatibility()
 		MastodonApp.context = RuntimeEnvironment.getApplication()
 		shadowOf(MastodonApp.context.getSystemService(ActivityManager::class.java)).apply {
 			setIsLowRamDevice(false)
@@ -29,7 +29,6 @@ class LiquidNavigationPreferencesCompatibilityTest {
 
 	@After
 	fun teardown() {
-		resetCompatibility()
 		GlobalUserPreferences.useIosLiquidNavigation = false
 		MastodonApp.context = null
 	}
@@ -73,30 +72,84 @@ class LiquidNavigationPreferencesCompatibilityTest {
 	}
 
 	@Test
-	fun failureAndUnrelatedSaveDoNotPersistSessionDisable() {
+	@Config(sdk = [33, 34, 35])
+	fun actualGraphicsExceptionDoesNotDisableExplicitChoiceOrPreventToggling() {
 		val prefs = GlobalUserPreferences.getPrefs()
-		prefs.edit().putBoolean("useIosLiquidNavigation", true).commit()
+		assertTrue(prefs.edit().putBoolean("useIosLiquidNavigation", true).commit())
 		GlobalUserPreferences.load()
-		LiquidGlassCompatibility.reportFailure("test backdrop", IllegalStateException("test"))
-		assertFalse(GlobalUserPreferences.isIosLiquidNavigationEnabled())
+		assertTrue(GlobalUserPreferences.isIosLiquidNavigationEnabled())
+		assertGraphicsFailurePropagates(IllegalStateException("test backdrop"))
+		assertTrue(LiquidGlassCompatibility.isSupported())
+		assertTrue(GlobalUserPreferences.isIosLiquidNavigationSupported())
+		assertTrue(GlobalUserPreferences.useIosLiquidNavigation)
+		assertTrue(GlobalUserPreferences.isIosLiquidNavigationEnabled())
 		GlobalUserPreferences.showCWs = !GlobalUserPreferences.showCWs
 		GlobalUserPreferences.save()
-		assertEquals(Build.VERSION.SDK_INT >= 33, GlobalUserPreferences.useIosLiquidNavigation)
-		assertEquals(Build.VERSION.SDK_INT >= 33, GlobalUserPreferences.isIosLiquidNavigationSupported())
 		assertTrue(prefs.getBoolean("useIosLiquidNavigation", false))
 		assertFalse(prefs.contains("sessionDisabled"))
-		resetCompatibility()
 		GlobalUserPreferences.load()
-		assertEquals(Build.VERSION.SDK_INT >= 33, GlobalUserPreferences.isIosLiquidNavigationEnabled())
+		assertTrue(GlobalUserPreferences.isIosLiquidNavigationEnabled())
+
+		GlobalUserPreferences.useIosLiquidNavigation = false
+		GlobalUserPreferences.save()
+		GlobalUserPreferences.load()
+		assertFalse(GlobalUserPreferences.useIosLiquidNavigation)
+		assertFalse(GlobalUserPreferences.isIosLiquidNavigationEnabled())
+		assertFalse(prefs.getBoolean("useIosLiquidNavigation", true))
+
+		GlobalUserPreferences.useIosLiquidNavigation = true
+		GlobalUserPreferences.save()
+		GlobalUserPreferences.load()
+		assertTrue(GlobalUserPreferences.useIosLiquidNavigation)
+		assertTrue(GlobalUserPreferences.isIosLiquidNavigationEnabled())
+		assertTrue(prefs.getBoolean("useIosLiquidNavigation", false))
+		assertFalse(prefs.contains("sessionDisabled"))
 	}
 
 	@Test
-	fun sessionFailureSaveStoresRequestedChoiceOnlyOnSupportedSdk() {
+	@Config(sdk = [33, 34, 35])
+	fun actualGraphicsOutOfMemoryDoesNotOverrideTheDefaultChoice() {
+		val prefs = GlobalUserPreferences.getPrefs()
 		GlobalUserPreferences.load()
-		LiquidGlassCompatibility.reportFailure("test startup", OutOfMemoryError("test"))
+		assertTrue(GlobalUserPreferences.isIosLiquidNavigationEnabled())
+		assertFalse(prefs.contains("useIosLiquidNavigation"))
+		assertGraphicsFailurePropagates(OutOfMemoryError("test startup"))
+		assertTrue(LiquidGlassCompatibility.isSupported())
+		assertTrue(GlobalUserPreferences.isIosLiquidNavigationEnabled())
 		GlobalUserPreferences.save()
-		assertEquals(Build.VERSION.SDK_INT >= 33, GlobalUserPreferences.getPrefs().contains("useIosLiquidNavigation"))
-		if (Build.VERSION.SDK_INT >= 33) assertTrue(GlobalUserPreferences.getPrefs().getBoolean("useIosLiquidNavigation", false))
+		assertTrue(prefs.contains("useIosLiquidNavigation"))
+		assertTrue(prefs.getBoolean("useIosLiquidNavigation", false))
+		GlobalUserPreferences.load()
+		assertTrue(GlobalUserPreferences.isIosLiquidNavigationEnabled())
+		assertFalse(prefs.contains("sessionDisabled"))
+	}
+
+	@Test
+	fun compatibilityHelperHasNoRuntimeFailureApiOrSessionState() {
+		val compatibility = LiquidGlassCompatibility::class.java
+		assertFalse(compatibility.declaredMethods.any {
+			it.name == "reportFailure" || it.name.contains("FailureListener") ||
+				it.name.startsWith("reset")
+		})
+		val supportMethods = compatibility.declaredMethods.filter { it.name == "isSupported" }
+		assertEquals(1, supportMethods.size)
+		assertEquals(0, supportMethods.single().parameterCount)
+		assertFalse(compatibility.declaredClasses.any { it.simpleName == "Effect" })
+		assertFalse(compatibility.declaredFields.any {
+			it.name.contains("sessionDisabled", ignoreCase = true) ||
+				it.name.contains("listener", ignoreCase = true)
+		})
+	}
+
+	@Test
+	fun savingDefaultChoiceCreatesAPreferenceOnlyOnSupportedSdk() {
+		val prefs = GlobalUserPreferences.getPrefs()
+		GlobalUserPreferences.load()
+		GlobalUserPreferences.save()
+		assertEquals(Build.VERSION.SDK_INT >= 33, prefs.contains("useIosLiquidNavigation"))
+		if (Build.VERSION.SDK_INT >= 33) {
+			assertTrue(prefs.getBoolean("useIosLiquidNavigation", false))
+		}
 	}
 
 	@Test
@@ -134,9 +187,23 @@ class LiquidNavigationPreferencesCompatibilityTest {
 		assertFalse(LiquidGlassCompatibility.shouldWarnAboutPerformance())
 	}
 
-	private fun resetCompatibility() {
-		LiquidGlassCompatibility::class.java.getDeclaredMethod("resetForTests").apply {
-			isAccessible = true
-		}.invoke(null)
+	private fun assertGraphicsFailurePropagates(error: Throwable) {
+		var attempted = false
+		var fallbackCalled = false
+		var failureCallbackCalled = false
+		val thrown = runCatching {
+			GraphicsSafety.guarded(
+				operation = "test graphics operation",
+				fallback = { fallbackCalled = true },
+				onFailure = { failureCallbackCalled = true },
+			) {
+				attempted = true
+				throw error
+			}
+		}.exceptionOrNull()
+		assertTrue("The real graphics operation must execute", attempted)
+		assertSame("Graphics exceptions must propagate unchanged", error, thrown)
+		assertFalse("A supported device must not silently use fallback", fallbackCalled)
+		assertFalse("No runtime failure callback may disable the user's choice", failureCallbackCalled)
 	}
 }

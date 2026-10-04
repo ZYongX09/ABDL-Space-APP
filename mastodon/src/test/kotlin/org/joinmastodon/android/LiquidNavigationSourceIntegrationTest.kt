@@ -8,7 +8,7 @@ class LiquidNavigationSourceIntegrationTest {
 	private fun source(path: String) = File(requireNotNull(System.getProperty("user.dir")), "src/main/java/org/joinmastodon/android/$path").readText()
 
 	@Test
-	fun settingsCapabilityAndRequestedChoiceAreIndependentOfRuntimeFallback() {
+	fun settingsCapabilityAndRequestedChoiceRemainSdkGatedWithoutRuntimeFallback() {
 		val preferences = source("GlobalUserPreferences.java")
 		val settings = source("fragments/settings/SettingsDisplayFragment.java")
 		assertTrue(preferences.contains("return LiquidGlassCompatibility.isSystemSupported();"))
@@ -42,23 +42,49 @@ class LiquidNavigationSourceIntegrationTest {
 	}
 
 	@Test
-	fun failureFallbackIsQueuedAndBoundToTheActiveView() {
+	fun graphicsExceptionsDoNotRegisterSessionFallbackAndUserChoiceStillRestoresClassicUi() {
 		val helper = source("ui/utils/LiquidGlassCompatibility.java")
 		val home = source("fragments/HomeFragment.java")
-		assertTrue(helper.contains("MAIN.post(notification)"))
-		assertTrue(helper.indexOf("state.sessionDisabled=true;") < helper.indexOf("MAIN.post(notification)"))
+		assertFalse(helper.contains("sessionDisabled"))
+		assertFalse(helper.contains("reportFailure"))
+		assertFalse(helper.contains("FailureListener"))
 		assertFalse(helper.contains("SharedPreferences"))
-		assertFalse(home.contains("catch(Throwable"))
-		assertFalse(home.contains("catch(Error"))
-		assertTrue(home.contains("content!=ownedContent || !ownedContent.isAttachedToWindow() || getActivity()==null"))
-		assertTrue(home.contains("LiquidGlassCompatibility.addFailureListener(liquidFailureListener)"))
+		assertFalse(home.contains("LiquidGlassCompatibility"))
+		assertFalse(home.contains("liquidFailureListener"))
+		val graphics = home.substringAfter("private void disposeLiquidNavigation(){").substringBefore("private void applyLiquidToolbarInsets")
+		assertFalse(graphics.contains("catch("))
+		assertTrue(graphics.contains("controller.dispose();"))
+		assertTrue(graphics.contains("ownedNavigation.setBackdropBitmap(bottom);"))
 		val destroyed = home.substringAfter("public void onDestroyView(){").substringBefore("super.onDestroyView();")
-		assertTrue(destroyed.contains("LiquidGlassCompatibility.removeFailureListener(liquidFailureListener)"))
 		assertTrue(destroyed.contains("cancelLiquidStartup();"))
 		assertTrue(destroyed.contains("stopLiquidCapture();"))
-		val fallback = home.substringAfter("private void restoreClassicNavigation(){").substringBefore("private void scheduleLiquidStartup")
-		assertTrue(fallback.contains("stopLiquidCapture();"))
-		assertTrue(fallback.contains("createNavigationBar(LayoutInflater.from(getActivity()));"))
-		assertTrue(fallback.contains("createLiquidToolbar();"))
+		val classic = home.substringAfter("private void restoreClassicNavigation(){").substringBefore("private void scheduleLiquidStartup")
+		assertTrue(classic.contains("stopLiquidCapture();"))
+		assertTrue(classic.contains("liquidHardwareVerified=false;"))
+		assertTrue(classic.contains("createNavigationBar(LayoutInflater.from(getActivity()));"))
+		assertTrue(classic.contains("createLiquidToolbar();"))
+		val settingsChanged = home.substringAfter("public void onStatusDisplaySettingsChanged").substringBefore("private void cancelLiquidStartup")
+		assertTrue(settingsChanged.contains("if(!GlobalUserPreferences.isIosLiquidNavigationEnabled())"))
+		assertTrue(settingsChanged.contains("restoreClassicNavigation();"))
+		val toolbar = home.substringAfter("private void createLiquidToolbar(){").substringBefore("private void applyLiquidToolbarInsets")
+		assertTrue(toolbar.contains("if(!GlobalUserPreferences.isIosLiquidNavigationEnabled() || !liquidHardwareVerified)"))
+		assertTrue(toolbar.contains("homeTabFragment.setLiquidToolbarController(null);"))
+		assertTrue(toolbar.contains("toolbarHost.setVisibility(View.GONE);"))
+	}
+
+	@Test
+	fun captureKeepsLocalResourceBoundsAndRestorationWithoutSessionFailureReporting() {
+		val capture = source("ui/views/BackdropCaptureFrameLayout.java")
+		assertFalse(capture.contains("reportFailure"))
+		assertFalse(capture.contains("failCapture"))
+		assertTrue(capture.contains("CAPTURE_MEMORY_BUDGET_BYTES=16L*1024*1024"))
+		assertTrue(capture.contains("MAX_CAPTURE_DOWNSAMPLE=4"))
+		assertTrue(capture.contains("MAX_CAPTURE_DIMENSION=8192"))
+		assertTrue(capture.contains("if(!canvas.isHardwareAccelerated()){\n\t\t\tstopCapture();"))
+		assertTrue(capture.contains("if(failure instanceof CaptureBudgetExceededException){\n\t\t\tstopCapture();"))
+		assertTrue(capture.contains("rethrow(failure);"))
+		assertTrue(capture.contains("Throwable restoreFailure=restoreHardwareBitmaps();"))
+		assertTrue(capture.contains("failure.addSuppressed(restoreFailure);"))
+		assertTrue(capture.contains("capturing=false;"))
 	}
 }

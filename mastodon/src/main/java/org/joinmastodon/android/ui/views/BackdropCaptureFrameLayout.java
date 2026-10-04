@@ -130,9 +130,17 @@ public class BackdropCaptureFrameLayout extends FrameLayout{
 		// An in-flight pass still owns its restoration queue and capturing flag.
 	}
 
-	private void failCapture(Throwable error){
-		stopCapture();
-		LiquidGlassCompatibility.reportFailure("backdrop capture", error);
+	// Only our explicit allocation limits stop this capture, never the graphics session.
+	private static class CaptureBudgetExceededException extends RuntimeException{
+		CaptureBudgetExceededException(String message){
+			super(message);
+		}
+	}
+
+	private static void rethrow(Throwable error){
+		if(error instanceof Error fatal)
+			throw fatal;
+		throw (RuntimeException)error;
 	}
 
 	@Override
@@ -147,7 +155,7 @@ public class BackdropCaptureFrameLayout extends FrameLayout{
 			return;
 		}
 		if(!canvas.isHardwareAccelerated()){
-			failCapture(new IllegalStateException("Backdrop capture requires a hardware-accelerated window canvas"));
+			stopCapture();
 			return;
 		}
 		if((topCaptureHeight<=0 && bottomCaptureHeight<=0) || getWidth()<=0 || getHeight()<=0)
@@ -164,14 +172,14 @@ public class BackdropCaptureFrameLayout extends FrameLayout{
 		capturing=true;
 		try{
 			if(width>MAX_CAPTURE_DIMENSION || height>MAX_CAPTURE_DIMENSION)
-				throw new IllegalStateException("Backdrop capture exceeds safe dimensions for the 16 MiB bitmap budget");
+				throw new CaptureBudgetExceededException("Backdrop capture exceeds safe dimensions for the 16 MiB bitmap budget");
 			updateSoftwareBitmapCacheBytes();
 			long available=CAPTURE_MEMORY_BUDGET_BYTES-softwareBitmapCacheBytes;
 			// Outputs must retain their root-pixel size: setBackdropBitmap has no scale metadata.
 			// Divide before multiplying, and reserve cached software copies before choosing a scale.
 			long outputBytesPerColumn=((long)actualTopHeight+actualBottomHeight)*4;
 			if(available<=0 || width>available/outputBytesPerColumn)
-				throw new IllegalStateException("Backdrop capture exceeds the 16 MiB bitmap budget");
+				throw new CaptureBudgetExceededException("Backdrop capture exceeds the 16 MiB bitmap budget");
 			long outputBytes=width*outputBytesPerColumn;
 			long sharedBudget=available-outputBytes;
 			int downsample=1, sharedWidth=0, sampledHeight=0;
@@ -189,7 +197,7 @@ public class BackdropCaptureFrameLayout extends FrameLayout{
 				}
 			}
 			if(sharedWidth==0)
-				throw new IllegalStateException("Backdrop capture exceeds the 16 MiB bitmap budget at bounded downsampling");
+				throw new CaptureBudgetExceededException("Backdrop capture exceeds the 16 MiB bitmap budget at bounded downsampling");
 
 			if(captureBitmap==null || captureBitmap.getWidth()!=sharedWidth || captureBitmap.getHeight()!=sampledHeight || captureBitmap.getConfig()!=sharedConfig
 					|| (actualTopHeight>0 && (topCaptureBitmap==null || topCaptureBitmap.getWidth()!=width || topCaptureBitmap.getHeight()!=actualTopHeight))
@@ -208,7 +216,7 @@ public class BackdropCaptureFrameLayout extends FrameLayout{
 					+(topCaptureBitmap==null ? 0 : topCaptureBitmap.getAllocationByteCount())
 					+(bottomCaptureBitmap==null ? 0 : bottomCaptureBitmap.getAllocationByteCount());
 			if(captureBufferBytes>CAPTURE_MEMORY_BUDGET_BYTES-softwareBitmapCacheBytes)
-				throw new IllegalStateException("Backdrop capture exceeds the 16 MiB bitmap budget");
+				throw new CaptureBudgetExceededException("Backdrop capture exceeds the 16 MiB bitmap budget");
 			// Local references survive reentrant disabling/height changes without reviving our fields.
 			Bitmap shared=captureBitmap, top=topCaptureBitmap, bottom=bottomCaptureBitmap;
 			// ALL conversion must be inside the restoration boundary: a later child may fail.
@@ -254,20 +262,28 @@ public class BackdropCaptureFrameLayout extends FrameLayout{
 						bottomCanvas.drawBitmap(shared, null, new RectF(0, -offset, width, sharedHeight-offset), resamplePaint);
 				}
 			}
-		}catch(RuntimeException | LinkageError | OutOfMemoryError error){
+		}catch(RuntimeException | Error error){
 			failure=error;
 		}finally{
 			try{
 				Throwable restoreFailure=restoreHardwareBitmaps();
-				if(failure==null)
-					failure=restoreFailure;
+				if(restoreFailure!=null){
+					if(failure==null || failure instanceof CaptureBudgetExceededException)
+						failure=restoreFailure;
+					else if(failure!=restoreFailure)
+						failure.addSuppressed(restoreFailure);
+				}
 			}finally{
 				capturing=false;
 			}
 		}
-		if(failure!=null){
-			failCapture(failure);
+		if(failure instanceof CaptureBudgetExceededException){
+			stopCapture();
 			return;
+		}
+		if(failure!=null){
+			releaseCaptureResources();
+			rethrow(failure);
 		}
 		if(generation!=captureGeneration){
 			releaseCaptureResources();
@@ -279,8 +295,9 @@ public class BackdropCaptureFrameLayout extends FrameLayout{
 		}
 		try{
 			listener.onCaptured(actualTopHeight>0 ? topCaptureBitmap : null, actualBottomHeight>0 ? bottomCaptureBitmap : null);
-		}catch(RuntimeException | LinkageError | OutOfMemoryError error){
-			failCapture(error);
+		}catch(RuntimeException | Error error){
+			releaseCaptureResources();
+			throw error;
 		}
 	}
 
@@ -348,13 +365,13 @@ public class BackdropCaptureFrameLayout extends FrameLayout{
 		if(softwareBitmap==null || softwareBitmap.isRecycled()){
 			long available=CAPTURE_MEMORY_BUDGET_BYTES-captureBufferBytes-softwareBitmapCacheBytes;
 			if((long)bitmap.getWidth()*bitmap.getHeight()>available/4)
-				throw new IllegalStateException("Backdrop software copy exceeds the 16 MiB bitmap budget");
+				throw new CaptureBudgetExceededException("Backdrop software copy exceeds the 16 MiB bitmap budget");
 			softwareBitmap=copyHardwareBitmap(bitmap);
 			if(softwareBitmap==null)
 				throw new IllegalStateException("Hardware bitmap software copy returned null");
 			long allocatedBytes=softwareBitmap.getAllocationByteCount();
 			if(allocatedBytes>available)
-				throw new IllegalStateException("Backdrop software copy exceeds the 16 MiB bitmap budget");
+				throw new CaptureBudgetExceededException("Backdrop software copy exceeds the 16 MiB bitmap budget");
 			softwareBitmapCache.put(bitmap, softwareBitmap);
 			softwareBitmapCacheBytes+=allocatedBytes;
 		}
@@ -367,10 +384,12 @@ public class BackdropCaptureFrameLayout extends FrameLayout{
 			for(int i=restoreDrawables.size()-1;i>=0;i--){
 				try{
 					restoreDrawables.get(i).run();
-				}catch(RuntimeException | LinkageError | OutOfMemoryError error){
+				}catch(RuntimeException | Error error){
 					// One broken setter must not strand the other children on software drawables.
 					if(failure==null)
 						failure=error;
+					else if(failure!=error)
+						failure.addSuppressed(error);
 				}
 			}
 		}finally{
