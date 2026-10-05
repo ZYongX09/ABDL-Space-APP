@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent" android:background="?colorM3Surface">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:padding="16dp"
+            android:orientation="horizontal" android:gravity="center_vertical">
+            <ImageView android:id="@+id/album_cover" android:layout_width="80dp" android:layout_height="80dp"
+                android:scaleType="centerCrop" android:importantForAccessibility="no" />
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+                android:paddingStart="16dp" android:orientation="vertical">
+                <TextView android:id="@+id/album_name" android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:textAppearance="@style/m3_title_large" android:textColor="?colorM3OnSurface" android:maxLines="2" android:ellipsize="end" />
+                <TextView android:id="@+id/album_meta" android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:paddingTop="6dp" android:textAppearance="@style/m3_body_medium" android:textColor="?colorM3OnSurfaceVariant" />
+            </LinearLayout>
+        </LinearLayout>
+        <HorizontalScrollView android:layout_width="match_parent" android:layout_height="wrap_content" android:scrollbars="none">
+            <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal" android:paddingHorizontal="12dp">
+                <Button android:id="@+id/album_group" style="@style/Widget.Mastodon.M3.Button.Text"
+                    android:layout_width="wrap_content" android:layout_height="48dp" android:text="@string/album_group_day" />
+                <Button android:id="@+id/album_settings" style="@style/Widget.Mastodon.M3.Button.Text"
+                    android:layout_width="wrap_content" android:layout_height="48dp" android:text="@string/album_settings" />
+                <Button android:id="@+id/album_invite" style="@style/Widget.Mastodon.M3.Button.Text"
+                    android:layout_width="wrap_content" android:layout_height="48dp" android:text="@string/album_invite" />
+                <Button android:id="@+id/album_members" style="@style/Widget.Mastodon.M3.Button.Text"
+                    android:layout_width="wrap_content" android:layout_height="48dp" android:text="@string/album_members" />
+                <Button android:id="@+id/album_refresh" style="@style/Widget.Mastodon.M3.Button.Text"
+                    android:layout_width="wrap_content" android:layout_height="48dp" android:text="@string/album_refresh" />
+            </LinearLayout>
+        </HorizontalScrollView>
+        <TextView android:id="@+id/album_state" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:padding="24dp" android:gravity="center" android:textAppearance="@style/m3_body_large"
+            android:textColor="?colorM3OnSurfaceVariant" android:accessibilityLiveRegion="polite" android:visibility="gone" />
+        <androidx.recyclerview.widget.RecyclerView android:id="@+id/album_grid" android:layout_width="match_parent"
+            android:layout_height="0dp" android:layout_weight="1" android:paddingHorizontal="6dp"
+            android:paddingBottom="88dp" android:clipToPadding="false" />
+        <Button android:id="@+id/album_more" style="@style/Widget.Mastodon.M3.Button.Text"
+            android:layout_width="match_parent" android:layout_height="48dp" android:text="@string/album_more" android:visibility="gone" />
+    </LinearLayout>
+    <Button android:id="@+id/album_upload" style="@style/Widget.Mastodon.M3.Button.Filled"
+        android:layout_width="64dp" android:layout_height="64dp" android:layout_gravity="bottom|end"
+        android:layout_margin="16dp" android:padding="0dp" android:minWidth="0dp" android:minHeight="0dp"
+        android:text="+" android:textSize="32sp" android:contentDescription="@string/album_upload"
+        android:elevation="6dp" android:visibility="gone" />
+</FrameLayout>

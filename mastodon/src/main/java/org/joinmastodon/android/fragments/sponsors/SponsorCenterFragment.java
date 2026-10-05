@@ -270,6 +270,7 @@ public class SponsorCenterFragment extends LoaderFragment{
 		}
 		renderIdentity(statusContent);
 		renderQuota(statusContent);
+		renderAlbumQuota(statusContent);
 		codeInput.setVisibility(me.sponsor.permanent ? View.GONE : View.VISIBLE);
 		redeemButton.setVisibility(me.sponsor.permanent ? View.GONE : View.VISIBLE);
 		redeemNote.setVisibility(me.sponsor.permanent ? View.VISIBLE : View.GONE);
@@ -355,10 +356,58 @@ public class SponsorCenterFragment extends LoaderFragment{
 		meterRow.addView(percentView, new LinearLayout.LayoutParams(-2, -1));
 	}
 
+	private void renderAlbumQuota(LinearLayout parent){
+		org.joinmastodon.android.model.albums.AlbumModels.StorageQuota quota=me.albumQuota;
+		LinearLayout card=SponsorUi.designCard(parent);
+		card.setPadding(V.dp(18), V.dp(8), V.dp(18), V.dp(8));
+		int muted=org.joinmastodon.android.ui.utils.UiUtils.getThemeColor(getActivity(), R.attr.colorM3OnSurfaceVariant);
+		card.addView(plainText(getString(R.string.baby_albums_storage_quota), 13, false, muted), new LinearLayout.LayoutParams(-1, V.dp(24)));
+		if(quota==null || quota.limitBytes<=0 || quota.usedBytes<0 || quota.reservedBytes<0 || quota.remainingBytes<0){
+			card.addView(plainText(getString(R.string.baby_albums_storage_unavailable), 14, false, muted));
+			return;
+		}
+		String used=albumBytes(quota.usedBytes), limit=albumBytes(quota.limitBytes);
+		card.addView(plainText(getString(R.string.baby_albums_storage_usage, used, limit), 24, true,
+				org.joinmastodon.android.ui.utils.UiUtils.getThemeColor(getActivity(), R.attr.colorM3OnSurface)), new LinearLayout.LayoutParams(-1, V.dp(38)));
+		LinearLayout row=new LinearLayout(getActivity());
+		row.setGravity(Gravity.CENTER_VERTICAL);
+		card.addView(row, new LinearLayout.LayoutParams(-1, V.dp(16)));
+		int percent=(int)Math.max(0, Math.min(100, Math.round(quota.remainingBytes*100d/quota.limitBytes)));
+		android.widget.ProgressBar meter=new android.widget.ProgressBar(getActivity(), null, android.R.attr.progressBarStyleHorizontal);
+		meter.setMax(100); meter.setProgress(percent);
+		meter.setProgressTintList(android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#F0B44D")));
+		meter.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(
+				org.joinmastodon.android.ui.utils.UiUtils.getThemeColor(getActivity(), R.attr.colorM3OutlineVariant)));
+		row.addView(meter, new LinearLayout.LayoutParams(0, V.dp(9), 1));
+		TextView remaining=plainText(getString(R.string.sponsor_ui_remaining_percent, percent), 14, false, muted);
+		remaining.setPadding(V.dp(10), 0, 0, 0);
+		row.addView(remaining, new LinearLayout.LayoutParams(-2, -1));
+		if(quota.reservedBytes>0){
+			TextView reserved=plainText(getString(R.string.baby_albums_storage_reserved, albumBytes(quota.reservedBytes)), 12, false, muted);
+			reserved.setPadding(0, V.dp(8), 0, 0);
+			card.addView(reserved);
+		}
+	}
+
+	private static String albumBytes(long bytes){
+		double gib=bytes/(1024d*1024*1024);
+		return gib>=1 ? String.format(java.util.Locale.getDefault(), "%.2f GB", gib)
+				: String.format(java.util.Locale.getDefault(), "%.1f MB", bytes/(1024d*1024));
+	}
+
 	private void renderBenefits(Config config){
 		LinearLayout card=SponsorUi.designCard(benefitsContent); card.setPadding(V.dp(16), V.dp(8), V.dp(16), V.dp(8));
 		TextView heading=SponsorUi.text(card, getString(R.string.sponsor_ui_benefits), true); heading.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 18); heading.setPadding(0, 0, 0, V.dp(2));
 		renderBenefitRow(card, coreBenefit(config, "original", R.string.sponsor_ui_original_benefit, R.string.sponsor_ui_original_benefit_description, "automatic"));
+		if(me.albumQuota!=null){
+			Benefit albums=new Benefit();
+			albums.id="baby_albums";
+			albums.title=getString(R.string.baby_albums_storage_benefit);
+			albums.description=getString(R.string.baby_albums_storage_benefit_body);
+			albums.action="none";
+			albums.status="automatic";
+			renderBenefitRow(card, albums);
+		}
 		renderBenefitRow(card, coreBenefit(config, "color", R.string.sponsor_ui_color_benefit, R.string.sponsor_ui_color_benefit_description, "coming_soon"));
 		renderBenefitRow(card, coreBenefit(config, "none", R.string.sponsor_ui_support_benefit, R.string.sponsor_ui_support_benefit_description, "automatic"));
 		ArrayList<Benefit> claimBenefits=new ArrayList<>();

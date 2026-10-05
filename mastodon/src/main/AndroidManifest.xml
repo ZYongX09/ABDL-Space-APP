@@ -132,6 +132,14 @@
 				<data android:scheme="https" android:host="abdl-space.top" android:pathPrefix="/c/"/>
 			</intent-filter>
 		</activity>
+		<activity android:name=".AlbumInviteLinkActivity" android:exported="true" android:theme="@style/Theme.Mastodon.AutoLightDark">
+			<intent-filter android:autoVerify="true">
+				<action android:name="android.intent.action.VIEW"/>
+				<category android:name="android.intent.category.DEFAULT"/>
+				<category android:name="android.intent.category.BROWSABLE"/>
+				<data android:scheme="https" android:host="abdl-space.top" android:pathPrefix="/album-invite/"/>
+			</intent-filter>
+		</activity>
 		<activity android:name=".ui.CrisisHelpActivity" android:exported="false" android:configChanges="orientation|screenSize" android:theme="@style/Theme.Mastodon.AutoLightDark"/>
 		<activity android:name=".ui.MediaCameraActivity" android:exported="false" android:screenOrientation="portrait" android:theme="@style/Theme.Mastodon.AutoLightDark"/>
 		<activity android:name=".ui.NotificationGuideActivity" android:exported="false" android:theme="@style/Theme.Mastodon.AutoLightDark"/>

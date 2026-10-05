@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ripple xmlns:android="http://schemas.android.com/apk/res/android" android:color="?android:colorControlHighlight">
+    <item><shape><solid android:color="@color/album_upload_design_light_gold_surface" /><corners android:bottomLeftRadius="12dp" android:bottomRightRadius="12dp" /></shape></item>
+</ripple>

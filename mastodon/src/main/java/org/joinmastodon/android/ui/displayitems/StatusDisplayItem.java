@@ -115,6 +115,7 @@ public abstract class StatusDisplayItem{
 				case DUMMY -> new DummyStatusDisplayItem.Holder(activity);
 				case EMOJI_REACTIONS -> new EmojiReactionsStatusDisplayItem.Holder(activity, parent);
 				case FRIEND_REQUEST_ITEM -> new FriendRequestStatusDisplayItem.Holder(activity, parent);
+				case ALBUM_UPDATE -> new AlbumUpdateStatusDisplayItem.Holder(activity, parent);
 			};
 	}
 
@@ -192,8 +193,11 @@ public abstract class StatusDisplayItem{
 			needAddCWItems=status.revealedSpoilers.contains(Status.SpoilerType.CONTENT_WARNING);
 		}
 
-		if(!TextUtils.isEmpty(statusForContent.content)){
-			SpannableStringBuilder parsedText=HtmlParser.parse(statusForContent.content, statusForContent.emojis, statusForContent.mentions, statusForContent.tags, accountID, statusForContent, context);
+		boolean albumUpdate=AlbumUpdateStatusDisplayItem.supported(statusForContent.albumUpdate);
+		String displayedContent=albumUpdate ? statusForContent.albumUpdate.description : statusForContent.content;
+		if(!TextUtils.isEmpty(displayedContent)){
+			SpannableStringBuilder parsedText=albumUpdate ? new SpannableStringBuilder(displayedContent)
+					: HtmlParser.parse(displayedContent, statusForContent.emojis, statusForContent.mentions, statusForContent.tags, accountID, statusForContent, context);
 			if(filtered){
 				HtmlParser.applyFilterHighlights(context, parsedText, status.filtered);
 			}
@@ -203,7 +207,10 @@ public abstract class StatusDisplayItem{
 			hsdi.needBottomPadding=true;
 		}
 
-		List<Attachment> imageAttachments=statusForContent.mediaAttachments.stream().filter(att->att.type.isImage()).collect(Collectors.toList());
+		if(albumUpdate)
+			contentItems.add(new AlbumUpdateStatusDisplayItem(parentID, callbacks, context, statusForContent, accountID));
+
+		List<Attachment> imageAttachments=albumUpdate ? List.of() : statusForContent.mediaAttachments.stream().filter(att->att.type.isImage()).collect(Collectors.toList());
 		if(!imageAttachments.isEmpty()){
 			PhotoLayoutHelper.TiledLayoutResult layout=PhotoLayoutHelper.processThumbs(imageAttachments);
 			MediaGridStatusDisplayItem mediaGrid=new MediaGridStatusDisplayItem(parentID, callbacks, context, layout, imageAttachments, statusForContent);
@@ -221,7 +228,7 @@ public abstract class StatusDisplayItem{
 		if(statusForContent.poll!=null){
 			buildPollItems(parentID, callbacks, context, statusForContent.poll, status, contentItems);
 		}
-		if(statusForContent.card!=null && statusForContent.mediaAttachments.isEmpty() && TextUtils.isEmpty(statusForContent.spoilerText)){
+		if(!albumUpdate && statusForContent.card!=null && statusForContent.mediaAttachments.isEmpty() && TextUtils.isEmpty(statusForContent.spoilerText)){
 			contentItems.add(new LinkCardStatusDisplayItem(parentID, callbacks, context, statusForContent, accountID));
 		}
 		if(statusForContent.quote!=null){
@@ -313,7 +320,8 @@ public abstract class StatusDisplayItem{
 			// MOSHIDON:
 			DUMMY,
 			EMOJI_REACTIONS,
-			FRIEND_REQUEST_ITEM
+			FRIEND_REQUEST_ITEM,
+			ALBUM_UPDATE
 		}
 
 	public static abstract class Holder<T> extends BindableViewHolder<T> implements UsableRecyclerView.DisableableClickable{

@@ -736,6 +736,12 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 			onLiquidCompose();
 			return;
 		}
+		if(id==R.id.compose_album){
+			Bundle args=new Bundle();
+			args.putString("account", accountID);
+			Nav.go(getActivity(), org.joinmastodon.android.fragments.albums.AlbumUploadFragment.class, args);
+			return;
+		}
 		if(id==R.id.compose_friend_request){
 			Bundle args=new Bundle();
 			args.putString("account", accountID);
