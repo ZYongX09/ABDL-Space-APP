@@ -413,6 +413,20 @@ public class MainActivity extends FragmentStackActivity implements LifecycleOwne
 		if(!"https".equals(uri.getScheme()) && !"http".equals(uri.getScheme()))
 			return;
 
+		String albumInvite=org.joinmastodon.android.albums.AlbumInviteLink.parseToken(uri);
+		if(albumInvite!=null){
+			String selectedAccount=accountID!=null ? accountID : AccountSessionManager.getInstance().getLastActiveAccountID();
+			if(selectedAccount==null || AccountSessionManager.getInstance().tryGetAccount(selectedAccount)==null){
+				Toast.makeText(this, R.string.baby_albums_invite_login, Toast.LENGTH_LONG).show();
+				return;
+			}
+			Bundle args=new Bundle();
+			args.putString("account", selectedAccount);
+			args.putString("invite_token", albumInvite);
+			Nav.go(this, org.joinmastodon.android.fragments.albums.AlbumListFragment.class, args);
+			return;
+		}
+
 		String verificationToken=VerificationLink.parseToken(uri);
 		if(verificationToken!=null){
 			Bundle args=new Bundle(); args.putString("token", verificationToken); args.putBoolean("_can_go_back", true);

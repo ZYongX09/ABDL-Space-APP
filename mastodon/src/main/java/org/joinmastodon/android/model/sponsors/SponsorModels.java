@@ -91,6 +91,7 @@ public final class SponsorModels{
 	public static class Me extends BaseModel{
 		public Sponsor sponsor;
 		public Quota quota;
+		public org.joinmastodon.android.model.albums.AlbumModels.StorageQuota albumQuota;
 		public boolean noticeRequired;
 		public int configVersion;
 		public List<String> claimedBenefitIds;

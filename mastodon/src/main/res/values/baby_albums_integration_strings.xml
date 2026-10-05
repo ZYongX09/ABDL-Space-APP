@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="baby_albums_profile_tab">相册</string>
+    <string name="baby_albums_compose_upload">图片传相册</string>
+    <string name="baby_albums_invite_login">请先登录 ABDL Space，再打开共同相册邀请。</string>
+    <string name="baby_albums_post_count">上传了 %1$d 个图片</string>
+    <string name="baby_albums_post_name">个人相册《%1$s》</string>
+    <string name="baby_albums_brand">ABDL Space 宝宝相册</string>
+    <string name="baby_albums_open_album">查看相册</string>
+    <string name="baby_albums_storage_quota">相册容量额度</string>
+    <string name="baby_albums_storage_usage">%1$s / %2$s</string>
+    <string name="baby_albums_storage_reserved">另有 %1$s 上传中占用额度</string>
+    <string name="baby_albums_storage_unavailable">容量暂不可用，请刷新重试</string>
+    <string name="baby_albums_storage_benefit">宝宝相册容量与高清权益</string>
+    <string name="baby_albums_storage_benefit_body">普通用户 3GB；周/月/季/年/永久赞助者分别 5/10/20/50/100GB。赞助者查看、下载自己相册的高清版本不消耗原图额度；无损原图上传须每张小于 20MB，无损版本仅主人可查看和下载，按次消耗额度。</string>
+</resources>

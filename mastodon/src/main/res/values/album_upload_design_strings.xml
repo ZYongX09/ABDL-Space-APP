@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="album_upload_design_title">传相册</string>
+    <string name="album_upload_design_cancel">取消</string>
+    <string name="album_upload_design_upload">上传</string>
+    <string name="album_upload_design_pause">暂停</string>
+    <string name="album_upload_design_resume">继续</string>
+    <string name="album_upload_design_discard">放弃</string>
+    <string name="album_upload_design_description_hint">为你的照片加点描述吧…</string>
+    <string name="album_upload_design_destination">上传到</string>
+    <string name="album_upload_design_choose">请选择相册</string>
+    <string name="album_upload_design_permissions">相册权限</string>
+    <string name="album_upload_design_permissions_readonly">本页仅展示所选相册现有的权限，不会更改相册或动态的可见范围。只有相册主人可以上传。如需调整权限，请前往相册详情的“相册设置”。</string>
+    <string name="album_upload_design_permission_value">当前权限：%1$s</string>
+    <string name="album_upload_design_quality">画质</string>
+    <string name="album_upload_design_hd">高清</string>
+    <string name="album_upload_design_original">原图</string>
+    <string name="album_upload_design_quality_help">高清：按动态图片的压缩规则处理，节省空间。原图：保留源文件字节，仅相册主人可访问。原图需当前账号的有效赞助权益；所有已选图片的大小必须已知且小于 20 MiB，格式须为 JPEG、PNG、WebP、GIF、HEIF 或 HEIC。</string>
+    <string name="album_upload_design_original_checking">正在确认赞助权益或图片信息，暂不能选择原图。</string>
+    <string name="album_upload_design_original_unavailable">当前权益或所选图片不满足原图条件，可使用高清。</string>
+    <string name="album_upload_design_time">拍摄时间</string>
+    <string name="album_upload_design_time_custom">自定义时间</string>
+    <string name="album_upload_design_sponsor">赞助者可上传无损原图</string>
+    <string name="album_upload_design_sponsor_accessibility">赞助者可上传无损原图，查看当前账号的赞助中心</string>
+    <string name="album_upload_design_add">添加照片</string>
+    <string name="album_upload_design_photo">已选第 %1$d 张照片</string>
+    <string name="album_upload_design_remove_title">移除此照片？</string>
+    <string name="album_upload_design_remove_help">仅从本次上传中移除，不会删除手机中的源图片。</string>
+    <string name="album_upload_design_remove">移除</string>
+    <string name="album_upload_design_count">%1$d / 20 张</string>
+    <string name="album_upload_design_capacity">已用 %1$s / %2$s</string>
+    <string name="album_upload_design_capacity_loading">容量确认中</string>
+    <string name="album_upload_design_help">上传说明</string>
+    <string name="album_upload_design_help_accessibility">查看容量、描述长度与图片上传说明</string>
+    <string name="album_upload_design_description_error">描述过长 · 查看说明</string>
+    <string name="album_upload_design_error_details">查看上传详情</string>
+    <string name="album_upload_design_failed_details">上传失败 · 查看详情</string>
+    <string name="album_upload_design_paused">上传已暂停</string>
+    <string name="album_upload_design_resumed">未完成的上传 · 可继续</string>
+    <string name="album_upload_design_quota_unavailable">尚未确认容量，请返回此页刷新后再上传。</string>
+    <string name="album_upload_design_done">完成</string>
+    <item type="id" name="album_upload_header" />
+    <item type="id" name="album_upload_header_title" />
+    <item type="id" name="album_upload_close" />
+    <item type="id" name="album_pick" />
+    <item type="id" name="album_quality" />
+    <item type="id" name="album_hd" />
+    <item type="id" name="album_original" />
+    <item type="id" name="album_custom_time" />
+    <item type="id" name="album_time_input" />
+    <item type="id" name="album_time_auto" />
+    <item type="id" name="album_upload" />
+    <item type="id" name="album_upload_remove" />
+</resources>

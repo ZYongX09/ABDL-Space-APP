@@ -60,6 +60,7 @@
 	<!-- 液态玻璃发帖菜单 -->
 	<item name="compose_post" type="id" />
 	<item name="compose_friend_request" type="id" />
+	<item name="compose_album" type="id" />
 
 	<!-- 小说 v2 -->
 	<item name="novel_square_pad" type="id" />
