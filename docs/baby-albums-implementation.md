@@ -1,6 +1,6 @@
 # 宝宝相册实现与验收边界
 
-初始实现来自 Android 与后端的 `feat/baby-albums`。后端已完成生产 migration0071 与 main 自动部署；Android 与参考图上传页改版统一在 `fix/album-upload-ui-20261005`，2026-10-05 用户授权源码提交推送并通过 PR 交付 `main`。Android 未改正式版本号（仍 3.0.1/code32），调试构建使用 `.debug` 包名；不能把本地调试包当作已发布的新版 App。
+初始实现来自 Android 与后端的 `feat/baby-albums`。后端已完成生产 migration0071 与 main 自动部署；Android 与参考图上传页改版统一在 `fix/album-upload-ui-20261005`，2026-10-05 已按用户授权提交推送并通过 PR #5 交付 `main`（`32738ebd`），没有进入废弃develop。Android 未改正式版本号（仍 3.0.1/code32），调试构建使用 `.debug` 包名；不能把本地调试包当作已发布的新版 App。
 
 ## 用户入口
 

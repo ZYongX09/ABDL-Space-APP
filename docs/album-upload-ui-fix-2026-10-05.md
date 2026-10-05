@@ -2,7 +2,7 @@
 
 ## 范围
 
-分支 `fix/album-upload-ui-20261005`，在上一轮宝宝相册 Android 实现上继续修改；保留所有既有相册权限、私有上传、恢复、原图额度与容量机制。2026-10-05 用户授权提交、推送与部署：Android 源码通过 PR 交付到 `main`，不进入废弃的 `develop`，不触发 Google Play/正式下载页发布、不操作手机；最终 PR 状态以远端为准。
+分支 `fix/album-upload-ui-20261005`，在上一轮宝宝相册 Android 实现上继续修改；保留所有既有相册权限、私有上传、恢复、原图额度与容量机制。2026-10-05 用户授权提交、推送与部署：Android 源码已通过 [PR #5](https://github.com/ZYongX09/ABDL-Space-APP/pull/5) squash合入 `main`，提交 `32738ebd6003579d5fbf9181eed86fe29fa32e48`，合并时间 `2026-10-05T09:23:26Z`。不进入废弃的 `develop`，未触发 Google Play/正式下载页发布、不操作手机。
 
 参考图：`/home/ZYongX/photo2.jpg`。已在实际可见 Fragment 的 Toolbar/View 树中重做，不用图片覆盖真实控件。
 
@@ -23,4 +23,4 @@
 
 ## 时间线错误与界面修复区分
 
-时间线已在生产公开原生请求复现为 NBW 上游526文本造成聚合500。后端隔离补丁在 `/home/ZYongX/projects/abdl-space` 的 `fix/album-timeline-20261005`，本轮按用户授权通过 main 的 Workers Builds 上线；最终部署与线上核验见后端 `docs/nbw-timeline-failure-2026-10-05.md`。APK仅包含客户端界面改版，不能代替服务端补丁。专属NBW源在上游证书故障期间仍须显示不可用，不关闭证书校验。
+时间线已在生产公开原生请求复现为 NBW 上游526文本造成聚合500。后端隔离补丁在 `/home/ZYongX/projects/abdl-space` 的 `fix/album-timeline-20261005`，已通过后端PR #20/main `8104a40` 与Workers Builds上线，Worker版本 `bd35b25f-4003-4748-8fac-73ea834c7bf1`100%启用；直连/主站代理跨站20/40及续页均200且无重复。详细线上核验见后端 `docs/nbw-timeline-failure-2026-10-05.md`。APK仅包含客户端界面改版，不能代替服务端补丁。专属NBW源在上游证书故障期间仍须显示不可用，不关闭证书校验。
