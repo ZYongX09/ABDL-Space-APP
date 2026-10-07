@@ -33,12 +33,12 @@ public class AlbumUpdateStatusDisplayItem extends StatusDisplayItem{
 		super(parentID, callbacks, context);
 		this.update=status.albumUpdate;
 		this.accountID=accountID;
-		coverRequest=update.coverUrl==null || update.coverUrl.isBlank() ? null : new UrlImageLoaderRequest(update.coverUrl, V.dp(360), V.dp(224));
+		coverRequest=update.downloadProtected || update.coverUrl==null || update.coverUrl.isBlank() ? null : new UrlImageLoaderRequest(update.coverUrl, V.dp(360), V.dp(224));
 	}
 
 	@Override public Type getType(){ return Type.ALBUM_UPDATE; }
-	@Override public int getImageCount(){ return coverRequest==null ? 0 : 1; }
-	@Override public ImageLoaderRequest getImageRequest(int index){ return coverRequest; }
+	@Override public int getImageCount(){ return update.downloadProtected || coverRequest==null ? 0 : 1; }
+	@Override public ImageLoaderRequest getImageRequest(int index){ return update.downloadProtected ? null : coverRequest; }
 
 	public static boolean supported(AlbumUpdate update){
 		return update!=null && update.albumId!=null && !update.albumId.isBlank()
@@ -49,7 +49,8 @@ public class AlbumUpdateStatusDisplayItem extends StatusDisplayItem{
 		private final FrameLayout wrapper;
 		private final LinearLayout card;
 		private final ImageView cover;
-		private final TextView count, name;
+		private final TextView count, name, protection;
+		private boolean protectedCover;
 
 		public Holder(Activity activity, ViewGroup parent){
 			super(new FrameLayout(activity));
@@ -79,6 +80,9 @@ public class AlbumUpdateStatusDisplayItem extends StatusDisplayItem{
 			brand.setText(R.string.baby_albums_brand);
 			brand.setPadding(V.dp(14), V.dp(10), V.dp(14), V.dp(10));
 			card.addView(brand);
+			protection=text(activity, 13, R.attr.colorM3OnSurfaceVariant);
+			protection.setText(R.string.album_protection_enabled); protection.setPadding(V.dp(14), V.dp(8), V.dp(14), V.dp(12));
+			protection.setVisibility(View.GONE); card.addView(protection);
 			card.setOnClickListener(v->onClick());
 		}
 
@@ -100,12 +104,22 @@ public class AlbumUpdateStatusDisplayItem extends StatusDisplayItem{
 			count.setText(wrapper.getContext().getString(R.string.baby_albums_post_count, item.update.photoCount));
 			name.setText(wrapper.getContext().getString(R.string.baby_albums_post_name, item.update.albumName));
 			card.setContentDescription(wrapper.getContext().getString(R.string.baby_albums_open_album)+" · "+item.update.albumName);
-			cover.setImageDrawable(null);
+			protectedCover=item.update.downloadProtected;
+			protection.setVisibility(protectedCover ? View.VISIBLE : View.GONE);
+			if(protectedCover) card.setContentDescription(card.getContentDescription()+" · "+wrapper.getContext().getString(R.string.album_protection_enabled));
+			clearImage(0);
 			card.requestLayout();
 		}
 
-		@Override public void setImage(int index, Drawable drawable){ cover.setImageDrawable(drawable); }
-		@Override public void clearImage(int index){ cover.setImageDrawable(null); }
+		@Override public void setImage(int index, Drawable drawable){ if(!protectedCover) cover.setImageDrawable(drawable); }
+		@Override public void clearImage(int index){
+			if(!protectedCover){ cover.setImageDrawable(null); return; }
+			Drawable lock=wrapper.getContext().getDrawable(R.drawable.ic_lock_24px).mutate();
+			lock.setTint(UiUtils.getThemeColor(wrapper.getContext(), R.attr.colorM3OnSurfaceVariant));
+			android.graphics.drawable.LayerDrawable placeholder=new android.graphics.drawable.LayerDrawable(new Drawable[]{lock});
+			placeholder.setLayerSize(0, V.dp(40), V.dp(40)); placeholder.setLayerGravity(0, Gravity.CENTER);
+			cover.setImageDrawable(placeholder);
+		}
 		@Override public void onClick(){
 			if(item==null || !(item.context instanceof Activity activity)) return;
 			Bundle args=new Bundle();

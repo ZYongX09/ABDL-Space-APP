@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="album_report">举报</string>
+    <string name="album_report_title">举报</string>
+    <string name="album_report_reason_header">举报原因</string>
+    <string name="album_report_detail_hint">补充说明（选填，最多 2000 字）</string>
+    <string name="album_report_submit">提交举报</string>
+    <string name="album_report_submitted">举报已提交，感谢您的反馈</string>
+    <string name="album_report_failed">举报提交失败，请稍后重试</string>
+    <!-- Report reasons; values are the server enum (nsfw/minor/spam/copyright/other). -->
+    <string-array name="album_report_reasons">
+        <item>色情低俗</item>
+        <item>未成年人</item>
+        <item>垃圾广告</item>
+        <item>侵权</item>
+        <item>其他</item>
+    </string-array>
+    <string-array name="album_report_reason_values" translatable="false">
+        <item>nsfw</item>
+        <item>minor</item>
+        <item>spam</item>
+        <item>copyright</item>
+        <item>other</item>
+    </string-array>
+</resources>

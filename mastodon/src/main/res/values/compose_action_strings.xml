@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="compose_action_title">Choose what to publish</string>
+    <string name="compose_action_post_description">Share a moment</string>
+    <string name="compose_action_friend_description">Meet new friends</string>
+    <string name="compose_action_album_description">Upload photos to an album</string>
+</resources>

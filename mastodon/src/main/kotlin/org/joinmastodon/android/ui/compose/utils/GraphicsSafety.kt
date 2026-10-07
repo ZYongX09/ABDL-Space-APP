@@ -1,71 +1,25 @@
 package org.joinmastodon.android.ui.compose.utils
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.graphics.drawscope.ContentDrawScope
-import androidx.compose.ui.node.DrawModifierNode
-import androidx.compose.ui.node.DelegatingNode
-import androidx.compose.ui.node.ModifierNodeElement
-import androidx.compose.ui.platform.InspectorInfo
 import org.joinmastodon.android.ui.utils.LiquidGlassCompatibility
 
-/** Java/Kotlin graphics failures only; native driver/RenderThread crashes cannot be caught here. */
-internal open class GraphicsEffectSafety(private val effect: LiquidGlassCompatibility.Effect) {
-    fun isSupported(): Boolean = LiquidGlassCompatibility.isSupported(effect)
+/** Only the system API boundary remains; supported-device graphics failures propagate. */
+@Suppress("UNUSED_PARAMETER")
+internal open class GraphicsEffectSafety {
+    fun isSupported(): Boolean = LiquidGlassCompatibility.isSystemSupported()
 
-    fun addFailureListener(listener: Runnable) = LiquidGlassCompatibility.addFailureListener(effect, listener)
-    fun removeFailureListener(listener: Runnable) = LiquidGlassCompatibility.removeFailureListener(effect, listener)
-    fun reportFailure(operation: String, error: Throwable) = LiquidGlassCompatibility.reportFailure(effect, operation, error)
-
-    /** Never enclose a composable invocation or application content in this operation. */
     fun <T> guarded(
         operation: String,
         fallback: () -> T,
         onFailure: () -> Unit = {},
         block: () -> T,
-    ): T {
-        if (!isSupported()) return fallback()
-        return try {
-            block()
-        } catch (error: RuntimeException) {
-            failed(operation, error, onFailure)
-            fallback()
-        } catch (error: LinkageError) {
-            failed(operation, error, onFailure)
-            fallback()
-        } catch (error: OutOfMemoryError) {
-            failed(operation, error, onFailure)
-            fallback()
-        }
-    }
+    ): T = if (isSupported()) block() else fallback()
 
-    private fun failed(operation: String, error: Throwable, onFailure: () -> Unit) {
-        // Disable first, before cleanup/fallback. Notifications are deferred by the Java helper.
-        reportFailure(operation, error)
-        cleanup("$operation cleanup", onFailure)
-    }
-
-    /** Resource release must still run after the session has been disabled. */
-    fun cleanup(operation: String, block: () -> Unit) {
-        try {
-            block()
-        } catch (error: RuntimeException) {
-            reportFailure(operation, error)
-        } catch (error: LinkageError) {
-            reportFailure(operation, error)
-        } catch (error: OutOfMemoryError) {
-            reportFailure(operation, error)
-        }
-    }
+    fun cleanup(operation: String, block: () -> Unit) = block()
 
     fun drawEffect(
         scope: DrawScope,
@@ -74,234 +28,45 @@ internal open class GraphicsEffectSafety(private val effect: LiquidGlassCompatib
         onFailure: () -> Unit = {},
         effect: DrawScope.() -> Unit,
     ) {
-        val drawn = guarded(operation, fallback = { false }, onFailure = onFailure) {
-            val canvas = scope.drawContext.canvas.nativeCanvas
-            val saveCount = canvas.save()
-            val oldSize = scope.drawContext.size
-            try {
-                scope.effect()
-                // A nested uniform/effect guard may have failed without throwing further.
-                isSupported()
-            } finally {
-                scope.drawContext.size = oldSize
-                canvas.restoreToCount(saveCount)
-            }
+        if (!isSupported()) {
+            scope.fallback()
+            return
         }
-        // Outside the catch and after restoration: failures in plain fallback drawing propagate.
-        if (!drawn) scope.fallback()
+        val canvas = scope.drawContext.canvas.nativeCanvas
+        val saveCount = canvas.save()
+        val oldSize = scope.drawContext.size
+        try {
+            scope.effect()
+        } finally {
+            scope.drawContext.size = oldSize
+            canvas.restoreToCount(saveCount)
+        }
     }
 }
 
-internal object GraphicsSafety : GraphicsEffectSafety(LiquidGlassCompatibility.Effect.NAVIGATION)
-internal object BackgroundGraphicsSafety : GraphicsEffectSafety(LiquidGlassCompatibility.Effect.BACKGROUND)
-internal object PageBlurGraphicsSafety : GraphicsEffectSafety(LiquidGlassCompatibility.Effect.PAGE_BLUR)
+internal object GraphicsSafety : GraphicsEffectSafety()
+internal object BackgroundGraphicsSafety : GraphicsEffectSafety()
+internal object PageBlurGraphicsSafety : GraphicsEffectSafety()
 
-/** Observe deferred failure notifications; draw-time guards always consult the live session flag. */
 @Composable
-internal fun rememberGraphicsEffectsSupported(safety: GraphicsEffectSafety = GraphicsSafety): Boolean {
-    var failed by remember(safety) { mutableStateOf(false) }
-    DisposableEffect(safety) {
-        val listener = Runnable { failed = true }
-        safety.addFailureListener(listener)
-        onDispose { safety.removeFailureListener(listener) }
-    }
-    return !failed && safety.isSupported()
-}
+internal fun rememberGraphicsEffectsSupported(safety: GraphicsEffectSafety = GraphicsSafety): Boolean =
+    safety.isSupported()
 
-/**
- * Only for an EMPTY graphics-only child (never a subtree containing application content).
- * Bypassing its drawContent skips the library's complete effect chain on a disabled session.
- */
 internal fun Modifier.safeGraphicsEffect(
     operation: String,
     fallback: DrawScope.() -> Unit,
     safety: GraphicsEffectSafety = GraphicsSafety,
     factory: () -> Modifier,
-): Modifier = then(safety.guarded(operation, fallback = { Modifier.drawBehind(fallback) }) {
-    Modifier.drawWithContent {
-        val effectScope = this
-        safety.drawEffect(this, operation, fallback) { effectScope.drawContent() }
-    }.then(factory())
-})
+): Modifier = then(safety.guarded(operation, fallback = { Modifier.drawBehind(fallback) }, block = factory))
 
-/**
- * For drawBackdrop/textureBlur's terminal effect node, including drawBackdrop's layer prefix.
- * Preserve that prefix and attach the effect disabled before its guarded enable update.
- * This is not a generic lifecycle catch for arbitrary modifier chains.
- */
 internal fun Modifier.safeBackdropEffect(
     operation: String,
     fallback: DrawScope.() -> Unit,
     safety: GraphicsEffectSafety = GraphicsSafety,
     factory: (enabled: Boolean) -> Modifier,
-): Modifier = then(safety.guarded(operation, fallback = { Modifier.drawBehind(fallback) }) {
-    val disabled = factory(false).backdropElements()
-    val enabled = factory(true).backdropElements()
-    check(disabled.isNotEmpty() && disabled.size == enabled.size) { "Mismatched backdrop chains" }
-    disabled.indices.forEach { index ->
-        check(disabled[index].javaClass == enabled[index].javaClass) { "Mismatched backdrop nodes" }
-    }
-    // miuix adds graphicsLayer before its effect when layerBlock is supplied; keep its transform.
-    enabled.dropLast(1).fold(Modifier as Modifier) { prefix, element -> prefix.then(element) }
-        .then(SafeBackdropElement(operation, disabled.last(), enabled.last(), safety, fallback))
-})
+): Modifier = then(safety.guarded(operation, fallback = { Modifier.drawBehind(fallback) }) { factory(true) })
 
-private fun Modifier.backdropElements(): List<ModifierNodeElement<*>> =
-    foldIn(mutableListOf()) { elements, element ->
-        check(element is ModifierNodeElement<*>) { "Expected backdrop node elements" }
-        elements.apply { add(element) }
-    }
-
-private data class SafeBackdropElement(
-    val operation: String,
-    val disabled: ModifierNodeElement<*>,
-    val enabled: ModifierNodeElement<*>,
-    val safety: GraphicsEffectSafety,
-    val fallback: DrawScope.() -> Unit,
-) : ModifierNodeElement<SafeBackdropNode>() {
-    override fun create() = SafeBackdropNode(operation, disabled, enabled, safety, fallback)
-    override fun update(node: SafeBackdropNode) = node.update(disabled, enabled, fallback)
-    override fun InspectorInfo.inspectableProperties() { name = "safeBackdropNode" }
-}
-
-private class SafeBackdropNode(
-    private val operation: String,
-    private var disabled: ModifierNodeElement<*>,
-    private var enabled: ModifierNodeElement<*>,
-    private val safety: GraphicsEffectSafety,
-    private var fallback: DrawScope.() -> Unit,
-) : DelegatingNode(), DrawModifierNode {
-    private var effectNode: Modifier.Node? = null
-
-    override fun ContentDrawScope.draw() {
-        val node = effectNode as? DrawModifierNode
-        safety.drawEffect(this, operation, fallback) {
-            if (node != null) with(node) { this@draw.draw() }
-        }
-    }
-
-    override fun onAttach() {
-        // Do not swallow disabled lifecycle failures: Compose has not set its detach flag yet.
-        val node = disabled.create()
-        delegate(node)
-        effectNode = node
-        enable()
-    }
-
-    @Suppress("UNCHECKED_CAST")
-    private fun enable() {
-        val node = effectNode ?: return
-        safety.guarded("$operation enable", fallback = {}) {
-            (enabled as ModifierNodeElement<Modifier.Node>).update(node)
-        }
-        // The child completed attachment, so this removal has valid lifecycle flags.
-        if (!safety.isSupported()) release()
-    }
-
-    fun update(off: ModifierNodeElement<*>, on: ModifierNodeElement<*>, fallback: DrawScope.() -> Unit) {
-        disabled = off
-        enabled = on
-        this.fallback = fallback
-        enable()
-    }
-
-    private fun release() {
-        val node = effectNode ?: return
-        try {
-            undelegate(node)
-            effectNode = null
-        } catch (error: RuntimeException) {
-            safety.reportFailure("$operation detach", error)
-            throw error
-        } catch (error: LinkageError) {
-            safety.reportFailure("$operation detach", error)
-            throw error
-        } catch (error: OutOfMemoryError) {
-            safety.reportFailure("$operation detach", error)
-            throw error
-        }
-        // Opaque child detach exceptions cannot safely be recovered using Compose public APIs.
-    }
-
-    override fun onDetach() = release()
-}
-
-/** A non-recoverable sentinel only around application content, unwrapped outside the catch. */
-private class ContentDrawFailure(val original: Throwable) : Error(null, null, false, false)
-
-/** For layerBackdrop recording: disabled sessions bypass recording but still draw content. */
 internal fun Modifier.safeBackdropRecording(
     safety: GraphicsEffectSafety = GraphicsSafety,
     factory: () -> Modifier,
-): Modifier = then(
-    safety.guarded("backdrop recording construction", fallback = { Modifier }) {
-        val element = factory().foldIn(null as ModifierNodeElement<*>?) { found, value ->
-            check(found == null && value is ModifierNodeElement<*>) { "Expected one recording node" }
-            value as ModifierNodeElement<*>
-        }
-        SafeRecordingElement(checkNotNull(element), safety)
-    },
-)
-
-private data class SafeRecordingElement(
-    val element: ModifierNodeElement<*>,
-    val safety: GraphicsEffectSafety,
-) : ModifierNodeElement<SafeRecordingNode>() {
-    override fun create() = SafeRecordingNode(element, safety)
-    override fun update(node: SafeRecordingNode) = node.update(element, safety)
-    override fun InspectorInfo.inspectableProperties() { name = "safeBackdropRecording" }
-}
-
-private class SafeRecordingNode(
-    private var element: ModifierNodeElement<*>,
-    private var safety: GraphicsEffectSafety,
-) : DelegatingNode(), DrawModifierNode {
-    private var recorder: Modifier.Node? = null
-
-    override fun onAttach() {
-        // layerBackdrop has no allocating onAttach; let structural failures propagate.
-        val node = element.create()
-        delegate(node)
-        recorder = node
-    }
-
-    @Suppress("UNCHECKED_CAST")
-    fun update(value: ModifierNodeElement<*>, safety: GraphicsEffectSafety) {
-        element = value
-        this.safety = safety
-        recorder?.let { (value as ModifierNodeElement<Modifier.Node>).update(it) }
-    }
-
-    override fun ContentDrawScope.draw() {
-        val node = recorder as? DrawModifierNode
-        if (!safety.isSupported() || node == null) {
-            drawContent()
-            return
-        }
-        val originalScope = this
-        var contentDrawn = false
-        val contentScope = object : ContentDrawScope by originalScope {
-            override fun drawContent() {
-                try {
-                    originalScope.drawContent()
-                    contentDrawn = true
-                } catch (error: RuntimeException) {
-                    throw ContentDrawFailure(error)
-                } catch (error: LinkageError) {
-                    throw ContentDrawFailure(error)
-                } catch (error: OutOfMemoryError) {
-                    throw ContentDrawFailure(error)
-                }
-            }
-        }
-        try {
-            safety.drawEffect(this, "backdrop recording", fallback = {
-                if (!contentDrawn) originalScope.drawContent()
-            }) {
-                with(node) { contentScope.draw() }
-            }
-        } catch (error: ContentDrawFailure) {
-            throw error.original
-        }
-    }
-}
+): Modifier = then(if (safety.isSupported()) factory() else Modifier)

@@ -7,6 +7,9 @@ import android.content.Intent;
 import android.graphics.Bitmap;
 import android.os.Bundle;
 import android.view.LayoutInflater;
+import android.view.Menu;
+import android.view.MenuInflater;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowInsets;
@@ -28,6 +31,7 @@ import com.google.zxing.qrcode.QRCodeWriter;
 
 import org.joinmastodon.android.R;
 import org.joinmastodon.android.albums.AlbumPhotoViewer;
+import org.joinmastodon.android.albums.AlbumSecureWindow;
 import org.joinmastodon.android.api.MastodonAPIRequest;
 import org.joinmastodon.android.api.MastodonErrorResponse;
 import org.joinmastodon.android.api.requests.albums.AlbumRequest;
@@ -73,6 +77,14 @@ public class AlbumDetailFragment extends LoaderFragment{
 	private AlertDialog dialog;
 	private int generation, offset;
 	private boolean bySecond, hasMore, pageLoading, busy, fresh;
+	private AlbumSecureWindow.Scope secureScope;
+	private boolean protectedVisitor(){ return album!=null && album.downloadProtected && !album.isOwner; }
+	private void updateSecureScope(){
+		if(protectedVisitor() && sessionValid() && getActivity()!=null){
+			if(secureScope==null) secureScope=AlbumSecureWindow.acquire(getActivity().getWindow());
+		}else releaseSecureScope();
+	}
+	private void releaseSecureScope(){ if(secureScope!=null){ secureScope.close(); secureScope=null; } }
 
 	@Override public void onCreate(Bundle state){
 		super.onCreate(state);
@@ -80,6 +92,7 @@ public class AlbumDetailFragment extends LoaderFragment{
 		accountId=args.getString("account"); albumId=args.getString("albumId", args.getString("album_id"));
 		session=AccountSessionManager.getInstance().tryGetAccount(accountId);
 		bySecond=state!=null && state.getBoolean("bySecond"); setTitle(R.string.album_title);
+		setHasOptionsMenu(true);
 	}
 	@Override public void onSaveInstanceState(Bundle state){ super.onSaveInstanceState(state); state.putBoolean("bySecond", bySecond); }
 	@Override public View onCreateContentView(LayoutInflater inflater, ViewGroup container, Bundle state){
@@ -92,6 +105,9 @@ public class AlbumDetailFragment extends LoaderFragment{
 		manager.setSpanSizeLookup(new GridLayoutManager.SpanSizeLookup(){ @Override public int getSpanSize(int position){ return position<rows.size() && rows.get(position).header!=null ? 3 : 1; } });
 		grid.setLayoutManager(manager); adapter=new PhotoAdapter(); grid.setAdapter(adapter);
 		group.setOnClickListener(v->{ bySecond=!bySecond; rebuildRows(); render(); });
+		android.graphics.drawable.Drawable settingsIcon=getActivity().getDrawable(R.drawable.ic_settings_24px).mutate();
+		settingsIcon.setTint(UiUtils.getThemeColor(getActivity(), R.attr.colorM3Primary));
+		settings.setCompoundDrawablesRelativeWithIntrinsicBounds(settingsIcon, null, null, null); settings.setCompoundDrawablePadding(V.dp(8));
 		settings.setOnClickListener(v->edit()); invite.setOnClickListener(v->confirmInvite()); members.setOnClickListener(v->manageMembers());
 		upload.setOnClickListener(v->openUpload()); more.setOnClickListener(v->loadPhotos(false)); body.findViewById(R.id.album_refresh).setOnClickListener(v->refresh());
 		grid.addOnScrollListener(new RecyclerView.OnScrollListener(){ @Override public void onScrolled(RecyclerView list, int dx, int dy){
@@ -116,7 +132,7 @@ public class AlbumDetailFragment extends LoaderFragment{
 		pageLoading=true; dataLoading=true; render(); int token=generation;
 		execute(AlbumRequest.get("/"+albumId, DetailResponse.class), token, result->{
 			if(!validAlbum(result.album)){ fail(invalid()); return; }
-			album=result.album; fresh=true; pageLoading=false; render(); loadPhotos(true);
+			album=result.album; fresh=true; pageLoading=false; updateSecureScope(); render(); loadPhotos(true);
 		}, this::fail);
 	}
 	private void loadPhotos(boolean first){
@@ -127,7 +143,11 @@ public class AlbumDetailFragment extends LoaderFragment{
 			if(result.photos==null || result.photos.size()>60 || (result.hasMore && result.photos.isEmpty())){ fail(invalid()); return; }
 			for(Photo photo:result.photos) if(photo==null || photo.id==null || !albumId.equals(photo.albumId) || photo.previewUrl==null || photo.sortAt<0){ fail(invalid()); return; }
 			Set<String> ids=new HashSet<>(); for(Photo previous:photos) ids.add(previous.id);
-			for(Photo photo:result.photos) if(ids.add(photo.id)) photos.add(photo);
+			for(Photo photo:result.photos){
+				if(photo.downloadProtected && !photo.isOwner){ album.downloadProtected=true; updateSecureScope(); }
+				if(protectedVisitor() && !photo.isOwner){ photo.downloadProtected=true; photo.canDownload=false; photo.hdUrl=null; photo.originalAvailable=false; }
+				if(ids.add(photo.id)) photos.add(photo);
+			}
 			offset=requestedOffset+result.photos.size(); hasMore=result.hasMore; pageLoading=false; dataLoading=false; dataLoaded(); rebuildRows(); render();
 		}, this::fail);
 	}
@@ -141,9 +161,10 @@ public class AlbumDetailFragment extends LoaderFragment{
 	private void invalidateData(){
 		generation++; for(MastodonAPIRequest<?> request:requests) request.cancel(); requests.clear();
 		pageLoading=false; busy=false; dataLoading=false; fresh=false; album=null; photos.clear(); rows.clear(); hasMore=false; offset=0;
+		if(grid!=null){ grid.setAdapter(null); grid.setAdapter(adapter); }
 		if(adapter!=null) adapter.notifyDataSetChanged();
 		if(dialog!=null){ dialog.dismiss(); dialog=null; }
-		render();
+		render(); releaseSecureScope();
 	}
 	private boolean sessionValid(){ return session!=null && accountId.equals(AccountSessionManager.getInstance().getLastActiveAccountID()) && AccountSessionManager.getInstance().tryGetAccount(accountId)==session; }
 	private boolean live(int token){ return token==generation && grid!=null && getActivity()!=null && sessionValid(); }
@@ -153,8 +174,9 @@ public class AlbumDetailFragment extends LoaderFragment{
 	private void render(){
 		if(grid==null) return;
 		name.setText(album==null ? getString(R.string.album_title) : album.name); meta.setText(album==null ? "" : getString(R.string.album_count, album.photoCount, AlbumUi.visibility(getActivity(), album.visibility)));
-		cover.setImageDrawable(AlbumUi.gradient(getActivity(), albumId));
-		if(album!=null && album.coverUrl!=null) ViewImageLoader.loadWithoutAnimation(cover, cover.getDrawable(), new UrlImageLoaderRequest(album.coverUrl, V.dp(80), V.dp(80)));
+		cover.setImageDrawable(protectedVisitor() ? AlbumUi.protectedPlaceholder(getActivity()) : AlbumUi.gradient(getActivity(), albumId));
+		if(album!=null && !protectedVisitor() && album.coverUrl!=null && !album.coverUrl.isBlank()) AlbumUi.loadImage(cover, album.coverUrl, V.dp(80));
+		if(album!=null && album.downloadProtected) meta.append(" · "+getString(R.string.album_protection_enabled));
 		group.setText(bySecond ? R.string.album_group_second : R.string.album_group_day); group.setEnabled(fresh);
 		settings.setVisibility(owner() ? View.VISIBLE : View.GONE); settings.setEnabled(!busy && !pageLoading);
 		invite.setVisibility(owner() && "shared".equals(album.visibility) ? View.VISIBLE : View.GONE); invite.setEnabled(!busy && !pageLoading);
@@ -163,7 +185,36 @@ public class AlbumDetailFragment extends LoaderFragment{
 		upload.setVisibility(owner() && album.canUpload ? View.VISIBLE : View.GONE); upload.setEnabled(!busy && !pageLoading);
 		stateText.setText(pageLoading ? R.string.album_loading : owner() ? R.string.album_empty_photos : R.string.album_empty_photos_visitor); stateText.setVisibility(photos.isEmpty() ? View.VISIBLE : View.GONE);
 		more.setVisibility(hasMore ? View.VISIBLE : View.GONE); more.setEnabled(!pageLoading && !busy && fresh); more.setText(pageLoading ? R.string.album_loading : R.string.album_more);
+		updateReportMenu();
 	}
+	/** The report entry exists only for signed-in visitors; owners report nothing and sessions must match. */
+	private boolean reportEntryVisible(){ return fresh && album!=null && sessionValid() && !album.isOwner; }
+	void updateReportMenu(){
+		if(grid==null) return;
+		android.widget.Toolbar toolbar=getToolbar();
+		if(toolbar==null) return;
+		MenuItem item=toolbar.getMenu().findItem(R.id.album_report);
+		if(item!=null) item.setVisible(reportEntryVisible());
+	}
+	@Override public void onCreateOptionsMenu(Menu menu, MenuInflater inflater){
+		inflater.inflate(R.menu.album_detail, menu);
+		MenuItem item=menu.findItem(R.id.album_report);
+		if(item!=null){
+			item.setIconTintList(android.content.res.ColorStateList.valueOf(UiUtils.getThemeColor(getActivity(), R.attr.colorM3Error)));
+			item.setContentDescription(getString(R.string.album_report));
+			item.setVisible(reportEntryVisible());
+		}
+	}
+	@Override public boolean onOptionsItemSelected(MenuItem item){
+		if(item.getItemId()==R.id.album_report){ openReport(); return true; }
+		return super.onOptionsItemSelected(item);
+	}
+	private void openReport(){
+		if(!reportEntryVisible() || busy || pageLoading || getActivity()==null) return;
+		Bundle args=new Bundle(); args.putString("account", accountId); args.putString("albumId", albumId);
+		Nav.go(getActivity(), AlbumReportFragment.class, args);
+	}
+	@Override protected boolean wantsToolbarMenuIconsTinted(){ return false; }
 	private void rebuildRows(){
 		rows.clear(); String previous=null;
 		for(int i=0;i<photos.size();i++){
@@ -186,12 +237,21 @@ public class AlbumDetailFragment extends LoaderFragment{
 		if(!owner() || busy || pageLoading) return;
 		dialog=AlbumUi.edit(getActivity(), album, values->{
 			busy=true; render(); int token=generation;
-			execute(AlbumRequest.patch("/"+albumId, DetailResponse.class, Map.of("name", values.name, "visibility", values.visibility)), token, result->{
+			execute(AlbumRequest.patch("/"+albumId, DetailResponse.class, editPayload(album, values)), token, result->{
 				busy=false;
-				if(!validAlbum(result.album)){ invalid().showToast(getActivity()); render(); return; }
+				if(!validAlbum(result.album) || !result.album.isOwner){ invalid().showToast(getActivity()); render(); return; }
+				// An old deployment may ignore the field. Only the returned server state is authoritative.
+				if(result.album.downloadProtected!=values.downloadProtected){
+					Toast.makeText(getActivity(), R.string.album_protection_not_confirmed, Toast.LENGTH_LONG).show();
+					album=result.album; updateSecureScope(); render(); return;
+				}
 				refresh();
 			}, error->{ busy=false; render(); error.showToast(getActivity()); });
 		}, this::confirmDeleteAlbum);
+	}
+	static Map<String, Object> editPayload(Album album, AlbumUi.EditValues values){
+		return album.isDefault ? Map.of("download_protected", values.downloadProtected)
+				: Map.of("name", values.name, "visibility", values.visibility, "download_protected", values.downloadProtected);
 	}
 	private void confirmDeleteAlbum(){
 		if(!owner() || album.isDefault || busy || pageLoading) return;
@@ -311,9 +371,13 @@ public class AlbumDetailFragment extends LoaderFragment{
 		@Override public void onBindViewHolder(PhotoHolder holder, int position){
 			Row row=rows.get(position);
 			if(row.header!=null){ ((TextView)holder.itemView).setText(row.header); return; }
-			Photo photo=photos.get(row.photoIndex); holder.image.setImageDrawable(AlbumUi.gradient(getActivity(), photo.id));
-			ViewImageLoader.loadWithoutAnimation(holder.image, holder.image.getDrawable(), new UrlImageLoaderRequest(photo.previewUrl, V.dp(140), V.dp(140)));
-			holder.itemView.setContentDescription(getString(R.string.album_photo_accessibility, groupLabel(photo.sortAt, true, ZoneId.systemDefault()), row.photoIndex+1));
+			Photo photo=photos.get(row.photoIndex);
+			boolean protectedTile=protectedVisitor() || (photo.downloadProtected && !photo.isOwner);
+			holder.image.setImageDrawable(protectedTile ? AlbumUi.protectedPlaceholder(getActivity()) : AlbumUi.gradient(getActivity(), photo.id));
+			// Protected previews are fetched only by the transient, secure viewer, never this disk-caching loader.
+			if(!protectedTile) AlbumUi.loadImage(holder.image, photo.previewUrl, V.dp(140));
+			holder.itemView.setContentDescription(getString(R.string.album_photo_accessibility, groupLabel(photo.sortAt, true, ZoneId.systemDefault()), row.photoIndex+1)
+					+(protectedTile ? " · "+getString(R.string.album_protection_thumbnail) : ""));
 				holder.itemView.setOnClickListener(v->{ if(fresh && sessionValid()) AlbumPhotoViewer.open(getActivity(), accountId, new ArrayList<>(photos), row.photoIndex); });
 				holder.itemView.setOnLongClickListener(v->{ if(!owner() || !photo.isOwner) return false; confirmDeletePhoto(photo); return true; });
 		}

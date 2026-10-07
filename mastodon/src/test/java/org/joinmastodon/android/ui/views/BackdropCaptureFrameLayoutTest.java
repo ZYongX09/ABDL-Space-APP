@@ -6,6 +6,7 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
@@ -13,6 +14,7 @@ import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 
+import org.joinmastodon.android.ui.drawables.BlurhashCrossfadeDrawable;
 import org.joinmastodon.android.ui.utils.LiquidGlassCompatibility;
 import org.junit.Before;
 import org.junit.Test;
@@ -37,25 +39,15 @@ import static org.junit.Assert.*;
 public class BackdropCaptureFrameLayoutTest{
 	private Context context;
 
-	// Predicate and main-thread notification behavior belong to the helper's own tests.
+	// SDK capability behavior belongs to the helper's own tests.
 	// Only the capability gate is simulated here; capture uses real native software canvases.
 	@Implements(LiquidGlassCompatibility.class)
 	public static class CompatibilityShadow{
 		static boolean supported;
-		static int reports;
-		static Throwable failure;
 
 		@Implementation
 		protected static boolean isSupported(){
 			return supported;
-		}
-
-		@Implementation
-		protected static void reportFailure(String operation, Throwable error){
-			assertEquals("backdrop capture", operation);
-			reports++;
-			failure=error;
-			supported=false;
 		}
 	}
 
@@ -63,8 +55,6 @@ public class BackdropCaptureFrameLayoutTest{
 	public void setUp(){
 		context=RuntimeEnvironment.getApplication();
 		CompatibilityShadow.supported=true;
-		CompatibilityShadow.reports=0;
-		CompatibilityShadow.failure=null;
 	}
 
 	@Test
@@ -146,7 +136,7 @@ public class BackdropCaptureFrameLayoutTest{
 		assertSame(shared, field(view, "captureBitmap"));
 		assertSame(top, delivered[0]);
 		assertSame(bottom, delivered[1]);
-		assertEquals(0, CompatibilityShadow.reports);
+		assertTrue(CompatibilityShadow.supported);
 	}
 
 	@Test
@@ -185,7 +175,7 @@ public class BackdropCaptureFrameLayoutTest{
 		for(int x:new int[]{1441/4, 1440})
 			assertEquals("Bottom boundary must not sample the cleared gap", edge.getPixel(x, 0), delivered[1].getPixel(x, 0));
 		assertWithinBudget(view);
-		assertEquals(0, CompatibilityShadow.reports);
+		assertTrue(CompatibilityShadow.supported);
 	}
 
 	@Test
@@ -208,7 +198,7 @@ public class BackdropCaptureFrameLayoutTest{
 		assertStripGeometryAndColors(delivered, 1440, 2000, 800);
 		assertEquals(16_704_000L, field(view, "captureBufferBytes"));
 		assertWithinBudget(view);
-		assertEquals(0, CompatibilityShadow.reports);
+		assertTrue(CompatibilityShadow.supported);
 	}
 
 	@Test
@@ -233,7 +223,7 @@ public class BackdropCaptureFrameLayoutTest{
 		assertEquals(Bitmap.Config.ARGB_8888, shared.getConfig());
 		assertEquals(3_456_000L, field(view, "captureBufferBytes"));
 		assertWithinBudget(view);
-		assertEquals(0, CompatibilityShadow.reports);
+		assertTrue(CompatibilityShadow.supported);
 	}
 
 	@Test
@@ -258,7 +248,7 @@ public class BackdropCaptureFrameLayoutTest{
 		assertEquals(Bitmap.Config.ARGB_8888, shared.getConfig());
 		assertEquals(15_667_200L, field(view, "captureBufferBytes"));
 		assertWithinBudget(view);
-		assertEquals(0, CompatibilityShadow.reports);
+		assertTrue(CompatibilityShadow.supported);
 	}
 
 	@Test
@@ -291,7 +281,7 @@ public class BackdropCaptureFrameLayoutTest{
 			assertWithinBudget(view);
 			view.setCaptureListener(null);
 		}
-		assertEquals(0, CompatibilityShadow.reports);
+		assertTrue(CompatibilityShadow.supported);
 	}
 
 	@Test
@@ -324,16 +314,16 @@ public class BackdropCaptureFrameLayoutTest{
 		assertEquals(0, view.copies);
 		assertSame(image.original, image.getDrawable());
 		assertWithinBudget(view);
-		assertEquals(0, CompatibilityShadow.reports);
+		assertTrue(CompatibilityShadow.supported);
 	}
 
 	@Test
-	public void customChildSoftwareDrawFailuresStopCaptureWithoutBreakingNormalUi() throws Exception{
+	public void customChildSoftwareDrawFailuresPropagateRestoreResourcesAndAllowRetry() throws Exception{
 		Throwable[] errors={new IllegalArgumentException("software draw"),
 				new NoClassDefFoundError("software effect"), new OutOfMemoryError("software draw")};
 		for(Throwable error:errors){
-			CompatibilityShadow.supported=true;
 			Harness view=new Harness(context);
+			TrackingImage image=image(view);
 			Bands child=new Bands(context);
 			child.softwareFailure=error;
 			view.addView(child);
@@ -342,17 +332,19 @@ public class BackdropCaptureFrameLayoutTest{
 			int[] calls={0};
 			view.setCaptureListener((top, bottom)->calls[0]++);
 
-			view.render(acceleratedCanvas(20, 40));
+			assertSame(error, assertThrows(error.getClass(), ()->view.render(acceleratedCanvas(20, 40))));
 
-			assertSame(error, CompatibilityShadow.failure);
+			assertSame(image.original, image.getDrawable());
 			assertEquals(0, calls[0]);
 			assertEquals(1, child.softwareDraws);
-			assertStopped(view);
+			assertRetryableAfterFailure(view);
+			child.softwareFailure=null;
 			view.render(acceleratedCanvas(20, 40));
 			assertEquals(2, child.hardwareDraws);
-			assertEquals(1, child.softwareDraws);
+			assertEquals(2, child.softwareDraws);
+			assertEquals(1, calls[0]);
 		}
-		assertEquals(3, CompatibilityShadow.reports);
+		assertTrue(CompatibilityShadow.supported);
 	}
 
 	@Test
@@ -395,7 +387,6 @@ public class BackdropCaptureFrameLayoutTest{
 			actualBytes+=bitmap.getAllocationByteCount();
 		}
 		assertEquals(actualBytes, bytes.getLong(view));
-		assertEquals(0, CompatibilityShadow.reports);
 		assertTrue(CompatibilityShadow.supported);
 	}
 
@@ -413,15 +404,15 @@ public class BackdropCaptureFrameLayoutTest{
 		int[] calls={0};
 		view.setCaptureListener((top, bottom)->calls[0]++);
 
-		view.render(acceleratedCanvas(20, 40));
+		UnsatisfiedLinkError actual=assertThrows(UnsatisfiedLinkError.class, ()->view.render(acceleratedCanvas(20, 40)));
 
 		assertEquals(2, view.copies);
 		assertEquals(1, first.restores);
 		assertSame(firstOriginal, first.getDrawable());
 		assertSame(secondOriginal, second.getDrawable());
 		assertEquals(0, calls[0]);
-		assertSame(view.copyFailure, CompatibilityShadow.failure);
-		assertStopped(view);
+		assertSame(view.copyFailure, actual);
+		assertRetryableAfterFailure(view);
 	}
 
 	@Test
@@ -435,15 +426,40 @@ public class BackdropCaptureFrameLayoutTest{
 		int[] calls={0};
 		view.setCaptureListener((top, bottom)->calls[0]++);
 
-		view.render(acceleratedCanvas(20, 40));
+		IllegalStateException actual=assertThrows(IllegalStateException.class, ()->view.render(acceleratedCanvas(20, 40)));
 
 		assertEquals(1, first.restores);
 		assertEquals(1, second.restores);
 		assertSame(first.original, first.getDrawable());
 		assertSame(second.original, second.getDrawable());
 		assertEquals(0, calls[0]);
-		assertTrue(CompatibilityShadow.failure instanceof IllegalStateException);
-		assertStopped(view);
+		assertRetryableAfterFailure(view);
+		assertTrue(actual.getMessage().contains("setter failed while restoring"));
+	}
+
+	@Test
+	public void softwareFailureRemainsPrimaryWhenDrawableRestorationAlsoFails() throws Exception{
+		Harness view=new Harness(context);
+		TrackingImage first=image(view);
+		TrackingImage second=image(view);
+		second.failRestore=true;
+		Bands child=new Bands(context);
+		IllegalArgumentException error=new IllegalArgumentException("original software draw");
+		child.softwareFailure=error;
+		view.addView(child);
+		layout(view, 20, 40);
+		view.setCaptureHeights(7, 7);
+		view.setCaptureListener((top, bottom)->fail("Failed draw must not deliver"));
+
+		assertSame(error, assertThrows(IllegalArgumentException.class, ()->view.render(acceleratedCanvas(20, 40))));
+
+		assertEquals(1, first.restores);
+		assertEquals(1, second.restores);
+		assertSame(first.original, first.getDrawable());
+		assertSame(second.original, second.getDrawable());
+		assertEquals(1, error.getSuppressed().length);
+		assertEquals("setter failed while restoring", error.getSuppressed()[0].getMessage());
+		assertRetryableAfterFailure(view);
 	}
 
 	@Test
@@ -456,13 +472,14 @@ public class BackdropCaptureFrameLayoutTest{
 		view.setCaptureHeights(7, 7);
 		view.setCaptureListener((top, bottom)->fail("Replacement failure must not deliver"));
 
-		view.render(acceleratedCanvas(20, 40));
+		IllegalStateException actual=assertThrows(IllegalStateException.class, ()->view.render(acceleratedCanvas(20, 40)));
 
 		assertSame(first.original, first.getDrawable());
 		assertSame(second.original, second.getDrawable());
 		assertEquals(1, first.restores);
 		assertEquals(1, second.restores);
-		assertStopped(view);
+		assertRetryableAfterFailure(view);
+		assertTrue(actual.getMessage().contains("setter failed after replacement"));
 	}
 
 	@Test
@@ -484,13 +501,11 @@ public class BackdropCaptureFrameLayoutTest{
 			assertSame(error, actual);
 		}
 		assertSame(image.original, image.getDrawable());
-		assertTrue(((List<?>)field(view, "restoreDrawables")).isEmpty());
-		assertFalse((boolean)field(view, "capturing"));
-		assertEquals(0, CompatibilityShadow.reports);
+		assertRetryableAfterFailure(view);
 	}
 
 	@Test
-	public void nullSoftwareCopyFailsCleanlyAndRestoresEarlierReplacement() throws Exception{
+	public void nullSoftwareCopyPropagatesAndRestoresEarlierReplacement() throws Exception{
 		Harness view=new Harness(context);
 		TrackingImage first=image(view);
 		image(view);
@@ -499,12 +514,12 @@ public class BackdropCaptureFrameLayoutTest{
 		view.setCaptureHeights(7, 7);
 		view.setCaptureListener((top, bottom)->fail("Null copy must not be delivered"));
 
-		view.render(acceleratedCanvas(20, 40));
+		IllegalStateException actual=assertThrows(IllegalStateException.class, ()->view.render(acceleratedCanvas(20, 40)));
 
 		assertSame(first.original, first.getDrawable());
 		assertEquals(1, first.restores);
-		assertTrue(CompatibilityShadow.failure.getMessage().contains("returned null"));
-		assertStopped(view);
+		assertRetryableAfterFailure(view);
+		assertTrue(actual.getMessage().contains("returned null"));
 	}
 
 	@Test
@@ -538,7 +553,7 @@ public class BackdropCaptureFrameLayoutTest{
 			assertEquals(1, calls[0]);
 			assertEquals(invalidations, view.invalidations);
 		}
-		assertEquals(0, CompatibilityShadow.reports);
+		assertTrue(CompatibilityShadow.supported);
 	}
 
 	@Test
@@ -557,52 +572,70 @@ public class BackdropCaptureFrameLayoutTest{
 		assertEquals(1, child.softwareDraws);
 		assertSame(image.original, image.getDrawable());
 		assertStopped(view);
-		assertEquals(0, CompatibilityShadow.reports);
+		assertTrue(CompatibilityShadow.supported);
 	}
 
 	@Test
-	public void listenerFailureDropsOwnRefsButDoesNotRecycleDeliveredBitmap() throws Exception{
+	public void listenerFailurePropagatesDropsOwnRefsAndDoesNotRecycleDeliveredBitmap() throws Exception{
 		Harness view=new Harness(context);
+		TrackingImage image=image(view);
 		view.addView(new Bands(context));
 		layout(view, 20, 40);
 		view.setCaptureHeights(7, 7);
 		Bitmap[] delivered=new Bitmap[1];
+		OutOfMemoryError error=new OutOfMemoryError("Compose consumer");
 		view.setCaptureListener((top, bottom)->{
 			delivered[0]=top;
-			throw new OutOfMemoryError("Compose consumer");
+			throw error;
 		});
 
-		view.render(acceleratedCanvas(20, 40));
+		assertSame(error, assertThrows(OutOfMemoryError.class, ()->view.render(acceleratedCanvas(20, 40))));
 
 		assertNotNull(delivered[0]);
 		assertFalse(delivered[0].isRecycled());
 		assertEquals(Color.RED, delivered[0].getPixel(10, 1));
-		assertStopped(view);
-		assertTrue(CompatibilityShadow.failure instanceof OutOfMemoryError);
+		assertSame(image.original, image.getDrawable());
+		assertRetryableAfterFailure(view);
+		int[] calls={0};
+		view.setCaptureListener((top, bottom)->calls[0]++);
+		view.render(acceleratedCanvas(20, 40));
+		assertEquals(1, calls[0]);
 	}
 
 	@Test
-	public void softwareWindowCanvasAndUnsupportedSessionDoNotStartCapture() throws Exception{
+	public void softwareWindowAndUnsupportedSdkDoNotCaptureOrPermanentlyDisableIt() throws Exception{
 		Harness view=new Harness(context);
 		Bands child=new Bands(context);
 		view.addView(child);
 		layout(view, 20, 40);
 		view.setCaptureHeights(7, 7);
-		view.setCaptureListener((top, bottom)->fail("Software window must not capture"));
+		int[] softwareWindowCalls={0};
+		BackdropCaptureFrameLayout.CaptureListener listener=(top, bottom)->softwareWindowCalls[0]++;
+		view.setCaptureListener(listener);
 		view.render(new Canvas(Bitmap.createBitmap(20, 40, Bitmap.Config.ARGB_8888)));
 		assertEquals(1, child.softwareDraws); // ordinary UI pass only
-		assertStopped(view);
-		assertEquals(1, CompatibilityShadow.reports);
-
-		view.setCaptureListener((top, bottom)->fail("Disabled session must not capture"));
+		assertSame(listener, field(view, "captureListener"));
+		assertCaptureResourcesReleased(view);
 		view.render(acceleratedCanvas(20, 40));
-		assertEquals(1, child.softwareDraws);
+		assertEquals(1, softwareWindowCalls[0]);
+		assertTrue(CompatibilityShadow.supported);
+
+		CompatibilityShadow.supported=false;
+		view.setCaptureListener((top, bottom)->fail("Unsupported SDK must not capture"));
+		view.render(acceleratedCanvas(20, 40));
+		assertEquals(2, child.softwareDraws);
 		assertStopped(view);
-		assertEquals(1, CompatibilityShadow.reports);
+
+		CompatibilityShadow.supported=true;
+		int[] calls={0};
+		view.setCaptureListener((top, bottom)->calls[0]++);
+		view.render(acceleratedCanvas(20, 40));
+		assertEquals(1, calls[0]);
+		assertEquals(3, child.softwareDraws);
 	}
 
 	@Test
-	public void oversizedAndExtremeBoundsFailBeforeAllocatingCaptureBuffers() throws Exception{
+	public void oversizedAndExtremeBoundsPauseLocallyBeforeAllocatingCaptureBuffers() throws Exception{
 		int[][] sizes={{2048, 4096, Integer.MAX_VALUE, Integer.MAX_VALUE},
 				{Integer.MAX_VALUE, Integer.MAX_VALUE, Integer.MAX_VALUE, Integer.MAX_VALUE},
 				{Integer.MAX_VALUE, 40, 1, 0}, {20, Integer.MAX_VALUE, 0, 7},
@@ -613,16 +646,30 @@ public class BackdropCaptureFrameLayoutTest{
 			Harness view=new Harness(context);
 			view.layout(0, 0, size[0], size[1]);
 			view.setCaptureHeights(size[2], size[3]);
-			view.setCaptureListener((top, bottom)->fail("Over-budget or extreme capture must not deliver"));
+			int[] clears={0}, calls={0};
+			BackdropCaptureFrameLayout.CaptureListener listener=(top, bottom)->{
+				if(top==null && bottom==null)
+					clears[0]++;
+				else
+					calls[0]++;
+			};
+			view.setCaptureListener(listener);
 
 			view.render(acceleratedCanvas(1, 1));
 
-			assertTrue(CompatibilityShadow.failure instanceof IllegalStateException);
-			assertTrue(CompatibilityShadow.failure.getMessage().contains("16 MiB"));
 			assertEquals(0, view.copies);
-			assertStopped(view);
+			assertPaused(view);
+			assertSame(listener, field(view, "captureListener"));
+			assertEquals(1, clears[0]);
+			assertTrue(CompatibilityShadow.supported);
+			layout(view, 20, 40);
+			view.setCaptureHeights(7, 7);
+			view.render(acceleratedCanvas(20, 40));
+			assertEquals(1, calls[0]);
+			assertFalse((boolean)field(view, "budgetPaused"));
+			assertWithinBudget(view);
 		}
-		assertEquals(sizes.length, CompatibilityShadow.reports);
+		assertTrue(CompatibilityShadow.supported);
 	}
 
 	@Test
@@ -630,40 +677,49 @@ public class BackdropCaptureFrameLayoutTest{
 		Harness view=new Harness(context);
 		view.layout(0, 0, 1440, 3200);
 		view.setCaptureHeights(2000, 850);
-		view.setCaptureListener((top, bottom)->fail("Capture cannot shrink without bound"));
+		view.setCaptureListener((top, bottom)->{
+			assertNull(top);
+			assertNull(bottom);
+		});
 		long outputBytes=1440L*(2000+850)*4;
 		assertTrue(outputBytes+360L*800*2>BackdropCaptureFrameLayout.CAPTURE_MEMORY_BUDGET_BYTES);
 		assertTrue(outputBytes+180L*400*2<BackdropCaptureFrameLayout.CAPTURE_MEMORY_BUDGET_BYTES);
 
 		view.render(acceleratedCanvas(1, 1));
 
-		assertEquals(1, CompatibilityShadow.reports);
-		assertTrue(CompatibilityShadow.failure.getMessage().contains("bounded downsampling"));
-		assertStopped(view);
+		assertTrue(CompatibilityShadow.supported);
+		assertPaused(view);
 	}
 
 	@Test
-	public void softwareCopiesCountAgainstBudgetBeforeCopying() throws Exception{
+	public void softwareCopiesArePlannedBeforeChoosingHalfSampling() throws Exception{
 		Harness view=new Harness(context);
 		TrackingImage image=new TrackingImage(context);
-		// The output strips and shared buffer together consume the complete 16 MiB budget.
+		// At 1x the strips and shared buffer consume 16 MiB. Reserve the new copy
+		// before choosing the scale, so 2x succeeds without relaxing the budget.
 		view.addView(image);
 		view.forceCopies=true;
 		image.setOriginal(new BitmapDrawable(context.getResources(), Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)));
 		layout(view, 1024, 4096);
 		view.setCaptureHeights(1024, 1024);
-		view.setCaptureListener((top, bottom)->fail("Copy cannot exceed budget"));
+		int[] calls={0};
+		view.setCaptureListener((top, bottom)->{
+			assertNotNull(top);
+			calls[0]++;
+		});
 
 		view.render(acceleratedCanvas(1, 1));
 
-		assertEquals(0, view.copies);
+		assertEquals(1, calls[0]);
+		assertEquals(1, view.copies);
+		assertEquals(512, ((Bitmap)field(view, "captureBitmap")).getWidth());
 		assertSame(image.original, image.getDrawable());
-		assertTrue(CompatibilityShadow.failure.getMessage().contains("software copy"));
-		assertStopped(view);
+		assertWithinBudget(view);
+		assertTrue(CompatibilityShadow.supported);
 	}
 
 	@Test
-	public void downsamplingCannotBypassTheBudgetForANewSoftwareCopy() throws Exception{
+	public void newSoftwareCopyCanSelectQuarterSamplingInsteadOfStoppingAfterPartialConversion() throws Exception{
 		Harness view=new Harness(context);
 		TrackingImage first=image(view);
 		TrackingImage second=new TrackingImage(context);
@@ -671,16 +727,17 @@ public class BackdropCaptureFrameLayoutTest{
 		view.addView(second);
 		layout(view, 1440, 3200);
 		view.setCaptureHeights(2000, 300);
-		view.setCaptureListener((top, bottom)->fail("New copy cannot overrun downsampled capture budget"));
+		view.setCaptureListener((top, bottom)->assertNotNull(top));
 
 		view.render(acceleratedCanvas(1, 1));
 
-		assertEquals(1, view.copies); // The large second copy must be rejected before allocation.
+		assertEquals(2, view.copies);
+		assertEquals(360, ((Bitmap)field(view, "captureBitmap")).getWidth());
 		assertEquals(1, first.restores);
 		assertSame(first.original, first.getDrawable());
 		assertSame(second.original, second.getDrawable());
-		assertTrue(CompatibilityShadow.failure.getMessage().contains("software copy"));
-		assertStopped(view);
+		assertWithinBudget(view);
+		assertTrue(CompatibilityShadow.supported);
 	}
 
 	@Test
@@ -691,7 +748,10 @@ public class BackdropCaptureFrameLayoutTest{
 		view.oversizedCopyAt=2;
 		layout(view, 1440, 3200);
 		view.setCaptureHeights(2000, 300);
-		view.setCaptureListener((top, bottom)->fail("Actual copy allocation cannot overrun the budget"));
+		view.setCaptureListener((top, bottom)->{
+			assertNull(top);
+			assertNull(bottom);
+		});
 
 		view.render(acceleratedCanvas(1, 1));
 
@@ -699,12 +759,12 @@ public class BackdropCaptureFrameLayoutTest{
 		assertSame(first.original, first.getDrawable());
 		assertSame(second.original, second.getDrawable());
 		assertEquals(1, first.restores);
-		assertTrue(CompatibilityShadow.failure.getMessage().contains("software copy"));
-		assertStopped(view);
+		assertPaused(view);
+		assertTrue(CompatibilityShadow.supported);
 	}
 
 	@Test
-	public void ordinaryDispatchDrawFailureIsNotMaskedOrReported() throws Exception{
+	public void ordinaryDispatchDrawFailureIsNotMasked() throws Exception{
 		Harness view=new Harness(context);
 		Bands child=new Bands(context);
 		IllegalStateException error=new IllegalStateException("ordinary UI draw");
@@ -720,9 +780,504 @@ public class BackdropCaptureFrameLayoutTest{
 		}catch(IllegalStateException actual){
 			assertSame(error, actual);
 		}
-		assertEquals(0, CompatibilityShadow.reports);
+		assertTrue(CompatibilityShadow.supported);
 		assertEquals(0, child.softwareDraws);
 		assertFalse((boolean)field(view, "capturing"));
+	}
+
+	@Test
+	public void new1080SquareCopySelectsHalfSamplingWithTheRealBudget() throws Exception{
+		Harness view=new Harness(context);
+		TrackingImage image=image(view);
+		image.setOriginal(new BitmapDrawable(context.getResources(), Bitmap.createBitmap(1080, 1080, Bitmap.Config.ARGB_8888)));
+		layout(view, 1440, 3200);
+		view.setCaptureHeights(300, 300);
+		view.setCaptureListener((top, bottom)->assertNotNull(top));
+		assertEquals(17_337_600L, 1440L*3200*2+1440L*600*4+1080L*1080*4);
+
+		view.render(acceleratedCanvas(1, 1));
+
+		assertEquals(720, ((Bitmap)field(view, "captureBitmap")).getWidth());
+		assertEquals(1, view.copies);
+		assertEquals(10_425_600L, (long)field(view, "captureBufferBytes")+(long)field(view, "softwareBitmapCacheBytes"));
+		assertWithinBudget(view);
+	}
+
+	@Test
+	public void duplicateBitmapIdentityIsPlannedAndCopiedOnlyOnce() throws Exception{
+		Harness view=new Harness(context);
+		TrackingImage first=image(view), second=image(view);
+		Bitmap bitmap=Bitmap.createBitmap(1080, 1080, Bitmap.Config.ARGB_8888);
+		first.setOriginal(new BitmapDrawable(context.getResources(), bitmap));
+		second.setOriginal(new BitmapDrawable(context.getResources(), bitmap));
+		layout(view, 1440, 3200);
+		view.setCaptureHeights(300, 300);
+		view.setCaptureListener((top, bottom)->assertNotNull(top));
+
+		view.render(acceleratedCanvas(1, 1));
+
+		assertEquals(1, view.copies);
+		assertEquals(720, ((Bitmap)field(view, "captureBitmap")).getWidth());
+		assertEquals(1, ((Map<?, ?>)field(view, "softwareBitmapCache")).size());
+		assertWithinBudget(view);
+	}
+
+	@Test
+	public void unrelatedCachedCopyIsEvictedInsteadOfForcingDownsampling() throws Exception{
+		Harness view=new Harness(context);
+		layout(view, 1024, 4096);
+		view.setCaptureHeights(1024, 1024);
+		Bitmap old=Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888);
+		@SuppressWarnings("unchecked")
+		Map<Bitmap, Bitmap> cache=(Map<Bitmap, Bitmap>)field(view, "softwareBitmapCache");
+		Bitmap cached=old.copy(Bitmap.Config.ARGB_8888, false);
+		cache.put(old, cached);
+		view.setCaptureListener((top, bottom)->assertNotNull(top));
+
+		view.render(acceleratedCanvas(1, 1));
+
+		assertEquals(1024, ((Bitmap)field(view, "captureBitmap")).getWidth());
+		assertTrue(cache.isEmpty());
+		assertFalse(cached.isRecycled());
+		assertWithinBudget(view);
+	}
+
+	@Test
+	public void pauseClearsStaleImageOnceAndHeightChangeRetriesSameCallbackWithoutSpin() throws Exception{
+		Harness view=new Harness(context);
+		layout(view, 1440, 3200);
+		view.setCaptureHeights(300, 300);
+		Bitmap[] delivered=new Bitmap[2];
+		int[] calls={0}, clears={0};
+		BackdropCaptureFrameLayout.CaptureListener listener=(top, bottom)->{
+			delivered[0]=top;
+			delivered[1]=bottom;
+			if(top==null && bottom==null){
+				clears[0]++;
+				// Simulate consumer invalidation caused by clearing its image.
+				view.onDescendantInvalidated(view, view);
+			}else{
+				calls[0]++;
+			}
+		};
+		view.setCaptureListener(listener);
+		view.render(acceleratedCanvas(1, 1));
+		Bitmap old=delivered[0];
+		view.setCaptureHeights(2000, 850);
+		view.render(acceleratedCanvas(1, 1));
+		assertPaused(view);
+		assertNull(delivered[0]);
+		assertNull(delivered[1]);
+		assertFalse(old.isRecycled());
+		int posts=view.framePosts;
+		for(int i=0;i<5;i++)
+			view.render(acceleratedCanvas(1, 1));
+		assertEquals(1, clears[0]);
+		assertEquals(posts, view.framePosts);
+		assertFalse((boolean)field(view, "captureFrameScheduled"));
+
+		view.setCaptureHeights(300, 300);
+		view.render(acceleratedCanvas(1, 1));
+
+		assertSame(listener, field(view, "captureListener"));
+		assertEquals(2, calls[0]);
+		assertNotNull(delivered[0]);
+		assertFalse((boolean)field(view, "budgetPaused"));
+		assertWithinBudget(view);
+	}
+
+	@Test
+	public void movingOverBudgetImageOutOfTheStripsRetriesOnRealContentInvalidation() throws Exception{
+		Harness view=new Harness(context);
+		TrackingImage image=image(view);
+		image.setOriginal(new BitmapDrawable(context.getResources(), Bitmap.createBitmap(2048, 2048, Bitmap.Config.ARGB_8888)));
+		image.setLayoutParams(new FrameLayout.LayoutParams(100, 100));
+		layout(view, 1440, 3200);
+		view.setCaptureHeights(300, 300);
+		int[] calls={0}, clears={0};
+		BackdropCaptureFrameLayout.CaptureListener listener=(top, bottom)->{
+			if(top==null && bottom==null)
+				clears[0]++;
+			else
+				calls[0]++;
+		};
+		view.setCaptureListener(listener);
+		view.render(acceleratedCanvas(1, 1));
+		assertPaused(view);
+		assertEquals(0, view.copies);
+		assertEquals(1, clears[0]);
+		image.layout(0, 1000, 100, 1100);
+		image.invalidate();
+		view.onDescendantInvalidated(image, image);
+		assertTrue((boolean)field(view, "captureFrameScheduled"));
+		((Runnable)field(view, "captureFrameRunnable")).run();
+
+		view.render(acceleratedCanvas(1, 1));
+
+		assertSame(listener, field(view, "captureListener"));
+		assertEquals(1, calls[0]);
+		assertEquals(0, view.copies);
+		assertSame(image.original, image.getDrawable());
+		assertWithinBudget(view);
+	}
+
+	@Test
+	public void softwareSnapshotKeepsLastCaptureAndNextHardwareFrameContinues() throws Exception{
+		Harness view=new Harness(context);
+		TrackingImage image=image(view);
+		layout(view, 20, 40);
+		view.setCaptureHeights(7, 7);
+		int[] calls={0};
+		BackdropCaptureFrameLayout.CaptureListener listener=(top, bottom)->calls[0]++;
+		view.setCaptureListener(listener);
+		view.render(acceleratedCanvas(20, 40));
+		Bitmap shared=(Bitmap)field(view, "captureBitmap"), top=(Bitmap)field(view, "topCaptureBitmap");
+		int copies=view.copies;
+
+		view.render(new Canvas(Bitmap.createBitmap(20, 40, Bitmap.Config.ARGB_8888)));
+
+		assertSame(listener, field(view, "captureListener"));
+		assertSame(shared, field(view, "captureBitmap"));
+		assertSame(top, field(view, "topCaptureBitmap"));
+		assertEquals(1, calls[0]);
+		assertEquals(copies, view.copies);
+		assertSame(image.original, image.getDrawable());
+		view.render(acceleratedCanvas(20, 40));
+		assertEquals(2, calls[0]);
+		assertWithinBudget(view);
+	}
+
+	@Test
+	public void hiddenTabsAndCentralHugeImagesDoNotCopyOrPauseVisibleStrips() throws Exception{
+		Harness view=new Harness(context);
+		TrackingImage visible=image(view), central=image(view), gone=image(view), hidden=image(view);
+		Bitmap large=Bitmap.createBitmap(2048, 2048, Bitmap.Config.ARGB_8888);
+		for(TrackingImage image:new TrackingImage[]{central, gone, hidden})
+			image.setOriginal(new BitmapDrawable(context.getResources(), large));
+		central.setLayoutParams(new FrameLayout.LayoutParams(100, 100));
+		gone.setVisibility(View.GONE);
+		FrameLayout tab=new FrameLayout(context);
+		view.removeView(hidden);
+		tab.addView(hidden);
+		tab.setVisibility(View.INVISIBLE);
+		view.addView(tab);
+		layout(view, 1440, 3200);
+		central.layout(0, 1000, 100, 1100);
+		view.setCaptureHeights(300, 300);
+		int[] calls={0};
+		view.setCaptureListener((top, bottom)->{
+			assertNotNull(top);
+			calls[0]++;
+		});
+
+		view.render(acceleratedCanvas(1, 1));
+
+		assertEquals(1, calls[0]);
+		assertEquals(1, view.copies);
+		assertEquals(1, visible.restores);
+		assertEquals(0, gone.restores);
+		assertEquals(0, hidden.restores);
+		assertSame(central.original, central.getDrawable());
+		assertFalse((boolean)field(view, "budgetPaused"));
+		assertWithinBudget(view);
+	}
+
+	@Test
+	public void centralPlaceholderAndRestoreDoNotRequestFrameworkLayoutButRealChangesStillDo() throws Exception{
+		Harness view=new Harness(context);
+		TrackingImage image=image(view);
+		Bitmap bitmap=Bitmap.createBitmap(20, 30, Bitmap.Config.ARGB_8888);
+		image.setOriginal(new BitmapDrawable(context.getResources(), bitmap));
+		image.setLayoutParams(new FrameLayout.LayoutParams(50, 50));
+		layout(view, 200, 400);
+		image.layout(0, 150, 50, 200);
+		view.setCaptureHeights(20, 20);
+		view.setCaptureListener((top, bottom)->assertNotNull(top));
+		image.checkPlaceholderDimensions=true;
+		int imageLayouts=image.layoutRequests, hostLayouts=view.layoutRequests;
+
+		for(int i=0;i<5;i++)
+			view.render(acceleratedCanvas(1, 1));
+
+		assertEquals(0, view.copies);
+		assertEquals(5, image.restores);
+		assertEquals(imageLayouts, image.layoutRequests);
+		assertEquals(hostLayouts, view.layoutRequests);
+		assertFalse(image.isLayoutRequested());
+		assertFalse(view.isLayoutRequested());
+		assertFalse((boolean)field(view, "captureFrameScheduled"));
+		assertSame(image.original, image.getDrawable());
+		image.checkPlaceholderDimensions=false;
+		image.setImageDrawable(new BitmapDrawable(context.getResources(), Bitmap.createBitmap(60, 70, Bitmap.Config.ARGB_8888)));
+		assertTrue(image.layoutRequests>imageLayouts);
+		assertTrue(image.isLayoutRequested());
+		image.invalidate();
+		view.onDescendantInvalidated(image, image);
+		assertTrue((boolean)field(view, "captureFrameScheduled"));
+	}
+
+	@Test
+	public void centralCrossfadePlaceholderPreservesSourceAndWrapperDimensionsWithoutLayout() throws Exception{
+		Harness view=new Harness(context);
+		TrackingImage image=image(view);
+		BitmapDrawable source=new BitmapDrawable(context.getResources(), Bitmap.createBitmap(20, 30, Bitmap.Config.ARGB_8888));
+		BlurhashCrossfadeDrawable crossfade=new BlurhashCrossfadeDrawable();
+		crossfade.setImageDrawable(source);
+		crossfade.setCrossfadeAlpha(0);
+		image.setOriginal(crossfade);
+		image.setLayoutParams(new FrameLayout.LayoutParams(50, 50));
+		layout(view, 200, 400);
+		image.layout(0, 150, 50, 200);
+		// Draw the image itself first, outside the host's tiny test-canvas clip:
+		// crossfade.draw initializes its inner source bounds from the outer bounds.
+		image.draw(acceleratedCanvas(50, 50));
+		Rect sourceBounds=new Rect(source.getBounds());
+		assertEquals(new Rect(0, 0, 50, 50), sourceBounds);
+		Bands observer=new Bands(context);
+		observer.softwareAction=()->{
+			Drawable placeholder=crossfade.getImageDrawable();
+			assertNotSame(source, placeholder);
+			assertEquals(source.getIntrinsicWidth(), placeholder.getIntrinsicWidth());
+			assertEquals(source.getIntrinsicHeight(), placeholder.getIntrinsicHeight());
+			assertEquals(source.getMinimumWidth(), placeholder.getMinimumWidth());
+			assertEquals(source.getMinimumHeight(), placeholder.getMinimumHeight());
+			assertEquals(sourceBounds, source.getBounds());
+			assertEquals(sourceBounds, placeholder.getBounds());
+			assertEquals(source.getIntrinsicWidth(), crossfade.getIntrinsicWidth());
+			assertEquals(source.getIntrinsicHeight(), crossfade.getIntrinsicHeight());
+		};
+		view.addView(observer);
+		layout(view, 200, 400);
+		image.layout(0, 150, 50, 200);
+		view.setCaptureHeights(20, 20);
+		view.setCaptureListener((top, bottom)->assertNotNull(top));
+		int imageLayouts=image.layoutRequests, hostLayouts=view.layoutRequests;
+
+		for(int i=0;i<5;i++)
+			view.render(acceleratedCanvas(1, 1));
+
+		assertEquals(0, view.copies);
+		assertEquals(imageLayouts, image.layoutRequests);
+		assertEquals(hostLayouts, view.layoutRequests);
+		assertSame(crossfade, image.getDrawable());
+		assertSame(source, crossfade.getImageDrawable());
+		assertEquals(sourceBounds, source.getBounds());
+		assertWithinBudget(view);
+	}
+
+	@Test
+	public void zeroPaddingDoesNotClipOverflowWhenClipChildrenIsDisabled() throws Exception{
+		Harness view=new Harness(context);
+		// The host must also allow the parent's overflow; otherwise it clips the
+		// entire container to its own bounds before the inner child can draw.
+		view.setClipChildren(false);
+		view.forceCopies=true;
+		FrameLayout overflow=new FrameLayout(context);
+		overflow.setClipChildren(false);
+		overflow.setClipToPadding(true); // Zero padding means no padding clip at draw time.
+		view.addView(overflow, new FrameLayout.LayoutParams(100, 100));
+		TrackingImage image=new TrackingImage(context);
+		Bitmap bitmap=Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888);
+		bitmap.eraseColor(Color.MAGENTA);
+		image.setOriginal(new BitmapDrawable(context.getResources(), bitmap));
+		overflow.addView(image, new FrameLayout.LayoutParams(50, 50));
+		layout(view, 200, 400);
+		overflow.layout(0, 100, 100, 200);
+		image.layout(0, -100, 50, -50); // Outside parent bounds, but inside host top strip.
+		view.setCaptureHeights(20, 20);
+		Bitmap[] delivered=new Bitmap[2];
+		view.setCaptureListener((top, bottom)->{
+			delivered[0]=top;
+			delivered[1]=bottom;
+		});
+
+		view.render(acceleratedCanvas(1, 1));
+
+		assertEquals(1, view.copies);
+		assertEquals(Color.MAGENTA, delivered[0].getPixel(10, 10));
+		assertSame(image.original, image.getDrawable());
+		assertWithinBudget(view);
+	}
+
+	@Test
+	public void nonzeroPaddingStillClipsOverflowWhenClipChildrenIsDisabled() throws Exception{
+		Harness view=new Harness(context);
+		view.setClipChildren(false); // Isolate the parent's nonzero padding clip.
+		view.forceCopies=true;
+		FrameLayout overflow=new FrameLayout(context);
+		overflow.setClipChildren(false);
+		overflow.setClipToPadding(true);
+		overflow.setPadding(1, 1, 1, 1);
+		view.addView(overflow, new FrameLayout.LayoutParams(100, 100));
+		TrackingImage image=new TrackingImage(context);
+		image.setOriginal(new BitmapDrawable(context.getResources(), Bitmap.createBitmap(2048, 2048, Bitmap.Config.ARGB_8888)));
+		overflow.addView(image, new FrameLayout.LayoutParams(50, 50));
+		layout(view, 200, 400);
+		overflow.layout(0, 100, 100, 200);
+		image.layout(0, -100, 50, -50);
+		view.setCaptureHeights(20, 20);
+		view.setCaptureListener((top, bottom)->assertNotNull(top));
+
+		view.render(acceleratedCanvas(1, 1));
+
+		assertEquals(0, view.copies);
+		assertSame(image.original, image.getDrawable());
+		assertWithinBudget(view);
+	}
+
+	@Test
+	public void ancestorScrollIsIncludedInHostRelativeImageIntersection() throws Exception{
+		Harness view=new Harness(context);
+		view.forceCopies=true;
+		FrameLayout scroller=new FrameLayout(context);
+		view.addView(scroller, new FrameLayout.LayoutParams(-1, -1));
+		TrackingImage image=new TrackingImage(context);
+		image.setOriginal(new BitmapDrawable(context.getResources(), Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)));
+		scroller.addView(image, new FrameLayout.LayoutParams(100, 100));
+		layout(view, 200, 400);
+		image.layout(0, 150, 100, 250);
+		scroller.scrollTo(0, 150);
+		view.setCaptureHeights(20, 20);
+		view.setCaptureListener((top, bottom)->assertNotNull(top));
+
+		view.render(acceleratedCanvas(1, 1));
+
+		assertEquals(1, view.copies);
+		assertSame(image.original, image.getDrawable());
+		assertWithinBudget(view);
+	}
+
+	@Test
+	public void transformedImageUsesConservativeConversionInsteadOfMissingHardwareArguments() throws Exception{
+		Harness view=new Harness(context);
+		TrackingImage image=image(view);
+		image.setLayoutParams(new FrameLayout.LayoutParams(100, 100));
+		layout(view, 200, 400);
+		image.layout(0, 150, 100, 250);
+		image.setTranslationY(-150);
+		view.setCaptureHeights(20, 20);
+		view.setCaptureListener((top, bottom)->assertNotNull(top));
+
+		view.render(acceleratedCanvas(1, 1));
+
+		assertEquals(1, view.copies);
+		assertSame(image.original, image.getDrawable());
+		assertWithinBudget(view);
+	}
+
+	@Test
+	public void clippedOffscreenHugeImageDoesNotConsumeCopyBudget() throws Exception{
+		Harness view=new Harness(context);
+		view.forceCopies=true;
+		FrameLayout clipped=new FrameLayout(context);
+		view.addView(clipped, new FrameLayout.LayoutParams(100, 100));
+		TrackingImage image=new TrackingImage(context);
+		image.setOriginal(new BitmapDrawable(context.getResources(), Bitmap.createBitmap(2048, 2048, Bitmap.Config.ARGB_8888)));
+		clipped.addView(image, new FrameLayout.LayoutParams(100, 100));
+		layout(view, 200, 400);
+		image.layout(0, 200, 100, 300);
+		view.setCaptureHeights(300, 20);
+		view.setCaptureListener((top, bottom)->assertNotNull(top));
+
+		view.render(acceleratedCanvas(1, 1));
+
+		assertEquals(0, view.copies);
+		assertSame(image.original, image.getDrawable());
+		assertWithinBudget(view);
+	}
+
+	@Test
+	public void bottomIntersectingImageStillCopiesAndKeepsHostRelativeStripPixels() throws Exception{
+		Harness view=new Harness(context);
+		TrackingImage image=image(view);
+		Bitmap source=((BitmapDrawable)image.original).getBitmap();
+		source.eraseColor(Color.MAGENTA);
+		image.setLayoutParams(new FrameLayout.LayoutParams(10, 10));
+		layout(view, 20, 40);
+		image.layout(5, 30, 15, 40);
+		view.setCaptureHeights(7, 7);
+		Bitmap[] delivered=new Bitmap[2];
+		view.setCaptureListener((top, bottom)->{
+			delivered[0]=top;
+			delivered[1]=bottom;
+		});
+
+		view.render(acceleratedCanvas(20, 40));
+
+		assertEquals(1, view.copies);
+		assertEquals(Color.MAGENTA, delivered[1].getPixel(10, 3));
+		assertEquals(Color.BLACK, delivered[0].getPixel(10, 3)); // untouched RGB565 strip
+		assertSame(image.original, image.getDrawable());
+		assertWithinBudget(view);
+	}
+
+	@Test
+	public void shrinkingWindowAloneRecoversBudgetPauseWithoutRegisteringAgain() throws Exception{
+		Harness view=new Harness(context);
+		layout(view, 1440, 3200);
+		view.setCaptureHeights(2000, 850);
+		int[] captures={0}, clears={0};
+		BackdropCaptureFrameLayout.CaptureListener listener=(top, bottom)->{
+			if(top==null && bottom==null)
+				clears[0]++;
+			else
+				captures[0]++;
+		};
+		view.setCaptureListener(listener);
+		view.render(acceleratedCanvas(1, 1));
+		assertPaused(view);
+
+		layout(view, 720, 1600);
+		view.render(acceleratedCanvas(1, 1));
+
+		assertSame(listener, field(view, "captureListener"));
+		assertEquals(1, clears[0]);
+		assertEquals(1, captures[0]);
+		assertWithinBudget(view);
+	}
+
+	@Test
+	public void reentrantHeightChangeDuringCaptureDropsOldGenerationAndNextDrawRecovers() throws Exception{
+		Harness view=new Harness(context);
+		TrackingImage image=image(view);
+		Bands child=new Bands(context);
+		child.softwareAction=()->view.setCaptureHeights(3, 4);
+		view.addView(child);
+		layout(view, 20, 40);
+		view.setCaptureHeights(7, 7);
+		int[] calls={0};
+		view.setCaptureListener((top, bottom)->{
+			assertEquals(3, top.getHeight());
+			assertEquals(4, bottom.getHeight());
+			calls[0]++;
+		});
+		view.render(acceleratedCanvas(20, 40));
+		assertEquals(0, calls[0]);
+		assertRetryableAfterFailure(view);
+		assertSame(image.original, image.getDrawable());
+		child.softwareAction=null;
+
+		view.render(acceleratedCanvas(20, 40));
+
+		assertEquals(1, calls[0]);
+		assertWithinBudget(view);
+	}
+
+	@Test
+	public void reentrantDisposeOnPauseCannotReviveListenerOrScheduledWork() throws Exception{
+		Harness view=new Harness(context);
+		layout(view, 1440, 3200);
+		view.setCaptureHeights(2000, 850);
+		view.setCaptureListener((top, bottom)->{
+			assertNull(top);
+			assertNull(bottom);
+			view.setCaptureListener(null);
+		});
+
+		view.render(acceleratedCanvas(1, 1));
+
+		assertStopped(view);
+		assertFalse((boolean)field(view, "budgetPaused"));
 	}
 
 	private static void assertStripGeometryAndColors(Bitmap[] delivered, int width, int topHeight, int bottomHeight){
@@ -820,8 +1375,24 @@ public class BackdropCaptureFrameLayoutTest{
 		return field.get(view);
 	}
 
+	private static void assertPaused(Harness view) throws Exception{
+		assertNotNull(field(view, "captureListener"));
+		assertTrue((boolean)field(view, "budgetPaused"));
+		assertCaptureResourcesReleased(view);
+	}
+
 	private static void assertStopped(Harness view) throws Exception{
 		assertNull(field(view, "captureListener"));
+		assertCaptureResourcesReleased(view);
+	}
+
+	private static void assertRetryableAfterFailure(Harness view) throws Exception{
+		assertTrue(CompatibilityShadow.supported);
+		assertNotNull(field(view, "captureListener"));
+		assertCaptureResourcesReleased(view);
+	}
+
+	private static void assertCaptureResourcesReleased(Harness view) throws Exception{
 		assertNull(field(view, "captureBitmap"));
 		assertNull(field(view, "topCaptureBitmap"));
 		assertNull(field(view, "bottomCaptureBitmap"));
@@ -836,7 +1407,7 @@ public class BackdropCaptureFrameLayoutTest{
 	private static class Harness extends BackdropCaptureFrameLayout{
 		boolean attached=true;
 		boolean forceCopies;
-		int copies, copyFailureAt, nullCopyAt, oversizedCopyAt, invalidations;
+		int copies, copyFailureAt, nullCopyAt, oversizedCopyAt, invalidations, framePosts, layoutRequests;
 		Throwable copyFailure;
 
 		Harness(Context context){
@@ -852,6 +1423,18 @@ public class BackdropCaptureFrameLayoutTest{
 		public void invalidate(){
 			invalidations++;
 			super.invalidate();
+		}
+
+		@Override
+		public void requestLayout(){
+			layoutRequests++;
+			super.requestLayout();
+		}
+
+		@Override
+		public void postOnAnimation(Runnable action){
+			framePosts++;
+			super.postOnAnimation(action);
 		}
 
 		@Override
@@ -945,11 +1528,14 @@ public class BackdropCaptureFrameLayoutTest{
 
 	private static class TrackingImage extends ImageView{
 		Drawable original;
-		boolean replaced, failRestore, failReplace;
-		int restores;
+		boolean replaced, failRestore, failReplace, checkPlaceholderDimensions;
+		int restores, layoutRequests;
 
 		TrackingImage(Context context){
 			super(context);
+			// These fixtures intentionally fill both capture strips; geometry-specific
+			// tests override the size/scale type rather than relying on FIT_CENTER.
+			setScaleType(ScaleType.FIT_XY);
 			setLayoutParams(new FrameLayout.LayoutParams(-1, -1));
 		}
 
@@ -959,7 +1545,21 @@ public class BackdropCaptureFrameLayoutTest{
 		}
 
 		@Override
+		public void requestLayout(){
+			layoutRequests++;
+			super.requestLayout();
+		}
+
+		@Override
 		public void setImageDrawable(Drawable drawable){
+			if(checkPlaceholderDimensions && drawable!=original){
+				assertNotNull(drawable);
+				assertEquals(original.getIntrinsicWidth(), drawable.getIntrinsicWidth());
+				assertEquals(original.getIntrinsicHeight(), drawable.getIntrinsicHeight());
+				assertEquals(original.getMinimumWidth(), drawable.getMinimumWidth());
+				assertEquals(original.getMinimumHeight(), drawable.getMinimumHeight());
+				assertEquals(original.getBounds(), drawable.getBounds());
+			}
 			boolean restoring=replaced && drawable==original;
 			if(drawable!=original)
 				replaced=true;

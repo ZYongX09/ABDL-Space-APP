@@ -72,11 +72,20 @@ public final class AlbumPhotoViewer implements PhotoViewer.AlbumDelegate, Applic
 	private final String accountID;
 	private final AccountSession session;
 	private final List<AlbumModels.Photo> photos;
+	private final PhotoPolicyListener policyListener;
+	private boolean policyDismissed;
+
+	/** Keep the underlying detail policy synchronized while this separate window covers it. */
+	public interface PhotoPolicyListener{
+		void onPhotoPolicyChanged(AlbumModels.Photo photo);
+		void onDismissed();
+	}
 	private final Handler main=new Handler(Looper.getMainLooper());
 	private final Set<MastodonAPIRequest<?>> requests=new HashSet<>();
 	private final SharedPreferences accountPrefs;
 	private final SharedPreferences.OnSharedPreferenceChangeListener accountListener;
 	private final Runnable sessionWatcher=this::watchSession;
+	private final Runnable policyWatcher=this::watchPolicy;
 	private PhotoViewer viewer;
 	private boolean closed, paused, permissionWaiting, commentsOpen, likeBusy, commentsLoading, commentBusy;
 	private long generation;
@@ -104,6 +113,10 @@ public final class AlbumPhotoViewer implements PhotoViewer.AlbumDelegate, Applic
 
 	/** The only integration screens need. No global account or fixed API domain is installed. */
 	public static void open(Activity activity, String accountID, List<AlbumModels.Photo> photos, int index){
+		open(activity, accountID, photos, index, null);
+	}
+
+	public static void open(Activity activity, String accountID, List<AlbumModels.Photo> photos, int index, @Nullable PhotoPolicyListener listener){
 		if(activity==null || activity.isFinishing() || activity.isDestroyed()) return;
 		if(accountID==null || photos==null || photos.isEmpty() || index<0 || index>=photos.size()
 				|| AccountSessionManager.getInstance().tryGetAccount(accountID)==null
@@ -115,10 +128,15 @@ public final class AlbumPhotoViewer implements PhotoViewer.AlbumDelegate, Applic
 				Toast.makeText(activity, R.string.album_viewer_image_error, Toast.LENGTH_LONG).show(); return;
 			}
 		}
-		new AlbumPhotoViewer(activity, accountID, photos, index).show();
+		new AlbumPhotoViewer(activity, accountID, photos, index, listener).show();
 	}
 
 	private AlbumPhotoViewer(Activity activity, String accountID, List<AlbumModels.Photo> photos, int index){
+		this(activity, accountID, photos, index, null);
+	}
+
+	private AlbumPhotoViewer(Activity activity, String accountID, List<AlbumModels.Photo> photos, int index, @Nullable PhotoPolicyListener listener){
+		policyListener=listener;
 		this.activity=activity;
 		this.accountID=accountID;
 		this.photos=new ArrayList<>(photos);
@@ -140,11 +158,14 @@ public final class AlbumPhotoViewer implements PhotoViewer.AlbumDelegate, Applic
 			@Override public void photoViewerDismissed(){}
 			@Override public void onRequestPermissions(String[] permissions){}
 		}, this);
-		createCommentsPanel();
-		viewer.setAlbumCommentsPanel(commentsPanel);
+		if(supportsComments()){
+			createCommentsPanel();
+			viewer.setAlbumCommentsPanel(commentsPanel);
+		}
 		accountPrefs.registerOnSharedPreferenceChangeListener(accountListener);
 		activity.getApplication().registerActivityLifecycleCallbacks(this);
 		main.post(sessionWatcher);
+		main.postDelayed(policyWatcher, 45_000);
 		main.post(()->onPhotoChanged(currentIndex));
 	}
 
@@ -168,12 +189,23 @@ public final class AlbumPhotoViewer implements PhotoViewer.AlbumDelegate, Applic
 
 	static boolean mayUseLossless(AlbumModels.Photo photo){ return photo!=null && photo.isOwner && photo.originalAvailable; }
 
+	static boolean protectedNonowner(AlbumModels.Photo photo){ return photo!=null && photo.downloadProtected && !photo.isOwner; }
+
+	static boolean mayDownload(AlbumModels.Photo photo){
+		return photo!=null && (photo.isOwner || !photo.downloadProtected && !Boolean.FALSE.equals(photo.canDownload));
+	}
+
 	static Map<String,Object> authorizationBody(String variant, String operation, Integer noticeVersion){
+		return authorizationBody(variant, operation, noticeVersion, false);
+	}
+
+	static Map<String,Object> authorizationBody(String variant, String operation, Integer noticeVersion, boolean download){
 		if(!"hd".equals(variant) && !"original".equals(variant)) throw new IllegalArgumentException("Unknown variant");
 		UUID.fromString(operation);
 		Map<String,Object> body=new HashMap<>();
 		body.put("variant", variant);
 		body.put("operation_id", operation);
+		body.put("intent", download ? "download" : "view");
 		if(noticeVersion!=null) body.put("notice_version", noticeVersion);
 		return body;
 	}
@@ -192,10 +224,28 @@ public final class AlbumPhotoViewer implements PhotoViewer.AlbumDelegate, Applic
 		main.postDelayed(sessionWatcher, 250);
 	}
 
+	private void watchPolicy(){
+		if(closed || paused) return;
+		if(live(generation) && !previewRefreshing){
+			long policyGeneration=generation;
+			refreshPreview(currentIndex, new PhotoViewer.AlbumPreviewCallback(){
+				@Override public void onRefreshed(String url, String description, int width, int height){
+					// Policy-only polling must not downgrade a selected HD/original or reset zoom.
+					if(policyGeneration!=generation) main.post(()->{ if(live(generation)) viewer.reloadAlbumPreview(); });
+				}
+				@Override public void onFailed(){}
+				@Override public void onAccessDenied(){ close(); }
+			});
+		}
+		main.postDelayed(policyWatcher, 45_000);
+	}
+
 	@Override public PhotoViewer.AlbumInfo getInfo(int position){
 		AlbumModels.Photo photo=photos.get(position);
 		PhotoViewer.AlbumInfo info=new PhotoViewer.AlbumInfo();
 		info.isOwner=photo.isOwner;
+		info.downloadProtected=photo.downloadProtected;
+		info.canDownload=mayDownload(photo);
 		info.originalAvailable=photo.originalAvailable;
 		info.liked=photo.liked;
 		info.likesCount=photo.likesCount;
@@ -217,7 +267,7 @@ public final class AlbumPhotoViewer implements PhotoViewer.AlbumDelegate, Applic
 		comments.clear(); commentsOffset=0; commentsHasMore=false;
 		if(commentInput!=null) commentInput.setText("");
 		if(commentAdapter!=null) commentAdapter.notifyDataSetChanged();
-		if(commentsOpen) loadComments(true);
+		if(supportsComments() && commentsOpen) loadComments(true);
 		viewer.refreshAlbumControls();
 	}
 
@@ -243,8 +293,19 @@ public final class AlbumPhotoViewer implements PhotoViewer.AlbumDelegate, Applic
 				callback.onFailed(); Toast.makeText(activity, R.string.album_viewer_image_error, Toast.LENGTH_LONG).show(); return;
 			}
 			photos.set(position, photo); // Owner/sponsor/original availability and social metadata come from renewed ACL DTO.
+			revokeChangedPolicy(previous, photo);
 			viewer.refreshAlbumControls();
+			try{
+				if(policyListener!=null) policyListener.onPhotoPolicyChanged(photo);
+			}catch(RuntimeException error){
+				cancelPending(); viewer.blockAlbumDismissal(); callback.onFailed();
+				Toast.makeText(activity, R.string.error, Toast.LENGTH_LONG).show(); return;
+			}
 			callback.onRefreshed(photo.previewUrl, photo.description, photo.width, photo.height);
+			if(permissionDownload!=null && live(token) && mayDownload(photo)){
+				Runnable download=permissionDownload; permissionDownload=null; main.post(download);
+				return;
+			}
 			if(live(token) && revision==previewRevision && mayAutoLoadHd(photo) && !hdLoaded && mediaAction==null){
 				MediaAction action=new MediaAction(position, "hd", false, token);
 				mediaAction=action; viewer.refreshAlbumControls();
@@ -260,14 +321,27 @@ public final class AlbumPhotoViewer implements PhotoViewer.AlbumDelegate, Applic
 		});
 	}
 
+	private void revokeChangedPolicy(AlbumModels.Photo previous, AlbumModels.Photo photo){
+		if(!(!protectedNonowner(previous) && protectedNonowner(photo)
+				|| mayDownload(previous) && !mayDownload(photo)
+				|| mayUseLossless(previous) && !mayUseLossless(photo))) return;
+		// Invalidate authorization/retry/permission generations and in-flight byte saves.
+		cancelPending();
+		permissionWaiting=false; permissionGeneration=-1;
+		if(permissionFragment!=null){ permissionFragment.completed=null; permissionFragment=null; }
+		viewer.revokeAlbumQuality();
+	}
+
 	@Override public void onView(int position, String variant){
-		if(!live(generation) || mediaAction!=null || permissionWaiting || previewRefreshing) return;
+		if(!live(generation) || position!=currentIndex || protectedNonowner(photos.get(position))
+				|| mediaAction!=null || permissionWaiting || previewRefreshing) return;
 		if("original".equals(variant) && !mayUseLossless(photos.get(position))) return;
 		beginMedia(position, variant, false);
 	}
 
 	@Override public void onDownload(int position){
-		if(!live(generation) || mediaAction!=null || permissionWaiting || previewRefreshing) return;
+		if(!live(generation) || position!=currentIndex || !mayDownload(photos.get(position))
+				|| mediaAction!=null || permissionWaiting || previewRefreshing) return;
 		long token=generation;
 		if(mayUseLossless(photos.get(position))){
 			actionDialog=new M3AlertDialogBuilder(activity).setTitle(R.string.album_viewer_download_quality)
@@ -279,7 +353,7 @@ public final class AlbumPhotoViewer implements PhotoViewer.AlbumDelegate, Applic
 	}
 
 	private void requestDownload(int position, String variant){
-		if(!live(generation) || position!=currentIndex) return;
+		if(!live(generation) || position!=currentIndex || !mayDownload(photos.get(position))) return;
 		if(Build.VERSION.SDK_INT<29 && activity.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)!=PackageManager.PERMISSION_GRANTED){
 			// Permission precedes authorization, so opening the system prompt can never consume quota.
 			permissionWaiting=true;
@@ -288,11 +362,11 @@ public final class AlbumPhotoViewer implements PhotoViewer.AlbumDelegate, Applic
 			permissionFragment=new PermissionFragment();
 			permissionFragment.completed=granted->{
 				permissionWaiting=false; permissionFragment=null;
-				if(!sessionValid() || position!=currentIndex || permissionGeneration!=generation) return;
+					if(!sessionValid() || position!=currentIndex || permissionGeneration!=generation || !mayDownload(photos.get(position))) return;
 				long token=permissionGeneration;
 				if(granted){
 					permissionDownload=()->{ if(live(token) && position==currentIndex) beginMedia(position, variant, true); };
-					if(!paused){ Runnable download=permissionDownload; permissionDownload=null; viewer.reloadAlbumPreview(); main.post(download); }
+						if(!paused) viewer.reloadAlbumPreview(); // Fresh GET completes before a permission-delayed authorization.
 				}else Toast.makeText(activity, R.string.storage_permission_to_download, Toast.LENGTH_LONG).show();
 				viewer.refreshAlbumControls();
 			};
@@ -305,7 +379,8 @@ public final class AlbumPhotoViewer implements PhotoViewer.AlbumDelegate, Applic
 	}
 
 	private void beginMedia(int position, String variant, boolean download){
-		if(!live(generation) || position!=currentIndex || mediaAction!=null) return;
+		if(!live(generation) || position!=currentIndex || mediaAction!=null || previewRefreshing
+				|| protectedNonowner(photos.get(position)) || download && !mayDownload(photos.get(position))) return;
 		if("original".equals(variant) && !mayUseLossless(photos.get(position))) return;
 		MediaAction action=new MediaAction(position, variant, download, generation);
 		mediaAction=action;
@@ -313,13 +388,18 @@ public final class AlbumPhotoViewer implements PhotoViewer.AlbumDelegate, Applic
 		authorize(action, null);
 	}
 
-	private boolean mediaLive(MediaAction action){ return mediaAction==action && live(action.generation) && action.position==currentIndex; }
+	private boolean mediaLive(MediaAction action){
+		return mediaAction==action && live(action.generation) && action.position==currentIndex
+				&& !protectedNonowner(photos.get(action.position))
+				&& (!action.download || mayDownload(photos.get(action.position)))
+				&& (!"original".equals(action.variant) || mayUseLossless(photos.get(action.position)));
+	}
 
 	private void authorize(MediaAction action, Integer noticeVersion){
 		if(!mediaLive(action)) return;
 		action.noticeVersion=noticeVersion;
 		AlbumRequest<AlbumModels.Authorization> request=AlbumRequest.post("/photos/"+pathId(photos.get(action.position).id)+"/authorize",
-				AlbumModels.Authorization.class, authorizationBody(action.variant, action.operationId, noticeVersion));
+				AlbumModels.Authorization.class, authorizationBody(action.variant, action.operationId, noticeVersion, action.download));
 		execute(request, action.generation, result->{
 			if(!mediaLive(action)) return;
 			if(result==null || TextUtils.isEmpty(result.url) || result.expiresAt<=System.currentTimeMillis()/1000){
@@ -331,8 +411,14 @@ public final class AlbumPhotoViewer implements PhotoViewer.AlbumDelegate, Applic
 			if(error instanceof SponsorRequest.SponsorError sponsorError){
 				if("notice_required".equals(sponsorError.code) && action.noticeRefreshes++<2){ loadSponsorCopy(action, sponsorError, false); return; }
 				if("quota_exhausted".equals(sponsorError.code)){ loadSponsorCopy(action, sponsorError, true); return; }
+				if("album_download_protected".equals(sponsorError.code)){
+					finishMedia(action); viewer.reloadAlbumPreview(); error.showToast(activity); return;
+				}
 				// Disabled/unavailable lossless and expired operations are never local permissions.
 				if(!Set.of("unknown", "network_error").contains(sponsorError.code)){ finishMedia(action); error.showToast(activity); return; }
+			}
+			if(error instanceof MastodonErrorResponse response && (response.httpStatus==403 || response.httpStatus==404)){
+				finishMedia(action); viewer.reloadAlbumPreview(); error.showToast(activity); return;
 			}
 			retryMedia(action, ()->authorize(action, action.noticeVersion), error);
 		});
@@ -419,8 +505,11 @@ public final class AlbumPhotoViewer implements PhotoViewer.AlbumDelegate, Applic
 		}, error->{ likeBusy=false; viewer.refreshAlbumControls(); error.showToast(activity); });
 	}
 
+	/** Hide only the album entry; server comment data/APIs and ordinary post replies are preserved. */
+	@Override public boolean supportsComments(){ return false; }
+
 	@Override public void onComments(int position){
-		if(!live(generation) || position!=currentIndex) return;
+		if(!supportsComments() || !live(generation) || position!=currentIndex) return;
 		commentsOpen=true;
 		viewer.setAlbumCommentsVisible(true);
 		commentsPanel.requestFocus();
@@ -482,7 +571,7 @@ public final class AlbumPhotoViewer implements PhotoViewer.AlbumDelegate, Applic
 	}
 
 	private void loadComments(boolean reset){
-		if(!live(generation) || !commentsOpen || !reset && commentsLoading) return;
+		if(!supportsComments() || !live(generation) || !commentsOpen || !reset && commentsLoading) return;
 		if(reset){
 			if(commentsRequest!=null){ commentsRequest.cancel(); requests.remove(commentsRequest); commentsRequest=null; }
 			commentsOffset=0; comments.clear(); commentAdapter.notifyDataSetChanged();
@@ -531,7 +620,7 @@ public final class AlbumPhotoViewer implements PhotoViewer.AlbumDelegate, Applic
 	}
 
 	private void addComment(){
-		if(!live(generation) || commentBusy) return;
+		if(!supportsComments() || !live(generation) || commentBusy) return;
 		String content=commentInput.getText().toString().trim();
 		if(content.isEmpty() || content.length()>2000){ Toast.makeText(activity, R.string.album_viewer_comment_invalid, Toast.LENGTH_LONG).show(); return; }
 		if(commentAction==null || !commentAction.content.equals(content)) commentAction=new CommentAction(content);
@@ -550,7 +639,7 @@ public final class AlbumPhotoViewer implements PhotoViewer.AlbumDelegate, Applic
 	private boolean ownComment(AlbumModels.Comment comment){ return comment!=null && session!=null && session.self!=null && String.valueOf(comment.userId).equals(session.self.id); }
 
 	private void deleteComment(AlbumModels.Comment comment){
-		if(!live(generation) || commentBusy || !ownComment(comment)) return;
+		if(!supportsComments() || !live(generation) || commentBusy || !ownComment(comment)) return;
 		long token=generation;
 		actionDialog=new M3AlertDialogBuilder(activity).setMessage(R.string.album_viewer_comment_delete_confirm)
 				.setPositiveButton(R.string.delete, (dialog,which)->{
@@ -615,6 +704,14 @@ public final class AlbumPhotoViewer implements PhotoViewer.AlbumDelegate, Applic
 	@Override public void cancelPending(){
 		generation++;
 		permissionDownload=null;
+		if(!paused || closed){
+			permissionWaiting=false; permissionGeneration=-1;
+			if(permissionFragment!=null){
+				permissionFragment.completed=null;
+				try{ activity.getFragmentManager().beginTransaction().remove(permissionFragment).commitAllowingStateLoss(); }catch(RuntimeException ignored){}
+				permissionFragment=null;
+			}
+		}
 		for(MastodonAPIRequest<?> request:new ArrayList<>(requests)) request.cancel();
 		requests.clear();
 		commentsRequest=null; commentsGeneration++;
@@ -632,6 +729,19 @@ public final class AlbumPhotoViewer implements PhotoViewer.AlbumDelegate, Applic
 		if(closed) return;
 		if(viewer!=null) viewer.onDismissed();
 		else onDismissed();
+	}
+
+	@Override public boolean onBeforeDismissed(){
+		if(policyListener==null || policyDismissed) return true;
+		try{
+			policyListener.onPhotoPolicyChanged(photos.get(currentIndex));
+			policyListener.onDismissed();
+			policyDismissed=true;
+			return true;
+		}catch(RuntimeException error){
+			cancelPending(); Toast.makeText(activity, R.string.error, Toast.LENGTH_LONG).show();
+			return false;
+		}
 	}
 
 	@Override public void onDismissed(){
@@ -652,15 +762,20 @@ public final class AlbumPhotoViewer implements PhotoViewer.AlbumDelegate, Applic
 	@Override public void onActivityPaused(Activity host){
 		if(host!=activity || closed) return;
 		paused=true;
+		main.removeCallbacks(policyWatcher);
 		viewer.onPause(); // Cancels authorization, bytes, comments, likes, and all retry/notice dialogs.
 		if(permissionWaiting) permissionGeneration=generation; // Only the permission prompt survives its own pause, before any authorization.
 	}
 	@Override public void onActivityResumed(Activity host){
 		if(host!=activity || closed) return;
 		paused=false;
+		main.removeCallbacks(policyWatcher);
 		if(!sessionValid()) close();
-		else if(permissionDownload!=null){ Runnable download=permissionDownload; permissionDownload=null; viewer.reloadAlbumPreview(); main.post(download); }
-		else viewer.resumeAlbum();
+		else{
+			main.postDelayed(policyWatcher, 45_000);
+			if(permissionDownload!=null) viewer.reloadAlbumPreview();
+			else viewer.resumeAlbum();
+		}
 	}
 	@Override public void onActivityStopped(Activity host){ if(host==activity) close(); }
 	@Override public void onActivityDestroyed(Activity host){ if(host==activity) close(); }

@@ -13,10 +13,15 @@ import android.view.Display;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowInsets;
+import android.view.WindowManager;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 
 import org.joinmastodon.android.MastodonApp;
+import org.joinmastodon.android.R;
+import org.joinmastodon.android.fragments.HomeTimelineFragment;
+import org.joinmastodon.android.model.Status;
+import org.joinmastodon.android.model.StatusPrivacy;
 import org.joinmastodon.android.api.MastodonAPIRequest;
 import org.joinmastodon.android.api.requests.albums.AlbumRequest;
 import org.joinmastodon.android.api.session.AccountSession;
@@ -34,6 +39,9 @@ import org.robolectric.RobolectricTestRunner;
 import org.robolectric.RuntimeEnvironment;
 import org.robolectric.android.controller.ActivityController;
 import org.robolectric.annotation.Config;
+import org.robolectric.annotation.Implementation;
+import org.robolectric.annotation.Implements;
+import org.robolectric.annotation.RealObject;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -139,6 +147,11 @@ public class AlbumPhotoViewerTest{
 		assertEquals("original", retry.get("variant"));
 		assertFalse(first.containsKey("notice_version")); assertEquals(4, retry.get("notice_version"));
 		assertFalse(first.containsKey("media_key"));
+		assertEquals("view", first.get("intent"));
+		Map<String,Object> saving=AlbumPhotoViewer.authorizationBody(download.variant, download.operationId, null, true);
+		Map<String,Object> savingRetry=AlbumPhotoViewer.authorizationBody(download.variant, download.operationId, 4, true);
+		assertEquals("download", saving.get("intent")); assertEquals("download", savingRetry.get("intent"));
+		assertEquals(saving.get("operation_id"), savingRetry.get("operation_id"));
 	}
 
 	@Test public void viewportShrinksAboveCommentsAndKeyboardWithoutCropping(){
@@ -264,6 +277,302 @@ public class AlbumPhotoViewerTest{
 		}
 	}
 
+	@Test public void albumReplyStaysGoneAndProgrammaticClickNeverCallsDelegate() throws Exception{
+		try(ActivityController<Activity> lifecycle=Robolectric.buildActivity(Activity.class).setup()){
+			Activity host=lifecycle.get(); host.setTheme(R.style.Theme_Mastodon_Dark);
+			ProbeDelegate delegate=new ProbeDelegate();
+			PhotoViewer viewer=new PhotoViewer(host, null, List.of(AlbumPhotoViewer.attachment(photo()), AlbumPhotoViewer.attachment(photo())), 0, null, "missing", new NoTransition(), delegate);
+			try{
+				View reply=(View)field(PhotoViewer.class, "replyBtn").get(viewer);
+				for(int position=0; position<2; position++){
+					method(PhotoViewer.class, "onPageChanged", int.class).invoke(viewer, position);
+					method(PhotoViewer.class, "updateBackgroundColor", int.class, float.class).invoke(viewer, position, 0f);
+					viewer.refreshAlbumControls();
+					assertEquals(View.GONE, reply.getVisibility()); assertFalse(reply.isEnabled()); assertFalse(reply.isFocusable());
+					reply.performClick(); method(PhotoViewer.class, "openAlbumComments").invoke(viewer);
+					assertEquals(0, delegate.commentEntries);
+					assertFalse(field(PhotoViewer.class, "albumCommentsVisible").getBoolean(viewer));
+					assertEquals(View.VISIBLE, ((View)field(PhotoViewer.class, "favoriteBtn").get(viewer)).getVisibility());
+				}
+			}finally{ viewer.onDismissed(); }
+		}
+	}
+
+	@Test @Config(shadows=RecordingApiExecution.class) public void albumAdapterRejectsEntryAndAutomaticCommentRequestsWithValidSession() throws Exception{
+		RecordingApiExecution.routes.clear();
+		withSession((accountID, session)->{
+			try(ActivityController<Activity> lifecycle=Robolectric.buildActivity(Activity.class).setup().visible()){
+				Activity host=lifecycle.get(); host.setTheme(R.style.Theme_Mastodon_Dark);
+				Constructor<AlbumPhotoViewer> constructor=AlbumPhotoViewer.class.getDeclaredConstructor(Activity.class, String.class, List.class, int.class); constructor.setAccessible(true);
+				AlbumPhotoViewer adapter=constructor.newInstance(host, accountID, List.of(photo(), photo()), 0);
+				PhotoViewer viewer=new PhotoViewer(host, null, List.of(AlbumPhotoViewer.attachment(photo()), AlbumPhotoViewer.attachment(photo())), 0, null, accountID, new NoTransition(), adapter);
+				field(AlbumPhotoViewer.class, "viewer").set(adapter, viewer);
+				try{
+					View overlay=(View)field(PhotoViewer.class, "windowView").get(viewer);
+					org.robolectric.shadows.ShadowLooper.idleMainLooper();
+					assertTrue("Overlay must be attached", overlay.isAttachedToWindow());
+					assertSame("Viewer must retain selected session", session, field(PhotoViewer.class, "albumSession").get(viewer));
+					assertSame(session, AccountSessionManager.getInstance().tryGetAccount(accountID));
+					assertEquals(accountID, AccountSessionManager.getInstance().getLastActiveAccountID());
+					assertFalse(host.isFinishing()); assertFalse(host.isDestroyed());
+					assertFalse(field(PhotoViewer.class, "closing").getBoolean(viewer)); assertFalse(field(PhotoViewer.class, "dismissed").getBoolean(viewer));
+					assertTrue(viewer.isAlbumHostValid()); assertEquals(true, method(AlbumPhotoViewer.class, "live", long.class).invoke(adapter, 0L));
+					assertFalse(adapter.supportsComments());
+					// Verify this fixture observes API execution, rather than accepting a dead network seam.
+					int beforePositiveControl=RecordingApiExecution.routes.size();
+					AlbumPhotoViewer.previewRequest("photo-test").exec(accountID);
+					assertEquals(beforePositiveControl+1, RecordingApiExecution.routes.size()); RecordingApiExecution.routes.clear();
+					adapter.onComments(0);
+					assertFalse(field(AlbumPhotoViewer.class, "commentsOpen").getBoolean(adapter));
+					assertNull(field(AlbumPhotoViewer.class, "commentsPanel").get(adapter));
+					// A stale/manual internal flag must not revive automatic pagination on a page callback.
+					field(AlbumPhotoViewer.class, "commentsOpen").setBoolean(adapter, true);
+					adapter.onPhotoChanged(1);
+					method(AlbumPhotoViewer.class, "loadComments", boolean.class).invoke(adapter, true);
+					method(AlbumPhotoViewer.class, "addComment").invoke(adapter);
+					adapter.onComments(1);
+					((View)field(PhotoViewer.class, "replyBtn").get(viewer)).performClick();
+					assertFalse(field(PhotoViewer.class, "albumCommentsVisible").getBoolean(viewer));
+					assertNull(field(AlbumPhotoViewer.class, "commentsRequest").get(adapter));
+					assertTrue(((Set<?>)field(AlbumPhotoViewer.class, "requests").get(adapter)).isEmpty());
+					assertTrue("No comment request may reach the API execution boundary", RecordingApiExecution.routes.stream().noneMatch(route->route.contains("/comments")));
+				}finally{ viewer.onDismissed(); }
+			}
+		});
+	}
+
+	@Test public void ordinaryPostImageReplyRemainsVisibleAndCallsExistingPreReplyFlow() throws Exception{
+		withSession((accountID, session)->{
+			try(ActivityController<Activity> lifecycle=Robolectric.buildActivity(Activity.class).setup()){
+				Activity host=lifecycle.get(); host.setTheme(R.style.Theme_Mastodon_Dark);
+				Status status=new Status(); status.id="post-test"; status.account=session.self; status.visibility=StatusPrivacy.PUBLIC; status.repliesCount=3;
+				ReplyProbeFragment parent=new ReplyProbeFragment();
+				Attachment attachment=AlbumPhotoViewer.attachment(photo()); attachment.url=attachment.previewUrl="file:///nonexistent-post-reply-fixture.jpg";
+				PhotoViewer viewer=new PhotoViewer(host, parent, List.of(attachment), 0, status, accountID, new NoTransition());
+				try{
+					assertNull(field(PhotoViewer.class, "albumDelegate").get(viewer));
+					View overlay=(View)field(PhotoViewer.class, "windowView").get(viewer);
+					assertEquals(0, ((WindowManager.LayoutParams)overlay.getLayoutParams()).flags & WindowManager.LayoutParams.FLAG_SECURE);
+					viewer.refreshAlbumControls(); // Album-only refresh must not touch post controls.
+					View reply=(View)field(PhotoViewer.class, "replyBtn").get(viewer);
+					assertEquals(View.VISIBLE, reply.getVisibility()); assertTrue(reply.isEnabled());
+					reply.performClick(); assertEquals(1, parent.replyEntries); assertSame(status, parent.replyStatus); assertNotNull(parent.proceed);
+				}finally{ viewer.onDismissed(); }
+			}
+		});
+	}
+
+	@Test public void protectedPermissionFactsKeepOwnerAndNullableLegacySemantics(){
+		AlbumModels.Photo photo=photo();
+		assertNull(photo.canDownload); assertTrue(AlbumPhotoViewer.mayDownload(photo));
+		photo.downloadProtected=true; photo.canDownload=true;
+		assertTrue(AlbumPhotoViewer.protectedNonowner(photo)); assertFalse(AlbumPhotoViewer.mayDownload(photo));
+		photo.ownerSponsor=true; assertFalse(AlbumPhotoViewer.mayDownload(photo));
+		photo.isOwner=true; photo.canDownload=false;
+		assertFalse(AlbumPhotoViewer.protectedNonowner(photo)); assertTrue(AlbumPhotoViewer.mayDownload(photo));
+		photo.isOwner=false; photo.downloadProtected=false;
+		assertFalse(AlbumPhotoViewer.mayDownload(photo));
+		photo.canDownload=null; assertTrue(AlbumPhotoViewer.mayDownload(photo));
+	}
+
+	@Test public void actualSecureOverlayPreservesOtherFlagsAndNeverChangesHostWindow() throws Exception{
+		try(ActivityController<Activity> lifecycle=Robolectric.buildActivity(Activity.class).setup().visible()){
+			Activity host=lifecycle.get(); host.setTheme(R.style.Theme_Mastodon_Dark);
+			host.getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE | WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+			int hostFlags=host.getWindow().getAttributes().flags;
+			ProbeDelegate delegate=new ProbeDelegate(); delegate.info.downloadProtected=true; delegate.info.canDownload=false;
+			PhotoViewer viewer=new PhotoViewer(host, null, List.of(AlbumPhotoViewer.attachment(photo()), AlbumPhotoViewer.attachment(photo())), 0, null, "missing", new NoTransition(), delegate);
+			try{
+				attachOverlay(viewer); // Attached window first: flag transitions ride real updateViewLayout calls.
+				View overlay=(View)field(PhotoViewer.class, "windowView").get(viewer);
+				WindowManager.LayoutParams params=(WindowManager.LayoutParams)overlay.getLayoutParams();
+				assertTrue((params.flags & WindowManager.LayoutParams.FLAG_SECURE)!=0);
+				assertEquals(0, delegate.previewRenewals); // Initial attachment is secured even before renewal is possible.
+				params.flags|=WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON;
+				for(String name:List.of("downloadButton", "viewOriginalBtn")){
+					View button=(View)field(PhotoViewer.class, name).get(viewer);
+					assertEquals(View.GONE, button.getVisibility()); assertFalse(button.isEnabled()); assertFalse(button.isFocusable());
+				}
+				delegate.info.downloadProtected=false; delegate.info.canDownload=true;
+				method(PhotoViewer.class, "onPageChanged", int.class).invoke(viewer, 1);
+				params=(WindowManager.LayoutParams)overlay.getLayoutParams();
+				assertEquals(0, params.flags & WindowManager.LayoutParams.FLAG_SECURE);
+				assertTrue((params.flags & WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)!=0);
+				assertEquals(hostFlags, host.getWindow().getAttributes().flags);
+				// A secure bit this viewer did not install must not be cleared.
+				params.flags|=WindowManager.LayoutParams.FLAG_SECURE;
+				delegate.info.downloadProtected=true; viewer.refreshAlbumControls();
+				delegate.info.downloadProtected=false; viewer.refreshAlbumControls();
+				assertTrue((((WindowManager.LayoutParams)overlay.getLayoutParams()).flags & WindowManager.LayoutParams.FLAG_SECURE)!=0);
+			}finally{ viewer.onDismissed(); }
+			assertEquals(hostFlags, host.getWindow().getAttributes().flags);
+		}
+	}
+
+	@Test public void initialProtectedWindowIsSecureBeforeDelegatePreviewRenewal() throws Exception{
+		withSession((accountID, session)->{
+			try(ActivityController<Activity> lifecycle=Robolectric.buildActivity(Activity.class).setup().visible()){
+				Activity host=lifecycle.get(); host.setTheme(R.style.Theme_Mastodon_Dark);
+				ProbeDelegate delegate=new ProbeDelegate(); delegate.info.downloadProtected=true; delegate.info.canDownload=false;
+				PhotoViewer viewer=new PhotoViewer(host, null, List.of(AlbumPhotoViewer.attachment(photo())), 0, null, accountID, new NoTransition(), delegate);
+				try{
+					attachOverlay(viewer);
+					assertTrue(viewer.isAlbumHostValid());
+					View overlay=(View)field(PhotoViewer.class, "windowView").get(viewer);
+					delegate.beforePreview=()->{
+						assertTrue((((WindowManager.LayoutParams)overlay.getLayoutParams()).flags & WindowManager.LayoutParams.FLAG_SECURE)!=0);
+						try{ assertTrue(((Map<?,?>)field(PhotoViewer.class, "albumPreviewCalls").get(viewer)).isEmpty()); }
+						catch(Exception error){ throw new AssertionError(error); }
+					};
+					int beforeRenewal=delegate.previewRenewals;
+					viewer.reloadAlbumPreview();
+					assertEquals(beforeRenewal+1, delegate.previewRenewals);
+					assertNull(field(PhotoViewer.class, "albumMediaCall").get(viewer));
+				}finally{ viewer.onDismissed(); }
+			}
+		});
+	}
+
+	@Test @Config(shadows=RecordingApiExecution.class) public void protectedAdapterAndViewerDenyProgrammaticDownloadAndHdAtNetworkBoundary() throws Exception{
+		RecordingApiExecution.routes.clear();
+		withSession((accountID, session)->{
+			try(ActivityController<Activity> lifecycle=Robolectric.buildActivity(Activity.class).setup().visible()){
+				Activity host=lifecycle.get(); host.setTheme(R.style.Theme_Mastodon_Dark);
+				AlbumModels.Photo photo=photo(); photo.downloadProtected=true; photo.canDownload=true;
+				Constructor<AlbumPhotoViewer> constructor=AlbumPhotoViewer.class.getDeclaredConstructor(Activity.class, String.class, List.class, int.class); constructor.setAccessible(true);
+				AlbumPhotoViewer adapter=constructor.newInstance(host, accountID, List.of(photo), 0);
+				PhotoViewer viewer=new PhotoViewer(host, null, List.of(AlbumPhotoViewer.attachment(photo)), 0, null, accountID, new NoTransition(), adapter);
+				field(AlbumPhotoViewer.class, "viewer").set(adapter, viewer);
+				try{
+					attachOverlay(viewer);
+					assertTrue(viewer.isAlbumHostValid());
+					// The attached overlay already renewed once at the API boundary; complete that cycle before denies.
+					assertFalse("Attached overlay renews its preview", RecordingApiExecution.routes.isEmpty());
+					deliverPreviewRenewal(photo); // Same DTO: no policy change, so the deny path starts settled.
+					assertTrue(adapter.getInfo(0).downloadProtected); assertFalse(adapter.getInfo(0).canDownload);
+					int before=RecordingApiExecution.routes.size();
+					adapter.onDownload(0); adapter.onView(0, "hd"); adapter.onView(0, "original");
+					method(AlbumPhotoViewer.class, "requestDownload", int.class, String.class).invoke(adapter, 0, "hd");
+					method(AlbumPhotoViewer.class, "beginMedia", int.class, String.class, boolean.class).invoke(adapter, 0, "hd", true);
+					((View)field(PhotoViewer.class, "downloadButton").get(viewer)).performClick();
+					((View)field(PhotoViewer.class, "viewOriginalBtn").get(viewer)).performClick();
+					int[] failures={0}; PhotoViewer.AlbumSourceCallback denied=new PhotoViewer.AlbumSourceCallback(){
+						@Override public void onLoaded(){ fail("Protected source cannot load/save"); }
+						@Override public void onFailed(){ failures[0]++; }
+					};
+					viewer.saveAlbumSource(0, photo.hdUrl, denied); viewer.updateAlbumSource(0, photo.hdUrl, denied);
+					assertEquals(2, failures[0]); assertNull(field(PhotoViewer.class, "albumMediaCall").get(viewer));
+					assertNull(field(AlbumPhotoViewer.class, "mediaAction").get(adapter));
+					assertEquals(before, RecordingApiExecution.routes.size());
+					// Positive control: a protected owner still authorizes a free/paid HD download normally.
+					photo.isOwner=true; photo.canDownload=true; viewer.refreshAlbumControls();
+					method(AlbumPhotoViewer.class, "beginMedia", int.class, String.class, boolean.class).invoke(adapter, 0, "hd", true);
+					assertEquals(before+1, RecordingApiExecution.routes.size());
+					assertTrue(RecordingApiExecution.routes.get(before).contains("/authorize"));
+					okio.Buffer body=new okio.Buffer(); RecordingApiExecution.last.getRequestBody().writeTo(body);
+					assertTrue(body.readUtf8().contains("\"intent\":\"download\""));
+				}finally{ viewer.onDismissed(); }
+			}
+		});
+	}
+
+	@Test @Config(shadows=RecordingApiExecution.class) public void renewedProtectionCancelsAuthorizedGenerationBeforePreviewCallback() throws Exception{
+		RecordingApiExecution.routes.clear();
+		withSession((accountID, session)->{
+			try(ActivityController<Activity> lifecycle=Robolectric.buildActivity(Activity.class).setup().visible()){
+				Activity host=lifecycle.get(); host.setTheme(R.style.Theme_Mastodon_Dark);
+				AlbumModels.Photo previous=photo();
+				Constructor<AlbumPhotoViewer> constructor=AlbumPhotoViewer.class.getDeclaredConstructor(Activity.class, String.class, List.class, int.class); constructor.setAccessible(true);
+				AlbumPhotoViewer adapter=constructor.newInstance(host, accountID, List.of(previous), 0);
+				PhotoViewer viewer=new PhotoViewer(host, null, List.of(AlbumPhotoViewer.attachment(previous)), 0, null, accountID, new NoTransition(), adapter);
+				field(AlbumPhotoViewer.class, "viewer").set(adapter, viewer);
+				try{
+					attachOverlay(viewer); // Fail-closed viewer only turns live after the overlay window attaches.
+					AlbumPhotoViewer.MediaAction action=new AlbumPhotoViewer.MediaAction(0, "hd", true, 0);
+					field(AlbumPhotoViewer.class, "mediaAction").set(adapter, action);
+					TrackedRequest pending=new TrackedRequest();
+					@SuppressWarnings("unchecked") Set<MastodonAPIRequest<?>> requests=(Set<MastodonAPIRequest<?>>)field(AlbumPhotoViewer.class, "requests").get(adapter);
+					requests.add(pending);
+					okhttp3.Call bytes=new okhttp3.OkHttpClient().newCall(new okhttp3.Request.Builder().url(previous.hdUrl).build());
+					field(PhotoViewer.class, "albumMediaCall").set(viewer, bytes);
+					field(PhotoViewer.class, "albumSourceDrawable").set(viewer, new android.graphics.drawable.ColorDrawable(0xff112233));
+					field(PhotoViewer.class, "albumSourcePosition").setInt(viewer, 0);
+					field(AlbumPhotoViewer.class, "permissionDownload").set(adapter, (Runnable)()->fail("Revoked permission must not authorize"));
+					final boolean[] refreshed={false};
+					adapter.refreshPreview(0, new PhotoViewer.AlbumPreviewCallback(){
+						@Override public void onRefreshed(String url, String description, int width, int height){
+							refreshed[0]=true;
+							try{
+								View overlay=(View)field(PhotoViewer.class, "windowView").get(viewer);
+								assertTrue((((WindowManager.LayoutParams)overlay.getLayoutParams()).flags & WindowManager.LayoutParams.FLAG_SECURE)!=0);
+								assertTrue(pending.canceled); assertTrue(bytes.isCanceled());
+								assertNull(field(PhotoViewer.class, "albumMediaCall").get(viewer));
+								assertNull(field(PhotoViewer.class, "albumSourceDrawable").get(viewer));
+								assertFalse((Boolean)method(AlbumPhotoViewer.class, "mediaLive", AlbumPhotoViewer.MediaAction.class).invoke(adapter, action));
+								assertNull(field(AlbumPhotoViewer.class, "permissionDownload").get(adapter));
+							}catch(Exception error){ throw new AssertionError(error); }
+						}
+						@Override public void onFailed(){ fail("Valid refreshed photo"); }
+						@Override public void onAccessDenied(){ fail("Preview remains viewable"); }
+					});
+					MastodonAPIRequest<?> renewal=RecordingApiExecution.last;
+					AlbumModels.PhotoDetailResponse result=new AlbumModels.PhotoDetailResponse(); result.photo=photo(); result.photo.downloadProtected=true; result.photo.canDownload=false;
+					Class<?> base=renewal.getClass(); Field callback=null;
+					while(base!=null && callback==null){ try{ callback=field(base, "callback"); }catch(NoSuchFieldException ignored){ base=base.getSuperclass(); } }
+					assertNotNull("Fixture must deliver the real API callback", callback);
+					@SuppressWarnings("unchecked") me.grishka.appkit.api.Callback<AlbumModels.PhotoDetailResponse> apiCallback=(me.grishka.appkit.api.Callback<AlbumModels.PhotoDetailResponse>)callback.get(renewal);
+					apiCallback.onSuccess(result); org.robolectric.shadows.ShadowLooper.idleMainLooper();
+					assertTrue(refreshed[0]); assertEquals(1, field(AlbumPhotoViewer.class, "generation").getLong(adapter));
+					assertTrue(RecordingApiExecution.routes.stream().noneMatch(route->route.contains("/authorize")));
+					adapter.onDownload(0); assertNull(field(AlbumPhotoViewer.class, "mediaAction").get(adapter));
+				}finally{ viewer.onDismissed(); }
+			}
+		});
+	}
+
+	private interface SessionTest{ void run(String accountID, AccountSession session) throws Exception; }
+	private void withSession(SessionTest test) throws Exception{
+		Constructor<AccountSession> constructor=AccountSession.class.getDeclaredConstructor(); constructor.setAccessible(true);
+		AccountSession session=constructor.newInstance(); session.domain="album-comment-gate.example.test"; session.self=new Account(); session.self.id="42"; session.token=new Token();
+		String accountID=session.getID(); AccountSessionManager manager=AccountSessionManager.getInstance();
+		@SuppressWarnings("unchecked") Map<String,AccountSession> sessions=(Map<String,AccountSession>)field(AccountSessionManager.class, "sessions").get(manager);
+		String previous=(String)field(AccountSessionManager.class, "lastActiveAccountID").get(manager); AccountSession old=sessions.put(accountID, session);
+		field(AccountSessionManager.class, "lastActiveAccountID").set(manager, accountID);
+		try{ test.run(accountID, session); }
+		finally{ if(old==null) sessions.remove(accountID); else sessions.put(accountID, old); field(AccountSessionManager.class, "lastActiveAccountID").set(manager, previous); }
+	}
+
+	/** A freshly constructed overlay is only attached after its first traversal; the viewer is fail-closed until then. */
+	private static void attachOverlay(PhotoViewer viewer) throws Exception{
+		View overlay=(View)field(PhotoViewer.class, "windowView").get(viewer);
+		org.robolectric.shadows.ShadowLooper.idleMainLooper();
+		assertTrue("Overlay must be attached", overlay.isAttachedToWindow());
+	}
+
+	/** The exec seam records the real preview renewal; the fixture delivers its genuine API callback. */
+	private static void deliverPreviewRenewal(AlbumModels.Photo renewed) throws Exception{
+		MastodonAPIRequest<?> renewal=RecordingApiExecution.last;
+		AlbumModels.PhotoDetailResponse result=new AlbumModels.PhotoDetailResponse(); result.photo=renewed;
+		Class<?> base=renewal.getClass(); Field callback=null;
+		while(base!=null && callback==null){ try{ callback=field(base, "callback"); }catch(NoSuchFieldException ignored){ base=base.getSuperclass(); } }
+		assertNotNull("Fixture must deliver the real API callback", callback);
+		@SuppressWarnings("unchecked") me.grishka.appkit.api.Callback<AlbumModels.PhotoDetailResponse> apiCallback=(me.grishka.appkit.api.Callback<AlbumModels.PhotoDetailResponse>)callback.get(renewal);
+		apiCallback.onSuccess(result); org.robolectric.shadows.ShadowLooper.idleMainLooper();
+	}
+
+	/** Stop at the real API execution boundary so a missing gate is observable without external network. */
+	@Implements(MastodonAPIRequest.class) public static class RecordingApiExecution{
+		static final List<String> routes=new java.util.ArrayList<>();
+		static MastodonAPIRequest<?> last;
+		@RealObject MastodonAPIRequest<?> request;
+		@Implementation public MastodonAPIRequest<?> exec(String accountID){ last=request; routes.add(request.getMethod()+" "+request.getURL()); return request; }
+	}
+
+	public static final class ReplyProbeFragment extends HomeTimelineFragment{
+		int replyEntries; Status replyStatus; Runnable proceed;
+		@Override public void maybeShowPreReplySheet(Status status, Runnable proceed){ replyEntries++; replyStatus=status; this.proceed=proceed; }
+	}
+
 	private static int windowTop(View view){ int[] location=new int[2]; view.getLocationInWindow(location); return location[1]; }
 
 	/** Independent hierarchy calculation: unlike production's descendant-rect mapper, no window/global shadow state. */
@@ -332,14 +641,16 @@ public class AlbumPhotoViewerTest{
 	}
 
 	private static final class ProbeDelegate implements PhotoViewer.AlbumDelegate{
-		int canceled, position, previewRenewals;
-		@Override public PhotoViewer.AlbumInfo getInfo(int position){ return new PhotoViewer.AlbumInfo(); }
+		int canceled, position, previewRenewals, commentEntries;
+		final PhotoViewer.AlbumInfo info=new PhotoViewer.AlbumInfo();
+		Runnable beforePreview;
+		@Override public PhotoViewer.AlbumInfo getInfo(int position){ return info; }
 		@Override public void onPhotoChanged(int position){ this.position=position; }
-		@Override public void refreshPreview(int position, PhotoViewer.AlbumPreviewCallback callback){ previewRenewals++; callback.onFailed(); }
+		@Override public void refreshPreview(int position, PhotoViewer.AlbumPreviewCallback callback){ if(beforePreview!=null) beforePreview.run(); previewRenewals++; callback.onFailed(); }
 		@Override public void onView(int position, String variant){}
 		@Override public void onDownload(int position){}
 		@Override public void onLike(int position){}
-		@Override public void onComments(int position){}
+		@Override public void onComments(int position){ commentEntries++; }
 		@Override public void onCommentsClosed(){}
 		@Override public void cancelPending(){ canceled++; }
 		@Override public void onDismissed(){}

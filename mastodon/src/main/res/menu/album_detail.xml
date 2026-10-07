@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+	<item
+		android:id="@+id/album_report"
+		android:icon="@drawable/ic_fluent_flag_24_regular"
+		android:showAsAction="always"
+		android:title="@string/album_report"/>
+</menu>

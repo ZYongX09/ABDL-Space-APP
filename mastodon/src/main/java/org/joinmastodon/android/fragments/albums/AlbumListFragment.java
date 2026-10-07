@@ -266,8 +266,10 @@ public class AlbumListFragment extends LoaderFragment{
 		@Override public AlbumHolder onCreateViewHolder(ViewGroup parent, int type){ return new AlbumHolder(LayoutInflater.from(parent.getContext()).inflate(R.layout.album_card, parent, false)); }
 		@Override public void onBindViewHolder(AlbumHolder holder, int position){
 			Album album=albums.get(position); holder.name.setText(album.name); holder.meta.setText(getString(R.string.album_count, album.photoCount, AlbumUi.visibility(getActivity(), album.visibility)));
-			holder.cover.setImageDrawable(AlbumUi.gradient(getActivity(), album.id));
-			if(album.coverUrl!=null && !album.coverUrl.isBlank()) ViewImageLoader.loadWithoutAnimation(holder.cover, holder.cover.getDrawable(), new UrlImageLoaderRequest(album.coverUrl, V.dp(180), V.dp(180)));
+				boolean protectedCover=album.downloadProtected && !album.isOwner;
+				holder.cover.setImageDrawable(protectedCover ? AlbumUi.protectedPlaceholder(getActivity()) : AlbumUi.gradient(getActivity(), album.id));
+				if(protectedCover) holder.meta.append(" · "+getString(R.string.album_protection_enabled));
+				if(!protectedCover && album.coverUrl!=null && !album.coverUrl.isBlank()) AlbumUi.loadImage(holder.cover, album.coverUrl, V.dp(180));
 			holder.itemView.setContentDescription(album.name+", "+holder.meta.getText()); holder.itemView.setOnClickListener(v->{ if(!busy && sessionValid()) onAlbumClicked(album); });
 		}
 		@Override public int getItemCount(){ return albums.size(); }

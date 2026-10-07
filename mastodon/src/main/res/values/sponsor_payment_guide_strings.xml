@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+	<string name="sponsor_payment_guide_title">付款后获取兑换码</string>
+	<string name="sponsor_payment_guide_step_1">第 1 步：在创作者主页点击「私信」</string>
+	<string name="sponsor_payment_guide_step_2">第 2 步：在聊天页面查看「兑换码」</string>
+	<string name="sponsor_payment_guide_example_note">图片中的金额/示例不代表实际方案价格</string>
+	<string name="sponsor_payment_guide_view_larger">点击查看大图</string>
+	<string name="sponsor_payment_guide_image_action">%1$s，点击查看大图</string>
+	<string name="sponsor_payment_guide_back">返回</string>
+	<string name="sponsor_payment_guide_previous">上一步</string>
+	<string name="sponsor_payment_guide_next">下一步</string>
+	<string name="sponsor_payment_guide_zoom_in">放大</string>
+	<string name="sponsor_payment_guide_zoom_out">缩小</string>
+	<string name="sponsor_payment_guide_zoom_hint">上下拖动阅读，双指或双击缩放；放大后可拖动查看细节</string>
+</resources>
