@@ -5,7 +5,6 @@ import android.app.AlertDialog;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.Bundle;
-import android.os.Looper;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
@@ -84,7 +83,6 @@ public class SettingsDisplayLiquidNavigationInteractionTest{
 		Context context=RuntimeEnvironment.getApplication();
 		MastodonApp.context=context;
 		V.setApplicationContext(context);
-		resetCompatibility();
 		setPerformance(false, 256); // Robolectric's default memory class can trigger the warning.
 		prefs=GlobalUserPreferences.getPrefs();
 		assertTrue(prefs.edit().clear().putBoolean("perAccountMigrationDone", true).commit());
@@ -132,7 +130,6 @@ public class SettingsDisplayLiquidNavigationInteractionTest{
 				else
 					instances.put(session.domain, replacedInstance);
 			}
-			resetCompatibility();
 			setPerformance(false, 256);
 			prefs.edit().clear().putBoolean("perAccountMigrationDone", true).commit();
 			GlobalUserPreferences.load();
@@ -144,7 +141,7 @@ public class SettingsDisplayLiquidNavigationInteractionTest{
 	@Test
 	@Config(sdk={26, 32})
 	public void oldSystemsHideTheItemAndPreserveARestoredDiskChoice() throws Exception{
-		launch(true, true, 64, true);
+		launch(true, true, 64);
 
 		assertFalse(LiquidGlassCompatibility.isSystemSupported());
 		assertFalse(GlobalUserPreferences.isIosLiquidNavigationSupported());
@@ -167,7 +164,7 @@ public class SettingsDisplayLiquidNavigationInteractionTest{
 
 	@Test
 	public void normalPerformanceWithoutASavedChoiceStartsChecked() throws Exception{
-		launch(null, false, 256, false);
+		launch(null, false, 256);
 
 		assertTrue(LiquidGlassCompatibility.isSystemSupported());
 		assertFalse(LiquidGlassCompatibility.shouldWarnAboutPerformance());
@@ -181,7 +178,7 @@ public class SettingsDisplayLiquidNavigationInteractionTest{
 
 	@Test
 	public void lowRamWithoutASavedChoiceStartsUncheckedButStillOffersTheItem() throws Exception{
-		launch(null, true, 256, false);
+		launch(null, true, 256);
 
 		assertTrue(GlobalUserPreferences.isIosLiquidNavigationSupported());
 		assertTrue(LiquidGlassCompatibility.isSupported());
@@ -196,7 +193,7 @@ public class SettingsDisplayLiquidNavigationInteractionTest{
 
 	@Test
 	public void memoryClassAt128WithoutASavedChoiceStartsUnchecked() throws Exception{
-		launch(null, false, 128, false);
+		launch(null, false, 128);
 
 		assertTrue(GlobalUserPreferences.isIosLiquidNavigationSupported());
 		assertTrue(LiquidGlassCompatibility.isSupported());
@@ -209,7 +206,7 @@ public class SettingsDisplayLiquidNavigationInteractionTest{
 
 	@Test
 	public void explicitTrueOnLowRamStartsCheckedWithoutAnOpeningWarning() throws Exception{
-		launch(true, true, 256, false);
+		launch(true, true, 256);
 
 		assertTrue(LiquidGlassCompatibility.shouldWarnAboutPerformance());
 		assertRequestedChoice(true);
@@ -220,22 +217,24 @@ public class SettingsDisplayLiquidNavigationInteractionTest{
 	}
 
 	@Test
-	public void navigationFailureKeepsExplicitTrueAndAllowsWarningFreeOptOut() throws Exception{
-		launch(true, true, 256, true);
+	public void explicitTrueOnLowRamAllowsWarningFreeOptOut() throws Exception{
+		launch(true, true, 256);
 
 		assertTrue(GlobalUserPreferences.isIosLiquidNavigationSupported());
-		assertFalse(LiquidGlassCompatibility.isSupported());
+		assertTrue(LiquidGlassCompatibility.isSupported());
 		assertTrue(LiquidGlassCompatibility.shouldWarnAboutPerformance());
 		assertRequestedChoice(true);
 		assertPersistedChoice(true);
-		assertFalse(GlobalUserPreferences.isIosLiquidNavigationEnabled());
-		assertSubtitle(R.string.settings_liquid_glass_runtime_fallback);
+		assertTrue(GlobalUserPreferences.isIosLiquidNavigationEnabled());
+		assertSubtitle(R.string.settings_ios_liquid_navigation_summary);
 		assertNoDialogEver();
 		assertEvents();
 
 		click(ClickTarget.SWITCH);
 		assertRequestedChoice(false);
 		assertPersistedChoice(false);
+		assertFalse(GlobalUserPreferences.isIosLiquidNavigationEnabled());
+		assertSubtitle(R.string.settings_ios_liquid_navigation_summary);
 		assertNoDialogEver();
 		assertEvents(false);
 	}
@@ -262,7 +261,7 @@ public class SettingsDisplayLiquidNavigationInteractionTest{
 
 	@Test
 	public void cancellingTheDefaultLowRamChoiceDoesNotCreateAPreference() throws Exception{
-		launch(null, true, 256, false);
+		launch(null, true, 256);
 		Map<String, ?> before=new HashMap<>(prefs.getAll());
 
 		click(ClickTarget.SWITCH);
@@ -283,7 +282,7 @@ public class SettingsDisplayLiquidNavigationInteractionTest{
 
 	@Test
 	public void repeatedRowAndSwitchRequestsKeepOnlyOneUncommittedWarning() throws Exception{
-		launch(false, true, 256, false);
+		launch(false, true, 256);
 		Map<String, ?> before=new HashMap<>(prefs.getAll());
 		click(ClickTarget.SWITCH);
 		AlertDialog dialog=assertPerformanceDialog();
@@ -316,38 +315,38 @@ public class SettingsDisplayLiquidNavigationInteractionTest{
 	}
 
 	@Test
-	public void navigationFailureCanSaveOptInAndExplainTheRuntimeFallback() throws Exception{
-		launch(false, false, 256, true);
+	public void realSwitchOptInSurvivesReloadWithoutAnObsoletePopup() throws Exception{
+		launch(false, false, 256);
 		assertRequestedChoice(false);
-		assertSubtitle(R.string.settings_liquid_glass_runtime_fallback);
+		assertSubtitle(R.string.settings_ios_liquid_navigation_summary);
 		assertFalse(LiquidGlassCompatibility.shouldWarnAboutPerformance());
 
 		click(ClickTarget.SWITCH);
 		assertRequestedChoice(true);
 		assertPersistedChoice(true);
 		assertEvents(true);
-		assertFalse(GlobalUserPreferences.isIosLiquidNavigationEnabled());
-		AlertDialog fallback=assertFallbackDialog();
+		assertTrue(GlobalUserPreferences.isIosLiquidNavigationEnabled());
+		assertNoDialogEver();
 
 		GlobalUserPreferences.load();
 		assertRequestedChoice(true);
 		assertPersistedChoice(true);
-		assertFalse(GlobalUserPreferences.isIosLiquidNavigationEnabled());
-		fallback.getButton(AlertDialog.BUTTON_POSITIVE).performClick();
-		idleMain();
-		assertNoDialog();
+		assertTrue(GlobalUserPreferences.isIosLiquidNavigationEnabled());
+		assertSubtitle(R.string.settings_ios_liquid_navigation_summary);
+		assertNoDialogEver();
 		assertEvents(true);
 
 		click(ClickTarget.ROW);
 		assertRequestedChoice(false);
 		assertPersistedChoice(false);
-		assertNoDialog();
+		assertFalse(GlobalUserPreferences.isIosLiquidNavigationEnabled());
+		assertNoDialogEver();
 		assertEvents(true, false);
 	}
 
 	@Test
-	public void lowRamNavigationFailureConfirmsThenSavesBeforeExplainingFallback() throws Exception{
-		launch(false, true, 256, true);
+	public void lowRamConfirmationSavesWithoutAnObsoletePopupAndRejectsRepeatedConfirmation() throws Exception{
+		launch(false, true, 256);
 		click(ClickTarget.ROW);
 		AlertDialog warning=assertPerformanceDialog();
 		Button confirm=warning.getButton(AlertDialog.BUTTON_POSITIVE);
@@ -361,28 +360,24 @@ public class SettingsDisplayLiquidNavigationInteractionTest{
 		assertRequestedChoice(true);
 		assertPersistedChoice(true);
 		assertEvents(true);
-		assertFalse(GlobalUserPreferences.isIosLiquidNavigationEnabled());
-		AlertDialog fallback=assertFallbackDialog();
-		assertNotSame(warning, fallback);
+		assertTrue(GlobalUserPreferences.isIosLiquidNavigationEnabled());
+		assertSubtitle(R.string.settings_ios_liquid_navigation_summary);
+		assertNoDialog();
+		assertSame(warning, ShadowAlertDialog.getLatestAlertDialog());
 
-		confirm.performClick(); // A dismissed warning cannot replace/acknowledge the fallback.
-		idleMain();
-		assertSame(fallback, currentDialog());
-		assertTrue(fallback.isShowing());
-		assertRequestedChoice(true);
-		assertPersistedChoice(true);
-		assertEvents(true);
-		fallback.getButton(AlertDialog.BUTTON_POSITIVE).performClick();
+		confirm.performClick(); // A dismissed warning must not commit or open another dialog.
 		idleMain();
 		assertNoDialog();
+		assertSame(warning, ShadowAlertDialog.getLatestAlertDialog());
 		assertRequestedChoice(true);
 		assertPersistedChoice(true);
+		assertTrue(GlobalUserPreferences.isIosLiquidNavigationEnabled());
 		assertEvents(true);
 	}
 
 	@Test
 	public void pausingActivityDismissesWarningAndRejectsOldConfirmationAfterResume() throws Exception{
-		launch(false, true, 256, false);
+		launch(false, true, 256);
 		click(ClickTarget.SWITCH);
 		AlertDialog oldDialog=assertPerformanceDialog();
 		Button oldConfirm=oldDialog.getButton(AlertDialog.BUTTON_POSITIVE);
@@ -408,7 +403,7 @@ public class SettingsDisplayLiquidNavigationInteractionTest{
 
 	@Test
 	public void hidingFragmentDismissesWarningAndRejectsOldConfirmationAfterShowing() throws Exception{
-		launch(false, false, 128, false);
+		launch(false, false, 128);
 		click(ClickTarget.ROW);
 		AlertDialog oldDialog=assertPerformanceDialog();
 		Button oldConfirm=oldDialog.getButton(AlertDialog.BUTTON_POSITIVE);
@@ -435,29 +430,8 @@ public class SettingsDisplayLiquidNavigationInteractionTest{
 		assertStaleConfirmationCannotCommitANewWarning(oldDialog, oldConfirm, ClickTarget.SWITCH);
 	}
 
-	@Test
-	public void backgroundAndPageBlurFailuresDoNotChangeTheNavigationInteraction() throws Exception{
-		launch(false, false, 256, false);
-		LiquidGlassCompatibility.reportFailure(LiquidGlassCompatibility.Effect.BACKGROUND,
-				"offline background failure", new IllegalStateException("synthetic failure"));
-		LiquidGlassCompatibility.reportFailure(LiquidGlassCompatibility.Effect.PAGE_BLUR,
-				"offline page blur failure", new OutOfMemoryError("synthetic failure"));
-		idleMain();
-
-		assertTrue(LiquidGlassCompatibility.isSupported());
-		assertFalse(LiquidGlassCompatibility.isSupported(LiquidGlassCompatibility.Effect.BACKGROUND));
-		assertFalse(LiquidGlassCompatibility.isSupported(LiquidGlassCompatibility.Effect.PAGE_BLUR));
-		click(ClickTarget.SWITCH);
-		assertRequestedChoice(true);
-		assertPersistedChoice(true);
-		assertTrue(GlobalUserPreferences.isIosLiquidNavigationEnabled());
-		assertSubtitle(R.string.settings_ios_liquid_navigation_summary);
-		assertNoDialogEver();
-		assertEvents(true);
-	}
-
 	private void assertPerformanceConfirmationFlow(boolean lowRam, int memoryClass, ClickTarget target) throws Exception{
-		launch(false, lowRam, memoryClass, false);
+		launch(false, lowRam, memoryClass);
 		assertTrue(LiquidGlassCompatibility.shouldWarnAboutPerformance());
 		assertRequestedChoice(false);
 		assertNoDialogEver();
@@ -501,7 +475,7 @@ public class SettingsDisplayLiquidNavigationInteractionTest{
 	}
 
 	private void assertImmediateToggleFlow(int memoryClass, ClickTarget target) throws Exception{
-		launch(false, false, memoryClass, false);
+		launch(false, false, memoryClass);
 		assertFalse(LiquidGlassCompatibility.shouldWarnAboutPerformance());
 		assertRequestedChoice(false);
 		assertEvents();
@@ -546,7 +520,7 @@ public class SettingsDisplayLiquidNavigationInteractionTest{
 		assertEvents(false, true);
 	}
 
-	private void launch(Boolean savedChoice, boolean lowRam, int memoryClass, boolean navigationFailure) throws Exception{
+	private void launch(Boolean savedChoice, boolean lowRam, int memoryClass) throws Exception{
 		setPerformance(lowRam, memoryClass);
 		SharedPreferences.Editor editor=prefs.edit();
 		if(savedChoice==null)
@@ -555,10 +529,6 @@ public class SettingsDisplayLiquidNavigationInteractionTest{
 			editor.putBoolean(CHOICE, savedChoice);
 		assertTrue(editor.commit());
 		GlobalUserPreferences.load();
-		if(navigationFailure){
-			// The default reportFailure overload must disable NAVIGATION, not other effects.
-			LiquidGlassCompatibility.reportFailure("offline navigation failure", new IllegalStateException("synthetic failure"));
-		}
 
 		controller=Robolectric.buildActivity(FragmentStackActivity.class);
 		activity=controller.get();
@@ -595,11 +565,6 @@ public class SettingsDisplayLiquidNavigationInteractionTest{
 			assertNotNull(navigationItem.checkedChangeListener);
 			assertSame(navigationItem, holder().getItem());
 			assertTrue(switchView().isEnabled());
-		}
-		if(navigationFailure && LiquidGlassCompatibility.isSystemSupported()){
-			assertFalse(LiquidGlassCompatibility.isSupported(LiquidGlassCompatibility.Effect.NAVIGATION));
-			assertTrue(LiquidGlassCompatibility.isSupported(LiquidGlassCompatibility.Effect.BACKGROUND));
-			assertTrue(LiquidGlassCompatibility.isSupported(LiquidGlassCompatibility.Effect.PAGE_BLUR));
 		}
 	}
 
@@ -657,16 +622,6 @@ public class SettingsDisplayLiquidNavigationInteractionTest{
 		return dialog;
 	}
 
-	private AlertDialog assertFallbackDialog() throws Exception{
-		assertSubtitle(R.string.settings_liquid_glass_runtime_fallback);
-		AlertDialog dialog=assertDialog(R.string.settings_ios_liquid_navigation,
-				R.string.settings_liquid_glass_runtime_fallback);
-		assertEquals(activity.getString(R.string.ok), dialog.getButton(AlertDialog.BUTTON_POSITIVE).getText().toString());
-		Button negative=dialog.getButton(AlertDialog.BUTTON_NEGATIVE);
-		assertTrue(negative==null || negative.getVisibility()!=View.VISIBLE);
-		return dialog;
-	}
-
 	private AlertDialog assertDialog(int titleResource, int messageResource) throws Exception{
 		AlertDialog dialog=currentDialog();
 		assertNotNull(dialog);
@@ -715,12 +670,6 @@ public class SettingsDisplayLiquidNavigationInteractionTest{
 
 	private static void idleMain(){
 		ShadowLooper.idleMainLooper();
-	}
-
-	private static void resetCompatibility() throws Exception{
-		var reset=LiquidGlassCompatibility.class.getDeclaredMethod("resetForTests");
-		reset.setAccessible(true);
-		reset.invoke(null);
 	}
 
 	private static Field field(Class<?> owner, String name) throws Exception{

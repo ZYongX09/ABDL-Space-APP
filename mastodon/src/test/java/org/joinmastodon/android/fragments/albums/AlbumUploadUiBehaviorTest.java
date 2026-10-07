@@ -6,7 +6,7 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Application;
 import android.app.Fragment;
-import android.content.ClipData;
+import android.Manifest;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
@@ -40,6 +40,11 @@ import org.joinmastodon.android.model.Account;
 import org.joinmastodon.android.model.Instance;
 import org.joinmastodon.android.model.InstanceV1;
 import org.joinmastodon.android.model.Token;
+import org.joinmastodon.android.ui.media.MediaAlbum;
+import org.joinmastodon.android.ui.media.MediaItem;
+import org.joinmastodon.android.ui.media.MediaPickerConfig;
+import org.joinmastodon.android.ui.sheets.MediaPickerSheet;
+import org.joinmastodon.android.ui.utils.UiUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -84,7 +89,7 @@ import okhttp3.ResponseBody;
 
 /** Real attached fragment/UI interactions. All API requests and selected image bytes stay local. */
 @RunWith(RobolectricTestRunner.class)
-@Config(sdk=28, application=Application.class, shadows=AlbumUploadUiBehaviorTest.RecordingNav.class)
+@Config(sdk=28, application=Application.class, shadows={AlbumUploadUiBehaviorTest.RecordingNav.class, AlbumUploadMediaPickerTest.OfflineMediaStoreLoader.class})
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 public class AlbumUploadUiBehaviorTest{
 	private AccountSessionManager manager;
@@ -199,10 +204,31 @@ public class AlbumUploadUiBehaviorTest{
 		<T extends View> T view(int id){ return root().findViewById(id); }
 		RecyclerView grid(){ return view(R.id.album_preview_grid); }
 	}
+	private static int backgroundColor(android.graphics.drawable.Drawable drawable){
+		if(drawable instanceof android.graphics.drawable.StateListDrawable states) return backgroundColor(states.getCurrent());
+		if(drawable instanceof android.graphics.drawable.InsetDrawable inset) return backgroundColor(inset.getDrawable());
+		if(drawable instanceof android.graphics.drawable.LayerDrawable layers) return backgroundColor(layers.getDrawable(0));
+		if(drawable instanceof android.graphics.drawable.GradientDrawable shape) return shape.getColor().getDefaultColor();
+		if(drawable instanceof android.graphics.drawable.ColorDrawable color) return color.getColor();
+		throw new AssertionError("Unexpected theme background "+drawable);
+	}
 	private static int countId(View root, int id){ int count=root.getId()==id ? 1 : 0; if(root instanceof ViewGroup group) for(int i=0;i<group.getChildCount();i++) count+=countId(group.getChildAt(i), id); return count; }
 	private static String text(View root, int id){ return ((TextView)root.findViewById(id)).getText().toString(); }
 	private static AlertDialog latest(){ ShadowLooper.idleMainLooper(); AlertDialog dialog=ShadowAlertDialog.getLatestAlertDialog(); assertNotNull(dialog); assertTrue(dialog.isShowing()); return dialog; }
 	private static Bundle saved(AlbumUploadFragment fragment){ Bundle saved=new Bundle(); fragment.onSaveInstanceState(saved); return saved.getBundle("draft"); }
+	@SuppressWarnings("unchecked") private static void selectPhotos(Host host, List<Uri> uris) throws Exception{
+		org.robolectric.shadows.ShadowApplication application=org.robolectric.shadow.api.Shadow.extract(RuntimeEnvironment.getApplication()); application.grantPermissions(Manifest.permission.READ_EXTERNAL_STORAGE);
+		layout(host); host.view(R.id.album_pick).performClick();
+		MediaPickerSheet sheet=(MediaPickerSheet)field(AlbumUploadFragment.class, "mediaPickerSheet").get(host.fragment); assertNotNull(sheet); assertTrue(sheet.isShowing());
+		MediaPickerConfig config=(MediaPickerConfig)field(MediaPickerSheet.class, "config").get(sheet); assertTrue(config.allowImages); assertFalse(config.allowVideos); assertEquals(20-saved(host.fragment).getStringArrayList("photos").size(), config.maxCount);
+		MediaAlbum album=new MediaAlbum(0, "Local images"); long id=1;
+		for(Uri uri:uris) album.items.add(new MediaItem(id++, 0, "Local images", uri, "image/jpeg", 0, 360, 360, 1024, 0, false));
+		// Only MediaStore enumeration is local/empty; sheet selection and send are production code.
+		var albums=(ArrayList<MediaAlbum>)field(MediaPickerSheet.class, "albums").get(sheet); albums.clear(); albums.add(album);
+		var select=MediaPickerSheet.class.getDeclaredMethod("selectAlbum", int.class); select.setAccessible(true); select.invoke(sheet, 0);
+		var toggle=MediaPickerSheet.class.getDeclaredMethod("toggle", int.class); toggle.setAccessible(true); for(int i=0;i<uris.size();i++) toggle.invoke(sheet, i+1);
+		((View)field(MediaPickerSheet.class, "send").get(sheet)).performClick(); assertNull(field(AlbumUploadFragment.class, "mediaPickerSheet").get(host.fragment)); assertFalse(sheet.isShowing());
+	}
 	private static boolean containsText(View root, String expected){
 		if(root instanceof TextView label && label.getText().toString().contains(expected)) return true;
 		if(root instanceof ViewGroup group) for(int i=0;i<group.getChildCount();i++) if(containsText(group.getChildAt(i), expected)) return true; return false;
@@ -214,9 +240,24 @@ public class AlbumUploadUiBehaviorTest{
 			host.fragment.onUpdateToolbar(); host.fragment.onUpdateToolbar(); layout(host);
 			android.widget.Toolbar toolbar=root.findViewById(R.id.toolbar);
 			assertEquals(1, countId(root, R.id.album_upload_header)); assertNull(toolbar.getNavigationIcon()); assertEquals("", toolbar.getTitle().toString());
+			Context colors=root.getContext();
+			assertEquals(UiUtils.getThemeColor(colors, R.attr.colorM3Surface), ((android.graphics.drawable.ColorDrawable)((View)field(AlbumUploadFragment.class, "body").get(host.fragment)).getBackground()).getColor());
+			assertEquals(UiUtils.getThemeColor(colors, R.attr.colorM3OnPrimary), host.<Button>view(R.id.album_upload).getCurrentTextColor());
+			assertEquals(UiUtils.getThemeColor(colors, R.attr.colorM3Primary), backgroundColor(host.view(R.id.album_upload).getBackground()));
+			assertEquals(UiUtils.getThemeColor(colors, R.attr.colorM3Primary), ((ImageView)((ViewGroup)host.view(R.id.album_choose)).getChildAt(0)).getImageTintList().getDefaultColor());
+			assertEquals(UiUtils.getThemeColor(colors, R.attr.colorM3OnSecondaryContainer), host.<TextView>view(R.id.album_upload_sponsor_text).getCurrentTextColor());
+			assertEquals(UiUtils.getThemeColor(colors, R.attr.colorM3OnSecondaryContainer), host.<ImageView>view(R.id.album_upload_sponsor_icon).getImageTintList().getDefaultColor());
+			assertEquals(UiUtils.getThemeColor(colors, R.attr.colorM3SecondaryContainer), backgroundColor(host.view(R.id.album_upload_sponsor).getBackground()));
 			assertEquals("传相册", text(root, R.id.album_upload_header_title)); assertEquals("取消", text(root, R.id.album_upload_close)); assertEquals("上传", text(root, R.id.album_upload));
 			assertTrue(host.<Button>view(R.id.album_upload).isEnabled()); assertTrue(host.view(R.id.album_upload).getHeight()>=V.dp(48)); assertTrue(host.view(R.id.album_upload_close).getHeight()>=V.dp(48));
 			assertEquals("宝宝相册", text(root, R.id.album_upload_album_name)); assertEquals("私密", text(root, R.id.album_permissions)); assertEquals("高清", text(root, R.id.album_upload_quality_value)); assertEquals("使用上传时间", text(root, R.id.album_upload_time_value));
+			ViewGroup settings=host.view(R.id.album_upload_settings);
+			List<Integer> rowIds=new ArrayList<>();
+			for(int index=0;index<settings.getChildCount();index++){
+				int id=settings.getChildAt(index).getId();
+				if(id==R.id.album_choose || id==R.id.album_upload_permissions_row || id==R.id.album_upload_time_row || id==R.id.album_upload_quality_row) rowIds.add(id);
+			}
+			assertEquals(List.of(R.id.album_choose,R.id.album_upload_permissions_row,R.id.album_upload_time_row,R.id.album_upload_quality_row),rowIds);
 			assertEquals(2, host.grid().getAdapter().getItemCount()); assertNotNull(host.view(R.id.album_pick)); assertNull(root.findViewById(R.id.album_original)); assertNull(root.findViewById(R.id.album_time_input));
 			RecyclerView.ViewHolder photo=host.grid().findViewHolderForAdapterPosition(0); assertNotNull(photo); assertEquals(photo.itemView.getWidth(), photo.itemView.getHeight());
 			assertTrue(((ImageView)photo.itemView.findViewById(R.id.album_photo)).getDrawable() instanceof BitmapDrawable); assertTrue(host.<ImageView>view(R.id.album_upload_cover).getDrawable() instanceof BitmapDrawable);
@@ -241,19 +282,18 @@ public class AlbumUploadUiBehaviorTest{
 		File oversized=File.createTempFile("album_ui_exact20", ".jpg", MastodonApp.context.getCacheDir()); localImages.add(oversized); Files.copy(source.toPath(), oversized.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING); try(RandomAccessFile bytes=new RandomAccessFile(oversized, "rw")){ bytes.setLength(20L*1024*1024); }
 		File invalid=File.createTempFile("album_ui_unsupported", ".jpg", MastodonApp.context.getCacheDir()); localImages.add(invalid); Files.writeString(invalid.toPath(), "Not an image");
 		for(Uri uri:List.of(Uri.fromFile(oversized), Uri.fromFile(invalid), Uri.parse("content://local-fixture/unknown-size"))){
-			host.fragment.onActivityResult(7820, Activity.RESULT_OK, new Intent().setData(uri)); await(()->{ try{ return !(boolean)field(AlbumUploadFragment.class, "checkingSources").get(host.fragment); }catch(Exception error){ throw new AssertionError(error); } });
+				selectPhotos(host, List.of(uri)); await(()->{ try{ return !(boolean)field(AlbumUploadFragment.class, "checkingSources").get(host.fragment); }catch(Exception error){ throw new AssertionError(error); } });
 			host.view(R.id.album_upload_quality_row).performClick(); AlertDialog quality=latest(); assertFalse(quality.findViewById(R.id.album_original).isEnabled()); quality.getButton(AlertDialog.BUTTON_POSITIVE).performClick(); assertEquals("hd", saved(host.fragment).getString("quality"));
 			layout(host); RecyclerView.ViewHolder photo=host.grid().findViewHolderForAdapterPosition(1); assertNotNull(photo); photo.itemView.findViewById(R.id.album_upload_remove).performClick();
 			await(()->{ try{ return !(boolean)field(AlbumUploadFragment.class, "checkingSources").get(host.fragment); }catch(Exception error){ throw new AssertionError(error); } });
 		}
 	}
-	@Test public void plusTileLaunchesSafAndOnlyRemovalBadgeOrConfirmedLongPressRemoves() throws Exception{
-		Host host=open(R.style.Theme_Mastodon_Light, "", List.of(source)); host.view(R.id.album_pick).performClick();
-		org.robolectric.shadows.ShadowActivity shadow=org.robolectric.shadow.api.Shadow.extract(host.lifecycle.get());
-		var picker=shadow.getNextStartedActivityForResult(); assertNotNull(picker); assertEquals(Intent.ACTION_OPEN_DOCUMENT, picker.intent.getAction()); assertEquals("image/*", picker.intent.getType()); assertTrue(picker.intent.hasCategory(Intent.CATEGORY_OPENABLE)); assertTrue(picker.intent.getBooleanExtra(Intent.EXTRA_ALLOW_MULTIPLE, false)); assertTrue((picker.intent.getFlags()&Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)!=0);
-		File second=localPhoto("blue", Color.rgb(155, 190, 210)), third=localPhoto("pink", Color.rgb(213, 175, 180)); ClipData clip=ClipData.newRawUri("Local", Uri.fromFile(second)); clip.addItem(new ClipData.Item(Uri.fromFile(third))); clip.addItem(new ClipData.Item(Uri.fromFile(source)));
-		Intent picked=new Intent(); picked.setClipData(clip);
-		host.fragment.onActivityResult(7820, Activity.RESULT_OK, picked); layout(host); assertEquals(4, host.grid().getAdapter().getItemCount()); assertEquals(3, saved(host.fragment).getStringArrayList("photos").size());
+	@Test public void plusTileLaunchesBuiltinPickerAndOnlyRemovalBadgeOrConfirmedLongPressRemoves() throws Exception{
+		Host host=open(R.style.Theme_Mastodon_Light, "", List.of(source));
+		File second=localPhoto("blue", Color.rgb(155, 190, 210)), third=localPhoto("pink", Color.rgb(213, 175, 180));
+		selectPhotos(host, List.of(Uri.fromFile(second), Uri.fromFile(third), Uri.fromFile(source)));
+		org.robolectric.shadows.ShadowActivity shadow=org.robolectric.shadow.api.Shadow.extract(host.lifecycle.get()); assertNull(shadow.getNextStartedActivityForResult());
+		layout(host); assertEquals(4, host.grid().getAdapter().getItemCount()); assertEquals(3, saved(host.fragment).getStringArrayList("photos").size());
 		RecyclerView.ViewHolder photo=host.grid().findViewHolderForAdapterPosition(0); assertNotNull(photo); photo.itemView.performClick(); photo.itemView.findViewById(R.id.album_photo).performClick(); assertEquals(3, saved(host.fragment).getStringArrayList("photos").size());
 		assertTrue(photo.itemView.performLongClick()); latest().getButton(AlertDialog.BUTTON_NEGATIVE).performClick(); ShadowLooper.idleMainLooper(); assertEquals(3, saved(host.fragment).getStringArrayList("photos").size());
 		photo.itemView.findViewById(R.id.album_upload_remove).performClick(); assertEquals(2, saved(host.fragment).getStringArrayList("photos").size()); assertTrue(source.isFile()); layout(host);
@@ -290,7 +330,7 @@ public class AlbumUploadUiBehaviorTest{
 		RecordingNav.reset(); field(AccountSessionManager.class, "lastActiveAccountID").set(manager, "other-session"); host.view(R.id.album_upload_sponsor).performClick(); assertNull(RecordingNav.destination); host.fragment.onShown(); assertFalse(host.view(R.id.album_upload).isEnabled()); assertFalse(host.view(R.id.album_upload_sponsor).isEnabled());
 	}
 
-	/** Only records navigation destinations; fragment state, widgets, SAF and uploader are real. */
+	/** Only records navigation destinations; fragment state, widgets, picker and uploader are real. */
 	@Implements(Nav.class) public static class RecordingNav{
 		static Class<? extends Fragment> destination; static Bundle arguments;
 		static void reset(){ destination=null; arguments=null; }

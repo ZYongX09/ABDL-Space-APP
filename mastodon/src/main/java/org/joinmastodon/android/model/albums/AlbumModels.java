@@ -14,14 +14,16 @@ public final class AlbumModels{
 		public String id, name, visibility, coverUrl;
 		public long ownerId, createdAt;
 		public int photoCount, memberCount;
-		public boolean isDefault, canUpload, isOwner;
+		public boolean isDefault, canUpload, isOwner, downloadProtected;
 	}
 	public static class Photo{
 		public String id, albumId, batchId, description, previewUrl, hdUrl;
 		public Long capturedAt;
 		public long uploadedAt, sortAt;
 		public int width, height, likesCount, commentsCount;
-		public boolean originalAvailable, liked, isOwner, ownerSponsor;
+		public boolean originalAvailable, liked, isOwner, ownerSponsor, downloadProtected;
+		/** Null for legacy servers; never interpret a missing permission as an explicit grant. */
+		public Boolean canDownload;
 	}
 	public static class StorageQuota{
 		public long limitBytes, usedBytes, reservedBytes, remainingBytes;
@@ -102,11 +104,20 @@ public final class AlbumModels{
 	public static class DeleteResponse{
 		public boolean deleted;
 	}
+	/** A report as returned by POST /albums/:id/report; snake_case fields via Gson policy. */
+	public static class Report{
+		public String id, albumId, reason, detail, status;
+		public long createdAt;
+	}
+	public static class ReportResponse{
+		public Report report;
+	}
 
 	/** Only this payload is parcelled as part of a native Mastodon Status. */
 	@Parcel
 	public static class AlbumUpdate{
 		public String albumId, albumName, description, coverUrl;
 		public int photoCount, width, height;
+		public boolean downloadProtected;
 	}
 }

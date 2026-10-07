@@ -53,12 +53,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.drawOutline
 import org.joinmastodon.android.ui.compose.utils.rememberGraphicsEffectsSupported
-import org.joinmastodon.android.ui.compose.utils.safeGraphicsEffect
-import org.joinmastodon.android.ui.compose.utils.GraphicsSafety
-import org.joinmastodon.android.ui.compose.utils.safeBackdropEffect
-import org.joinmastodon.android.ui.compose.utils.safeBackdropRecording
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.shadow.Shadow
@@ -414,53 +409,8 @@ internal fun IosLiquidGlassNavigationBar(
                 .fillMaxWidth(),
             contentAlignment = Alignment.CenterStart,
         ) {
+            // Keep the backdrop layer on the visible Row so its press scale includes tabs.
             CompositionLocalProvider(LocalContentColor provides tabContentColor) {
-                Box {
-                    // No tab content inside this guarded effect child.
-                    Box(Modifier.matchParentSize().safeGraphicsEffect(
-                        operation = "navigation pill backdrop",
-                        fallback = { drawOutline(pillShape.createOutline(size, layoutDirection, this), surfaceContainer) },
-                    ) {
-                        Modifier
-                            .graphicsLayer { translationX = panelOffset }
-                        .dropShadow(
-                            shape = pillShape,
-                            shadow = Shadow(
-                                radius = 10.dp,
-                                color = Color.Black,
-                                // Lighter in light theme to avoid a visible gray fringe.
-                                alpha = if (isDark) 0.2f else 0.1f,
-                            ),
-                        )
-                            .then(if (blurActive && backdrop != null && tabsBackdrop != null) {
-                                Modifier.safeBackdropEffect(
-                                    "navigation pill shaders",
-                                    fallback = { drawOutline(pillShape.createOutline(size, layoutDirection, this), surfaceContainer) },
-                                ) { enabled -> Modifier.drawBackdrop(
-                                    enabled = enabled,
-                                    backdrop = backdrop,
-                                    shape = { pillShape },
-                                    effects = {
-                                        GraphicsSafety.guarded("backdrop effects callback", fallback = { renderEffect = null }) {
-                                        padding = maxOf(padding, 40.dp.toPx())
-                                        vibrancy()
-                                        blur(14.dp.toPx(), 14.dp.toPx())
-                                        lens(24.dp.toPx(), 24.dp.toPx())
-
-                                        }
-                                    },
-                                    highlight = { baseHighlight.value.copy(alpha = 0.75f) },
-                                    layerBlock = {
-                                        val width = size.width.coerceAtLeast(1f)
-                                        val scale = lerp(1f, 1f + 16.dp.toPx() / width, dampedDrag.pressProgress)
-                                        scaleX = scale
-                                        scaleY = scale
-                                    },
-                                    onDrawSurface = { drawRect(containerColor) },
-                                ) }
-                            } else Modifier.background(surfaceContainer, pillShape))
-                            .then(if (blurActive) interactiveHighlight.modifier else Modifier)
-                    })
                 Row(
                     modifier = Modifier
                         .selectableGroup()
@@ -470,17 +420,58 @@ internal fun IosLiquidGlassNavigationBar(
                             tabWidthPx = (contentWidthPx / tabsCount).coerceAtLeast(0f)
                         }
                         .graphicsLayer { translationX = panelOffset }
+                        .dropShadow(
+                            shape = pillShape,
+                            shadow = Shadow(
+                                radius = 10.dp,
+                                color = Color.Black,
+                                // Lighter in light theme to avoid a visible gray fringe.
+                                alpha = if (isDark) 0.2f else 0.1f,
+                            ),
+                        )
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
                             onClick = {},
                         )
+                        .then(
+                            if (blurActive && backdrop != null && tabsBackdrop != null) {
+                                Modifier.drawBackdrop(
+                                    backdrop = backdrop,
+                                    shape = { pillShape },
+                                    effects = {
+                                        // 24dp lens refraction + 16dp press-scale reach, raised before blur() reads it.
+                                        padding = maxOf(padding, 40.dp.toPx())
+                                        vibrancy()
+                                        blur(
+                                            14.dp.toPx(),
+                                            14.dp.toPx(),
+                                        )
+                                        lens(
+                                            refractionHeight = 24.dp.toPx(),
+                                            refractionAmount = 24.dp.toPx(),
+                                        )
+                                    },
+                                    highlight = { baseHighlight.value.copy(alpha = 0.75f) },
+                                    layerBlock = {
+                                        val width = size.width.coerceAtLeast(1f)
+                                        val s = lerp(1f, 1f + 16.dp.toPx() / width, dampedDrag.pressProgress)
+                                        scaleX = s
+                                        scaleY = s
+                                    },
+                                    onDrawSurface = { drawRect(containerColor) },
+                                )
+                            } else {
+                                Modifier
+                                    .background(containerColor, pillShape)
+                            },
+                        )
+                        .then(if (blurActive) interactiveHighlight.modifier else Modifier)
                         .height(64.dp)
                         .padding(4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     content = tabsContent,
                 )
-                }
             }
 
             if (blurActive && backdrop != null && tabsBackdrop != null) {
@@ -488,42 +479,32 @@ internal fun IosLiquidGlassNavigationBar(
                     LocalIosTabScale provides { lerp(1f, 1.2f, dampedDrag.pressProgress) },
                     LocalContentColor provides accentColor,
                 ) {
-                    Box(
+                    Row(
                         modifier = Modifier
                             .clearAndSetSemantics {}
                             .alpha(0f)
-                            .safeBackdropRecording { Modifier.layerBackdrop(tabsBackdrop) }
+                            .layerBackdrop(tabsBackdrop)
                             .graphicsLayer { translationX = panelOffset }
-                            .height(56.dp)
-                            .padding(horizontal = 4.dp),
-                    ) {
-                        Box(Modifier.matchParentSize().safeBackdropEffect(
-                            operation = "navigation capture backdrop",
-                            fallback = { drawOutline(pillShape.createOutline(size, layoutDirection, this), surfaceContainer) },
-                        ) { enabled -> Modifier.drawBackdrop(
-                                enabled = enabled,
+                            .drawBackdrop(
                                 backdrop = backdrop,
                                 shape = { pillShape },
                                 effects = {
-                                    GraphicsSafety.guarded("backdrop effects callback", fallback = { renderEffect = null }) {
                                     vibrancy()
                                     blur(14.dp.toPx(), 14.dp.toPx())
                                     lens(
                                         refractionHeight = 24.dp.toPx(),
                                         refractionAmount = 24.dp.toPx(),
                                     )
-
-                                    }
                                 },
                                 onDrawSurface = { drawRect(containerColor) },
                             )
-                        }.then(interactiveHighlight.modifier))
-                        Row(
-                            Modifier.fillMaxWidth().fillMaxHeight(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            content = tabsContent,
-                        )
-                    }
+                            .then(interactiveHighlight.modifier)
+                            .height(56.dp)
+                            // Inset only tab content, not the surface recorded by drawBackdrop.
+                            .padding(horizontal = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        content = tabsContent,
+                    )
                 }
             }
 
@@ -540,18 +521,10 @@ internal fun IosLiquidGlassNavigationBar(
                             }
                             .then(interactiveHighlight.gestureModifier)
                             .then(dampedDrag.modifier)
-                            .safeGraphicsEffect(
-                                operation = "navigation indicator backdrop and inner shadow",
-                                fallback = { drawOutline(pillShape.createOutline(size, layoutDirection, this), accentColor.copy(alpha = 0.15f)) },
-                            ) { Modifier.safeBackdropEffect(
-                                "navigation indicator shaders",
-                                fallback = { drawOutline(pillShape.createOutline(size, layoutDirection, this), accentColor.copy(alpha = 0.15f)) },
-                            ) { enabled -> Modifier.drawBackdrop(
-                                enabled = enabled,
+                            .drawBackdrop(
                                 backdrop = combinedBackdrop,
                                 shape = { pillShape },
                                 effects = {
-                                    GraphicsSafety.guarded("backdrop effects callback", fallback = { renderEffect = null }) {
                                     val progress = dampedDrag.pressProgress
                                     lens(
                                         refractionHeight = 10.dp.toPx() * progress,
@@ -559,8 +532,6 @@ internal fun IosLiquidGlassNavigationBar(
                                         depthEffect = true,
                                         chromaticAberration = 0.5f,
                                     )
-
-                                    }
                                 },
                                 highlight = { pillHighlight.value.copy(alpha = dampedDrag.pressProgress) },
                                 layerBlock = {
@@ -578,14 +549,13 @@ internal fun IosLiquidGlassNavigationBar(
                                     )
                                     drawRect(Color.Black.copy(alpha = 0.03f * progress))
                                 },
-                            ) }
+                            )
                             .innerShadow(shape = pillShape) {
                                 InnerShadow(
                                     radius = 8.dp * dampedDrag.pressProgress,
                                     color = Color.Black.copy(alpha = 0.15f),
                                     alpha = dampedDrag.pressProgress,
                                 )
-                            }
                             }
                             .height(56.dp)
                             .width(tabWidthDp),

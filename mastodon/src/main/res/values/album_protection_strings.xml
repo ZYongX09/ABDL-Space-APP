@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="album_protection_title">Image protection</string>
+    <string name="album_protection_description">After the server confirms this setting, other people cannot download photos or access HD images. Supported apps restrict screenshots and screen recordings; protected photos open in the viewer instead of showing grid thumbnails. You can still download your own photos. This cannot prevent external cameras, rooted devices, modified clients, copying preview bytes, or use of previously issued links. Requires server support.</string>
+    <string name="album_protection_enabled">Image protection enabled</string>
+    <string name="album_protection_thumbnail">Protected photo · tap to view</string>
+    <string name="album_protection_not_confirmed">The server did not confirm this protection change. The current server setting is still in effect; update the server and try again.</string>
+</resources>

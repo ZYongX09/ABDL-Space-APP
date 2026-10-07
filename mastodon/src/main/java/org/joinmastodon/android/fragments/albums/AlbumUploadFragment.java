@@ -1,15 +1,17 @@
 package org.joinmastodon.android.fragments.albums;
 
+import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.res.ColorStateList;
-import android.graphics.Color;
-import android.graphics.drawable.GradientDrawable;
+import android.content.pm.PackageManager;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.Gravity;
@@ -46,6 +48,10 @@ import org.joinmastodon.android.model.albums.AlbumModels.*;
 import org.joinmastodon.android.fragments.sponsors.SponsorCenterFragment;
 import org.joinmastodon.android.ui.M3AlertDialogBuilder;
 import org.joinmastodon.android.ui.OutlineProviders;
+import org.joinmastodon.android.ui.media.MediaCameraContract;
+import org.joinmastodon.android.ui.media.MediaPickerConfig;
+import org.joinmastodon.android.ui.media.MediaStoreLoader;
+import org.joinmastodon.android.ui.sheets.MediaPickerSheet;
 import org.joinmastodon.android.ui.utils.SimpleTextWatcher;
 import org.joinmastodon.android.ui.utils.UiUtils;
 
@@ -64,9 +70,13 @@ import me.grishka.appkit.imageloader.ViewImageLoader;
 import me.grishka.appkit.imageloader.requests.UrlImageLoaderRequest;
 import me.grishka.appkit.utils.V;
 
-/** Retained editor. SAF grants only selected images; processing/network work never holds the view. */
+/** Retained editor. Local photo selection stays separate from the immutable upload task. */
 public class AlbumUploadFragment extends ToolbarFragment{
-	private static final int PICK_PHOTOS=7820, SELECT_ALBUM=7821;
+	private static final int SELECT_ALBUM=7821;
+	private MediaPickerSheet mediaPickerSheet;
+	private int photoGeneration, nextPhotoRequest=7900;
+	private int galleryPermissionRequest=-1, cameraPermissionRequest=-1, cameraRequest=-1;
+	private boolean pausingForPhotoRequest;
 	private String accountId;
 	private AccountSession session;
 	private AlbumUploadDraft draft;
@@ -90,7 +100,6 @@ public class AlbumUploadFragment extends ToolbarFragment{
 	private RadioButton dialogOriginal;
 	private String statusDetails;
 	private int sideInsetLeft, sideInsetRight;
-	private boolean darkDesign;
 	private ProgressBar progress;
 	private RecyclerView previews;
 	private PreviewAdapter adapter;
@@ -167,22 +176,20 @@ public class AlbumUploadFragment extends ToolbarFragment{
 			@Override public void onInitializeAccessibilityNodeInfo(View host, AccessibilityNodeInfo info){ super.onInitializeAccessibilityNodeInfo(host, info); info.setClassName(Button.class.getName()); }
 		});
 	}
-	private int designBackground(){ return darkDesign ? getResources().getColor(R.color.album_upload_design_dark_background, getActivity().getTheme()) : UiUtils.getThemeColor(body.getContext(), R.attr.colorM3Surface); }
+	private int designBackground(){ return UiUtils.getThemeColor(body.getContext(), R.attr.colorM3Surface); }
 	private void applyDesign(){
-		// Resolve the actual view theme, not global/system night mode (also supports explicit M3 themes).
-		int surface=UiUtils.getThemeColor(body.getContext(), R.attr.colorM3Surface); darkDesign=Color.luminance(surface)<0.5f;
-		body.setBackgroundColor(designBackground());
+		// Use the same semantic palette as other pages, including dynamic and high-contrast themes.
+		Context context=body.getContext(); body.setBackgroundColor(designBackground());
 		for(int id:new int[]{R.id.album_description, R.id.album_upload_settings, R.id.album_upload_photos}){
-			View card=body.findViewById(id); if(darkDesign && card.getBackground() instanceof GradientDrawable shape) shape.mutate().setTint(getResources().getColor(R.color.album_upload_design_dark_surface, getActivity().getTheme()));
+			View card=body.findViewById(id);
 			card.setOutlineProvider(OutlineProviders.roundedRect(12)); card.setClipToOutline(true);
 		}
-		int accent=getResources().getColor(darkDesign ? R.color.album_upload_design_dark_accent : R.color.album_upload_design_light_accent, getActivity().getTheme());
+		int accent=UiUtils.getThemeColor(context, R.attr.colorM3Primary);
 		for(View row:new View[]{choose, permissionRow, qualityRow, timeRow}) ((ImageView)((ViewGroup)row).getChildAt(0)).setImageTintList(ColorStateList.valueOf(accent));
-		sponsorRow.getBackground().mutate().setTint(getResources().getColor(darkDesign ? R.color.album_upload_design_dark_gold_surface : R.color.album_upload_design_light_gold_surface, getActivity().getTheme()));
-		int gold=getResources().getColor(darkDesign ? R.color.album_upload_design_dark_gold : R.color.album_upload_design_light_gold, getActivity().getTheme());
-		((TextView)body.findViewById(R.id.album_upload_sponsor_text)).setTextColor(gold);
-		((ImageView)body.findViewById(R.id.album_upload_sponsor_icon)).setImageTintList(ColorStateList.valueOf(gold));
-		((ImageView)body.findViewById(R.id.album_upload_sponsor_chevron)).setImageTintList(ColorStateList.valueOf(gold));
+		int sponsorContent=UiUtils.getThemeColor(context, R.attr.colorM3OnSecondaryContainer);
+		((TextView)body.findViewById(R.id.album_upload_sponsor_text)).setTextColor(sponsorContent);
+		((ImageView)body.findViewById(R.id.album_upload_sponsor_icon)).setImageTintList(ColorStateList.valueOf(sponsorContent));
+		((ImageView)body.findViewById(R.id.album_upload_sponsor_chevron)).setImageTintList(ColorStateList.valueOf(sponsorContent));
 		albumCover.setOutlineProvider(OutlineProviders.roundedRect(8)); albumCover.setClipToOutline(true);
 	}
 	@Override protected void onShown(){
@@ -192,8 +199,21 @@ public class AlbumUploadFragment extends ToolbarFragment{
 		refreshPermissions();
 		if(sourceInfo==null && !checkingSources) inspectSources();
 	}
+	@Override public void onPause(){
+		// AppKit calls onHidden from onPause too. Keep only a pending external permission/camera
+		// request alive through that pause; actual navigation and destroyed views invalidate it.
+		pausingForPhotoRequest=!isHidden() && (galleryPermissionRequest!=-1 || cameraPermissionRequest!=-1 || cameraRequest!=-1);
+		try{ super.onPause(); }finally{ pausingForPhotoRequest=false; }
+	}
+	@Override public void onHiddenChanged(boolean hidden){
+		super.onHiddenChanged(hidden);
+		// AppKit does not call onHidden for navigation while already paused. Do not let a
+		// camera/permission result survive a hide-and-show cycle in that interval.
+		if(hidden) invalidatePhotoSelection();
+	}
 	@Override protected void onHidden(){
-		super.onHidden(); saveEditor(); generation++; sourceGeneration++; checkingSources=false; refreshing=false;
+		super.onHidden(); if(pausingForPhotoRequest && sessionValid() && uploader==null && !discarding) closePhotoPicker(); else invalidatePhotoSelection();
+		saveEditor(); generation++; sourceGeneration++; checkingSources=false; refreshing=false;
 		for(MastodonAPIRequest<?> request:requests) request.cancel(); requests.clear();
 		if(uploader!=null) uploader.setListener(null); if(dialog!=null){ dialog.dismiss(); dialog=null; }
 		removeBackCallback(confirmBack);
@@ -234,7 +254,7 @@ public class AlbumUploadFragment extends ToolbarFragment{
 	private void refreshPermissions(){
 		if(refreshing || body==null || discarding) return;
 		if(!sessionValid()){
-			selected=null; quota=null; if(uploader!=null) uploader.cancel();
+			invalidatePhotoSelection(); selected=null; quota=null; if(uploader!=null) uploader.cancel();
 			setEditorEnabled(false); showStatus(getString(R.string.album_session_changed), getString(R.string.album_session_changed)); updateActions(); return;
 		}
 		refreshing=true; quota=null; selected=null; quotaText.setText(R.string.album_upload_design_capacity_loading); updateActions(); int token=++generation;
@@ -363,30 +383,117 @@ public class AlbumUploadFragment extends ToolbarFragment{
 		String details=statusDetails!=null ? statusDetails : uploader!=null ? getString(R.string.album_upload_resume) : getString(R.string.album_description_limit);
 		dialog=new M3AlertDialogBuilder(getActivity()).setTitle(R.string.album_upload_design_error_details).setMessage(details).setPositiveButton(R.string.ok, null).show();
 	}
+	private MediaPickerConfig photoPickerConfig(){
+		MediaPickerConfig config=new MediaPickerConfig(); config.allowImages=true; config.allowVideos=false;
+		config.maxCount=Math.max(0, AlbumUploader.MAX_PHOTOS-draft.photos.size()); return config;
+	}
+	private boolean photoSelectionLive(int token){ return token==photoGeneration && canEdit() && getActivity()!=null && !isHidden(); }
 	private void pickPhotos(){
-		if(uploader!=null || !sessionValid()) return;
+		if(!canEdit() || mediaPickerSheet!=null || galleryPermissionRequest!=-1 || cameraPermissionRequest!=-1 || cameraRequest!=-1) return;
 		if(draft.photos.size()>=AlbumUploader.MAX_PHOTOS){ Toast.makeText(getActivity(), R.string.album_pick_limit, Toast.LENGTH_LONG).show(); return; }
-		Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT).setType("image/*").addCategory(Intent.CATEGORY_OPENABLE)
-				.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
-		try{ startActivityForResult(intent, PICK_PHOTOS); }catch(RuntimeException unavailable){ Toast.makeText(getActivity(), R.string.album_picker_unavailable, Toast.LENGTH_LONG).show(); }
+		int token=++photoGeneration; MediaPickerConfig config=photoPickerConfig();
+		if(!new MediaStoreLoader(getActivity()).hasPermission(config)){
+			String[] permissions=Build.VERSION.SDK_INT>=34
+					? new String[]{Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED}
+					: Build.VERSION.SDK_INT>=33 ? new String[]{Manifest.permission.READ_MEDIA_IMAGES} : new String[]{Manifest.permission.READ_EXTERNAL_STORAGE};
+			galleryPermissionRequest=nextPhotoRequest++; requestPermissions(permissions, galleryPermissionRequest); return;
+		}
+		showPhotoPicker(token);
+	}
+	private void showPhotoPicker(int token){
+		if(!photoSelectionLive(token)) return;
+		MediaPickerConfig config=photoPickerConfig(); if(config.maxCount==0) return;
+		MediaPickerSheet sheet=new MediaPickerSheet(getActivity(), config, new MediaPickerSheet.Listener(){
+			@Override public void onMediaSelected(ArrayList<Uri> uris){
+				if(token!=photoGeneration || mediaPickerSheet==null) return;
+				if(!photoSelectionLive(token)){ invalidatePhotoSelection(); return; }
+				closePhotoPicker(); addSelectedPhotos(uris, token); photoGeneration++;
+			}
+			@Override public void onCameraRequested(){
+				if(token!=photoGeneration || mediaPickerSheet==null) return;
+				if(!photoSelectionLive(token)){ invalidatePhotoSelection(); return; }
+				closePhotoPicker(); openPhotoCamera(token);
+			}
+		});
+		mediaPickerSheet=sheet;
+		// Camera delivery follows dismiss() inside the sheet. Defer cancellation cleanup one
+		// turn so even zero-duration dismissal cannot invalidate that same-stack callback.
+		sheet.setOnDismissListener(ignored->main.post(()->{ if(mediaPickerSheet==sheet){ mediaPickerSheet=null; photoGeneration++; } }));
+		sheet.show();
+	}
+	private void closePhotoPicker(){
+		MediaPickerSheet sheet=mediaPickerSheet; mediaPickerSheet=null;
+		if(sheet!=null){ sheet.setOnDismissListener(null); sheet.dismissWithoutAnimation(); }
+	}
+	private void invalidatePhotoSelection(){
+		photoGeneration++; galleryPermissionRequest=-1; cameraPermissionRequest=-1; cameraRequest=-1; closePhotoPicker();
+	}
+	private void openPhotoCamera(int token){
+		if(!photoSelectionLive(token) || draft.photos.size()>=AlbumUploader.MAX_PHOTOS) return;
+		// The camera activity checks permission but does not request it for still photos.
+		if(getActivity().checkSelfPermission(Manifest.permission.CAMERA)!=PackageManager.PERMISSION_GRANTED){
+			cameraPermissionRequest=nextPhotoRequest++; requestPermissions(new String[]{Manifest.permission.CAMERA}, cameraPermissionRequest); return;
+		}
+		cameraRequest=nextPhotoRequest++;
+		try{ startActivityForResult(MediaCameraContract.createIntent(getActivity(), false), cameraRequest); }
+		catch(RuntimeException unavailable){ cameraRequest=-1; showPhotoPermissionError(true); }
+	}
+	private void showPhotoPermissionError(boolean camera){
+		if(!canEdit()) return;
+		dialog=new M3AlertDialogBuilder(getActivity()).setTitle(R.string.permission_required)
+				.setMessage(camera ? "无法使用相机，请在系统设置中允许相机权限后重试。" : "无法读取相册照片，请在系统设置中允许照片访问权限（也可以仅允许所选照片）后重试。")
+				.setPositiveButton(R.string.open_settings, (d, which)->{
+					if(!canEdit()) return;
+					try{ startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:"+getActivity().getPackageName()))); }
+					catch(RuntimeException unavailable){ Toast.makeText(getActivity(), R.string.permission_required, Toast.LENGTH_LONG).show(); }
+				}).setNegativeButton(R.string.cancel, null).show();
+	}
+	@Override public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults){
+		super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+		if(requestCode==galleryPermissionRequest){
+			galleryPermissionRequest=-1;
+			if(!photoSelectionLive(photoGeneration)) return;
+			// Android 14 may grant only the selected-photo permission, not READ_MEDIA_IMAGES.
+			if(new MediaStoreLoader(getActivity()).hasPermission(photoPickerConfig())) showPhotoPicker(photoGeneration);
+			else showPhotoPermissionError(false);
+		}else if(requestCode==cameraPermissionRequest){
+			cameraPermissionRequest=-1;
+			if(!photoSelectionLive(photoGeneration)) return;
+			if(getActivity().checkSelfPermission(Manifest.permission.CAMERA)==PackageManager.PERMISSION_GRANTED) openPhotoCamera(photoGeneration);
+			else showPhotoPermissionError(true);
+		}
+	}
+	private void addSelectedPhotos(ArrayList<Uri> sources, int token){
+		if(!photoSelectionLive(token) || sources==null || sources.isEmpty()) return;
+		boolean changed=false, exceeded=false;
+		for(Uri source:sources){
+			if(source==null || draft.photos.contains(source.toString())) continue;
+			String scheme=source.getScheme(); if(!"content".equals(scheme) && !"file".equals(scheme)) continue;
+			// The sheet queries images only; also reject an unexpected video result at the boundary.
+			if("media".equals(source.getAuthority()) && source.getPathSegments().contains("video")) continue;
+			String mime;
+			try{
+				mime=getActivity().getContentResolver().getType(source);
+				if(mime==null && "file".equals(scheme)) mime=android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(android.webkit.MimeTypeMap.getFileExtensionFromUrl(source.toString()).toLowerCase(java.util.Locale.ROOT));
+			}catch(RuntimeException unavailable){ continue; }
+			if(mime!=null && !mime.startsWith("image/")) continue;
+			if(draft.photos.size()>=AlbumUploader.MAX_PHOTOS){ exceeded=true; continue; }
+			// MediaStore and our camera FileProvider are not SAF documents. No persistable grant.
+			changed|=draft.addPhoto(source.toString());
+		}
+		if(exceeded) Toast.makeText(getActivity(), R.string.album_pick_limit, Toast.LENGTH_LONG).show();
+		if(changed){ renderSelection(); updateActions(); inspectSources(); }
 	}
 	@Override public void onActivityResult(int requestCode, int resultCode, Intent result){
 		super.onActivityResult(requestCode, resultCode, result);
-		if(requestCode!=PICK_PHOTOS || resultCode!=Activity.RESULT_OK || result==null || uploader!=null) return;
-		ArrayList<Uri> sources=new ArrayList<>();
-		if(result.getClipData()!=null) for(int i=0;i<result.getClipData().getItemCount();i++) sources.add(result.getClipData().getItemAt(i).getUri());
-		else if(result.getData()!=null) sources.add(result.getData());
-		boolean exceeded=false;
-		for(Uri source:sources){
-			if(source==null) continue;
-			if(draft.photos.size()>=AlbumUploader.MAX_PHOTOS){ exceeded=true; break; }
-			try{
-				if((result.getFlags()&Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)!=0) getActivity().getContentResolver().takePersistableUriPermission(source, Intent.FLAG_GRANT_READ_URI_PERMISSION);
-				draft.addPhoto(source.toString());
-			}catch(SecurityException denied){ Toast.makeText(getActivity(), R.string.album_picker_unavailable, Toast.LENGTH_LONG).show(); }
+		if(requestCode!=cameraRequest || cameraRequest==-1) return;
+		cameraRequest=-1; int token=photoGeneration;
+		if(!photoSelectionLive(token)) return;
+		Uri source=MediaCameraContract.getUri(result); String mime=MediaCameraContract.getMimeType(result);
+		if(resultCode==Activity.RESULT_OK && source!=null && !MediaCameraContract.isVideo(result) && (mime==null || mime.startsWith("image/"))){
+			ArrayList<Uri> sources=new ArrayList<>(); sources.add(source); addSelectedPhotos(sources, token);
 		}
-		if(exceeded) Toast.makeText(getActivity(), R.string.album_pick_limit, Toast.LENGTH_LONG).show();
-		renderSelection(); updateActions(); inspectSources();
+		photoGeneration++;
 	}
 	private void uploadOrPause(){
 		if(discarding || !sessionValid()) return;
@@ -499,7 +606,7 @@ public class AlbumUploadFragment extends ToolbarFragment{
 		super.onApplyWindowInsets(insets.replaceSystemWindowInsets(0, insets.getSystemWindowInsetTop(), 0, insets.getSystemWindowInsetBottom()));
 	}
 	@Override public void onDestroyView(){
-		saveEditor(); generation++; sourceGeneration++; checkingSources=false; refreshing=false; for(MastodonAPIRequest<?> request:requests) request.cancel(); requests.clear();
+		invalidatePhotoSelection(); saveEditor(); generation++; sourceGeneration++; checkingSources=false; refreshing=false; for(MastodonAPIRequest<?> request:requests) request.cancel(); requests.clear();
 		if(uploader!=null) uploader.setListener(null); removeBackCallback(confirmBack); if(dialog!=null){ dialog.dismiss(); dialog=null; }
 		if(previews!=null) previews.setAdapter(null);
 		body=null; editor=null; uploadBar=null; header=null; description=null; albumName=null; albumCover=null; permissionText=null; qualityValue=null; timeValue=null; quotaText=null; count=null; status=null; dialogOriginal=null;
@@ -519,7 +626,6 @@ public class AlbumUploadFragment extends ToolbarFragment{
 		@Override public PreviewHolder onCreateViewHolder(ViewGroup parent, int type){
 			SquareTile tile=new SquareTile(parent.getContext()); tile.setPadding(V.dp(4), V.dp(4), V.dp(4), V.dp(4)); tile.setLayoutParams(new RecyclerView.LayoutParams(-1, -2));
 			FrameLayout content=new FrameLayout(parent.getContext()); content.setBackgroundResource(R.drawable.album_upload_design_tile);
-			if(darkDesign) content.getBackground().mutate().setTint(getResources().getColor(R.color.album_upload_design_dark_tile, getActivity().getTheme()));
 			content.setOutlineProvider(OutlineProviders.roundedRect(8)); content.setClipToOutline(true); tile.addView(content, new FrameLayout.LayoutParams(-1, -1));
 			if(type==1){
 				content.setId(R.id.album_pick); content.setFocusable(true); content.setClickable(true); accessibleButton(content);
@@ -530,7 +636,7 @@ public class AlbumUploadFragment extends ToolbarFragment{
 				stack.addView(label); content.addView(stack, new FrameLayout.LayoutParams(-1, -1)); return new PreviewHolder(tile, content, null, null);
 			}
 			ImageView image=new ImageView(parent.getContext()); image.setId(R.id.album_photo); image.setScaleType(ImageView.ScaleType.CENTER_CROP); image.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO); content.addView(image, new FrameLayout.LayoutParams(-1, -1));
-			ImageButton remove=new ImageButton(parent.getContext()); remove.setId(R.id.album_upload_remove); remove.setBackgroundResource(R.drawable.album_upload_design_remove); remove.setImageResource(R.drawable.ic_fluent_dismiss_24_regular); remove.setImageTintList(ColorStateList.valueOf(Color.WHITE)); remove.setPadding(V.dp(13), V.dp(13), V.dp(13), V.dp(13));
+			ImageButton remove=new ImageButton(parent.getContext()); remove.setId(R.id.album_upload_remove); remove.setBackgroundResource(R.drawable.album_upload_design_remove); remove.setImageResource(R.drawable.ic_fluent_dismiss_24_regular); remove.setImageTintList(ColorStateList.valueOf(UiUtils.getThemeColor(parent.getContext(), R.attr.colorM3OnSurface))); remove.setPadding(V.dp(13), V.dp(13), V.dp(13), V.dp(13));
 			content.addView(remove, new FrameLayout.LayoutParams(V.dp(48), V.dp(48), Gravity.TOP|Gravity.END)); return new PreviewHolder(tile, content, image, remove);
 		}
 		@Override public void onBindViewHolder(PreviewHolder holder, int position){

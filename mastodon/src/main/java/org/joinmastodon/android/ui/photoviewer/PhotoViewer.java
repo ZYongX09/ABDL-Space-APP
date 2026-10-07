@@ -163,6 +163,7 @@ public class PhotoViewer implements ZoomPanView.Listener{
 	private final Set<PhotoViewHolder> albumPhotoHolders=new HashSet<>();
 	private final OkHttpClient albumHttpClient;
 	private android.window.OnBackInvokedCallback albumBackCallback;
+	private boolean albumSecureFlagAdded;
 
 	private WindowRootFrameLayout windowView;
 	private FragmentRootLinearLayout uiOverlay;
@@ -396,6 +397,9 @@ public class PhotoViewer implements ZoomPanView.Listener{
 		wlp.type=WindowManager.LayoutParams.TYPE_APPLICATION;
 		wlp.flags=WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN | WindowManager.LayoutParams.FLAG_LAYOUT_INSET_DECOR
 				| WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS;
+		// Protect this separate overlay before attachment, traversal, or any preview GET.
+		// Never mutate the host Activity window: its protection belongs to the detail screen.
+		if(albumDelegate!=null) applyAlbumSecureFlag(wlp, albumDelegate.getInfo(index));
 		wlp.format=PixelFormat.TRANSLUCENT;
 		wlp.setTitle(activity.getString(R.string.media_viewer));
 		if(albumDelegate!=null) wlp.softInputMode=(Build.VERSION.SDK_INT>=30 ? WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING : WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
@@ -516,7 +520,7 @@ public class PhotoViewer implements ZoomPanView.Listener{
 		shareBtn.setVisibility(View.GONE);
 		replyBtn.setFocusable(true);
 		favoriteBtn.setFocusable(true);
-		replyBtn.setOnClickListener(v->albumDelegate.onComments(currentIndex));
+		replyBtn.setOnClickListener(v->openAlbumComments());
 		favoriteBtn.setOnClickListener(v->albumDelegate.onLike(currentIndex));
 		ViewGroup.LayoutParams actionParams=postActions.getLayoutParams();
 		actionParams.height=V.dp(48);
@@ -568,24 +572,60 @@ public class PhotoViewer implements ZoomPanView.Listener{
 
 	public int getCurrentIndex(){ return currentIndex; }
 
+	private void openAlbumComments(){
+		// Gate the action too: performClick() can invoke listeners on a GONE/disabled view.
+		if(albumDelegate==null || closing || dismissed || !albumDelegate.supportsComments()) return;
+		albumDelegate.onComments(currentIndex);
+	}
+
+	private static boolean protectedAlbumNonowner(AlbumInfo info){ return info.downloadProtected && !info.isOwner; }
+
+	private boolean applyAlbumSecureFlag(WindowManager.LayoutParams params, AlbumInfo info){
+		int oldFlags=params.flags;
+		if(protectedAlbumNonowner(info)){
+			if((params.flags & WindowManager.LayoutParams.FLAG_SECURE)==0){
+				params.flags|=WindowManager.LayoutParams.FLAG_SECURE;
+				albumSecureFlagAdded=true;
+			}
+		}else if(albumSecureFlagAdded){
+			params.flags&=~WindowManager.LayoutParams.FLAG_SECURE;
+			albumSecureFlagAdded=false;
+		}
+		return oldFlags!=params.flags;
+	}
+
+	private void updateAlbumSecureWindow(AlbumInfo info){
+		if(windowView.isAttachedToWindow() && windowView.getLayoutParams() instanceof WindowManager.LayoutParams params
+				&& applyAlbumSecureFlag(params, info)) wm.updateViewLayout(windowView, params);
+	}
+
 	public void refreshAlbumControls(){
 		if(albumDelegate==null || closing || dismissed || albumLosslessButton==null) return;
 		AlbumInfo info=albumDelegate.getInfo(currentIndex);
+		updateAlbumSecureWindow(info);
+		boolean protectedNonowner=protectedAlbumNonowner(info);
+		boolean commentsEnabled=albumDelegate.supportsComments();
+		replyBtn.setVisibility(commentsEnabled ? View.VISIBLE : View.GONE);
+		replyBtn.setEnabled(commentsEnabled); replyBtn.setFocusable(commentsEnabled);
 		bindActionButton(replyText, info.commentsCount);
 		bindActionButton(favoriteText, info.likesCount);
 		favoriteBtn.setSelected(info.liked);
 		favoriteBtn.setEnabled(!info.likeBusy);
 		favoriteBtn.setContentDescription(activity.getString(info.liked ? R.string.album_viewer_unlike : R.string.album_viewer_like, info.likesCount));
 		replyBtn.setContentDescription(activity.getString(R.string.album_viewer_comment_count, info.commentsCount));
-		viewOriginalBtn.setVisibility(info.hdLoaded ? View.GONE : View.VISIBLE);
+		viewOriginalBtn.setVisibility(protectedNonowner || info.hdLoaded ? View.GONE : View.VISIBLE);
 		viewOriginalBtn.setText(info.mediaBusy ? R.string.album_viewer_busy : R.string.album_viewer_hd);
-		viewOriginalBtn.setEnabled(!info.mediaBusy);
+		viewOriginalBtn.setEnabled(!protectedNonowner && !info.mediaBusy);
+		viewOriginalBtn.setFocusable(!protectedNonowner && !info.mediaBusy);
 		albumLosslessButton.setVisibility(info.isOwner && info.originalAvailable && !info.originalLoaded ? View.VISIBLE : View.GONE);
 		albumLosslessButton.setText(info.mediaBusy ? R.string.album_viewer_busy : R.string.album_viewer_lossless);
 		albumLosslessButton.setEnabled(!info.mediaBusy);
 		albumQualityControls.setVisibility(albumCommentsVisible || viewOriginalBtn.getVisibility()!=View.VISIBLE && albumLosslessButton.getVisibility()!=View.VISIBLE ? View.GONE : View.VISIBLE);
 		postActions.setVisibility(albumCommentsVisible && albumImeInset>0 ? View.GONE : View.VISIBLE);
-		downloadButton.setEnabled(!info.mediaBusy);
+		boolean downloadable=info.canDownload && !protectedNonowner;
+		downloadButton.setVisibility(downloadable ? View.VISIBLE : View.GONE);
+		downloadButton.setEnabled(downloadable && !info.mediaBusy);
+		downloadButton.setFocusable(downloadable && !info.mediaBusy);
 		updateAltText();
 		if(albumCommentsVisible) altText.setVisibility(View.GONE);
 	}
@@ -689,7 +729,8 @@ public class PhotoViewer implements ZoomPanView.Listener{
 
 	/** Signed image bytes and drawables are transient; album media NEVER uses ImageCache. */
 	public void updateAlbumSource(int position, String url, AlbumSourceCallback callback){
-		if(!isAlbumHostValid() || position!=currentIndex || !isAcceptableImageUrl(url) || !url.startsWith("https://")){
+		if(!isAlbumHostValid() || position!=currentIndex || protectedAlbumNonowner(albumDelegate.getInfo(position))
+				|| !isAcceptableImageUrl(url) || !url.startsWith("https://")){
 			callback.onFailed(); return;
 		}
 		if(albumMediaCall!=null) albumMediaCall.cancel();
@@ -848,7 +889,8 @@ public class PhotoViewer implements ZoomPanView.Listener{
 
 	/** Saves fresh authorized bytes directly; never reuses the displayed image or a disk cache. */
 	public void saveAlbumSource(int position, String url, AlbumSourceCallback callback){
-		if(!isAlbumHostValid() || position!=currentIndex || !isAcceptableImageUrl(url) || !url.startsWith("https://")){
+		if(!isAlbumHostValid() || position!=currentIndex || !albumDelegate.getInfo(position).canDownload || protectedAlbumNonowner(albumDelegate.getInfo(position))
+				|| !isAcceptableImageUrl(url) || !url.startsWith("https://")){
 			callback.onFailed(); return;
 		}
 		if(albumMediaCall!=null) albumMediaCall.cancel();
@@ -880,8 +922,9 @@ public class PhotoViewer implements ZoomPanView.Listener{
 				AlbumDestination target=destination;
 				boolean success=copied;
 				activity.runOnUiThread(()->{
-					if(!albumMediaLive(call, generation, position)){
-						if(target!=null) target.discard(); return;
+						if(!albumMediaLive(call, generation, position) || !albumDelegate.getInfo(position).canDownload
+								|| protectedAlbumNonowner(albumDelegate.getInfo(position))){
+							if(target!=null) target.discard(); return;
 					}
 					albumMediaCall=null;
 					if(success && target!=null){
@@ -945,6 +988,26 @@ public class PhotoViewer implements ZoomPanView.Listener{
 		refreshAlbumControls();
 	}
 
+	/** A renewed ACL revoked quality/download access; discard already displayed HD as well. */
+	public void revokeAlbumQuality(){
+		cancelAlbumMedia();
+		albumSourceDrawable=null; albumSourcePosition=-1;
+		for(PhotoViewHolder holder:albumPhotoHolders) holder.imageView.setImageDrawable(null);
+	}
+
+	/** A failed host policy handoff must not expose its stale grid behind this overlay. */
+	public void blockAlbumDismissal(){
+		if(albumDelegate==null || dismissed) return;
+		revokeAlbumQuality();
+		windowView.animate().cancel(); windowView.setAlpha(1f); background.setAlpha(255);
+		if(windowView.isAttachedToWindow() && windowView.getLayoutParams() instanceof WindowManager.LayoutParams params){
+			params.flags|=WindowManager.LayoutParams.FLAG_SECURE;
+			// Fail-closed protection is retained until removal, not cleared by a stale unprotected DTO.
+			albumSecureFlagAdded=false;
+			wm.updateViewLayout(windowView, params);
+		}
+	}
+
 	public void cancelAlbumMedia(){
 		if(albumMediaCall!=null){ albumMediaCall.cancel(); albumMediaCall=null; }
 		for(Call call:albumPreviewCalls.values()) call.cancel();
@@ -985,6 +1048,7 @@ public class PhotoViewer implements ZoomPanView.Listener{
 	@Override
 	public void onStartSwipeToDismissTransition(float velocityY){
 		if(closing || dismissed) return;
+		if(albumDelegate!=null && !albumDelegate.onBeforeDismissed()){ blockAlbumDismissal(); return; }
 		closing=true;
 		invalidateOriginalWork();
 		pauseVideo();
@@ -1224,7 +1288,10 @@ public class PhotoViewer implements ZoomPanView.Listener{
 	}
 
 	private void startOriginalDownload(){
-		if(albumDelegate!=null){ albumDelegate.onView(currentIndex, "hd"); return; }
+		if(albumDelegate!=null){
+			if(isAlbumHostValid() && !protectedAlbumNonowner(albumDelegate.getInfo(currentIndex))) albumDelegate.onView(currentIndex, "hd");
+			return;
+		}
 		int position=pager.getCurrentItem();
 		Attachment att=attachments.get(position);
 		if(att.type!=Attachment.Type.IMAGE || originalDownloadPosition!=-1 || originalGate==null || originalGate.isBusy()) return;
@@ -1446,7 +1513,13 @@ public class PhotoViewer implements ZoomPanView.Listener{
 	}
 
 	private void saveCurrentFile(){
-		if(albumDelegate!=null){ if(isAlbumHostValid()) albumDelegate.onDownload(currentIndex); return; }
+		if(albumDelegate!=null){
+			if(isAlbumHostValid()){
+				AlbumInfo info=albumDelegate.getInfo(currentIndex);
+				if(info.canDownload && !protectedAlbumNonowner(info)) albumDelegate.onDownload(currentIndex);
+			}
+			return;
+		}
 		if(closing || dismissed || originalGate==null || originalGate.isBusy() || originalDownloadPosition!=-1) return;
 		Attachment att=attachments.get(pager.getCurrentItem());
 		if(Build.VERSION.SDK_INT<29 && activity.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)!=PackageManager.PERMISSION_GRANTED){
@@ -1698,6 +1771,8 @@ public class PhotoViewer implements ZoomPanView.Listener{
 
 	/** No album API/model dependency in the generic viewer. */
 	public interface AlbumDelegate{
+		/** Public album comment entry is opt-in; low-level panel geometry remains independent. */
+		default boolean supportsComments(){ return false; }
 		AlbumInfo getInfo(int position);
 		void onPhotoChanged(int position);
 		void refreshPreview(int position, AlbumPreviewCallback callback);
@@ -1707,11 +1782,14 @@ public class PhotoViewer implements ZoomPanView.Listener{
 		void onComments(int position);
 		void onCommentsClosed();
 		void cancelPending();
+		/** Invoked before the overlay is removed; returning false keeps the window attached. */
+		default boolean onBeforeDismissed(){ return true; }
 		void onDismissed();
 	}
 
 	public static final class AlbumInfo{
-		public boolean isOwner, originalAvailable, liked, hdLoaded, originalLoaded, mediaBusy, likeBusy;
+		public boolean isOwner, originalAvailable, liked, hdLoaded, originalLoaded, mediaBusy, likeBusy, downloadProtected;
+		public boolean canDownload=true; // Legacy delegates/unprotected servers retain their existing controls.
 		public int likesCount, commentsCount;
 	}
 
@@ -1856,7 +1934,7 @@ public class PhotoViewer implements ZoomPanView.Listener{
 		public void onBind(Attachment item){
 			super.onBind(item);
 			FrameLayout.LayoutParams params=(FrameLayout.LayoutParams) imageView.getLayoutParams();
-			Drawable currentDrawable=listener.getPhotoViewCurrentDrawable(getAbsoluteAdapterPosition());
+			Drawable currentDrawable=albumDelegate==null ? listener.getPhotoViewCurrentDrawable(getAbsoluteAdapterPosition()) : null;
 			if(item.hasKnownDimensions()){
 				params.width=item.getWidth();
 				params.height=item.getHeight();
@@ -1930,7 +2008,7 @@ public class PhotoViewer implements ZoomPanView.Listener{
 			super.onBind(item);
 			playerReady=false;
 			FrameLayout.LayoutParams params=(FrameLayout.LayoutParams) wrap.getLayoutParams();
-			Drawable currentDrawable=listener.getPhotoViewCurrentDrawable(getAbsoluteAdapterPosition());
+			Drawable currentDrawable=albumDelegate==null ? listener.getPhotoViewCurrentDrawable(getAbsoluteAdapterPosition()) : null;
 			if(item.hasKnownDimensions()){
 				params.width=item.getWidth();
 				params.height=item.getHeight();

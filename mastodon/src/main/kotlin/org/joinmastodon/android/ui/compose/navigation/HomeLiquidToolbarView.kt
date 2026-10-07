@@ -249,7 +249,7 @@ class HomeLiquidToolbarController(
 		addView(composeView, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
 	}
 
-	fun setBackdropBitmap(bitmap: Bitmap) {
+	fun setBackdropBitmap(bitmap: Bitmap?) {
 		backdrop.update(bitmap)
 	}
 	fun setContentTouchTarget(target: View?) { contentTouchTarget = target }

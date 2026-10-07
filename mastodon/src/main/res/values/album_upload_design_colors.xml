@@ -1,15 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="album_upload_design_blue">#007ABD</color>
-    <color name="album_upload_design_blue_disabled">#55758B</color>
-    <color name="album_upload_design_dark_background">#111111</color>
-    <color name="album_upload_design_dark_surface">#252525</color>
-    <color name="album_upload_design_dark_tile">#363636</color>
-    <color name="album_upload_design_dark_accent">#D5D39A</color>
-    <color name="album_upload_design_light_accent">#817029</color>
-    <color name="album_upload_design_dark_gold_surface">#2B2213</color>
-    <color name="album_upload_design_light_gold_surface">#F5EDD9</color>
-    <color name="album_upload_design_dark_gold">#E9C778</color>
-    <color name="album_upload_design_light_gold">#74591D</color>
-    <color name="album_upload_design_remove_surface">#C0111111</color>
+    <!-- Album upload uses the app's colorM3 theme attributes directly, not a separate palette. -->
 </resources>

@@ -33,8 +33,8 @@ internal class ViewBitmapBackdrop : Backdrop {
 
 	override val isCoordinatesDependent = true
 
-	fun update(bitmap: Bitmap) {
-		image = bitmap.asImageBitmap()
+	fun update(bitmap: Bitmap?) {
+		image = bitmap?.asImageBitmap()
 		generation++
 	}
 

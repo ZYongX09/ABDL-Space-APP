@@ -214,8 +214,7 @@ public final class AlbumUploader{
 							validateUploadAuthorization(auth, variant.mimeType, variant.size, variant.contentMd5, System.currentTimeMillis()/1000);
 							variant.putAttempted=true; save();
 							put(auth, variant, done);
-							CompleteResponse response=api("POST", "/uploads/"+auth.uploadId+"/complete", Map.of(), CompleteResponse.class);
-							if(!response.complete) throw new Failure("图片尚未通过存储校验，请重试", "upload_incomplete", 409, true, true);
+							completeOrThrow(auth.uploadId);
 							variant.complete=true;
 						}
 						save();
@@ -400,11 +399,30 @@ public final class AlbumUploader{
 		for(UploadAuthorization upload:response.uploads) if(clientId.equals(upload.clientId) && kind.equals(upload.kind)) return upload;
 		throw new IOException("缺少图片上传授权");
 	}
+	/** Definitive "object absent" answers: the batch may safely issue another PUT. */
+	private static final Set<String> OBJECT_MISSING_CODES=Set.of("upload_object_missing", "upload_incomplete", "object_not_found", "upload_not_complete", "object_missing");
+	/** The server could not run verification: the object may already exist, so only complete-first retries are safe. */
+	private static final Set<String> VERIFICATION_UNAVAILABLE_CODES=Set.of("upload_verification_unavailable", "private_storage_unavailable", "albums_unavailable");
 	private boolean tryComplete(String uploadId) throws IOException{
 		try{ return api("POST", "/uploads/"+uploadId+"/complete", Map.of(), CompleteResponse.class).complete; }
 		catch(Failure error){
-			if(Set.of("upload_object_missing", "upload_incomplete", "object_not_found", "upload_not_complete", "object_missing").contains(error.code)) return false;
-			throw error; // Access/entitlement/transport failures must NEVER trigger another PUT.
+			if(OBJECT_MISSING_CODES.contains(error.code)) return false;
+			throw normalizeVerificationFailure(error); // Access/entitlement/transport failures must NEVER trigger another PUT.
+		}
+	}
+	/** A refused verification is a known "not complete" outcome; resume retries the same complete-first flow. */
+	private static Failure normalizeVerificationFailure(Failure error){
+		if(VERIFICATION_UNAVAILABLE_CODES.contains(error.code) || error.status==502 || error.status==503 || error.status==429)
+			return new Failure(error.getMessage(), error.code, error.status, true, false);
+		return error;
+	}
+	private void completeOrThrow(String uploadId) throws IOException{
+		try{
+			if(!api("POST", "/uploads/"+uploadId+"/complete", Map.of(), CompleteResponse.class).complete)
+				throw new Failure("图片尚未通过存储校验，请重试", "upload_incomplete", 409, true, true);
+		}catch(Failure error){
+			if(OBJECT_MISSING_CODES.contains(error.code)) throw new Failure(error.getMessage(), error.code, error.status, true, true);
+			throw normalizeVerificationFailure(error);
 		}
 	}
 	private void put(UploadAuthorization auth, Variant variant, long alreadyTransferred) throws IOException{

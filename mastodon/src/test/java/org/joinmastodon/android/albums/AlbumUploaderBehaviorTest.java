@@ -202,6 +202,16 @@ public class AlbumUploaderBehaviorTest{
 		AlbumUploader resumed=AlbumUploader.resume(accountId, operation); tasks.add(resumed); Result result=execute(resumed);
 		assertNull(result.error); assertNotNull(result.published); assertEquals(operation, resumed.getOperationId()); assertEquals(body, authorizeBodies.get(1)); assertEquals(2, putCount);
 	}
+	@Test public void verificationUnavailableKeepsOutcomeKnownAndResumeRetriesCompleteFirstWithoutSecondPut() throws Exception{
+		failCompleteOnce=true; AlbumUploader first=create("hd"); Result failed=execute(first);
+		assertNotNull(failed.error); assertEquals("upload_verification_unavailable", failed.error.code);
+		assertTrue(failed.error.retryable);
+		assertFalse("Verification unavailability is a known not-complete outcome, not an unknown one", failed.error.outcomeUnknown);
+		assertEquals(1, putCount); // The preview PUT succeeded; the refusal consumed no bytes.
+		AlbumUploader resumed=AlbumUploader.resume(accountId, first.getOperationId()); tasks.add(resumed); Result result=execute(resumed);
+		assertNull(result.error); assertNotNull(result.published);
+		assertEquals(2, putCount); // Resume PUTs only the missing hd variant; the existing preview is verified complete-first.
+	}
 	@Test public void lostPublicationResponseRecoversBeforeAuthorization() throws Exception{
 		losePublishOnce=true; AlbumUploader task=create("hd"); Result failed=execute(task); assertTrue(published); assertNotNull(failed.error); assertTrue(failed.error.outcomeUnknown);
 		AlbumUploader resumed=AlbumUploader.resume(accountId, task.getOperationId()); tasks.add(resumed); Result success=execute(resumed);

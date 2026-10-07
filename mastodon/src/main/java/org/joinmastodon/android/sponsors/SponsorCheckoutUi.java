@@ -12,6 +12,7 @@ import android.text.style.StyleSpan;
 import android.view.View;
 import android.widget.Button;
 import android.widget.LinearLayout;
+import android.widget.ImageView;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
@@ -44,6 +45,42 @@ public final class SponsorCheckoutUi{
 		TextView body=SponsorUi.text(card, text, false);
 		// This card stays baby pink in both themes, so its text must stay dark too.
 		body.setTextColor(Color.rgb(85, 39, 61));
+		TextView example=SponsorUi.text(card, context.getString(R.string.sponsor_payment_guide_example_note), false);
+		example.setTextAppearance(R.style.m3_body_medium);
+		example.setTextColor(Color.rgb(85, 39, 61));
+		LinearLayout steps=new LinearLayout(context);
+		card.addView(steps, new LinearLayout.LayoutParams(-1, -2));
+		for(int step=0; step<2; step++){
+			final int selectedStep=step;
+			LinearLayout stage=new LinearLayout(context);
+			stage.setOrientation(LinearLayout.VERTICAL);
+			LinearLayout.LayoutParams stageParams=new LinearLayout.LayoutParams(0, -2, 1);
+			if(step==0) stageParams.rightMargin=V.dp(12);
+			steps.addView(stage, stageParams);
+			TextView caption=SponsorUi.text(stage, context.getString(SponsorPaymentGuide.captionResource(step)), true);
+			caption.setTextAppearance(R.style.m3_title_small);
+			caption.setTextColor(Color.rgb(122, 31, 77));
+			ImageView image=new ImageView(context);
+			image.setImageResource(SponsorPaymentGuide.imageResource(step));
+			image.setAdjustViewBounds(true);
+			image.setScaleType(ImageView.ScaleType.FIT_CENTER);
+			image.setMinimumHeight(V.dp(48));
+			image.setContentDescription(context.getString(R.string.sponsor_payment_guide_image_action,
+					context.getString(SponsorPaymentGuide.captionResource(step))));
+			image.setFocusable(true);
+			image.setOnClickListener(v->SponsorPaymentGuide.show(context, selectedStep));
+			stage.addView(image, new LinearLayout.LayoutParams(-1, -2));
+			Button larger=new Button(context, null, 0, R.style.Widget_Mastodon_M3_Button_Text);
+			larger.setText(R.string.sponsor_payment_guide_view_larger);
+			larger.setContentDescription(image.getContentDescription());
+			larger.setTextColor(Color.rgb(122, 31, 77));
+			larger.setAllCaps(false);
+			larger.setSingleLine(false);
+			larger.setMinHeight(V.dp(48));
+			larger.setPadding(V.dp(4), V.dp(4), V.dp(4), V.dp(4));
+			larger.setOnClickListener(v->SponsorPaymentGuide.show(context, selectedStep));
+			stage.addView(larger, new LinearLayout.LayoutParams(-1, -2));
+		}
 		return card;
 	}
 

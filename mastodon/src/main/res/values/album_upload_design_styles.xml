@@ -12,7 +12,7 @@
     </style>
     <style name="Widget.Mastodon.AlbumUpload.UploadButton" parent="Widget.Mastodon.AlbumUpload.HeaderButton">
         <item name="android:background">@drawable/album_upload_design_button</item>
-        <item name="android:textColor">#FFFFFF</item>
+        <item name="android:textColor">@color/button_text_m3_filled</item>
     </style>
     <style name="Widget.Mastodon.AlbumUpload.Row" parent="">
         <item name="android:minHeight">56dp</item>

@@ -11,6 +11,7 @@ import kotlin.math.abs
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
+import org.joinmastodon.android.CompatibilityTestApplication
 import org.joinmastodon.android.MastodonApp
 import org.joinmastodon.android.R
 import org.junit.Assert.assertEquals
@@ -27,7 +28,7 @@ import org.robolectric.annotation.LooperMode
 import java.util.function.IntConsumer
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [26])
+@Config(sdk = [26], application = CompatibilityTestApplication::class)
 @LooperMode(LooperMode.Mode.PAUSED)
 class HomeLiquidToolbarMenuInteractionTest {
 	@get:Rule val compose = createComposeRule()

@@ -4,6 +4,10 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.Drawable;
+import android.graphics.drawable.LayerDrawable;
+import android.view.Gravity;
+import android.widget.ImageView;
 import android.net.Uri;
 import android.text.InputFilter;
 import android.text.InputType;
@@ -14,12 +18,14 @@ import android.widget.LinearLayout;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.TextView;
+import android.widget.ScrollView;
 
 import org.joinmastodon.android.R;
 import org.joinmastodon.android.model.albums.AlbumModels.Album;
 import org.joinmastodon.android.ui.M3AlertDialogBuilder;
 import org.joinmastodon.android.ui.OutlineProviders;
 import org.joinmastodon.android.ui.utils.UiUtils;
+import org.joinmastodon.android.ui.views.M3Switch;
 
 import java.time.Instant;
 import java.time.ZoneId;
@@ -52,6 +58,46 @@ final class AlbumUi{
 		int second=UiUtils.getThemeColor(context, R.attr.colorM3SurfaceVariant);
 		return new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{first, second});
 	}
+	static Drawable protectedPlaceholder(Context context){
+		Drawable lock=context.getDrawable(R.drawable.ic_lock_24px).mutate(); lock.setTint(UiUtils.getThemeColor(context, R.attr.colorM3OnSurfaceVariant));
+		LayerDrawable placeholder=new LayerDrawable(new Drawable[]{gradient(context, null), lock});
+		placeholder.setLayerSize(1, V.dp(32), V.dp(32)); placeholder.setLayerGravity(1, Gravity.CENTER); return placeholder;
+	}
+	private static final java.util.WeakHashMap<ImageView, ImageLoad> imageLoads=new java.util.WeakHashMap<>();
+	/** Use the cache's public cancellation handle, rather than ViewImageLoader's private LoadTask. */
+	static void loadImage(ImageView view, String url, int size){
+		cancelImage(view);
+		ImageLoad load=new ImageLoad(view); imageLoads.put(view, load); view.addOnAttachStateChangeListener(load);
+		load.request=me.grishka.appkit.imageloader.ImageCache.getInstance(view.getContext()).get(
+				new me.grishka.appkit.imageloader.requests.UrlImageLoaderRequest(url, size, size), null, load, true);
+	}
+	static boolean isImageLoading(ImageView view){ return imageLoads.containsKey(view); }
+	static void cancelImage(ImageView view){
+		ImageLoad load=imageLoads.remove(view);
+		if(load!=null){ load.canceled=true; if(load.request!=null) load.request.cancel(); view.removeOnAttachStateChangeListener(load); }
+	}
+	static void clearImages(View root){
+		if(root instanceof ImageView image){ cancelImage(image); image.setImageDrawable(null); }
+		if(root instanceof android.view.ViewGroup group) for(int i=0;i<group.getChildCount();i++) clearImages(group.getChildAt(i));
+	}
+	private static final class ImageLoad implements me.grishka.appkit.imageloader.ImageLoaderCallback, View.OnAttachStateChangeListener{
+		final java.lang.ref.WeakReference<ImageView> view;
+		final android.os.Handler main=new android.os.Handler(android.os.Looper.getMainLooper());
+		me.grishka.appkit.imageloader.ImageCache.PendingImageRequest request;
+		boolean canceled;
+		ImageLoad(ImageView view){ this.view=new java.lang.ref.WeakReference<>(view); }
+		@Override public void onImageLoaded(me.grishka.appkit.imageloader.requests.ImageLoaderRequest request, Drawable drawable){
+			main.post(()->{
+				ImageView target=view.get();
+				if(!canceled && target!=null && imageLoads.get(target)==this){ cancelImage(target); target.setImageDrawable(drawable); }
+			});
+		}
+		@Override public void onImageLoadingFailed(me.grishka.appkit.imageloader.requests.ImageLoaderRequest request, Throwable error){
+			main.post(()->{ ImageView target=view.get(); if(target!=null && imageLoads.get(target)==this) cancelImage(target); });
+		}
+		@Override public void onViewAttachedToWindow(View view){}
+		@Override public void onViewDetachedFromWindow(View view){ cancelImage((ImageView)view); }
+	}
 	static String date(long second){ return DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM).withZone(ZoneId.systemDefault()).format(Instant.ofEpochSecond(second)); }
 	static String inviteToken(String value){
 		if(value==null) return null;
@@ -79,19 +125,30 @@ final class AlbumUi{
 		}
 		privacy.check(1+Math.max(0, VISIBILITIES.indexOf(album==null ? "private" : album.visibility))); root.addView(privacy);
 		label(root, context.getString(album!=null && album.isDefault ? R.string.album_default_help : R.string.album_privacy_help), false);
-		android.app.AlertDialog dialog=new M3AlertDialogBuilder(context).setTitle(album==null ? R.string.album_new : R.string.album_settings).setView(root)
+		// Creation still uses the legacy name/visibility contract. Protection is owner-only, after creation.
+		M3Switch protection=album!=null && album.isOwner ? new M3Switch(context) : null;
+		if(protection!=null){
+			protection.setText(R.string.album_protection_title); protection.setTextAppearance(R.style.m3_title_medium);
+			protection.setTextColor(UiUtils.getThemeColor(context, R.attr.colorM3OnSurface)); protection.setMinHeight(V.dp(56));
+			protection.setChecked(album.downloadProtected); root.addView(protection, new LinearLayout.LayoutParams(-1, -2));
+			label(root, context.getString(R.string.album_protection_description), false);
+		}
+		ScrollView scroll=new ScrollView(context); scroll.addView(root);
+		android.app.AlertDialog dialog=new M3AlertDialogBuilder(context).setTitle(album==null ? R.string.album_new : R.string.album_settings).setView(scroll)
 				.setPositiveButton(album==null ? R.string.album_create : R.string.album_save, null).setNegativeButton(R.string.cancel, null).create();
 		dialog.setOnShowListener(ignored->dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
 			String value=name.getText().toString().trim();
-			if(value.isEmpty() || value.codePointCount(0, value.length())>80){ name.setError(context.getString(R.string.album_name_invalid)); return; }
-			if(album!=null && album.isDefault){ dialog.dismiss(); return; }
-			submit.accept(new EditValues(value, VISIBILITIES.get(Math.max(0, privacy.getCheckedRadioButtonId()-1)))); dialog.dismiss();
+			if(album!=null && !album.isOwner){ dialog.dismiss(); return; }
+			if((album==null || !album.isDefault) && (value.isEmpty() || value.codePointCount(0, value.length())>80)){ name.setError(context.getString(R.string.album_name_invalid)); return; }
+			submit.accept(new EditValues(value, VISIBILITIES.get(Math.max(0, privacy.getCheckedRadioButtonId()-1)), protection!=null && protection.isChecked())); dialog.dismiss();
 		}));
-		if(delete!=null && album!=null && !album.isDefault) button(root, R.string.album_delete_album, ()->{ dialog.dismiss(); delete.run(); });
+		if(delete!=null && album!=null && album.isOwner && !album.isDefault) button(root, R.string.album_delete_album, ()->{ dialog.dismiss(); delete.run(); });
 		dialog.show(); return dialog;
 	}
 	static class EditValues{
 		final String name, visibility;
-		EditValues(String name, String visibility){ this.name=name; this.visibility=visibility; }
+		final boolean downloadProtected;
+		EditValues(String name, String visibility){ this(name, visibility, false); }
+		EditValues(String name, String visibility, boolean downloadProtected){ this.name=name; this.visibility=visibility; this.downloadProtected=downloadProtected; }
 	}
 }

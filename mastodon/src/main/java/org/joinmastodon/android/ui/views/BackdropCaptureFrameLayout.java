@@ -3,9 +3,12 @@ package org.joinmastodon.android.ui.views;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
+import android.graphics.ColorFilter;
 import android.graphics.Paint;
+import android.graphics.PixelFormat;
 import android.graphics.Path;
 import android.graphics.PorterDuff;
+import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
@@ -20,10 +23,13 @@ import org.joinmastodon.android.ui.drawables.BlurhashCrossfadeDrawable;
 import org.joinmastodon.android.ui.utils.LiquidGlassCompatibility;
 
 import java.util.ArrayList;
+import java.util.IdentityHashMap;
 import java.util.WeakHashMap;
 
 public class BackdropCaptureFrameLayout extends FrameLayout{
 	public interface CaptureListener{
+		// Either strip may be null. A budget pause delivers (null, null) once to clear
+		// stale consumer images, but keeps this registration for the next real draw.
 		void onCaptured(Bitmap top, Bitmap bottom);
 	}
 
@@ -42,6 +48,7 @@ public class BackdropCaptureFrameLayout extends FrameLayout{
 	private Bitmap bottomCaptureBitmap;
 	private CaptureListener captureListener;
 	private boolean capturing;
+	private boolean budgetPaused;
 	private boolean captureFrameScheduled;
 	private int captureGeneration;
 	private long captureBufferBytes;
@@ -83,6 +90,7 @@ public class BackdropCaptureFrameLayout extends FrameLayout{
 		cancelCaptureFrame();
 		captureGeneration++;
 		this.captureListener=captureListener;
+		budgetPaused=false;
 		if(captureListener==null || !LiquidGlassCompatibility.isSupported()){
 			stopCapture();
 			return;
@@ -125,14 +133,40 @@ public class BackdropCaptureFrameLayout extends FrameLayout{
 	private void stopCapture(){
 		captureGeneration++;
 		captureListener=null;
+		budgetPaused=false;
 		cancelCaptureFrame();
 		releaseCaptureResources();
 		// An in-flight pass still owns its restoration queue and capturing flag.
 	}
 
-	private void failCapture(Throwable error){
-		stopCapture();
-		LiquidGlassCompatibility.reportFailure("backdrop capture", error);
+	private void pauseCapture(){
+		cancelCaptureFrame();
+		releaseCaptureResources();
+		if(budgetPaused || captureListener==null)
+			return;
+		budgetPaused=true;
+		// A consumer clearing its image can invalidate synchronously. Do not turn that
+		// notification (or our temporary drawable changes) into a self-sustaining retry.
+		capturing=true;
+		try{
+			captureListener.onCaptured(null, null);
+		}finally{
+			capturing=false;
+		}
+		// No timer: layout, capture-height changes and real content invalidation retry.
+	}
+
+	// Only our explicit allocation limits pause this capture, never the graphics session.
+	private static class CaptureBudgetExceededException extends RuntimeException{
+		CaptureBudgetExceededException(String message){
+			super(message);
+		}
+	}
+
+	private static void rethrow(Throwable error){
+		if(error instanceof Error fatal)
+			throw fatal;
+		throw (RuntimeException)error;
 	}
 
 	@Override
@@ -146,10 +180,10 @@ public class BackdropCaptureFrameLayout extends FrameLayout{
 			stopCapture();
 			return;
 		}
-		if(!canvas.isHardwareAccelerated()){
-			failCapture(new IllegalStateException("Backdrop capture requires a hardware-accelerated window canvas"));
+		// A one-off software snapshot does not describe the actual window renderer.
+		// Keep both the callback and last delivered buffers for its next hardware draw.
+		if(!canvas.isHardwareAccelerated())
 			return;
-		}
 		if((topCaptureHeight<=0 && bottomCaptureHeight<=0) || getWidth()<=0 || getHeight()<=0)
 			return;
 
@@ -164,32 +198,47 @@ public class BackdropCaptureFrameLayout extends FrameLayout{
 		capturing=true;
 		try{
 			if(width>MAX_CAPTURE_DIMENSION || height>MAX_CAPTURE_DIMENSION)
-				throw new IllegalStateException("Backdrop capture exceeds safe dimensions for the 16 MiB bitmap budget");
-			updateSoftwareBitmapCacheBytes();
-			long available=CAPTURE_MEMORY_BUDGET_BYTES-softwareBitmapCacheBytes;
-			// Outputs must retain their root-pixel size: setBackdropBitmap has no scale metadata.
-			// Divide before multiplying, and reserve cached software copies before choosing a scale.
-			long outputBytesPerColumn=((long)actualTopHeight+actualBottomHeight)*4;
-			if(available<=0 || width>available/outputBytesPerColumn)
-				throw new IllegalStateException("Backdrop capture exceeds the 16 MiB bitmap budget");
-			long outputBytes=width*outputBytesPerColumn;
-			long sharedBudget=available-outputBytes;
+				throw new CaptureBudgetExceededException("Backdrop capture exceeds safe dimensions for the 16 MiB bitmap budget");
+			// Plan the entire pass before allocating: native strips, intermediate and all
+			// new copies (deduplicated by source identity), not just yesterday's cache.
+			long outputBytes=(long)width*((long)actualTopHeight+actualBottomHeight)*4;
 			int downsample=1, sharedWidth=0, sampledHeight=0;
 			long requiredBytes=0;
-			// At most half or quarter resolution, not an unbounded shrink-until-it-fits loop.
+			ArrayList<ImageView> images=new ArrayList<>();
+			collectHardwareImages(this, images);
+			IdentityHashMap<Bitmap, Boolean> needed=new IdentityHashMap<>();
+			IdentityHashMap<ImageView, Boolean> intersecting=new IdentityHashMap<>();
 			for(;downsample<=MAX_CAPTURE_DOWNSAMPLE;downsample*=2){
+				needed.clear();
+				intersecting.clear();
+				int guard=actualTopHeight>0 && downsample>1 ? 2*downsample : 0;
+				for(ImageView image:images){
+					if(intersectsCapture(image, actualTopHeight, actualBottomHeight, guard)){
+						intersecting.put(image, Boolean.TRUE);
+						needed.put(((BitmapDrawable)hardwareDrawable(image)).getBitmap(), Boolean.TRUE);
+					}
+				}
+				long copyBytes=0;
+				for(Bitmap source:needed.keySet()){
+					Bitmap cached=softwareBitmapCache.get(source);
+					copyBytes+=cached!=null && !cached.isRecycled() ? cached.getAllocationByteCount()
+							: (long)source.getWidth()*source.getHeight()*4;
+				}
 				int candidateWidth=(width+downsample-1)/downsample;
 				int candidateHeight=(sharedHeight+downsample-1)/downsample;
-				long sharedBytesPerColumn=(long)candidateHeight*(actualTopHeight>0 ? 2 : 4);
-				if(candidateWidth<=sharedBudget/sharedBytesPerColumn){
+				long candidateBytes=outputBytes+(long)candidateWidth*candidateHeight*(actualTopHeight>0 ? 2 : 4);
+				if(candidateBytes<=CAPTURE_MEMORY_BUDGET_BYTES-copyBytes){
 					sharedWidth=candidateWidth;
 					sampledHeight=candidateHeight;
-					requiredBytes=outputBytes+candidateWidth*sharedBytesPerColumn;
+					requiredBytes=candidateBytes;
 					break;
 				}
 			}
 			if(sharedWidth==0)
-				throw new IllegalStateException("Backdrop capture exceeds the 16 MiB bitmap budget at bounded downsampling");
+				throw new CaptureBudgetExceededException("Backdrop capture exceeds the 16 MiB bitmap budget at bounded downsampling");
+			// Unrelated old cache entries are evictable, not part of this frame's plan.
+			softwareBitmapCache.keySet().removeIf(source->!needed.containsKey(source));
+			updateSoftwareBitmapCacheBytes();
 
 			if(captureBitmap==null || captureBitmap.getWidth()!=sharedWidth || captureBitmap.getHeight()!=sampledHeight || captureBitmap.getConfig()!=sharedConfig
 					|| (actualTopHeight>0 && (topCaptureBitmap==null || topCaptureBitmap.getWidth()!=width || topCaptureBitmap.getHeight()!=actualTopHeight))
@@ -208,11 +257,11 @@ public class BackdropCaptureFrameLayout extends FrameLayout{
 					+(topCaptureBitmap==null ? 0 : topCaptureBitmap.getAllocationByteCount())
 					+(bottomCaptureBitmap==null ? 0 : bottomCaptureBitmap.getAllocationByteCount());
 			if(captureBufferBytes>CAPTURE_MEMORY_BUDGET_BYTES-softwareBitmapCacheBytes)
-				throw new IllegalStateException("Backdrop capture exceeds the 16 MiB bitmap budget");
+				throw new CaptureBudgetExceededException("Backdrop capture exceeds the 16 MiB bitmap budget");
 			// Local references survive reentrant disabling/height changes without reviving our fields.
 			Bitmap shared=captureBitmap, top=topCaptureBitmap, bottom=bottomCaptureBitmap;
 			// ALL conversion must be inside the restoration boundary: a later child may fail.
-			replaceHardwareBitmaps(this);
+			replaceHardwareBitmaps(images, intersecting);
 			if(generation==captureGeneration){
 				Canvas captureCanvas=new Canvas(shared);
 				captureCanvas.drawColor(0, PorterDuff.Mode.CLEAR);
@@ -254,20 +303,33 @@ public class BackdropCaptureFrameLayout extends FrameLayout{
 						bottomCanvas.drawBitmap(shared, null, new RectF(0, -offset, width, sharedHeight-offset), resamplePaint);
 				}
 			}
-		}catch(RuntimeException | LinkageError | OutOfMemoryError error){
+		}catch(RuntimeException | Error error){
 			failure=error;
 		}finally{
 			try{
 				Throwable restoreFailure=restoreHardwareBitmaps();
-				if(failure==null)
-					failure=restoreFailure;
+				if(restoreFailure!=null){
+					if(failure==null || failure instanceof CaptureBudgetExceededException)
+						failure=restoreFailure;
+					else if(failure!=restoreFailure)
+						failure.addSuppressed(restoreFailure);
+				}
 			}finally{
 				capturing=false;
 			}
 		}
-		if(failure!=null){
-			failCapture(failure);
+		if(failure instanceof CaptureBudgetExceededException){
+			// A reentrant disable/listener change owns the new generation; do not send
+			// a stale pause notification to that registration.
+			if(generation==captureGeneration)
+				pauseCapture();
+			else
+				releaseCaptureResources();
 			return;
+		}
+		if(failure!=null){
+			releaseCaptureResources();
+			rethrow(failure);
 		}
 		if(generation!=captureGeneration){
 			releaseCaptureResources();
@@ -277,10 +339,12 @@ public class BackdropCaptureFrameLayout extends FrameLayout{
 			stopCapture();
 			return;
 		}
+		budgetPaused=false;
 		try{
 			listener.onCaptured(actualTopHeight>0 ? topCaptureBitmap : null, actualBottomHeight>0 ? bottomCaptureBitmap : null);
-		}catch(RuntimeException | LinkageError | OutOfMemoryError error){
-			failCapture(error);
+		}catch(RuntimeException | Error error){
+			releaseCaptureResources();
+			throw error;
 		}
 	}
 
@@ -290,27 +354,144 @@ public class BackdropCaptureFrameLayout extends FrameLayout{
 		super.onDetachedFromWindow();
 	}
 
-	private void replaceHardwareBitmaps(View view){
-		if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.O && view instanceof ImageView imageView){
-			Drawable drawable=imageView.getDrawable();
-			if(drawable instanceof BlurhashCrossfadeDrawable crossfadeDrawable){
-				Drawable imageDrawable=crossfadeDrawable.getImageDrawable();
-				Drawable replacement=getSoftwareDrawable(imageDrawable);
-				if(replacement!=imageDrawable){
-					restoreDrawables.add(()->crossfadeDrawable.setImageDrawable(imageDrawable));
-					crossfadeDrawable.setImageDrawable(replacement);
-				}
-			}else{
-				Drawable replacement=getSoftwareDrawable(drawable);
-				if(replacement!=drawable){
-					restoreDrawables.add(()->imageView.setImageDrawable(drawable));
-					imageView.setImageDrawable(replacement);
-				}
-			}
+	private Drawable hardwareDrawable(ImageView image){
+		Drawable drawable=image.getDrawable();
+		if(drawable instanceof BlurhashCrossfadeDrawable crossfade)
+			drawable=crossfade.getImageDrawable();
+		return drawable;
+	}
+
+	private void collectHardwareImages(View view, ArrayList<ImageView> images){
+		// A legacy visibility animation may still draw an otherwise hidden child.
+		if(view.getVisibility()!=View.VISIBLE && view.getAnimation()==null)
+			return;
+		if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.O && view instanceof ImageView image){
+			Drawable drawable=hardwareDrawable(image);
+			if(drawable instanceof BitmapDrawable bitmapDrawable && bitmapDrawable.getBitmap()!=null
+					&& requiresSoftwareCopy(bitmapDrawable.getBitmap()))
+				images.add(image);
 		}
 		if(view instanceof ViewGroup group){
 			for(int i=0;i<group.getChildCount();i++)
-				replaceHardwareBitmaps(group.getChildAt(i));
+				collectHardwareImages(group.getChildAt(i), images);
+		}
+	}
+
+	private boolean intersectsCapture(ImageView image, int topHeight, int bottomHeight, int guard){
+		// Work in host-local coordinates, never screen/window coordinates. Only prove
+		// exclusion for ordinary geometry; transforms/animations/custom boundaries
+		// that cannot be proven safe must keep conversion (software Canvas validates
+		// hardware bitmap arguments even when the current clip misses the image).
+		// Check the whole chain first: an ancestor transform can move an apparently
+		// clipped/off-strip descendant back into view.
+		for(View current=image;current!=this;){
+			if(current.getAnimation()!=null || !current.getMatrix().isIdentity())
+				return true;
+			if(!(current.getParent() instanceof View parent))
+				return true;
+			current=parent;
+		}
+		Rect bounds=image.getDrawable().getBounds();
+		if(bounds.isEmpty())
+			return true;
+		RectF area=new RectF(bounds);
+		if(!image.getImageMatrix().isAffine())
+			return true;
+		image.getImageMatrix().mapRect(area);
+		if(!Float.isFinite(area.left) || !Float.isFinite(area.top) || !Float.isFinite(area.right) || !Float.isFinite(area.bottom))
+			return true;
+		area.offset(image.getPaddingLeft()-image.getScrollX(), image.getPaddingTop()-image.getScrollY());
+		if(image.getCropToPadding() && !area.intersect(image.getPaddingLeft(), image.getPaddingTop(),
+				image.getWidth()-image.getPaddingRight(), image.getHeight()-image.getPaddingBottom()))
+			return false;
+		View child=image;
+		while(child!=this){
+			if(child.getAnimation()!=null || !child.getMatrix().isIdentity())
+				return true;
+			if(!(child.getParent() instanceof ViewGroup parent))
+				return true;
+			if(parent.getClipChildren() && !area.intersect(0, 0, child.getWidth(), child.getHeight()))
+				return false;
+			area.offset(child.getLeft()-parent.getScrollX(), child.getTop()-parent.getScrollY());
+			// ViewGroup only clips to padding when its padding-not-null flag is set.
+			// With zero padding and clipChildren=false, children may overflow the parent.
+			if(parent.getClipToPadding() && (parent.getPaddingLeft()!=0 || parent.getPaddingTop()!=0
+					|| parent.getPaddingRight()!=0 || parent.getPaddingBottom()!=0)
+					&& !area.intersect(parent.getPaddingLeft(), parent.getPaddingTop(),
+					parent.getWidth()-parent.getPaddingRight(), parent.getHeight()-parent.getPaddingBottom()))
+				return false;
+			child=parent;
+		}
+		return (topHeight>0 && RectF.intersects(area, new RectF(0, 0, getWidth(), Math.min(getHeight(), topHeight+guard))))
+				|| (bottomHeight>0 && RectF.intersects(area, new RectF(0, Math.max(0, getHeight()-bottomHeight-guard), getWidth(), getHeight())));
+	}
+
+	private void replaceHardwareBitmaps(ArrayList<ImageView> images, IdentityHashMap<ImageView, Boolean> intersecting){
+		for(ImageView image:images){
+			Drawable drawable=image.getDrawable();
+			Drawable source=hardwareDrawable(image);
+			// Never submit off-strip hardware bitmap arguments to a software Canvas.
+			// A null drawable would change ImageView's intrinsic dimensions and request
+			// another framework layout on both replacement and restoration: use a no-op
+			// with identical sizing instead, without suppressing legitimate requestLayout.
+			Drawable replacement=intersecting.containsKey(image) ? getSoftwareDrawable(source) : new CapturePlaceholderDrawable(source);
+			if(drawable instanceof BlurhashCrossfadeDrawable crossfade){
+				restoreDrawables.add(()->crossfade.setImageDrawable(source));
+				crossfade.setImageDrawable(replacement);
+			}else{
+				restoreDrawables.add(()->image.setImageDrawable(drawable));
+				image.setImageDrawable(replacement);
+			}
+		}
+	}
+
+	private static class CapturePlaceholderDrawable extends Drawable{
+		private final int intrinsicWidth, intrinsicHeight, minimumWidth, minimumHeight;
+
+		CapturePlaceholderDrawable(Drawable source){
+			intrinsicWidth=source.getIntrinsicWidth();
+			intrinsicHeight=source.getIntrinsicHeight();
+			minimumWidth=source.getMinimumWidth();
+			minimumHeight=source.getMinimumHeight();
+			setBounds(source.getBounds());
+		}
+
+		@Override
+		public void draw(Canvas canvas){
+			// Intentionally no bitmap draw, even on a software Canvas.
+		}
+
+		@Override
+		public void setAlpha(int alpha){
+		}
+
+		@Override
+		public void setColorFilter(ColorFilter colorFilter){
+		}
+
+		@Override
+		public int getOpacity(){
+			return PixelFormat.TRANSPARENT;
+		}
+
+		@Override
+		public int getIntrinsicWidth(){
+			return intrinsicWidth;
+		}
+
+		@Override
+		public int getIntrinsicHeight(){
+			return intrinsicHeight;
+		}
+
+		@Override
+		public int getMinimumWidth(){
+			return minimumWidth;
+		}
+
+		@Override
+		public int getMinimumHeight(){
+			return minimumHeight;
 		}
 	}
 
@@ -348,13 +529,13 @@ public class BackdropCaptureFrameLayout extends FrameLayout{
 		if(softwareBitmap==null || softwareBitmap.isRecycled()){
 			long available=CAPTURE_MEMORY_BUDGET_BYTES-captureBufferBytes-softwareBitmapCacheBytes;
 			if((long)bitmap.getWidth()*bitmap.getHeight()>available/4)
-				throw new IllegalStateException("Backdrop software copy exceeds the 16 MiB bitmap budget");
+				throw new CaptureBudgetExceededException("Backdrop software copy exceeds the 16 MiB bitmap budget");
 			softwareBitmap=copyHardwareBitmap(bitmap);
 			if(softwareBitmap==null)
 				throw new IllegalStateException("Hardware bitmap software copy returned null");
 			long allocatedBytes=softwareBitmap.getAllocationByteCount();
 			if(allocatedBytes>available)
-				throw new IllegalStateException("Backdrop software copy exceeds the 16 MiB bitmap budget");
+				throw new CaptureBudgetExceededException("Backdrop software copy exceeds the 16 MiB bitmap budget");
 			softwareBitmapCache.put(bitmap, softwareBitmap);
 			softwareBitmapCacheBytes+=allocatedBytes;
 		}
@@ -367,10 +548,12 @@ public class BackdropCaptureFrameLayout extends FrameLayout{
 			for(int i=restoreDrawables.size()-1;i>=0;i--){
 				try{
 					restoreDrawables.get(i).run();
-				}catch(RuntimeException | LinkageError | OutOfMemoryError error){
+				}catch(RuntimeException | Error error){
 					// One broken setter must not strand the other children on software drawables.
 					if(failure==null)
 						failure=error;
+					else if(failure!=error)
+						failure.addSuppressed(error);
 				}
 			}
 		}finally{

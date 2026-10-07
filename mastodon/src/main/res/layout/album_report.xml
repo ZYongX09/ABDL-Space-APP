@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/album_report_reason_header"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:textColor="?android:attr/textColorPrimary"
+        android:layout_marginBottom="8dp" />
+
+    <LinearLayout
+        android:id="@+id/album_report_reasons"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_marginBottom="16dp" />
+
+    <EditText
+        android:id="@+id/album_report_detail"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:minHeight="120dp"
+        android:hint="@string/album_report_detail_hint"
+        android:inputType="textMultiLine"
+        android:maxLength="2000"
+        android:gravity="top"
+        android:background="@drawable/search_bg"
+        android:padding="12dp"
+        android:textSize="15sp"
+        android:layout_marginBottom="16dp" />
+
+    <Button
+        android:id="@+id/album_report_submit"
+        style="@style/Widget.Mastodon.M3.Button.Filled"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:text="@string/album_report_submit"
+        android:enabled="false"
+        android:layout_marginBottom="32dp" />
+
+</LinearLayout>

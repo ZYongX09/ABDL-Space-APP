@@ -103,6 +103,40 @@ public class AlbumPostIntegrationTest{
 		assertTrue(AlbumUpdateStatusDisplayItem.supported(status.albumUpdate));
 	}
 
+	@Test public void protectedMetadataDeserializesAndSurvivesParcel(){
+		Gson gson=org.joinmastodon.android.api.MastodonAPIController.gson;
+		var photo=gson.fromJson("{\"download_protected\":true,\"can_download\":false}", org.joinmastodon.android.model.albums.AlbumModels.Photo.class);
+		assertTrue(photo.downloadProtected); assertEquals(Boolean.FALSE, photo.canDownload);
+		assertNull(gson.fromJson("{}", org.joinmastodon.android.model.albums.AlbumModels.Photo.class).canDownload);
+		assertTrue(gson.fromJson("{\"download_protected\":true}", org.joinmastodon.android.model.albums.AlbumModels.Album.class).downloadProtected);
+		AlbumUpdate update=post().albumUpdate; update.downloadProtected=true;
+		android.os.Parcel parcel=android.os.Parcel.obtain();
+		try{
+			parcel.writeParcelable(org.parceler.Parcels.wrap(update), 0); parcel.setDataPosition(0);
+			AlbumUpdate restored=org.parceler.Parcels.unwrap(parcel.readParcelable(getClass().getClassLoader()));
+			assertTrue(restored.downloadProtected); assertEquals(update.albumId, restored.albumId);
+		}finally{ parcel.recycle(); }
+	}
+
+	@Test public void protectedCardHasZeroImageRequestsAndRejectsLateBitmap(){
+		try(ActivityController<Activity> lifecycle=Robolectric.buildActivity(Activity.class)){
+			Activity activity=lifecycle.get(); activity.setTheme(R.style.Theme_Mastodon_Light); lifecycle.setup();
+			Status status=post(); status.albumUpdate.downloadProtected=true; status.albumUpdate.coverUrl="https://must-not-load.example.test/cover.jpg";
+			AlbumUpdateStatusDisplayItem item=new AlbumUpdateStatusDisplayItem(status.id, new StatusDisplayItem.NoOpCallbacks(activity), activity, status, "offline");
+			assertTrue(AlbumUpdateStatusDisplayItem.supported(status.albumUpdate)); assertEquals(0, item.getImageCount()); assertNull(item.getImageRequest(0));
+			AlbumUpdateStatusDisplayItem.Holder holder=new AlbumUpdateStatusDisplayItem.Holder(activity, new FrameLayout(activity)); holder.onBind(item);
+			LinearLayout card=(LinearLayout)((FrameLayout)holder.itemView).getChildAt(0); ImageView image=(ImageView)card.getChildAt(0);
+			assertNotNull(image.getDrawable()); var placeholder=image.getDrawable();
+			holder.setImage(0, new BitmapDrawable(activity.getResources(), Bitmap.createBitmap(10, 10, Bitmap.Config.ARGB_8888))); assertSame(placeholder, image.getDrawable());
+			assertEquals(View.VISIBLE, card.getChildAt(5).getVisibility()); assertEquals(activity.getString(R.string.album_protection_enabled), ((TextView)card.getChildAt(5)).getText().toString());
+			holder.clearImage(0); assertNotNull(image.getDrawable());
+			status.albumUpdate.downloadProtected=false;
+			AlbumUpdateStatusDisplayItem normal=new AlbumUpdateStatusDisplayItem(status.id, new StatusDisplayItem.NoOpCallbacks(activity), activity, status, "offline");
+			assertEquals(1, normal.getImageCount()); assertNotNull(normal.getImageRequest(0)); holder.onBind(normal);
+			assertEquals(View.GONE, card.getChildAt(5).getVisibility()); assertNull(image.getDrawable());
+		}
+	}
+
 	@Test public void cardKeepsImageAspectFitAndThemeText(){
 		for(int theme:new int[]{R.style.Theme_Mastodon_Light, R.style.Theme_Mastodon_Dark}){
 			try(ActivityController<Activity> lifecycle=Robolectric.buildActivity(Activity.class)){
