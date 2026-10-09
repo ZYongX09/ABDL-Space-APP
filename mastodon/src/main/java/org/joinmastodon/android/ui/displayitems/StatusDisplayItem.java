@@ -116,6 +116,7 @@ public abstract class StatusDisplayItem{
 				case EMOJI_REACTIONS -> new EmojiReactionsStatusDisplayItem.Holder(activity, parent);
 				case FRIEND_REQUEST_ITEM -> new FriendRequestStatusDisplayItem.Holder(activity, parent);
 				case ALBUM_UPDATE -> new AlbumUpdateStatusDisplayItem.Holder(activity, parent);
+				case ADVERTISEMENT -> new AdvertisementStatusDisplayItem.Holder(activity, parent);
 			};
 	}
 
@@ -136,6 +137,14 @@ public abstract class StatusDisplayItem{
 			callbacks=new NoOpCallbacks(context);
 		String parentID=parentObject.getID();
 		Status statusForContent=status.getContentStatus();
+		if(statusForContent.advertisement!=null){
+			ArrayList<StatusDisplayItem> result=new ArrayList<>();
+			AdvertisementStatusDisplayItem adItem=new AdvertisementStatusDisplayItem(parentID, callbacks, context, statusForContent, accountID);
+			adItem.index=1;
+			adItem.fullWidth=(flags & FLAG_FULL_WIDTH)!=0;
+			result.add(adItem);
+			return result;
+		}
 		if(statusForContent.friendRequest!=null){
 			ArrayList<StatusDisplayItem> result=new ArrayList<>();
 			FriendRequestStatusDisplayItem friendRequestItem=new FriendRequestStatusDisplayItem(parentID, callbacks, context, statusForContent, accountID);
@@ -321,7 +330,8 @@ public abstract class StatusDisplayItem{
 			DUMMY,
 			EMOJI_REACTIONS,
 			FRIEND_REQUEST_ITEM,
-			ALBUM_UPDATE
+			ALBUM_UPDATE,
+			ADVERTISEMENT
 		}
 
 	public static abstract class Holder<T> extends BindableViewHolder<T> implements UsableRecyclerView.DisableableClickable{
