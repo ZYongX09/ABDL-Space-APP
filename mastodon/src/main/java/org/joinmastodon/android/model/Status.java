@@ -20,6 +20,7 @@ import java.util.Locale;
 import java.util.Objects;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import com.google.gson.JsonDeserializationContext;
 import com.google.gson.JsonDeserializer;
@@ -69,6 +70,12 @@ public class Status extends BaseModel implements DisplayItemsParent, Searchable 
 	public double heat;			// 热度（后端计算下发，App 不重算）
 	@SerializedName("friend_request")
 	public FriendRequest friendRequest;	// 交友宇宙卡片载荷（非标准字段，仅在跨站时间线内存在）
+	@SerializedName("album_update")
+	public org.joinmastodon.android.model.albums.AlbumModels.AlbumUpdate albumUpdate;
+	/** Optional extension payload. Ordinary Mastodon statuses keep this null. */
+	@SerializedName(value="advertisement", alternate={"advertisement_data", "ad"})
+	@Nullable
+	public Advertisement advertisement;
 	public Instant editedAt;
 
 	public String url;
