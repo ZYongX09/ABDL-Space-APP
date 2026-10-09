@@ -16,6 +16,8 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.content.res.ColorStateList;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Insets;
 import android.graphics.Paint;
 import android.graphics.PixelFormat;
@@ -51,7 +53,10 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
 import android.view.WindowManager;
+import android.view.WindowInsets;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.FrameLayout;
+import android.widget.LinearLayout;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
@@ -66,6 +71,7 @@ import org.joinmastodon.android.E;
 import org.joinmastodon.android.GlobalUserPreferences;
 import org.joinmastodon.android.R;
 import org.joinmastodon.android.api.MastodonAPIController;
+import org.joinmastodon.android.api.session.AccountSession;
 import org.joinmastodon.android.api.session.AccountSessionManager;
 import org.joinmastodon.android.events.StatusCountersUpdatedEvent;
 import org.joinmastodon.android.fragments.BaseStatusListFragment;
@@ -84,12 +90,17 @@ import org.joinmastodon.android.ui.views.WindowRootFrameLayout;
 import org.joinmastodon.android.utils.BroadcastCompat;
 import org.parceler.Parcels;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.InputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -111,6 +122,12 @@ import me.grishka.appkit.utils.CubicBezierInterpolator;
 import me.grishka.appkit.utils.V;
 import me.grishka.appkit.views.BottomSheet;
 import me.grishka.appkit.views.FragmentRootLinearLayout;
+import okhttp3.CacheControl;
+import okhttp3.Call;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
+import okhttp3.ResponseBody;
 import okio.BufferedSink;
 import okio.Okio;
 import okio.Sink;
@@ -129,6 +146,24 @@ public class PhotoViewer implements ZoomPanView.Listener{
 	private Status status;
 	private String accountID;
 	private BaseStatusListFragment<?> parentFragment;
+	private final AlbumDelegate albumDelegate;
+	private final AccountSession albumSession;
+	private TextView albumLosslessButton, albumPreviewRetryButton;
+	private LinearLayout albumQualityControls;
+	private long albumPreviewGeneration=-1, albumPreviewRevision;
+	private int albumPreviewPosition=-1, albumPreviewRenewals;
+	private boolean albumPreviewRefreshing;
+	private View albumCommentsPanel;
+	private boolean albumCommentsVisible;
+	private int albumSystemBottomInset, albumImeInset;
+	private Drawable albumSourceDrawable;
+	private int albumSourcePosition=-1;
+	private Call albumMediaCall;
+	private final Map<PhotoViewHolder, Call> albumPreviewCalls=new HashMap<>();
+	private final Set<PhotoViewHolder> albumPhotoHolders=new HashSet<>();
+	private final OkHttpClient albumHttpClient;
+	private android.window.OnBackInvokedCallback albumBackCallback;
+	private boolean albumSecureFlagAdded;
 
 	private WindowRootFrameLayout windowView;
 	private FragmentRootLinearLayout uiOverlay;
@@ -205,6 +240,16 @@ public class PhotoViewer implements ZoomPanView.Listener{
 	};
 
 	public PhotoViewer(Activity activity, BaseStatusListFragment<?> parentFragment, List<Attachment> attachments, int index, Status status, String accountID, Listener listener){
+		this(activity, parentFragment, attachments, index, status, accountID, listener, null);
+	}
+
+	/** Optional album hooks reuse the same pager, zoom, description and action controls. */
+	public PhotoViewer(Activity activity, BaseStatusListFragment<?> parentFragment, List<Attachment> attachments, int index, Status status, String accountID, Listener listener, @Nullable AlbumDelegate albumDelegate){
+		this.albumDelegate=albumDelegate;
+		albumSession=albumDelegate==null ? null : AccountSessionManager.getInstance().tryGetAccount(accountID);
+		albumHttpClient=albumDelegate==null ? null : MastodonAPIController.getHttpClient().newBuilder()
+				.cache(null).followRedirects(false).followSslRedirects(false).retryOnConnectionFailure(false)
+				.callTimeout(60, TimeUnit.SECONDS).build();
 		this.activity=activity;
 		this.attachments=attachments.stream().filter(a->a.type==Attachment.Type.IMAGE || a.type==Attachment.Type.GIFV || a.type==Attachment.Type.VIDEO).collect(Collectors.toList());
 		currentIndex=index;
@@ -242,13 +287,15 @@ public class PhotoViewer implements ZoomPanView.Listener{
 		windowView.setDispatchKeyEventListener((v, keyCode, event)->{
 			if(event.getKeyCode()==KeyEvent.KEYCODE_BACK){
 				if(event.getAction()==KeyEvent.ACTION_DOWN){
-					onStartSwipeToDismissTransition(0f);
+					if(albumDelegate!=null) onAlbumBack();
+					else onStartSwipeToDismissTransition(0f);
 				}
 				return true;
 			}
 			return false;
 		});
 		windowView.setDispatchApplyWindowInsetsListener((v, insets)->{
+			if(albumDelegate!=null) return applyAlbumInsets(insets);
 			int bottomInset=insets.getSystemWindowInsetBottom();
 			bottomBar.setPadding(bottomBar.getPaddingLeft(), bottomBar.getPaddingTop(), bottomBar.getPaddingRight(), bottomInset>0 ? Math.max(bottomInset+V.dp(8), V.dp(40)) : V.dp(12));
 			insets=insets.replaceSystemWindowInsets(insets.getSystemWindowInsetLeft(), insets.getSystemWindowInsetTop(), insets.getSystemWindowInsetRight(), 0);
@@ -329,7 +376,9 @@ public class PhotoViewer implements ZoomPanView.Listener{
 		updateBackgroundColor(currentIndex, 0);
 		updateViewOriginalButton();
 
-		if(status==null){
+		if(albumDelegate!=null){
+			configureAlbumControls();
+		}else if(status==null){
 			bottomBar.setVisibility(View.GONE);
 		}else{
 			Paint paint=new Paint();
@@ -348,14 +397,24 @@ public class PhotoViewer implements ZoomPanView.Listener{
 		wlp.type=WindowManager.LayoutParams.TYPE_APPLICATION;
 		wlp.flags=WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN | WindowManager.LayoutParams.FLAG_LAYOUT_INSET_DECOR
 				| WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS;
+		// Protect this separate overlay before attachment, traversal, or any preview GET.
+		// Never mutate the host Activity window: its protection belongs to the detail screen.
+		if(albumDelegate!=null) applyAlbumSecureFlag(wlp, albumDelegate.getInfo(index));
 		wlp.format=PixelFormat.TRANSLUCENT;
 		wlp.setTitle(activity.getString(R.string.media_viewer));
+		if(albumDelegate!=null) wlp.softInputMode=(Build.VERSION.SDK_INT>=30 ? WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING : WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+				| WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN;
 		if(Build.VERSION.SDK_INT>=28)
 			wlp.layoutInDisplayCutoutMode=Build.VERSION.SDK_INT>=30 ? WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS : WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
 		windowView.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
 		wm.addView(windowView, wlp);
 		if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.TIRAMISU){
-			activity.getOnBackInvokedDispatcher().registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT, ()->onStartSwipeToDismissTransition(0));
+			if(albumDelegate!=null){
+				albumBackCallback=this::onAlbumBack;
+				activity.getOnBackInvokedDispatcher().registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT, albumBackCallback);
+			}else{
+				activity.getOnBackInvokedDispatcher().registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT, ()->onStartSwipeToDismissTransition(0));
+			}
 		}
 
 		windowView.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener(){
@@ -369,6 +428,9 @@ public class PhotoViewer implements ZoomPanView.Listener{
 					RecyclerView rv=(RecyclerView) pager.getChildAt(0);
 					BaseHolder holder=(BaseHolder) rv.findViewHolderForAdapterPosition(index);
 					holder.zoomPanView.animateIn(rect, radius);
+				}else if(albumDelegate!=null){
+					background.setAlpha(255);
+					uiOverlay.setAlpha(1f);
 				}
 
 				return true;
@@ -433,15 +495,523 @@ public class PhotoViewer implements ZoomPanView.Listener{
 		});
 		videoSeekBar.setThumb(new VideoPlayerSeekBarThumbDrawable());
 
-		originalGate=new SponsorOriginalGate(activity, accountID, ()->!closing && !dismissed && windowView.isAttachedToWindow()
-				&& (parentFragment==null || accountID.equals(parentFragment.getAccountID())), this::updateOriginalControls, ()->{
-			onDismissed(); // Nav must not leave the full-screen WindowManager overlay over the center.
-			Bundle args=new Bundle();
-			args.putString("account", accountID);
-			Nav.go(activity, SponsorCenterFragment.class, args);
-		});
+		if(albumDelegate==null){
+			originalGate=new SponsorOriginalGate(activity, accountID, ()->!closing && !dismissed && windowView.isAttachedToWindow()
+					&& (parentFragment==null || accountID.equals(parentFragment.getAccountID())), this::updateOriginalControls, ()->{
+				onDismissed(); // Nav must not leave the full-screen WindowManager overlay over the center.
+				Bundle args=new Bundle();
+				args.putString("account", accountID);
+				Nav.go(activity, SponsorCenterFragment.class, args);
+			});
+		}
 		activity.getSharedPreferences("account_manager", Context.MODE_PRIVATE).registerOnSharedPreferenceChangeListener(originalAccountListener);
 		E.register(this);
+		if(albumDelegate!=null) windowView.post(()->{
+			for(PhotoViewHolder holder:albumPhotoHolders){ int position=holder.getAbsoluteAdapterPosition(); if(position>=0) loadAlbumPreview(holder, this.attachments.get(position)); }
+			updateAlbumViewport();
+		});
+	}
+
+	private void configureAlbumControls(){
+		bottomBar.setVisibility(View.VISIBLE);
+		bottomBar.setPadding(0, V.dp(8), 0, V.dp(12));
+		boostBtn.setVisibility(View.GONE);
+		bookmarkBtn.setVisibility(View.GONE);
+		shareBtn.setVisibility(View.GONE);
+		replyBtn.setFocusable(true);
+		favoriteBtn.setFocusable(true);
+		replyBtn.setOnClickListener(v->openAlbumComments());
+		favoriteBtn.setOnClickListener(v->albumDelegate.onLike(currentIndex));
+		ViewGroup.LayoutParams actionParams=postActions.getLayoutParams();
+		actionParams.height=V.dp(48);
+		postActions.setLayoutParams(actionParams);
+		((ViewGroup)viewOriginalBtn.getParent()).removeView(viewOriginalBtn);
+		albumQualityControls=new LinearLayout(uiOverlay.getContext());
+		albumQualityControls.setPadding(V.dp(16), 0, V.dp(16), V.dp(8));
+		albumQualityControls.setGravity(Gravity.CENTER);
+		viewOriginalBtn.setMinHeight(V.dp(48));
+		viewOriginalBtn.setFocusable(true);
+		viewOriginalBtn.setGravity(Gravity.CENTER);
+		albumQualityControls.addView(viewOriginalBtn, new LinearLayout.LayoutParams(0, -2, 1));
+		albumLosslessButton=new TextView(uiOverlay.getContext());
+		albumLosslessButton.setTextAppearance(R.style.m3_label_large);
+		albumLosslessButton.setTextColor(0xffffffff);
+		albumLosslessButton.setGravity(Gravity.CENTER);
+		albumLosslessButton.setPadding(V.dp(8), V.dp(8), V.dp(8), V.dp(8));
+		albumLosslessButton.setMinHeight(V.dp(48));
+		albumLosslessButton.setBackgroundResource(R.drawable.bg_view_original_pill);
+		albumLosslessButton.setFocusable(true);
+		albumLosslessButton.setOnClickListener(v->albumDelegate.onView(currentIndex, "original"));
+		LinearLayout.LayoutParams losslessParams=new LinearLayout.LayoutParams(0, -2, 1);
+		losslessParams.leftMargin=V.dp(8);
+		albumQualityControls.addView(albumLosslessButton, losslessParams);
+		((LinearLayout)bottomBar).addView(albumQualityControls, 0);
+		albumPreviewRetryButton=new TextView(uiOverlay.getContext());
+		albumPreviewRetryButton.setText(R.string.album_viewer_preview_retry);
+		albumPreviewRetryButton.setTextAppearance(R.style.m3_label_large);
+		albumPreviewRetryButton.setTextColor(0xffffffff);
+		albumPreviewRetryButton.setGravity(Gravity.CENTER);
+		albumPreviewRetryButton.setMinHeight(V.dp(48));
+		albumPreviewRetryButton.setFocusable(true);
+		albumPreviewRetryButton.setVisibility(View.GONE);
+		albumPreviewRetryButton.setOnClickListener(v->{ albumPreviewRenewals=0; renewAlbumPreview(currentIndex); });
+		((LinearLayout)bottomBar).addView(albumPreviewRetryButton, 0, new LinearLayout.LayoutParams(-1, -2));
+		bottomBar.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->updateAlbumViewport());
+		toolbarWrap.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->updateAlbumViewport());
+		windowView.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->updateAlbumViewport());
+		backButton.setOnClickListener(v->onAlbumBack());
+		refreshAlbumControls();
+	}
+
+	public boolean isAlbumHostValid(){
+		return albumDelegate!=null && !closing && !dismissed && !activity.isFinishing() && !activity.isDestroyed()
+				&& windowView.isAttachedToWindow() && albumSession!=null
+				&& AccountSessionManager.getInstance().tryGetAccount(accountID)==albumSession
+				&& accountID.equals(AccountSessionManager.getInstance().getLastActiveAccountID());
+	}
+
+	public int getCurrentIndex(){ return currentIndex; }
+
+	private void openAlbumComments(){
+		// Gate the action too: performClick() can invoke listeners on a GONE/disabled view.
+		if(albumDelegate==null || closing || dismissed || !albumDelegate.supportsComments()) return;
+		albumDelegate.onComments(currentIndex);
+	}
+
+	private static boolean protectedAlbumNonowner(AlbumInfo info){ return info.downloadProtected && !info.isOwner; }
+
+	private boolean applyAlbumSecureFlag(WindowManager.LayoutParams params, AlbumInfo info){
+		int oldFlags=params.flags;
+		if(protectedAlbumNonowner(info)){
+			if((params.flags & WindowManager.LayoutParams.FLAG_SECURE)==0){
+				params.flags|=WindowManager.LayoutParams.FLAG_SECURE;
+				albumSecureFlagAdded=true;
+			}
+		}else if(albumSecureFlagAdded){
+			params.flags&=~WindowManager.LayoutParams.FLAG_SECURE;
+			albumSecureFlagAdded=false;
+		}
+		return oldFlags!=params.flags;
+	}
+
+	private void updateAlbumSecureWindow(AlbumInfo info){
+		if(windowView.isAttachedToWindow() && windowView.getLayoutParams() instanceof WindowManager.LayoutParams params
+				&& applyAlbumSecureFlag(params, info)) wm.updateViewLayout(windowView, params);
+	}
+
+	public void refreshAlbumControls(){
+		if(albumDelegate==null || closing || dismissed || albumLosslessButton==null) return;
+		AlbumInfo info=albumDelegate.getInfo(currentIndex);
+		updateAlbumSecureWindow(info);
+		boolean protectedNonowner=protectedAlbumNonowner(info);
+		boolean commentsEnabled=albumDelegate.supportsComments();
+		replyBtn.setVisibility(commentsEnabled ? View.VISIBLE : View.GONE);
+		replyBtn.setEnabled(commentsEnabled); replyBtn.setFocusable(commentsEnabled);
+		bindActionButton(replyText, info.commentsCount);
+		bindActionButton(favoriteText, info.likesCount);
+		favoriteBtn.setSelected(info.liked);
+		favoriteBtn.setEnabled(!info.likeBusy);
+		favoriteBtn.setContentDescription(activity.getString(info.liked ? R.string.album_viewer_unlike : R.string.album_viewer_like, info.likesCount));
+		replyBtn.setContentDescription(activity.getString(R.string.album_viewer_comment_count, info.commentsCount));
+		viewOriginalBtn.setVisibility(protectedNonowner || info.hdLoaded ? View.GONE : View.VISIBLE);
+		viewOriginalBtn.setText(info.mediaBusy ? R.string.album_viewer_busy : R.string.album_viewer_hd);
+		viewOriginalBtn.setEnabled(!protectedNonowner && !info.mediaBusy);
+		viewOriginalBtn.setFocusable(!protectedNonowner && !info.mediaBusy);
+		albumLosslessButton.setVisibility(info.isOwner && info.originalAvailable && !info.originalLoaded ? View.VISIBLE : View.GONE);
+		albumLosslessButton.setText(info.mediaBusy ? R.string.album_viewer_busy : R.string.album_viewer_lossless);
+		albumLosslessButton.setEnabled(!info.mediaBusy);
+		albumQualityControls.setVisibility(albumCommentsVisible || viewOriginalBtn.getVisibility()!=View.VISIBLE && albumLosslessButton.getVisibility()!=View.VISIBLE ? View.GONE : View.VISIBLE);
+		postActions.setVisibility(albumCommentsVisible && albumImeInset>0 ? View.GONE : View.VISIBLE);
+		boolean downloadable=info.canDownload && !protectedNonowner;
+		downloadButton.setVisibility(downloadable ? View.VISIBLE : View.GONE);
+		downloadButton.setEnabled(downloadable && !info.mediaBusy);
+		downloadButton.setFocusable(downloadable && !info.mediaBusy);
+		updateAltText();
+		if(albumCommentsVisible) altText.setVisibility(View.GONE);
+	}
+
+	/** A child of this overlay, not a dialog above the photo. */
+	public void setAlbumCommentsPanel(View panel){
+		if(albumDelegate==null || dismissed) return;
+		if(albumCommentsPanel!=null) ((ViewGroup)albumCommentsPanel.getParent()).removeView(albumCommentsPanel);
+		albumCommentsPanel=panel;
+		panel.setVisibility(View.GONE);
+		((LinearLayout)bottomBar).addView(panel, new LinearLayout.LayoutParams(-1, V.dp(280)));
+	}
+
+	public void setAlbumCommentsVisible(boolean visible){
+		if(albumDelegate==null || albumCommentsPanel==null || dismissed) return;
+		if(visible && !uiVisible) toggleUI();
+		albumCommentsVisible=visible;
+		albumCommentsPanel.setVisibility(visible ? View.VISIBLE : View.GONE);
+		if(!visible){
+			activity.getSystemService(InputMethodManager.class).hideSoftInputFromWindow(windowView.getWindowToken(), 0);
+			windowView.clearFocus();
+		}
+		refreshAlbumControls();
+		windowView.post(this::updateAlbumViewport);
+	}
+
+	private void onAlbumBack(){
+		if(albumCommentsVisible){
+			if(albumImeInset>0) activity.getSystemService(InputMethodManager.class).hideSoftInputFromWindow(windowView.getWindowToken(), 0);
+			else{ setAlbumCommentsVisible(false); albumDelegate.onCommentsClosed(); replyBtn.requestFocus(); }
+		}else onStartSwipeToDismissTransition(0);
+	}
+
+	private WindowInsets applyAlbumInsets(WindowInsets insets){
+		if(Build.VERSION.SDK_INT>=30){
+			albumSystemBottomInset=insets.getInsets(WindowInsets.Type.systemBars()).bottom;
+			albumImeInset=insets.getInsets(WindowInsets.Type.ime()).bottom;
+		}else{
+			int bottom=insets.getSystemWindowInsetBottom();
+			if(bottom>V.dp(100)) albumImeInset=bottom;
+			else{ albumImeInset=0; albumSystemBottomInset=bottom; }
+		}
+		bottomBar.setPadding(V.dp(8), V.dp(8), V.dp(8), albumImeInset>0 ? V.dp(8) : albumSystemBottomInset+V.dp(8));
+		FrameLayout.LayoutParams params=(FrameLayout.LayoutParams)bottomBar.getLayoutParams();
+		params.bottomMargin=Build.VERSION.SDK_INT>=30 ? albumImeInset : 0; // Older windows resize themselves for IME.
+		bottomBar.setLayoutParams(params);
+		refreshAlbumControls();
+		WindowInsets overlayInsets=insets.replaceSystemWindowInsets(insets.getSystemWindowInsetLeft(), insets.getSystemWindowInsetTop(), insets.getSystemWindowInsetRight(), 0);
+		uiOverlay.dispatchApplyWindowInsets(overlayInsets);
+		windowView.post(this::updateAlbumViewport);
+		return insets.consumeSystemWindowInsets();
+	}
+
+	private void updateAlbumViewport(){
+		if(albumDelegate==null || dismissed || windowView.getHeight()==0) return;
+		if(albumCommentsPanel!=null && albumCommentsVisible){
+			int available=Math.max(1, windowView.getHeight()-(Build.VERSION.SDK_INT>=30 ? albumImeInset : 0)-toolbarWrap.getHeight()-uiOverlay.getPaddingTop());
+			int height=Math.min(V.dp(320), Math.max(V.dp(112), available/2));
+			if(albumCommentsPanel.getLayoutParams().height!=height){
+				ViewGroup.LayoutParams panelParams=albumCommentsPanel.getLayoutParams();
+				panelParams.height=height;
+				albumCommentsPanel.setLayoutParams(panelParams);
+			}
+		}
+		// These controls share the pager's root: map layout bounds locally, independent of WindowManager location state.
+		Rect toolbarBounds=new Rect(0, 0, toolbarWrap.getWidth(), toolbarWrap.getHeight());
+		Rect bottomBounds=new Rect(0, 0, bottomBar.getWidth(), bottomBar.getHeight());
+		windowView.offsetDescendantRectToMyCoords(toolbarWrap, toolbarBounds);
+		windowView.offsetDescendantRectToMyCoords(bottomBar, bottomBounds);
+		int toolbarBottom=uiVisible ? toolbarBounds.bottom : 0;
+		int panelTop=uiVisible ? bottomBounds.top : windowView.getHeight()-albumSystemBottomInset;
+		AlbumViewport viewport=albumViewport(windowView.getWidth(), windowView.getHeight(), toolbarBottom, panelTop, Build.VERSION.SDK_INT>=30 ? albumImeInset : 0);
+		FrameLayout.LayoutParams params=(FrameLayout.LayoutParams)pager.getLayoutParams();
+		if(params.topMargin!=viewport.top || params.bottomMargin!=viewport.bottomInset){
+			params.topMargin=viewport.top;
+			params.bottomMargin=viewport.bottomInset;
+			pager.setLayoutParams(params);
+			// ZoomPanView's min scale is FIT_CENTER; changed viewport resets panning as well.
+			for(PhotoViewHolder holder:albumPhotoHolders){
+				if(holder.zoomPanView.isLaidOut() && holder.imageView.getWidth()>0) holder.zoomPanView.endAllAnimations();
+				holder.zoomPanView.setFill(false); holder.zoomPanView.updateLayout();
+			}
+		}
+		for(PhotoViewHolder holder:albumPhotoHolders) holder.zoomPanView.setSwipeToDismissEnabled(!albumCommentsVisible);
+	}
+
+	/** Geometry shared with tests: the viewport never extends beneath comments or IME. */
+	public static AlbumViewport albumViewport(int width, int height, int toolbarBottom, int commentsTop, int imeBottom){
+		int bottom=Math.max(0, Math.min(height, Math.min(commentsTop, height-Math.max(0, imeBottom))));
+		int top=Math.max(0, Math.min(toolbarBottom, bottom));
+		return new AlbumViewport(Math.max(0, width), top, bottom-top, height-bottom);
+	}
+
+	public static final class AlbumViewport{
+		public final int width, top, height, bottomInset;
+		private AlbumViewport(int width, int top, int height, int bottomInset){ this.width=width; this.top=top; this.height=height; this.bottomInset=bottomInset; }
+		public float fitCenterScale(int imageWidth, int imageHeight){
+			return imageWidth<=0 || imageHeight<=0 ? 0 : Math.min(width/(float)imageWidth, height/(float)imageHeight);
+		}
+	}
+
+	/** Signed image bytes and drawables are transient; album media NEVER uses ImageCache. */
+	public void updateAlbumSource(int position, String url, AlbumSourceCallback callback){
+		if(!isAlbumHostValid() || position!=currentIndex || protectedAlbumNonowner(albumDelegate.getInfo(position))
+				|| !isAcceptableImageUrl(url) || !url.startsWith("https://")){
+			callback.onFailed(); return;
+		}
+		if(albumMediaCall!=null) albumMediaCall.cancel();
+		long generation=mediaGeneration;
+		Call call=albumHttpClient.newCall(new Request.Builder().url(url).cacheControl(new CacheControl.Builder().noStore().build()).build());
+		albumMediaCall=call;
+		call.enqueue(new okhttp3.Callback(){
+			@Override public void onFailure(@NonNull Call c, @NonNull IOException error){
+				activity.runOnUiThread(()->{ if(albumMediaLive(call, generation, position)){ albumMediaCall=null; callback.onFailed(); } });
+			}
+			@Override public void onResponse(@NonNull Call c, @NonNull Response response){
+				Drawable drawable=null;
+				try(response){
+					if(!response.isSuccessful() || response.body()==null) throw new IOException("Image request failed");
+					drawable=readAlbumDrawable(response.body());
+				}catch(IOException | RuntimeException | OutOfMemoryError ignored){}
+				Drawable result=drawable;
+				activity.runOnUiThread(()->{
+					if(!albumMediaLive(call, generation, position)) return;
+					albumMediaCall=null;
+					if(result==null){ callback.onFailed(); return; }
+					albumSourcePosition=position;
+					albumSourceDrawable=result;
+					for(PhotoViewHolder holder:albumPhotoHolders){
+						if(holder.getAbsoluteAdapterPosition()==position){
+							Call preview=albumPreviewCalls.remove(holder); if(preview!=null) preview.cancel();
+							holder.setImageDrawable(result); holder.zoomPanView.updateLayout();
+						}
+					}
+					callback.onLoaded();
+				});
+			}
+		});
+	}
+
+	private void renewAlbumPreview(int position){
+		if(!isAlbumHostValid() || position!=currentIndex || albumPreviewRefreshing) return;
+		albumPreviewRefreshing=true;
+		albumPreviewGeneration=-1;
+		albumPreviewPosition=-1;
+		long generation=mediaGeneration, revision=++albumPreviewRevision;
+		for(Call call:albumPreviewCalls.values()) call.cancel();
+		albumPreviewCalls.clear();
+		albumPreviewRetryButton.setVisibility(View.GONE);
+		albumDelegate.refreshPreview(position, new AlbumPreviewCallback(){
+			private boolean live(){ return generation==mediaGeneration && revision==albumPreviewRevision && position==currentIndex && isAlbumHostValid(); }
+			@Override public void onRefreshed(String previewUrl, String description, int width, int height){
+				if(!live()) return;
+				if(TextUtils.isEmpty(previewUrl) || !isAcceptableImageUrl(previewUrl) || !previewUrl.startsWith("https://")){ onFailed(); return; }
+				Attachment attachment=attachments.get(position);
+				// Only renewed preview enters Attachment. HD/lossless remain transient separate sources.
+				setAlbumPreviewMetadata(attachment, previewUrl, description, width, height);
+				albumPreviewRefreshing=false;
+				albumPreviewGeneration=generation;
+				albumPreviewPosition=position;
+				refreshAlbumControls();
+				for(PhotoViewHolder holder:albumPhotoHolders){
+					if(holder.getAbsoluteAdapterPosition()==position){
+						FrameLayout.LayoutParams params=(FrameLayout.LayoutParams)holder.imageView.getLayoutParams();
+						params.width=attachment.getWidth(); params.height=attachment.getHeight(); holder.imageView.setLayoutParams(params);
+						loadAlbumPreview(holder, attachment);
+					}
+				}
+			}
+			@Override public void onFailed(){
+				if(!live()) return;
+				albumPreviewRefreshing=false;
+				albumPreviewRetryButton.setVisibility(View.VISIBLE);
+				refreshAlbumControls();
+			}
+			@Override public void onAccessDenied(){
+				if(!live()) return;
+				Toast.makeText(activity, R.string.album_viewer_access_denied, Toast.LENGTH_LONG).show();
+				onDismissed(); // Clears every drawable/request before returning to the album screen.
+			}
+		});
+	}
+
+	static void setAlbumPreviewMetadata(Attachment attachment, String previewUrl, String description, int width, int height){
+		attachment.url=previewUrl;
+		attachment.previewUrl=previewUrl;
+		attachment.description=description;
+		if(attachment.meta==null) attachment.meta=new Attachment.Metadata();
+		attachment.meta.width=width; attachment.meta.height=height;
+	}
+
+	private void loadAlbumPreview(PhotoViewHolder holder, Attachment attachment){
+		int position=holder.getAbsoluteAdapterPosition();
+		if(position<0 || position!=currentIndex || !isAlbumHostValid()) return;
+		if(albumPreviewRefreshing) return;
+		if(albumPreviewGeneration!=mediaGeneration || albumPreviewPosition!=position){ renewAlbumPreview(position); return; }
+		if(position==albumSourcePosition && albumSourceDrawable!=null){ holder.setImageDrawable(albumSourceDrawable); return; }
+		Call previous=albumPreviewCalls.remove(holder); if(previous!=null) previous.cancel();
+		if(TextUtils.isEmpty(attachment.previewUrl) || !isAcceptableImageUrl(attachment.previewUrl) || !attachment.previewUrl.startsWith("https://")){
+			albumPreviewRetryButton.setVisibility(View.VISIBLE);
+			Toast.makeText(activity, R.string.album_viewer_image_error, Toast.LENGTH_LONG).show();
+			return;
+		}
+		long generation=mediaGeneration, revision=albumPreviewRevision;
+		Call call=albumHttpClient.newCall(new Request.Builder().url(attachment.previewUrl).cacheControl(new CacheControl.Builder().noStore().build()).build());
+		albumPreviewCalls.put(holder, call);
+		call.enqueue(new okhttp3.Callback(){
+			@Override public void onFailure(@NonNull Call c, @NonNull IOException error){ complete(null, false); }
+			@Override public void onResponse(@NonNull Call c, @NonNull Response response){
+				Drawable result=null;
+				boolean expired=response.code()==403;
+				try(response){ if(response.isSuccessful() && response.body()!=null) result=readAlbumDrawable(response.body()); }
+				catch(IOException | RuntimeException | OutOfMemoryError ignored){}
+				complete(result, expired);
+			}
+			private void complete(Drawable result, boolean expired){
+				activity.runOnUiThread(()->{
+					if(albumPreviewCalls.get(holder)!=call || generation!=mediaGeneration || revision!=albumPreviewRevision
+							|| position!=currentIndex || !isAlbumHostValid() || holder.getAbsoluteAdapterPosition()!=position) return;
+					albumPreviewCalls.remove(holder);
+					if(result!=null){
+						holder.setImageDrawable(result); holder.zoomPanView.updateLayout(); albumPreviewRetryButton.setVisibility(View.GONE);
+					}else if(expired && albumPreviewRenewals++<1){
+						renewAlbumPreview(position); // COS signature expiry rechecks ACL via GET, never quota authorization.
+					}else{
+						albumPreviewRetryButton.setVisibility(View.VISIBLE);
+						Toast.makeText(activity, R.string.album_viewer_image_error, Toast.LENGTH_LONG).show();
+					}
+				});
+			}
+		});
+	}
+
+	private boolean albumMediaLive(Call call, long generation, int position){
+		return albumMediaCall==call && generation==mediaGeneration && position==currentIndex && isAlbumHostValid();
+	}
+
+	private Drawable readAlbumDrawable(ResponseBody body) throws IOException{
+		final int limit=20*1024*1024;
+		if(body.contentLength()>limit) throw new IOException("Image too large");
+		ByteArrayOutputStream bytes=new ByteArrayOutputStream();
+		try(InputStream input=body.byteStream()){
+			byte[] buffer=new byte[8192];
+			int read;
+			while((read=input.read(buffer))!=-1){
+				if(bytes.size()+read>limit) throw new IOException("Image too large");
+				bytes.write(buffer, 0, read);
+			}
+		}
+		byte[] data=bytes.toByteArray();
+		BitmapFactory.Options bounds=new BitmapFactory.Options(); bounds.inJustDecodeBounds=true;
+		BitmapFactory.decodeByteArray(data, 0, data.length, bounds);
+		if(bounds.outWidth<=0 || bounds.outHeight<=0) throw new IOException("Invalid image");
+		BitmapFactory.Options options=new BitmapFactory.Options(); options.inSampleSize=1;
+		while(bounds.outWidth/options.inSampleSize>maxImageDimensions || bounds.outHeight/options.inSampleSize>maxImageDimensions
+				|| (long)(bounds.outWidth/options.inSampleSize)*(bounds.outHeight/options.inSampleSize)>16_000_000) options.inSampleSize*=2;
+		Bitmap bitmap=BitmapFactory.decodeByteArray(data, 0, data.length, options);
+		if(bitmap==null) throw new IOException("Invalid image");
+		return new BitmapDrawable(activity.getResources(), bitmap);
+	}
+
+	/** Saves fresh authorized bytes directly; never reuses the displayed image or a disk cache. */
+	public void saveAlbumSource(int position, String url, AlbumSourceCallback callback){
+		if(!isAlbumHostValid() || position!=currentIndex || !albumDelegate.getInfo(position).canDownload || protectedAlbumNonowner(albumDelegate.getInfo(position))
+				|| !isAcceptableImageUrl(url) || !url.startsWith("https://")){
+			callback.onFailed(); return;
+		}
+		if(albumMediaCall!=null) albumMediaCall.cancel();
+		long generation=mediaGeneration;
+		Call call=albumHttpClient.newCall(new Request.Builder().url(url).cacheControl(new CacheControl.Builder().noStore().build()).build());
+		albumMediaCall=call;
+		call.enqueue(new okhttp3.Callback(){
+			@Override public void onFailure(@NonNull Call c, @NonNull IOException error){
+				activity.runOnUiThread(()->{ if(albumMediaLive(call, generation, position)){ albumMediaCall=null; callback.onFailed(); } });
+			}
+			@Override public void onResponse(@NonNull Call c, @NonNull Response response){
+				AlbumDestination destination=null;
+				boolean copied=false;
+				try(response){
+					if(!response.isSuccessful() || response.body()==null) throw new IOException("Download failed");
+					ResponseBody body=response.body();
+					if(body.contentLength()>20*1024*1024) throw new IOException("Download too large");
+					destination=new AlbumDestination(body.contentType()==null ? "image/jpeg" : body.contentType().toString());
+					try(InputStream input=body.byteStream(); OutputStream output=destination.open()){
+						byte[] buffer=new byte[8192]; long total=0; int count;
+						while((count=input.read(buffer))!=-1){
+							if(call.isCanceled() || (total+=count)>20*1024*1024) throw new IOException("Download canceled");
+							output.write(buffer, 0, count);
+						}
+						if(total==0) throw new IOException("Empty download");
+					}
+					copied=true;
+				}catch(IOException | RuntimeException ignored){}
+				AlbumDestination target=destination;
+				boolean success=copied;
+				activity.runOnUiThread(()->{
+						if(!albumMediaLive(call, generation, position) || !albumDelegate.getInfo(position).canDownload
+								|| protectedAlbumNonowner(albumDelegate.getInfo(position))){
+							if(target!=null) target.discard(); return;
+					}
+					albumMediaCall=null;
+					if(success && target!=null){
+						try{ target.publish(); callback.onLoaded(); Toast.makeText(activity, R.string.image_saved, Toast.LENGTH_LONG).show(); }
+						catch(RuntimeException error){ target.discard(); callback.onFailed(); }
+					}else{ if(target!=null) target.discard(); callback.onFailed(); }
+				});
+			}
+		});
+	}
+
+	private final class AlbumDestination{
+		private final Uri uri;
+		private final File file;
+		private final String mime;
+		AlbumDestination(String contentType) throws IOException{
+			mime=contentType.split(";")[0].trim();
+			String ext=switch(mime){ case "image/png" -> ".png"; case "image/webp" -> ".webp"; case "image/gif" -> ".gif"; case "image/heif", "image/heic" -> ".heic"; case "image/avif" -> ".avif"; case "image/jpeg" -> ".jpg"; default -> throw new IOException("Unsupported image"); };
+			String name="Album_"+java.util.UUID.randomUUID()+ext;
+			if(Build.VERSION.SDK_INT>=29){
+				ContentValues values=new ContentValues();
+				values.put(MediaStore.MediaColumns.DISPLAY_NAME, name);
+				values.put(MediaStore.MediaColumns.MIME_TYPE, mime);
+				values.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS);
+				values.put(MediaStore.MediaColumns.IS_PENDING, 1);
+				uri=activity.getContentResolver().insert(MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY), values);
+				file=null;
+				if(uri==null) throw new IOException("No download destination");
+			}else{
+				uri=null;
+				File directory=Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+				if(!directory.isDirectory() && !directory.mkdirs()) throw new IOException("No download directory");
+				file=new File(directory, name);
+			}
+		}
+		OutputStream open() throws IOException{
+			OutputStream result=uri==null ? new FileOutputStream(file) : activity.getContentResolver().openOutputStream(uri);
+			if(result==null) throw new IOException("No download stream");
+			return result;
+		}
+		void publish(){
+			if(uri!=null){ ContentValues values=new ContentValues(); values.put(MediaStore.MediaColumns.IS_PENDING, 0); activity.getContentResolver().update(uri, values, null, null); }
+			else MediaScannerConnection.scanFile(activity, new String[]{file.getAbsolutePath()}, new String[]{mime}, null);
+		}
+		void discard(){
+			try{ if(uri!=null) activity.getContentResolver().delete(uri, null, null); else if(file!=null) file.delete(); }
+			catch(RuntimeException ignored){}
+		}
+	}
+
+	public void reloadAlbumPreview(){
+		if(!isAlbumHostValid()) return;
+		albumPreviewRenewals=0;
+		renewAlbumPreview(currentIndex);
+	}
+
+	public void resumeAlbum(){
+		if(!isAlbumHostValid()) return;
+		reloadAlbumPreview();
+		albumDelegate.onPhotoChanged(currentIndex);
+		refreshAlbumControls();
+	}
+
+	/** A renewed ACL revoked quality/download access; discard already displayed HD as well. */
+	public void revokeAlbumQuality(){
+		cancelAlbumMedia();
+		albumSourceDrawable=null; albumSourcePosition=-1;
+		for(PhotoViewHolder holder:albumPhotoHolders) holder.imageView.setImageDrawable(null);
+	}
+
+	/** A failed host policy handoff must not expose its stale grid behind this overlay. */
+	public void blockAlbumDismissal(){
+		if(albumDelegate==null || dismissed) return;
+		revokeAlbumQuality();
+		windowView.animate().cancel(); windowView.setAlpha(1f); background.setAlpha(255);
+		if(windowView.isAttachedToWindow() && windowView.getLayoutParams() instanceof WindowManager.LayoutParams params){
+			params.flags|=WindowManager.LayoutParams.FLAG_SECURE;
+			// Fail-closed protection is retained until removal, not cleared by a stale unprotected DTO.
+			albumSecureFlagAdded=false;
+			wm.updateViewLayout(windowView, params);
+		}
+	}
+
+	public void cancelAlbumMedia(){
+		if(albumMediaCall!=null){ albumMediaCall.cancel(); albumMediaCall=null; }
+		for(Call call:albumPreviewCalls.values()) call.cancel();
+		albumPreviewCalls.clear();
 	}
 
 	public void removeMenu(){
@@ -478,6 +1048,7 @@ public class PhotoViewer implements ZoomPanView.Listener{
 	@Override
 	public void onStartSwipeToDismissTransition(float velocityY){
 		if(closing || dismissed) return;
+		if(albumDelegate!=null && !albumDelegate.onBeforeDismissed()){ blockAlbumDismissal(); return; }
 		closing=true;
 		invalidateOriginalWork();
 		pauseVideo();
@@ -538,6 +1109,18 @@ public class PhotoViewer implements ZoomPanView.Listener{
 			activity.unregisterReceiver(downloadCompletedReceiver);
 		}
 		activity.getSharedPreferences("account_manager", Context.MODE_PRIVATE).unregisterOnSharedPreferenceChangeListener(originalAccountListener);
+		if(albumDelegate!=null){
+			cancelAlbumMedia();
+			albumSourceDrawable=null;
+			for(PhotoViewHolder holder:albumPhotoHolders) holder.imageView.setImageDrawable(null);
+			albumPhotoHolders.clear();
+			pager.setAdapter(null);
+			windowView.removeCallbacks(uiAutoHider);
+			if(currentUiVisibilityAnimation!=null){ currentUiVisibilityAnimation.cancel(); currentUiVisibilityAnimation=null; }
+			activity.getSystemService(InputMethodManager.class).hideSoftInputFromWindow(windowView.getWindowToken(), 0);
+			if(Build.VERSION.SDK_INT>=33 && albumBackCallback!=null) activity.getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(albumBackCallback);
+			albumDelegate.onDismissed();
+		}
 		E.unregister(this);
 	}
 
@@ -547,6 +1130,7 @@ public class PhotoViewer implements ZoomPanView.Listener{
 	}
 
 	private void toggleUI(){
+		if(albumDelegate!=null && albumCommentsVisible) return;
 		if(currentUiVisibilityAnimation!=null)
 			currentUiVisibilityAnimation.cancel();
 		if(uiVisible){
@@ -591,6 +1175,7 @@ public class PhotoViewer implements ZoomPanView.Listener{
 				hideUiDelayed(5000);
 		}
 		uiVisible=!uiVisible;
+		if(albumDelegate!=null) windowView.postDelayed(this::updateAlbumViewport, 310);
 	}
 
 	private void hideUiDelayed(){
@@ -615,6 +1200,13 @@ public class PhotoViewer implements ZoomPanView.Listener{
 		}
 		updateAltText();
 		updateViewOriginalButton();
+		if(albumDelegate!=null){
+			albumDelegate.onPhotoChanged(index);
+			refreshAlbumControls();
+			windowView.post(()->{
+				for(PhotoViewHolder holder:albumPhotoHolders){ int position=holder.getAbsoluteAdapterPosition(); if(position>=0) loadAlbumPreview(holder, attachments.get(position)); }
+			});
+		}
 	}
 
 	private void updateAltText(){
@@ -632,6 +1224,7 @@ public class PhotoViewer implements ZoomPanView.Listener{
 	 * “查看原图”药丸按钮的可见性与文案：仅图片页且原图尚未缓存/未加载时显示。
 	 */
 	private void updateViewOriginalButton(){
+		if(albumDelegate!=null){ refreshAlbumControls(); return; }
 		Attachment att=attachments.get(currentIndex);
 		boolean show=att.type==Attachment.Type.IMAGE
 				&& !originalLoadedPositions.contains(currentIndex)
@@ -666,6 +1259,16 @@ public class PhotoViewer implements ZoomPanView.Listener{
 		if(originalDownloadRequest!=null){ originalDownloadRequest.cancel(); originalDownloadRequest=null; }
 		originalDownloadPosition=-1;
 		if(originalGate!=null) originalGate.cancel();
+		if(albumDelegate!=null){
+			cancelAlbumMedia();
+			albumPreviewRevision++;
+			albumPreviewGeneration=-1; albumPreviewPosition=-1; albumPreviewRefreshing=false; albumPreviewRenewals=0;
+			if(albumPreviewRetryButton!=null) albumPreviewRetryButton.setVisibility(View.GONE);
+			albumSourceDrawable=null;
+			albumSourcePosition=-1;
+			for(PhotoViewHolder holder:albumPhotoHolders) holder.imageView.setImageDrawable(null);
+			albumDelegate.cancelPending();
+		}
 	}
 
 	private void updateOriginalControls(){
@@ -685,6 +1288,10 @@ public class PhotoViewer implements ZoomPanView.Listener{
 	}
 
 	private void startOriginalDownload(){
+		if(albumDelegate!=null){
+			if(isAlbumHostValid() && !protectedAlbumNonowner(albumDelegate.getInfo(currentIndex))) albumDelegate.onView(currentIndex, "hd");
+			return;
+		}
 		int position=pager.getCurrentItem();
 		Attachment att=attachments.get(position);
 		if(att.type!=Attachment.Type.IMAGE || originalDownloadPosition!=-1 || originalGate==null || originalGate.isBusy()) return;
@@ -897,6 +1504,7 @@ public class PhotoViewer implements ZoomPanView.Listener{
 	}
 
 	public void onPause(){
+		if(albumDelegate!=null){ invalidateOriginalWork(); return; }
 		// A system permission dialog may pause the host. Keep only its captured attachment;
 		// page changes, account switches and close still invalidate it before the result is used.
 		if(pendingPermissionAttachment==null) invalidateOriginalWork();
@@ -905,6 +1513,13 @@ public class PhotoViewer implements ZoomPanView.Listener{
 	}
 
 	private void saveCurrentFile(){
+		if(albumDelegate!=null){
+			if(isAlbumHostValid()){
+				AlbumInfo info=albumDelegate.getInfo(currentIndex);
+				if(info.canDownload && !protectedAlbumNonowner(info)) albumDelegate.onDownload(currentIndex);
+			}
+			return;
+		}
 		if(closing || dismissed || originalGate==null || originalGate.isBusy() || originalDownloadPosition!=-1) return;
 		Attachment att=attachments.get(pager.getCurrentItem());
 		if(Build.VERSION.SDK_INT<29 && activity.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)!=PackageManager.PERMISSION_GRANTED){
@@ -1154,6 +1769,41 @@ public class PhotoViewer implements ZoomPanView.Listener{
 		sheet.getWindow().getDecorView().setSystemUiVisibility(sheet.getWindow().getDecorView().getSystemUiVisibility() & ~View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
 	}
 
+	/** No album API/model dependency in the generic viewer. */
+	public interface AlbumDelegate{
+		/** Public album comment entry is opt-in; low-level panel geometry remains independent. */
+		default boolean supportsComments(){ return false; }
+		AlbumInfo getInfo(int position);
+		void onPhotoChanged(int position);
+		void refreshPreview(int position, AlbumPreviewCallback callback);
+		void onView(int position, String variant);
+		void onDownload(int position);
+		void onLike(int position);
+		void onComments(int position);
+		void onCommentsClosed();
+		void cancelPending();
+		/** Invoked before the overlay is removed; returning false keeps the window attached. */
+		default boolean onBeforeDismissed(){ return true; }
+		void onDismissed();
+	}
+
+	public static final class AlbumInfo{
+		public boolean isOwner, originalAvailable, liked, hdLoaded, originalLoaded, mediaBusy, likeBusy, downloadProtected;
+		public boolean canDownload=true; // Legacy delegates/unprotected servers retain their existing controls.
+		public int likesCount, commentsCount;
+	}
+
+	public interface AlbumSourceCallback{
+		void onLoaded();
+		void onFailed();
+	}
+
+	public interface AlbumPreviewCallback{
+		void onRefreshed(String previewUrl, String description, int width, int height);
+		void onFailed();
+		void onAccessDenied();
+	}
+
 	public interface Listener{
 		void setPhotoViewVisibility(int index, boolean visible);
 
@@ -1234,8 +1884,22 @@ public class PhotoViewer implements ZoomPanView.Listener{
 		}
 
 		@Override
+		public void onViewRecycled(@NonNull BaseHolder holder){
+			if(albumDelegate!=null && holder instanceof PhotoViewHolder photoHolder){
+				Call call=albumPreviewCalls.remove(photoHolder); if(call!=null) call.cancel();
+				albumPhotoHolders.remove(photoHolder);
+				photoHolder.imageView.setImageDrawable(null);
+			}
+			super.onViewRecycled(holder);
+		}
+
+		@Override
 		public void onViewAttachedToWindow(@NonNull BaseHolder holder){
 			super.onViewAttachedToWindow(holder);
+			if(albumDelegate!=null && holder instanceof PhotoViewHolder photoHolder){
+				albumPhotoHolders.add(photoHolder);
+				loadAlbumPreview(photoHolder, attachments.get(holder.getAbsoluteAdapterPosition()));
+			}
 			if(holder instanceof GifVViewHolder gifHolder){
 				gifHolder.prepareAndStartPlayer();
 			}
@@ -1262,6 +1926,7 @@ public class PhotoViewer implements ZoomPanView.Listener{
 
 		public PhotoViewHolder(){
 			imageView=new ImageView(activity);
+			if(albumDelegate!=null){ imageView.setScaleType(ImageView.ScaleType.FIT_CENTER); zoomPanView.setFill(false); }
 			zoomPanView.addView(imageView, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER));
 		}
 
@@ -1269,7 +1934,7 @@ public class PhotoViewer implements ZoomPanView.Listener{
 		public void onBind(Attachment item){
 			super.onBind(item);
 			FrameLayout.LayoutParams params=(FrameLayout.LayoutParams) imageView.getLayoutParams();
-			Drawable currentDrawable=listener.getPhotoViewCurrentDrawable(getAbsoluteAdapterPosition());
+			Drawable currentDrawable=albumDelegate==null ? listener.getPhotoViewCurrentDrawable(getAbsoluteAdapterPosition()) : null;
 			if(item.hasKnownDimensions()){
 				params.width=item.getWidth();
 				params.height=item.getHeight();
@@ -1279,6 +1944,12 @@ public class PhotoViewer implements ZoomPanView.Listener{
 			}else{
 				params.width=1920;
 				params.height=1080;
+			}
+			if(albumDelegate!=null){
+				albumPhotoHolders.add(this);
+				imageView.setContentDescription(activity.getString(R.string.album_viewer_photo_position, getAbsoluteAdapterPosition()+1, attachments.size()));
+				loadAlbumPreview(this, item);
+				return;
 			}
 			// 默认只加载预览图；用户点击“查看原图”完成后（或原图已在本会话加载过）才加载原图
 			int position=getAbsoluteAdapterPosition();
@@ -1337,7 +2008,7 @@ public class PhotoViewer implements ZoomPanView.Listener{
 			super.onBind(item);
 			playerReady=false;
 			FrameLayout.LayoutParams params=(FrameLayout.LayoutParams) wrap.getLayoutParams();
-			Drawable currentDrawable=listener.getPhotoViewCurrentDrawable(getAbsoluteAdapterPosition());
+			Drawable currentDrawable=albumDelegate==null ? listener.getPhotoViewCurrentDrawable(getAbsoluteAdapterPosition()) : null;
 			if(item.hasKnownDimensions()){
 				params.width=item.getWidth();
 				params.height=item.getHeight();

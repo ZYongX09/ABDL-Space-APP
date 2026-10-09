@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="compose_action_title">选择发布内容</string>
+    <string name="compose_action_post_description">分享日常动态</string>
+    <string name="compose_action_friend_description">发布交友信息</string>
+    <string name="compose_action_album_description">上传图片到相册</string>
+</resources>

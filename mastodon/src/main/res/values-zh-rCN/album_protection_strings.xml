@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="album_protection_title">防盗图保护</string>
+    <string name="album_protection_description">服务器确认保存后，其他人将无法下载照片或获取高清图。支持此功能的 App 会限制截图和录屏；受保护照片不显示列表缩略图，点按后在看图器中查看。你仍可下载自己的照片。本功能无法阻止外部相机拍摄、Root 设备、修改版客户端、复制预览图数据或使用已签发的链接。需要服务器支持。</string>
+    <string name="album_protection_enabled">已开启防盗图保护</string>
+    <string name="album_protection_thumbnail">受保护照片 · 点按查看</string>
+    <string name="album_protection_not_confirmed">服务器未确认此次防盗图保护变更，将以当前服务器设置为准。请更新服务器后重试。</string>
+</resources>

@@ -72,6 +72,7 @@ import org.joinmastodon.android.ui.SimpleViewHolder;
 import org.joinmastodon.android.ui.compose.navigation.HomeLiquidToolbarController;
 import org.joinmastodon.android.ui.compose.navigation.HomeToolbarMenuItem;
 import org.joinmastodon.android.ui.compose.navigation.HomeToolbarTimeline;
+import org.joinmastodon.android.ui.sheets.ComposeActionSheet;
 import org.joinmastodon.android.ui.utils.LocationUtils;
 import org.joinmastodon.android.ui.utils.UiUtils;
 import org.joinmastodon.android.updater.GithubSelfUpdater;
@@ -536,9 +537,8 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 	}
 
 	private void onFabClick(View v){
-		if (fragments[pager.getCurrentItem()] instanceof BaseStatusListFragment<?> l) {
-			l.onFabClick(v);
-		}
+		if(getActivity()!=null)
+			new ComposeActionSheet(getActivity(), this::openComposeAction).show();
 	}
 
 	private boolean onFabLongClick(View v) {
@@ -717,10 +717,26 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 			onNewPostsBtnClick(toolbarShowNewPostsBtn);
 	}
 
-	public void onLiquidCompose(){
+	/** Shared by the classic home sheet and the liquid compose menu. */
+	public void openComposeAction(int id){
+		Class<? extends Fragment> destination;
+		if(id==R.id.compose_post)
+			destination=ComposeFragment.class;
+		else if(id==R.id.compose_friend_request)
+			destination=FriendRequestCreateFragment.class;
+		else if(id==R.id.compose_album)
+			destination=org.joinmastodon.android.fragments.albums.AlbumUploadFragment.class;
+		else
+			return;
+		if(getActivity()==null)
+			return;
 		Bundle args=new Bundle();
 		args.putString("account", accountID);
-		Nav.go(getActivity(), ComposeFragment.class, args);
+		Nav.go(getActivity(), destination, args);
+	}
+
+	public void onLiquidCompose(){
+		openComposeAction(R.id.compose_post);
 	}
 
 	public void onLiquidMenuItem(int id){
@@ -732,14 +748,8 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 			openQrScanner();
 			return;
 		}
-		if(id==R.id.compose_post){
-			onLiquidCompose();
-			return;
-		}
-		if(id==R.id.compose_friend_request){
-			Bundle args=new Bundle();
-			args.putString("account", accountID);
-			Nav.go(getActivity(), FriendRequestCreateFragment.class, args);
+		if(id==R.id.compose_post || id==R.id.compose_friend_request || id==R.id.compose_album){
+			openComposeAction(id);
 			return;
 		}
 		MenuItem item=overflowPopup==null ? null : overflowPopup.getMenu().findItem(id);

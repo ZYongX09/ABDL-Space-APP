@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/album_upload_body"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:background="?colorM3Surface">
+    <ScrollView android:id="@+id/album_editor_scroll" android:layout_width="match_parent" android:layout_height="0dp"
+        android:layout_weight="1" android:clipToPadding="false">
+        <LinearLayout android:id="@+id/album_editor" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="vertical" android:paddingHorizontal="16dp" android:paddingTop="12dp" android:paddingBottom="16dp">
+            <EditText android:id="@+id/album_description" style="@style/Widget.Mastodon.M3.EditText"
+                android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="170dp"
+                android:background="@drawable/album_upload_design_card" android:backgroundTint="@null"
+                android:padding="20dp" android:gravity="top|start" android:inputType="textCapSentences|textMultiLine"
+                android:lineSpacingExtra="4dp" android:textSize="17sp" android:hint="@string/album_upload_design_description_hint"
+                android:contentDescription="@string/album_description" android:importantForAutofill="no"
+                android:scrollHorizontally="false" android:maxLines="8" />
+            <LinearLayout android:id="@+id/album_upload_settings" android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="16dp" android:orientation="vertical" android:background="@drawable/album_upload_design_card">
+                <LinearLayout android:id="@+id/album_choose" style="@style/Widget.Mastodon.AlbumUpload.Row"
+                    android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="60dp">
+                    <ImageView style="@style/Widget.Mastodon.AlbumUpload.RowIcon" android:layout_width="24dp" android:layout_height="24dp" android:src="@drawable/ic_fluent_arrow_upload_24_regular" />
+                    <TextView style="@style/Widget.Mastodon.AlbumUpload.RowLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/album_upload_design_destination" />
+                    <TextView android:id="@+id/album_upload_album_name" style="@style/Widget.Mastodon.AlbumUpload.RowValue"
+                        android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginHorizontal="10dp" android:text="@string/album_upload_design_choose" />
+                    <ImageView android:id="@+id/album_upload_cover" android:layout_width="34dp" android:layout_height="34dp"
+                        android:scaleType="centerCrop" android:background="@drawable/album_upload_design_tile" android:src="@drawable/ic_fluent_image_24_regular" android:importantForAccessibility="no" />
+                    <ImageView android:layout_width="20dp" android:layout_height="24dp" android:layout_marginStart="4dp" android:src="@drawable/ic_fluent_chevron_right_24_regular" android:tint="?colorM3OnSurfaceVariant" android:importantForAccessibility="no" />
+                </LinearLayout>
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginHorizontal="16dp" android:alpha="0.3" android:background="?colorM3OutlineVariant" />
+                <LinearLayout android:id="@+id/album_upload_permissions_row" style="@style/Widget.Mastodon.AlbumUpload.Row" android:layout_width="match_parent" android:layout_height="wrap_content">
+                    <ImageView style="@style/Widget.Mastodon.AlbumUpload.RowIcon" android:layout_width="24dp" android:layout_height="24dp" android:src="@drawable/ic_fluent_eye_24_regular" />
+                    <TextView style="@style/Widget.Mastodon.AlbumUpload.RowLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/album_upload_design_permissions" />
+                    <TextView android:id="@+id/album_permissions" style="@style/Widget.Mastodon.AlbumUpload.RowValue" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginHorizontal="10dp" />
+                    <ImageView android:layout_width="20dp" android:layout_height="24dp" android:src="@drawable/ic_fluent_chevron_right_24_regular" android:tint="?colorM3OnSurfaceVariant" android:importantForAccessibility="no" />
+                </LinearLayout>
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginHorizontal="16dp" android:alpha="0.3" android:background="?colorM3OutlineVariant" />
+                <LinearLayout android:id="@+id/album_upload_time_row" style="@style/Widget.Mastodon.AlbumUpload.Row" android:layout_width="match_parent" android:layout_height="wrap_content">
+                    <ImageView style="@style/Widget.Mastodon.AlbumUpload.RowIcon" android:layout_width="24dp" android:layout_height="24dp" android:src="@drawable/ic_fluent_clock_24_regular" />
+                    <TextView style="@style/Widget.Mastodon.AlbumUpload.RowLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/album_upload_design_time" />
+                    <TextView android:id="@+id/album_upload_time_value" style="@style/Widget.Mastodon.AlbumUpload.RowValue" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginHorizontal="10dp" android:text="@string/album_time_auto" />
+                    <ImageView android:layout_width="20dp" android:layout_height="24dp" android:src="@drawable/ic_fluent_chevron_right_24_regular" android:tint="?colorM3OnSurfaceVariant" android:importantForAccessibility="no" />
+                </LinearLayout>
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginHorizontal="16dp" android:alpha="0.3" android:background="?colorM3OutlineVariant" />
+                <LinearLayout android:id="@+id/album_upload_quality_row" style="@style/Widget.Mastodon.AlbumUpload.Row" android:layout_width="match_parent" android:layout_height="wrap_content">
+                    <ImageView style="@style/Widget.Mastodon.AlbumUpload.RowIcon" android:layout_width="24dp" android:layout_height="24dp" android:src="@drawable/ic_fluent_image_24_regular" />
+                    <TextView style="@style/Widget.Mastodon.AlbumUpload.RowLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/album_upload_design_quality" />
+                    <TextView android:id="@+id/album_upload_quality_value" style="@style/Widget.Mastodon.AlbumUpload.RowValue" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginHorizontal="10dp" android:text="@string/album_upload_design_hd" />
+                    <ImageView android:layout_width="20dp" android:layout_height="24dp" android:src="@drawable/ic_fluent_chevron_right_24_regular" android:tint="?colorM3OnSurfaceVariant" android:importantForAccessibility="no" />
+                </LinearLayout>
+                <LinearLayout android:id="@+id/album_upload_sponsor" style="@style/Widget.Mastodon.AlbumUpload.Row" android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:background="@drawable/album_upload_design_sponsor" android:minHeight="48dp" android:contentDescription="@string/album_upload_design_sponsor_accessibility">
+                    <ImageView android:id="@+id/album_upload_sponsor_icon" android:layout_width="22dp" android:layout_height="22dp" android:src="@drawable/ic_volunteer_activism_24px" android:importantForAccessibility="no" />
+                    <TextView android:id="@+id/album_upload_sponsor_text" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginHorizontal="10dp"
+                        android:text="@string/album_upload_design_sponsor" android:textAppearance="@style/m3_body_medium" android:importantForAccessibility="no" />
+                    <ImageView android:id="@+id/album_upload_sponsor_chevron" android:layout_width="20dp" android:layout_height="24dp" android:src="@drawable/ic_fluent_chevron_right_24_regular" android:importantForAccessibility="no" />
+                </LinearLayout>
+            </LinearLayout>
+            <LinearLayout android:id="@+id/album_upload_photos" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="16dp"
+                android:orientation="vertical" android:padding="12dp" android:background="@drawable/album_upload_design_card">
+                <androidx.recyclerview.widget.RecyclerView android:id="@+id/album_preview_grid" android:layout_width="match_parent" android:layout_height="wrap_content" android:nestedScrollingEnabled="false" android:overScrollMode="never" />
+                <TextView android:id="@+id/album_pick_count" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp"
+                    android:gravity="end" android:textAppearance="@style/m3_body_small" android:textColor="?colorM3OnSurfaceVariant" android:accessibilityLiveRegion="polite" />
+            </LinearLayout>
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="48dp" android:orientation="horizontal" android:gravity="center_vertical">
+                <TextView android:id="@+id/album_quota" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginEnd="8dp"
+                    android:text="@string/album_upload_design_capacity_loading" android:textAppearance="@style/m3_body_small" android:textColor="?colorM3OnSurfaceVariant" />
+                <Button android:id="@+id/album_upload_help" style="@style/Widget.Mastodon.M3.Button.Text" android:layout_width="wrap_content" android:layout_height="48dp"
+                    android:paddingHorizontal="8dp" android:text="@string/album_upload_design_help" android:textSize="12sp" android:contentDescription="@string/album_upload_design_help_accessibility" />
+            </LinearLayout>
+        </LinearLayout>
+    </ScrollView>
+    <LinearLayout android:id="@+id/album_upload_bar" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical"
+        android:paddingHorizontal="16dp" android:paddingVertical="8dp" android:visibility="gone">
+        <TextView android:id="@+id/album_upload_status" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="48dp"
+            android:gravity="center_vertical" android:textAppearance="@style/m3_body_medium" android:textColor="?colorM3OnSurfaceVariant"
+            android:accessibilityLiveRegion="polite" android:background="?android:selectableItemBackground" android:focusable="true" android:clickable="true" />
+        <ProgressBar android:id="@+id/album_upload_progress" style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent" android:layout_height="8dp" android:max="100" android:visibility="gone" />
+        <Button android:id="@+id/album_upload_discard" style="@style/Widget.Mastodon.M3.Button.Text" android:layout_width="match_parent" android:layout_height="48dp" android:text="@string/album_upload_discard" android:visibility="gone" />
+    </LinearLayout>
+</LinearLayout>

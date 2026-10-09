@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Widget.Mastodon.AlbumUpload.HeaderButton" parent="Widget.Mastodon.M3.Button.Text">
+        <item name="android:textSize">16sp</item>
+        <item name="android:paddingLeft">12dp</item>
+        <item name="android:paddingRight">12dp</item>
+        <item name="android:minWidth">48dp</item>
+        <item name="android:minHeight">48dp</item>
+        <item name="android:textColor">?colorM3OnSurface</item>
+        <item name="android:backgroundTint">@null</item>
+        <item name="android:includeFontPadding">false</item>
+    </style>
+    <style name="Widget.Mastodon.AlbumUpload.UploadButton" parent="Widget.Mastodon.AlbumUpload.HeaderButton">
+        <item name="android:background">@drawable/album_upload_design_button</item>
+        <item name="android:textColor">@color/button_text_m3_filled</item>
+    </style>
+    <style name="Widget.Mastodon.AlbumUpload.Row" parent="">
+        <item name="android:minHeight">56dp</item>
+        <item name="android:orientation">horizontal</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:paddingLeft">16dp</item>
+        <item name="android:paddingRight">12dp</item>
+        <item name="android:paddingTop">6dp</item>
+        <item name="android:paddingBottom">6dp</item>
+        <item name="android:background">?android:selectableItemBackground</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+    </style>
+    <style name="Widget.Mastodon.AlbumUpload.RowLabel" parent="">
+        <item name="android:textAppearance">@style/m3_body_large</item>
+        <item name="android:textSize">17sp</item>
+        <item name="android:textColor">?colorM3OnSurface</item>
+        <item name="android:layout_marginLeft">12dp</item>
+        <item name="android:importantForAccessibility">no</item>
+    </style>
+    <style name="Widget.Mastodon.AlbumUpload.RowValue" parent="">
+        <item name="android:textAppearance">@style/m3_body_medium</item>
+        <item name="android:textColor">?colorM3OnSurfaceVariant</item>
+        <item name="android:gravity">end</item>
+        <item name="android:singleLine">true</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:importantForAccessibility">no</item>
+    </style>
+    <style name="Widget.Mastodon.AlbumUpload.RowIcon" parent="">
+        <item name="android:importantForAccessibility">no</item>
+    </style>
+</resources>

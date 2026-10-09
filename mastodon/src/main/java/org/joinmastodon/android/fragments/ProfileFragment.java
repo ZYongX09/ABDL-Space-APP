@@ -147,7 +147,7 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 	private ProgressBarButton actionButton;
 	private ViewPager2 pager;
 	private NestedRecyclerScrollView scrollView;
-	private ProfileFeaturedFragment featuredFragment;
+	private org.joinmastodon.android.fragments.albums.AlbumListFragment featuredFragment;
 	private AccountTimelineFragment timelineFragment;
 	private ProfileAboutFragment aboutFragment;
 	private SavedPostsTimelineFragment savedFragment;
@@ -338,7 +338,7 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 		tabbar.setTabTextSize(V.dp(14));
 		tabLayoutMediator=new TabLayoutMediator(tabbar, pager, (tab, position)->{
 			tab.setText(switch(position){
-				case 0 -> R.string.profile_featured;
+				case 0 -> R.string.baby_albums_profile_tab;
 				case 1 -> R.string.profile_timeline;
 				case 2 -> R.string.profile_about;
 				case 3 -> R.string.profile_saved_posts;
@@ -356,7 +356,9 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 
 			@Override
 			public void onTabReselected(TabLayout.Tab tab){
-				if(getFragmentForPage(tab.getPosition()) instanceof ScrollableToTop stt)
+				if(getFragmentForPage(tab.getPosition()) instanceof org.joinmastodon.android.fragments.albums.AlbumListFragment albums)
+					albums.scrollToTop();
+				else if(getFragmentForPage(tab.getPosition()) instanceof ScrollableToTop stt)
 					stt.scrollToTop();
 			}
 		});
@@ -376,7 +378,7 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 		familiarFollowersRow.setOnClickListener(this::onFamiliarFollowersClick);
 
 		if(savedInstanceState!=null){
-			featuredFragment=(ProfileFeaturedFragment) getChildFragmentManager().getFragment(savedInstanceState, "featured");
+			featuredFragment=(org.joinmastodon.android.fragments.albums.AlbumListFragment) getChildFragmentManager().getFragment(savedInstanceState, "albums");
 			timelineFragment=(AccountTimelineFragment) getChildFragmentManager().getFragment(savedInstanceState, "timeline");
 			aboutFragment=(ProfileAboutFragment) getChildFragmentManager().getFragment(savedInstanceState, "about");
 			savedFragment=(SavedPostsTimelineFragment) getChildFragmentManager().getFragment(savedInstanceState, "saved");
@@ -460,8 +462,7 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 							refreshLayout.setRefreshing(false);
 							if(timelineFragment.loaded)
 								timelineFragment.onRefresh();
-							if(featuredFragment.loaded)
-								featuredFragment.onRefresh();
+							featuredFragment.refresh();
 							if(savedFragment!=null && savedFragment.loaded)
 								savedFragment.onRefresh();
 						}
@@ -528,8 +529,11 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 		args.putBoolean("__is_tab", true);
 		args.putBoolean("noAutoLoad", true);
 		if(featuredFragment==null){
-			featuredFragment=new ProfileFeaturedFragment();
-			featuredFragment.setArguments(args);
+			featuredFragment=new org.joinmastodon.android.fragments.albums.AlbumListFragment();
+			Bundle albumArgs=new Bundle(args);
+			albumArgs.putString("ownerId", account.id);
+			albumArgs.putBoolean("noAutoLoad", false);
+			featuredFragment.setArguments(albumArgs);
 		}
 		if(timelineFragment==null){
 			timelineFragment=AccountTimelineFragment.newInstance(accountID, account, true);
@@ -548,6 +552,7 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 				public boolean onPreDraw(){
 					pager.getViewTreeObserver().removeOnPreDrawListener(this);
 					pager.setCurrentItem(1, false);
+					updateAlbumPageVisibility();
 					tabbar.selectTab(tabbar.getTabAt(1));
 					return true;
 				}
@@ -568,6 +573,7 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 				pager.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback(){
 					@Override
 					public void onPageSelected(int position){
+						updateAlbumPageVisibility();
 						Fragment _page=getFragmentForPage(position);
 						if(_page instanceof BaseRecyclerFragment<?> page && page.isAdded()){
 							if(!page.loaded && !page.isDataLoading())
@@ -607,6 +613,42 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 			bindHeaderViewForPreviewMaybe();
 	}
 
+	private void updateAlbumPageVisibility(){
+		if(featuredFragment!=null)
+			featuredFragment.setProfileVisible(isResumed() && !isHidden() && pager!=null && pager.getCurrentItem()==0);
+	}
+
+	@Override
+	protected void onShown(){
+		super.onShown();
+		updateAlbumPageVisibility();
+	}
+
+	@Override
+	protected void onHidden(){
+		if(featuredFragment!=null) featuredFragment.setProfileVisible(false);
+		super.onHidden();
+	}
+
+	@Override
+	public void onHiddenChanged(boolean hidden){
+		super.onHiddenChanged(hidden);
+		if(hidden && featuredFragment!=null) featuredFragment.setProfileVisible(false);
+		else updateAlbumPageVisibility();
+	}
+
+	@Override
+	public void onResume(){
+		super.onResume();
+		updateAlbumPageVisibility();
+	}
+
+	@Override
+	public void onPause(){
+		if(featuredFragment!=null) featuredFragment.setProfileVisible(false);
+		super.onPause();
+	}
+
 	public ImageButton getFab() {
 		return fab;
 	}
@@ -633,7 +675,7 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 		if(featuredFragment==null)
 			return;
 		if(featuredFragment.isAdded())
-			getChildFragmentManager().putFragment(outState, "featured", featuredFragment);
+			getChildFragmentManager().putFragment(outState, "albums", featuredFragment);
 		if(timelineFragment.isAdded())
 			getChildFragmentManager().putFragment(outState, "timeline", timelineFragment);
 		if(aboutFragment.isAdded())
@@ -1304,6 +1346,8 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 		if(pager==null)
 			return null;
 		Fragment fragment=getFragmentForPage(pager.getCurrentItem());
+		if(fragment instanceof org.joinmastodon.android.fragments.albums.AlbumListFragment albums)
+			return albums.getRecyclerView();
 		View view=fragment==null ? null : fragment.getView();
 		return view==null ? null : view.findViewById(R.id.list);
 	}

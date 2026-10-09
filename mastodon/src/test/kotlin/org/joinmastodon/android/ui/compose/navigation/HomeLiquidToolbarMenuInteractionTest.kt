@@ -11,6 +11,7 @@ import kotlin.math.abs
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
+import org.joinmastodon.android.CompatibilityTestApplication
 import org.joinmastodon.android.MastodonApp
 import org.joinmastodon.android.R
 import org.junit.Assert.assertEquals
@@ -27,7 +28,7 @@ import org.robolectric.annotation.LooperMode
 import java.util.function.IntConsumer
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [26])
+@Config(sdk = [26], application = CompatibilityTestApplication::class)
 @LooperMode(LooperMode.Mode.PAUSED)
 class HomeLiquidToolbarMenuInteractionTest {
 	@get:Rule val compose = createComposeRule()
@@ -42,6 +43,7 @@ class HomeLiquidToolbarMenuInteractionTest {
 				toolbar.setComposeMenu(listOf(
 					HomeToolbarComposeMenuItem(R.id.compose_post, "普通帖", Icons.Default.Edit),
 					HomeToolbarComposeMenuItem(R.id.compose_friend_request, "交友帖", Icons.Default.Edit),
+					HomeToolbarComposeMenuItem(R.id.compose_album, "图片传相册", Icons.Default.Edit),
 				))
 				toolbar.view
 			})
@@ -49,9 +51,9 @@ class HomeLiquidToolbarMenuInteractionTest {
 		compose.waitForIdle()
 	}
 
-	@Test fun bothRenderedRowsDispatchTheirActionWithAndWithoutStatusInset() {
+	@Test fun allRenderedRowsDispatchTheirActionWithAndWithoutStatusInset() {
 		for(inset in listOf(0, 72)) {
-			for((title, id) in listOf("普通帖" to R.id.compose_post, "交友帖" to R.id.compose_friend_request)) {
+			for((title, id) in listOf("普通帖" to R.id.compose_post, "交友帖" to R.id.compose_friend_request, "图片传相册" to R.id.compose_album)) {
 				openCompose(inset)
 				// Use the actual rendered text position, but dispatch through the outer View gate.
 				val center = composeRowCenter(title)
@@ -62,7 +64,7 @@ class HomeLiquidToolbarMenuInteractionTest {
 				}
 			}
 		}
-		assertEquals(4, actions.size)
+		assertEquals(6, actions.size)
 	}
 
 	@Test fun outsideTapDismissesWithoutActivatingRow() {

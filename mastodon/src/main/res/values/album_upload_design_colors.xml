@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Album upload uses the app's colorM3 theme attributes directly, not a separate palette. -->
+</resources>

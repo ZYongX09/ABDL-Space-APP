@@ -114,8 +114,9 @@ public abstract class StatusDisplayItem{
 				// MOSHIDON:
 				case DUMMY -> new DummyStatusDisplayItem.Holder(activity);
 				case EMOJI_REACTIONS -> new EmojiReactionsStatusDisplayItem.Holder(activity, parent);
-					case FRIEND_REQUEST_ITEM -> new FriendRequestStatusDisplayItem.Holder(activity, parent);
-					case ADVERTISEMENT -> new AdvertisementStatusDisplayItem.Holder(activity, parent);
+				case FRIEND_REQUEST_ITEM -> new FriendRequestStatusDisplayItem.Holder(activity, parent);
+				case ALBUM_UPDATE -> new AlbumUpdateStatusDisplayItem.Holder(activity, parent);
+				case ADVERTISEMENT -> new AdvertisementStatusDisplayItem.Holder(activity, parent);
 			};
 	}
 
@@ -201,9 +202,11 @@ public abstract class StatusDisplayItem{
 			needAddCWItems=status.revealedSpoilers.contains(Status.SpoilerType.CONTENT_WARNING);
 		}
 
-			String displayedContent=statusForContent.content;
-			if(!TextUtils.isEmpty(displayedContent)){
-				SpannableStringBuilder parsedText=HtmlParser.parse(displayedContent, statusForContent.emojis, statusForContent.mentions, statusForContent.tags, accountID, statusForContent, context);
+		boolean albumUpdate=AlbumUpdateStatusDisplayItem.supported(statusForContent.albumUpdate);
+		String displayedContent=albumUpdate ? statusForContent.albumUpdate.description : statusForContent.content;
+		if(!TextUtils.isEmpty(displayedContent)){
+			SpannableStringBuilder parsedText=albumUpdate ? new SpannableStringBuilder(displayedContent)
+					: HtmlParser.parse(displayedContent, statusForContent.emojis, statusForContent.mentions, statusForContent.tags, accountID, statusForContent, context);
 			if(filtered){
 				HtmlParser.applyFilterHighlights(context, parsedText, status.filtered);
 			}
@@ -213,7 +216,10 @@ public abstract class StatusDisplayItem{
 			hsdi.needBottomPadding=true;
 		}
 
-			List<Attachment> imageAttachments=statusForContent.mediaAttachments.stream().filter(att->att.type.isImage()).collect(Collectors.toList());
+		if(albumUpdate)
+			contentItems.add(new AlbumUpdateStatusDisplayItem(parentID, callbacks, context, statusForContent, accountID));
+
+		List<Attachment> imageAttachments=albumUpdate ? List.of() : statusForContent.mediaAttachments.stream().filter(att->att.type.isImage()).collect(Collectors.toList());
 		if(!imageAttachments.isEmpty()){
 			PhotoLayoutHelper.TiledLayoutResult layout=PhotoLayoutHelper.processThumbs(imageAttachments);
 			MediaGridStatusDisplayItem mediaGrid=new MediaGridStatusDisplayItem(parentID, callbacks, context, layout, imageAttachments, statusForContent);

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="album_viewer_hd">查看原图</string>
+    <string name="album_viewer_lossless">查看无损原图</string>
+    <string name="album_viewer_download_hd">下载高清原图</string>
+    <string name="album_viewer_download_lossless">下载无损原图</string>
+    <string name="album_viewer_download_quality">选择下载画质</string>
+    <string name="album_viewer_busy">正在处理…</string>
+    <string name="album_viewer_retry">重试</string>
+    <string name="album_viewer_retry_action">请求未完成，是否重试同一次操作？重试不会重复扣除额度。</string>
+    <string name="album_viewer_image_error">图片加载失败，请重试</string>
+    <string name="album_viewer_preview_retry">重新加载照片</string>
+    <string name="album_viewer_access_denied">照片已删除或你已无权查看，请刷新相册</string>
+    <string name="album_viewer_invalid_session">当前账号已改变，请重新打开照片</string>
+    <string name="album_viewer_comments">照片评论</string>
+    <string name="album_viewer_close_comments">关闭照片评论</string>
+    <string name="album_viewer_comment_hint">写下评论（最多 2000 字）</string>
+    <string name="album_viewer_comment_send">发送评论</string>
+    <string name="album_viewer_comment_delete">删除我的评论</string>
+    <string name="album_viewer_comment_delete_confirm">删除这条评论？</string>
+    <string name="album_viewer_comment_more">加载更多评论</string>
+    <string name="album_viewer_comment_empty">还没有评论</string>
+    <string name="album_viewer_comment_loading">正在加载评论…</string>
+    <string name="album_viewer_comment_failed">评论加载失败，点击重试</string>
+    <string name="album_viewer_comment_invalid">评论需为 1 至 2000 字</string>
+    <string name="album_viewer_like">赞这张照片，%1$d 个赞</string>
+    <string name="album_viewer_unlike">取消照片赞，%1$d 个赞</string>
+    <string name="album_viewer_comment_count">查看照片评论，%1$d 条</string>
+    <string name="album_viewer_photo_position">照片 %1$d / %2$d</string>
+</resources>

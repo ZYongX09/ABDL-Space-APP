@@ -60,6 +60,7 @@ import top.yukonga.miuix.kmp.icon.MiuixIcons;
 
 import static top.yukonga.miuix.kmp.icon.extended.ContactsBookKt.getContactsBook;
 import static top.yukonga.miuix.kmp.icon.extended.NotesKt.getNotes;
+import static top.yukonga.miuix.kmp.icon.extended.ImageKt.getImage;
 
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -807,6 +808,7 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 		List<HomeToolbarComposeMenuItem> composeItems=new ArrayList<>();
 		composeItems.add(new HomeToolbarComposeMenuItem(R.id.compose_post, getString(R.string.compose_menu_post), getNotes(MiuixIcons.INSTANCE)));
 		composeItems.add(new HomeToolbarComposeMenuItem(R.id.compose_friend_request, getString(R.string.compose_menu_friend_request), getContactsBook(MiuixIcons.INSTANCE)));
+		composeItems.add(new HomeToolbarComposeMenuItem(R.id.compose_album, getString(R.string.baby_albums_compose_upload), getImage(MiuixIcons.INSTANCE)));
 		liquidToolbarController.setComposeMenu(composeItems);
 
 		liquidToolbarController.setMenuOpenListener(open->{
