@@ -3,6 +3,11 @@ package org.joinmastodon.android.ui.map;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.os.Bundle;
+import java.util.function.Consumer;
+import org.joinmastodon.android.R;
+import org.joinmastodon.android.ui.utils.UiUtils;
+import com.amap.api.maps.model.Circle;
+import com.amap.api.maps.model.CircleOptions;
 
 import com.amap.api.maps.AMap;
 import com.amap.api.maps.CameraUpdateFactory;
@@ -20,6 +25,7 @@ import com.amap.api.maps.model.MarkerOptions;
 public final class AMapProvider extends AbstractMapProvider{
 	private MapView mapView;
 	private AMap map;
+	private Circle fuzzCircle;
 	private final ExceptionLogger exceptionLogger=new ExceptionLogger(){
 		@Override public void onException(Throwable error){ fail("sdk_render_failed"); }
 		@Override public void onDownloaderException(int status,int source){ if(status==401 || status==403) fail("sdk_auth_failed"); }
@@ -70,6 +76,28 @@ public final class AMapProvider extends AbstractMapProvider{
 		MapCoordinateConverter.Coordinate second=MapCoordinateConverter.gcj02ToWgs84(bounds.northeast.latitude,bounds.northeast.longitude);
 		MapCoordinateConverter.Coordinate center=MapCoordinateConverter.gcj02ToWgs84(position.target.latitude,position.target.longitude);
 		return new CameraState(Math.min(first.latitude(),second.latitude()),Math.min(first.longitude(),second.longitude()),Math.max(first.latitude(),second.latitude()),Math.max(first.longitude(),second.longitude()),center.latitude(),center.longitude(),Math.round(position.zoom),requestedCamera==null?null:requestedCamera.regionId());
+	}
+	@Override protected void applyContentInsets(){
+		if(map==null || mapView==null) return;
+		map.getUiSettings().setLogoBottomMargin(contentBottomInset+12);
+	}
+	@Override protected void applyFuzzArea(){
+		if(map==null || fuzzPoint==null){ if(fuzzCircle!=null){ fuzzCircle.remove(); fuzzCircle=null; } return; }
+		MapCoordinateConverter.Coordinate center=MapCoordinateConverter.wgs84ToGcj02(fuzzPoint.lat,fuzzPoint.lng);
+		float radius="5km".equals(fuzzPoint.precisionLevel)?5000:"1km".equals(fuzzPoint.precisionLevel)?1000:"200m".equals(fuzzPoint.precisionLevel)?200:20000;
+		int primary=UiUtils.getThemeColor(context,R.attr.colorM3Primary);
+		int fill=(primary&0x00ffffff)|0x18000000; int stroke=(primary&0x00ffffff)|0x66000000;
+		if(fuzzCircle==null) fuzzCircle=map.addCircle(new CircleOptions().center(new LatLng(center.latitude(),center.longitude())).radius(radius).fillColor(fill).strokeColor(stroke).strokeWidth(2));
+		else { fuzzCircle.setCenter(new LatLng(center.latitude(),center.longitude())); fuzzCircle.setRadius(radius); }
+	}
+	@Override public void requestSnapshot(Consumer<Bitmap> callback){
+		if(map==null || destroyed || !isReady()){ callback.accept(null); return; }
+		long token=beginSnapshot(); if(token==0){ callback.accept(null); return; }
+		map.getMapScreenShot(new AMap.OnMapScreenShotListener(){
+			private void deliver(Bitmap bitmap){ if(finishSnapshot(token) && !destroyed) callback.accept(bitmap); }
+			@Override public void onMapScreenShot(Bitmap bitmap){ deliver(bitmap); }
+			@Override public void onMapScreenShot(Bitmap bitmap,int status){ deliver(bitmap); }
+		});
 	}
 	@Override protected MarkerHandle addMarker(String id,double lat,double lng){
 		BitmapDescriptor initial=BitmapDescriptorFactory.defaultMarker();

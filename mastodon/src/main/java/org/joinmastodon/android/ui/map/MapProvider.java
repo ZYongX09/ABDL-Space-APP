@@ -5,6 +5,8 @@ import android.view.View;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.function.Consumer;
+import android.graphics.Bitmap;
 
 import org.joinmastodon.android.model.map.MapModels;
 
@@ -34,5 +36,9 @@ public interface MapProvider{
 	default void onPause(){}
 	default void onSaveInstanceState(Bundle state){}
 	default void onLowMemory(){}
+	default void requestSnapshot(Consumer<Bitmap> callback){ callback.accept(null); }
+	default void setContentInsets(int top,int bottom){}
+	default void selectPoint(String id){}
+	default void showFuzzArea(MapModels.Point point){}
 	default void renderSafe(List<MapModels.Point> points){ render(points==null ? Collections.emptyList() : points); }
 }

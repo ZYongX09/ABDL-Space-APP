@@ -54,6 +54,7 @@ object HomeNavigationTabs {
 	val ids = intArrayOf(
 		R.id.tab_home,
 		R.id.tab_messages,
+		R.id.tab_map,
 		R.id.tab_diaper,
 		R.id.tab_profile,
 	)
@@ -123,6 +124,7 @@ class HomeLiquidNavigationController(
 		val items = listOf(
 			NavigationItem("首页", androidx.compose.ui.graphics.vector.ImageVector.vectorResource(R.drawable.ic_tab_rating)),
 			NavigationItem(view.context.getString(R.string.messages), androidx.compose.ui.graphics.vector.ImageVector.vectorResource(R.drawable.ic_tab_messages)),
+			NavigationItem(view.context.getString(R.string.map_presence_title), androidx.compose.ui.graphics.vector.ImageVector.vectorResource(R.drawable.ic_fluent_map_24_regular)),
 			NavigationItem(view.context.getString(R.string.diaper), androidx.compose.ui.graphics.vector.ImageVector.vectorResource(R.drawable.ic_tab_rating)),
 			NavigationItem(view.context.getString(R.string.my_profile), androidx.compose.ui.graphics.vector.ImageVector.vectorResource(R.drawable.ic_tab_rating)),
 		)
@@ -159,6 +161,12 @@ class HomeLiquidNavigationController(
 						HomeNavigationTabs.indexOf(R.id.tab_messages) -> Icon(
 							modifier = Modifier.size(22.dp),
 							painter = painterResource(R.drawable.ic_tab_messages),
+							contentDescription = null,
+							tint = LocalContentColor.current,
+						)
+						HomeNavigationTabs.indexOf(R.id.tab_map) -> Icon(
+							modifier = Modifier.size(22.dp),
+							painter = painterResource(R.drawable.ic_fluent_map_24_regular),
 							contentDescription = null,
 							tint = LocalContentColor.current,
 						)

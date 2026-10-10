@@ -30,6 +30,7 @@ class HomeNavigationTabsTest {
 			intArrayOf(
 				R.id.tab_home,
 				R.id.tab_messages,
+				R.id.tab_map,
 				R.id.tab_diaper,
 				R.id.tab_profile,
 			),
@@ -38,11 +39,65 @@ class HomeNavigationTabsTest {
 	}
 
 	@Test
+	fun mapIsTheCenterOfFiveDistinctDestinations() {
+		assertEquals(5, HomeNavigationTabs.ids.size)
+		assertEquals(5, HomeNavigationTabs.ids.toSet().size)
+		assertEquals(2, HomeNavigationTabs.indexOf(R.id.tab_map))
+		assertEquals(R.id.tab_map, HomeNavigationTabs.ids[HomeNavigationTabs.ids.size / 2])
+	}
+
+	@Test
+	fun classicAndLiquidNavigationKeepTheSameFiveDestinationOrder() {
+		val projectDir = File(requireNotNull(System.getProperty("user.dir")))
+		val layout = File(projectDir, "src/main/res/layout/tab_bar.xml").readText()
+		val liquid = File(projectDir, "src/main/kotlin/org/joinmastodon/android/ui/compose/navigation/HomeLiquidNavigationView.kt").readText()
+		val ids = File(projectDir, "src/main/res/values/ids.xml").readText()
+		val layoutTabs = Regex("android:id=\"@(?:\\+)?id/(tab_home|tab_messages|tab_map|tab_diaper|tab_profile)\"")
+			.findAll(layout).map { it.groupValues[1] }.toList()
+		assertEquals(listOf("tab_home", "tab_messages", "tab_map", "tab_diaper", "tab_profile"), layoutTabs)
+		assertTrue(ids.contains("name=\"tab_map\" type=\"id\""))
+		val items = liquid.substringAfter("val items = listOf(").substringBefore("val iconTypes")
+		assertEquals(5, Regex("NavigationItem\\(").findAll(items).count())
+		assertTrue(items.indexOf("R.string.messages") < items.indexOf("R.string.map_presence_title"))
+		assertTrue(items.indexOf("R.string.map_presence_title") < items.indexOf("R.string.diaper"))
+		assertTrue(liquid.contains("painterResource(R.drawable.ic_fluent_map_24_regular)"))
+	}
+
+	@Test
+	fun embeddedMapStateRestoresOldBundlesAndActivatesOnlyAfterSelection() {
+		val projectDir = File(requireNotNull(System.getProperty("user.dir")))
+		val home = File(projectDir, "src/main/java/org/joinmastodon/android/fragments/HomeFragment.java").readText()
+		val creation = home.substringAfter("private FriendMapFragment createEmbeddedFriendMapFragment(){").substringBefore("public void onDestroy()")
+		listOf("__is_tab", "noAutoLoad", "hidden").forEach {
+			assertTrue(creation.contains("args.putBoolean(\"$it\", true);"))
+		}
+		assertTrue(creation.contains("fragment.setTabVisible(false);"))
+		val restoration = home.substringAfter("public void onViewStateRestored(").substringBefore("public void onHiddenChanged(")
+		assertTrue(restoration.contains("restoreChildFragment(savedInstanceState, \"friendMapFragment\")"))
+		assertTrue(restoration.contains("if(friendMapFragment==null)\n\t\t\tfriendMapFragment=createEmbeddedFriendMapFragment();"))
+		assertTrue(restoration.contains("if(!friendMapFragment.isAdded())"))
+		assertTrue(restoration.contains(".hide(friendMapFragment)"))
+		assertTrue(restoration.contains(".runOnCommit(this::updateMapTabVisibility)"))
+		assertTrue(home.contains("putFragment(outState, \"friendMapFragment\", friendMapFragment)"))
+		val visibility = home.substringAfter("private void updateMapTabVisibility(){").substringBefore("private void updateCaptureHeights()")
+		assertTrue(visibility.contains("parentActive && currentTab==R.id.tab_map"))
+		assertTrue(visibility.contains("friendMapFragment.isAdded() && !friendMapFragment.isHidden()"))
+		assertTrue(home.contains("setNavigationInsets(topSystemInset, navigationHost==null ? 0 : navigationHost.getHeight())"))
+		val loading = home.substringAfter("private void maybeTriggerLoading(").substringBefore("private boolean onTabLongClick(")
+		assertTrue(loading.indexOf("instanceof FriendMapFragment") < loading.indexOf("instanceof LoaderFragment"))
+		assertFalse(loading.contains("friendMapFragment.loadData()"))
+		val back = home.substringAfter("public boolean onBackPressed(){").substringBefore("private void selectTabInNavigation(")
+		assertTrue(back.contains("parentActive && currentTab==R.id.tab_map"))
+		assertTrue(back.indexOf("friendMapFragment.onBackPressed()") < back.indexOf("liquidToolbarController.onBackPressed()"))
+	}
+
+	@Test
 	fun dragReleaseAlwaysSnapsToAValidTab() {
-		assertEquals(1, snapNavigationDragTarget(1.47f, 4))
-		assertEquals(2, snapNavigationDragTarget(1.5f, 4))
-		assertEquals(0, snapNavigationDragTarget(-0.4f, 4))
-		assertEquals(3, snapNavigationDragTarget(4.8f, 4))
+		val tabsCount = HomeNavigationTabs.ids.size
+		assertEquals(1, snapNavigationDragTarget(1.47f, tabsCount))
+		assertEquals(2, snapNavigationDragTarget(1.5f, tabsCount))
+		assertEquals(0, snapNavigationDragTarget(-0.4f, tabsCount))
+		assertEquals(4, snapNavigationDragTarget(4.8f, tabsCount))
 	}
 
 	@Test

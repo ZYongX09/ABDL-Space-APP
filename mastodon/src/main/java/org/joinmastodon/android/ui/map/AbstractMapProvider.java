@@ -2,6 +2,7 @@ package org.joinmastodon.android.ui.map;
 
 import android.content.Context;
 import android.graphics.Bitmap;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -14,6 +15,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
 
 import org.joinmastodon.android.model.map.MapModels;
 
@@ -21,6 +23,7 @@ abstract class AbstractMapProvider implements MapProvider{
 	interface MarkerHandle{
 		void position(double latitude, double longitude);
 		void icon(Bitmap bitmap);
+		default void selected(boolean selected){}
 		void remove();
 	}
 
@@ -38,6 +41,20 @@ abstract class AbstractMapProvider implements MapProvider{
 	private final Map<String, String> avatarKeys=new HashMap<>();
 	private List<MapModels.Point> pendingPoints=List.of();
 	private final Runnable loadTimeout=()->{ if(resumed && !ready) fail("map_load_timeout"); };
+	private final MapSnapshotGate snapshotGate=new MapSnapshotGate();
+	protected int contentTopInset,contentBottomInset;
+	private String selectedPointId;
+	protected MapModels.Point fuzzPoint;
+
+	@Override public void setContentInsets(int top,int bottom){ contentTopInset=Math.max(0,top); contentBottomInset=Math.max(0,bottom); applyContentInsets(); }
+	protected void applyContentInsets(){}
+	@Override public void selectPoint(String id){
+		String previous=selectedPointId; selectedPointId=id;
+		if(previous!=null && markers.containsKey(previous)) markers.get(previous).selected(false);
+		if(id!=null && markers.containsKey(id)) markers.get(id).selected(true);
+	}
+	@Override public void showFuzzArea(MapModels.Point point){ fuzzPoint=point; applyFuzzArea(); }
+	protected void applyFuzzArea(){}
 
 	AbstractMapProvider(Context context){
 		this.context=context;
@@ -65,7 +82,7 @@ abstract class AbstractMapProvider implements MapProvider{
 	protected final void loaded(){
 		main.post(()->{
 			if(destroyed || failed) return;
-			ready=true; main.removeCallbacks(loadTimeout);
+			ready=true; main.removeCallbacks(loadTimeout); applyContentInsets(); applyFuzzArea();
 			if(requestedCamera!=null) setCamera(requestedCamera);
 			render(pendingPoints);
 			if(listener!=null) listener.onMapReady();
@@ -118,6 +135,7 @@ abstract class AbstractMapProvider implements MapProvider{
 				MarkerHandle marker=markers.get(id);
 				if(marker==null){ marker=addMarker(id,point.lat,point.lng); markers.put(id,marker); }
 				else marker.position(point.lat,point.lng);
+				marker.selected(id.equals(selectedPointId));
 				String avatarKey=point.anonymous ? "anonymous" : point.account==null ? "default" : String.valueOf(point.account.avatar)+point.account.displayName;
 				if(!avatarKey.equals(avatarKeys.get(id))){
 					avatarKeys.put(id,avatarKey); MarkerHandle current=marker;
@@ -135,7 +153,7 @@ abstract class AbstractMapProvider implements MapProvider{
 	}
 
 	@Override public void clear(){
-		avatars.clear(); pendingPoints=List.of();
+		selectedPointId=null; fuzzPoint=null; avatars.clear(); pendingPoints=List.of();
 		for(MarkerHandle marker:markers.values()) marker.remove();
 		markers.clear(); points.clear(); avatarKeys.clear();
 	}
@@ -152,7 +170,10 @@ abstract class AbstractMapProvider implements MapProvider{
 		try{ pauseMap(); }catch(RuntimeException error){ fail("sdk_pause_failed"); }
 	}
 	@Override public void onSaveInstanceState(Bundle state){ if(!destroyed && !failed) saveMap(state); }
+	protected final long beginSnapshot(){ return snapshotGate.begin(); }
+	protected final boolean finishSnapshot(long token){ return snapshotGate.finish(token); }
 	@Override public void destroy(){
+		snapshotGate.reset();
 		if(destroyed) return;
 		destroyed=true; ready=false; listener=null; main.removeCallbacksAndMessages(null);
 		try{ clear(); }finally{ try{ destroyMap(); }finally{ container.removeAllViews(); } }

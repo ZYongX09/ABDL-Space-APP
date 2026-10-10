@@ -4,6 +4,8 @@ import android.content.Context;
 import android.graphics.Color;
 import android.view.View;
 import android.widget.TextView;
+import java.util.function.Consumer;
+import android.graphics.Bitmap;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -29,5 +31,6 @@ public final class FakeMapProvider implements MapProvider {
     @Override public CameraState getCamera(){ return camera; }
     @Override public void render(List<MapModels.Point> points){ this.points.clear(); if(points!=null) this.points.addAll(points); view.setText(points==null || points.isEmpty() ? "地图服务准备中\n暂无附近用户" : "地图服务准备中\n附近用户："+points.size()); }
     @Override public void clear(){ points.clear(); view.setText("地图服务准备中"); }
+    @Override public void requestSnapshot(Consumer<Bitmap> callback){ callback.accept(null); }
     @Override public void destroy(){ listener=null; points.clear(); }
 }
