@@ -35,7 +35,7 @@ public final class BaiduMapProvider extends AbstractMapProvider{
 		SDKInitializer.addAuthResultListener(authListener);
 		if(!SDKInitializer.isInitialized()) SDKInitializer.initialize(app);
 		mapView=new MapView(context);
-		if(state!=null) mapView.onCreate(context,state);
+		mapView.onCreate(context,state);
 		map=mapView.getMap();
 		map.setMyLocationEnabled(false);
 		map.getUiSettings().setCompassEnabled(true);
