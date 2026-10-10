@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+	<string name="map_presence_locate">当前位置</string>
+	<string name="map_presence_provider">切换地图</string>
+	<string name="map_presence_preferences">出现设置</string>
+	<string name="map_presence_refresh">刷新</string>
+	<string name="map_presence_loading">正在读取地图权限…</string>
+	<string name="map_presence_current_city">当前城市</string>
+	<string name="map_presence_city_scope">仅限定位所在城市：%s</string>
+	<string name="map_presence_nationwide">全国地图 · 长按可指定展示位置</string>
+	<string name="map_presence_privacy_title">交友地图与第三方地图服务</string>
+	<string name="map_presence_privacy_body">地图使用百度地图与高德地图 SDK 显示底图，两家服务会处理必要的设备与网络信息。我们不会开启厂商持续定位或后台定位。你的位置只在主动开启地图出现时发送给 ABDL Space，软件模糊处理后才向其他用户显示。\n\n普通用户只能查看定位所在城市；赞助者可以查看全国并指定展示位置。你可以选择公开、仅互关或隐藏，随时关闭地图出现。关闭页面停止刷新，位置最多保留 30 分钟后过期。\n\n请阅读应用隐私政策以及百度、高德的 SDK 隐私政策后决定是否同意。</string>
+	<string name="map_presence_agree">同意并继续</string>
+	<string name="map_presence_privacy_link">阅读隐私政策</string>
+	<string name="map_presence_later">暂不</string>
+	<string name="map_presence_settings_failed">地图设置暂时不可用，请重试</string>
+	<string name="map_presence_presence_failed">地图数据暂时不可用，请重试</string>
+	<string name="map_presence_hidden">你已隐藏地图位置。点击出现设置后可开启。</string>
+	<string name="map_presence_locating">正在获取一次前台定位…</string>
+	<string name="map_presence_location_failed">无法取得新定位，请检查系统定位服务并重试</string>
+	<string name="map_presence_permission_needed">需要前台位置权限。仅粗略定位也可使用软件级模糊位置；不要求后台定位。</string>
+	<string name="map_presence_open_settings">打开系统设置</string>
+	<string name="map_presence_provider_unavailable">地图服务未配置或当前设备不受支持，请重试或切换地图。不会使用占位地图冒充真实服务。</string>
+	<string name="map_presence_baidu">百度地图</string>
+	<string name="map_presence_amap">高德地图</string>
+	<string name="map_presence_switching">地图服务暂时不可用，正在切换备用地图…</string>
+	<string name="map_presence_other_city">查看其他城市</string>
+	<string name="map_presence_sponsor_body">普通用户只能查看定位所在城市。成为赞助者后可查看全国地图，并自由选择展示位置。购买后返回地图将重新读取权益。</string>
+	<string name="map_presence_back_city">返回当前城市</string>
+	<string name="map_presence_public">公开出现</string>
+	<string name="map_presence_friends">仅互关用户可见</string>
+	<string name="map_presence_hide">隐藏我的位置</string>
+	<string name="map_presence_fuzz">软件级定位模糊</string>
+	<string name="map_presence_anonymous">切换匿名显示</string>
+	<string name="map_presence_pin">指定展示位置（赞助者）</string>
+	<string name="map_presence_long_press">长按地图选择展示位置，确认后按当前模糊设置公开</string>
+	<string name="map_presence_pin_confirm">将以当前软件模糊精度展示这个地点，不会展示设备真实位置。确定使用此地点吗？</string>
+	<string name="map_presence_confirm">确认使用</string>
+	<string-array name="map_presence_precisions">
+		<item>城市级</item>
+		<item>约 5 公里</item>
+		<item>约 1 公里</item>
+		<item>约 200 米</item>
+	</string-array>
+</resources>

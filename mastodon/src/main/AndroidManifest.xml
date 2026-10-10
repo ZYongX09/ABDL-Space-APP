@@ -9,6 +9,7 @@
 	<uses-permission android:name="android.permission.INTERNET"/>
 	<uses-permission android:name="android.permission.USE_BIOMETRIC"/>
 	<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+	<uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
 	<uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
 	<uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
 	<uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE"/>
@@ -24,6 +25,8 @@
 	<uses-permission android:name="com.google.android.c2dm.permission.RECEIVE"/>
 	<uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
 	<uses-permission android:name="android.permission.CAMERA"/>
+	<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+	<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
 	<uses-permission android:name="android.permission.HIDE_OVERLAY_WINDOWS"/>
 	<uses-permission android:name="android.permission.RECORD_AUDIO"/>
 	<uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
@@ -63,6 +66,9 @@
 		android:icon="@mipmap/ic_launcher"
 		android:theme="@style/Theme.Mastodon.AutoLightDark"
 		android:largeHeap="true">
+
+		<meta-data android:name="com.baidu.lbsapi.API_KEY" android:value="${BAIDU_MAP_ANDROID_AK}" />
+		<meta-data android:name="com.amap.api.v2.apikey" android:value="${AMAP_ANDROID_KEY}" />
 
 		<activity
 			android:name=".fragments.settings.ComposeAboutActivity"

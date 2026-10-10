@@ -5,8 +5,18 @@ plugins {
 	id 'org.jetbrains.kotlin.plugin.compose'
 }
 
+def mapCredential = { String name ->
+	def value = System.getenv(name) ?: ''
+	if (value && !(value ==~ /[A-Za-z0-9_-]{16,128}/)) {
+		throw new GradleException("Invalid map credential format: ${name}")
+	}
+	return value
+}
+def baiduAndroidKey = mapCredential('BAIDU_MAP_ANDROID_AK')
+def amapAndroidKey = mapCredential('AMAP_ANDROID_KEY')
+
 android {
-	androidResources {
+		androidResources {
 		generateLocaleConfig = true
 	}
 	aaptOptions {
@@ -24,6 +34,9 @@ android {
 		buildConfigField "String", "BABY_VERIFICATION_COS_HOST", "\"${System.getenv('BABY_VERIFICATION_COS_HOST') ?: 'abdl-1339643562.cos.ap-shanghai.myqcloud.com'}\""
 		buildConfigField "String", "QQ_APP_ID", '"1905661071"'
 		buildConfigField "boolean", "QQ_LOGIN_ENABLED", "false"
+		manifestPlaceholders += [BAIDU_MAP_ANDROID_AK: baiduAndroidKey, AMAP_ANDROID_KEY: amapAndroidKey]
+		buildConfigField "boolean", "BAIDU_MAP_CONFIGURED", String.valueOf(!baiduAndroidKey.isEmpty())
+		buildConfigField "boolean", "AMAP_CONFIGURED", String.valueOf(!amapAndroidKey.isEmpty())
 		testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 		testBuildType "screenshotsUiTest"
 
@@ -89,7 +102,7 @@ android {
 			debuggable true
 			versionNameSuffix '-debug'
 			applicationIdSuffix '.debug'
-			manifestPlaceholders = [oAuthScheme:"abdl-space"]
+			manifestPlaceholders += [oAuthScheme:"abdl-space"]
 		}
 //		appcenterPrivateBeta {
 //			initWith release
@@ -119,7 +132,7 @@ android {
 			}
 			applicationIdSuffix '.nightly'
 			signingConfig signingConfigs.nightly
-			manifestPlaceholders = [oAuthScheme:"abdl-space"]
+			manifestPlaceholders += [oAuthScheme:"abdl-space"]
 		}
 		githubDebug {
 			initWith debug
@@ -221,6 +234,8 @@ configurations.all {
 }
 
 dependencies {
+	implementation 'com.baidu.lbsyun:BaiduMapSDK_Map:8.2.0'
+	implementation files('libs/AMap3DMap_AMapSearch_AMapLocation-11.3.100-9.8.1-11.3.101.jar')
 	implementation files('libs/open_sdk_3.5.19_r9483ffc7_lite.jar')
 	implementation project(':reader-core')
 	implementation project(':novel-editor-core')
