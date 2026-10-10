@@ -45,6 +45,7 @@ public final class BaiduMapProvider extends AbstractMapProvider{
 		mapView.onCreate(context,state);
 		map=mapView.getMap();
 		map.setMyLocationEnabled(false);
+		mapView.showZoomControls(false);
 		map.getUiSettings().setCompassEnabled(true);
 		map.setOnMapLoadedCallback(this::loaded);
 		map.setOnMapStatusChangeListener(new BaiduMap.OnMapStatusChangeListener(){

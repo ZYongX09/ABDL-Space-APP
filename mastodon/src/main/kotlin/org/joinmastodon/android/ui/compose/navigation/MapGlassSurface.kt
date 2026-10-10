@@ -15,7 +15,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.ComposeView
@@ -67,7 +66,6 @@ class MapGlassSurface(context: Context, private val radiusDp: Int, private val l
 		val material = if (liquid) liquidMaterial(backdrop, shape, fill) else Modifier.background(fill, shape)
 		Box(Modifier.fillMaxSize()
 			.onGloballyPositioned { backdrop.updateOriginInWindow(mapOrigin) }
-			.graphicsLayer { shadowElevation = if (largePanel) 10.dp.toPx() else 5.dp.toPx(); this.shape = shape; clip = true }
 			.then(material)
 			.border(.75.dp, outlineColor.copy(alpha = if (liquid) .45f else .65f), shape))
 	}

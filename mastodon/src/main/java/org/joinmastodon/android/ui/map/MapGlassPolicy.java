@@ -6,6 +6,6 @@ public final class MapGlassPolicy{
 		return sdk>=33 && hardware && preference && sampleReady;
 	}
 	public static float surfaceAlpha(boolean liquid,boolean largePanel){
-		return liquid ? (largePanel ? .38f : .26f) : .96f;
+		return liquid ? (largePanel ? .48f : .35f) : .96f;
 	}
 }

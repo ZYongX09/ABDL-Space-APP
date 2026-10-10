@@ -13,8 +13,8 @@ public class MapGlassPolicyTest{
 	@Test public void hardwareWithValidSampleUsesSubtleBackgroundOnly(){
 		assertTrue(MapGlassPolicy.supportsLiquid(33,true,true,true));
 		assertTrue(MapGlassPolicy.supportsLiquid(35,true,true,true));
-		assertEquals(.26f,MapGlassPolicy.surfaceAlpha(true,false),0);
-		assertEquals(.38f,MapGlassPolicy.surfaceAlpha(true,true),0);
+		assertEquals(.35f,MapGlassPolicy.surfaceAlpha(true,false),0);
+		assertEquals(.48f,MapGlassPolicy.surfaceAlpha(true,true),0);
 		assertEquals(.96f,MapGlassPolicy.surfaceAlpha(false,true),0);
 	}
 }
