@@ -7,7 +7,10 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.Rect;
+import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
+
+import org.joinmastodon.android.ui.drawables.BlurhashCrossfadeDrawable;
 import android.os.Handler;
 import android.os.Looper;
 
@@ -22,7 +25,7 @@ import me.grishka.appkit.imageloader.requests.UrlImageLoaderRequest;
 
 import org.joinmastodon.android.model.map.MapModels;
 
-final class MapAvatarRenderer{
+class MapAvatarRenderer{
 	private final Context context;
 	private final Handler main=new Handler(Looper.getMainLooper());
 	private final Map<String, Object> pending=new HashMap<>();
@@ -30,6 +33,8 @@ final class MapAvatarRenderer{
 	private int generation;
 
 	MapAvatarRenderer(Context context){ this.context=context.getApplicationContext(); }
+	boolean requiresSoftwareCopy(Bitmap bitmap){ return bitmap.getConfig()==Bitmap.Config.HARDWARE; }
+	Bitmap copyForSoftwareCanvas(Bitmap bitmap){ return bitmap.copy(Bitmap.Config.ARGB_8888,false); }
 
 	void render(MapModels.Point point, Consumer<Bitmap> callback){
 		String name=point.anonymous ? "?" : point.account==null ? "?" : point.account.displayName;
@@ -62,7 +67,7 @@ final class MapAvatarRenderer{
 		requests.clear();
 	}
 
-	private Bitmap draw(Drawable drawable, String initial){
+	Bitmap draw(Drawable drawable, String initial){
 		int size=Math.max(48, Math.round(48*context.getResources().getDisplayMetrics().density));
 		Bitmap bitmap=Bitmap.createBitmap(size,size,Bitmap.Config.ARGB_8888);
 		Canvas canvas=new Canvas(bitmap); Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -70,8 +75,27 @@ final class MapAvatarRenderer{
 		paint.setColor(Color.WHITE); canvas.drawCircle(center,center,center-1,paint);
 		paint.setColor(0xff6657cd); canvas.drawCircle(center,center,radius,paint);
 		if(drawable!=null){
-			int save=canvas.save(); Path clip=new Path(); clip.addCircle(center,center,radius,Path.Direction.CW); canvas.clipPath(clip);
-			Rect original=new Rect(drawable.getBounds()); drawable.setBounds(3,3,size-3,size-3); drawable.draw(canvas); drawable.setBounds(original); canvas.restoreToCount(save);
+			Drawable renderDrawable=drawable;
+			Bitmap softwareCopy=null;
+			if(drawable instanceof BitmapDrawable bitmapDrawable){
+				Bitmap source=bitmapDrawable.getBitmap();
+				if(requiresSoftwareCopy(source)){
+					softwareCopy=copyForSoftwareCanvas(source);
+					renderDrawable=softwareCopy==null ? null : new BitmapDrawable(context.getResources(),softwareCopy);
+				}
+			}
+			int save=canvas.save();
+			try{
+				Path clip=new Path(); clip.addCircle(center,center,radius,Path.Direction.CW); canvas.clipPath(clip);
+				if(renderDrawable!=null){
+					Rect original=new Rect(renderDrawable.getBounds());
+					try{ renderDrawable.setBounds(3,3,size-3,size-3); renderDrawable.draw(canvas); }
+					finally{ renderDrawable.setBounds(original); }
+				}
+			}finally{
+				canvas.restoreToCount(save);
+				if(softwareCopy!=null) softwareCopy.recycle();
+			}
 		}else{
 			paint.setColor(Color.WHITE); paint.setTextAlign(Paint.Align.CENTER); paint.setTextSize(size*0.42f);
 			canvas.drawText(initial,center,center-(paint.ascent()+paint.descent())/2,paint);

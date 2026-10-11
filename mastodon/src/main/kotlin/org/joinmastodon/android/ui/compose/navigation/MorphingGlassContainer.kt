@@ -113,7 +113,7 @@ internal fun MorphingGlassContainer(
 	val interactionSource = remember { MutableInteractionSource() }
 	val pressed by interactionSource.collectIsPressedAsState()
 	val pressScale = remember { Animatable(1f) }
-	val outlineHighlight = rememberGravityRotatedHighlight(iosIndicatorSpecular, extraDegrees = -45f)
+		val outlineHighlight = rememberIsolatedGlassHighlight(iosIndicatorSpecular, extraDegrees = -45f)
 	val isDark = isInDarkTheme()
 	val surfaceAlpha = homeLiquidToolbarVisualSpec().surfaceAlpha
 	val surface = if(isDark) Color.Black.copy(alpha = surfaceAlpha) else Color.White.copy(alpha = surfaceAlpha)

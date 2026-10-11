@@ -15,6 +15,8 @@ import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.unit.Density
 import top.yukonga.miuix.kmp.blur.Backdrop
+import top.yukonga.miuix.kmp.blur.BackdropEffectScope
+import kotlin.math.round
 
 internal fun topCaptureRange(viewHeight: Int, requestedHeight: Int): IntRange {
 	val height = requestedHeight.coerceIn(0, viewHeight.coerceAtLeast(0))
@@ -32,15 +34,17 @@ internal class ViewBitmapBackdrop : Backdrop {
 	private var originInWindow by mutableStateOf(Offset.Zero)
 
 	override val isCoordinatesDependent = true
+	override var offsetResidualX = 0f
+		private set
+	override var offsetResidualY = 0f
+		private set
 
 	fun update(bitmap: Bitmap?) {
 		image = bitmap?.asImageBitmap()
 		generation++
 	}
 
-	fun updateOriginInWindow(origin: Offset) {
-		originInWindow = origin
-	}
+	fun updateOriginInWindow(origin: Offset) { originInWindow = origin }
 
 	override fun DrawScope.drawBackdrop(
 		density: Density,
@@ -52,12 +56,19 @@ internal class ViewBitmapBackdrop : Backdrop {
 		val currentImage = image ?: return
 		val currentCoordinates = coordinates ?: return
 		val offset = currentCoordinates.positionInWindow() - originInWindow
-		val scaleFactor = downscaleFactor.coerceAtLeast(1)
+		val factor = downscaleFactor.coerceAtLeast(1)
+		val inv = 1f / factor
+		val x = offset.x * inv
+		val y = offset.y * inv
+		val roundedX = if(factor>1) round(x * .5f) * 2f else x
+		val roundedY = if(factor>1) round(y * .5f) * 2f else y
+		offsetResidualX = (x - roundedX) * factor
+		offsetResidualY = (y - roundedY) * factor
+		val consumerSize = (density as? BackdropEffectScope)?.size ?: size
 		withTransform({
-			translate(-offset.x / scaleFactor, -offset.y / scaleFactor)
-			if (scaleFactor > 1) scale(1f / scaleFactor, 1f / scaleFactor, Offset.Zero)
-		}) {
-			drawImage(currentImage)
-		}
+			if(layerBlock!=null) with(BitmapBackdropTransform()) { inverse(density, consumerSize, layerBlock) }
+			translate(-roundedX, -roundedY)
+			if(factor>1) scale(inv, inv, Offset.Zero)
+		}) { drawImage(currentImage) }
 	}
 }

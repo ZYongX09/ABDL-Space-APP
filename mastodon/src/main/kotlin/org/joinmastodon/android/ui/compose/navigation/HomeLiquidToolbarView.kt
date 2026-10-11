@@ -624,7 +624,7 @@ val trailingExpanded = menuPageState==HomeToolbarMenuPage.ROOT || menuPageState=
 		val interactionSource = remember { MutableInteractionSource() }
 		val pressed by interactionSource.collectIsPressedAsState()
 		val motionSpec = homeLiquidToolbarMotionSpec()
-		val outlineHighlight = rememberGravityRotatedHighlight(iosIndicatorSpecular, extraDegrees = -45f)
+			val outlineHighlight = rememberIsolatedGlassHighlight(iosIndicatorSpecular, extraDegrees = -45f)
 		val scale by animateFloatAsState(
 			targetValue = if(pressed) 0.96f else 1f,
 			animationSpec = spring(motionSpec.dampingRatio, motionSpec.stiffness),

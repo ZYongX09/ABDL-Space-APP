@@ -10,8 +10,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -29,6 +31,7 @@ import org.joinmastodon.android.ui.compose.navigation.liquid.lens
 import org.joinmastodon.android.ui.compose.navigation.liquid.rememberGravityRotatedHighlight
 import org.joinmastodon.android.ui.compose.navigation.liquid.vibrancy
 import top.yukonga.miuix.kmp.blur.Backdrop
+import top.yukonga.miuix.kmp.blur.LocalRuntimeShaderCache
 import top.yukonga.miuix.kmp.blur.blur
 import top.yukonga.miuix.kmp.blur.drawBackdrop
 
@@ -45,7 +48,7 @@ class MapGlassSurface(context: Context, private val radiusDp: Int, private val l
 		isClickable = false
 		importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
 		setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
-		setContent { Surface() }
+		setContent { WithIsolatedGlassShaderCache { Surface() } }
 	}
 
 	fun update(bitmap: Bitmap?, mapLeft: Int, mapTop: Int) {
@@ -62,7 +65,7 @@ class MapGlassSurface(context: Context, private val radiusDp: Int, private val l
 		val shape = RoundedCornerShape(radiusDp.dp)
 		val liquid = MapGlassPolicy.supportsLiquid(android.os.Build.VERSION.SDK_INT, hardware,
 			GlobalUserPreferences.isIosLiquidNavigationEnabled(), sampleReady)
-		val fill = surfaceColor.copy(alpha = MapGlassPolicy.surfaceAlpha(liquid, largePanel))
+		val fill = surfaceColor.copy(alpha = if (liquid) .16f else MapGlassPolicy.surfaceAlpha(false, largePanel))
 		val material = if (liquid) liquidMaterial(backdrop, shape, fill) else Modifier.background(fill, shape)
 		Box(Modifier.fillMaxSize()
 			.onGloballyPositioned { backdrop.updateOriginInWindow(mapOrigin) }
@@ -74,7 +77,7 @@ class MapGlassSurface(context: Context, private val radiusDp: Int, private val l
 /** Only reached on API33+ hardware rendering; low API code never constructs a shader. */
 @Composable
 private fun liquidMaterial(backdrop: Backdrop, shape: RoundedCornerShape, fill: Color): Modifier {
-	val highlight = rememberGravityRotatedHighlight(iosIndicatorSpecular, extraDegrees = -45f)
+		val highlight = rememberIsolatedGlassHighlight(iosIndicatorSpecular, extraDegrees = -45f)
 	return Modifier.drawBackdrop(
 		backdrop = backdrop,
 		shape = { shape },

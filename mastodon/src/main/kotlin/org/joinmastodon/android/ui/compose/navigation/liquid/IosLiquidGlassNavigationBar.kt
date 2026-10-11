@@ -76,6 +76,7 @@ import org.joinmastodon.android.ui.compose.ui.isInDarkTheme
 import org.joinmastodon.android.ui.compose.navigation.animation.DampedDragAnimation
 import org.joinmastodon.android.ui.compose.navigation.animation.InteractiveHighlight
 import org.joinmastodon.android.ui.compose.navigation.snapNavigationDragTarget
+import org.joinmastodon.android.ui.compose.navigation.rememberIsolatedGlassHighlight
 import top.yukonga.miuix.kmp.basic.BadgedBox
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.NavigationItem
@@ -325,8 +326,8 @@ internal fun IosLiquidGlassNavigationBar(
     }
 
     // Read .value only inside highlight lambdas (draw phase), never in composition.
-    val baseHighlight = rememberGravityRotatedHighlight(iosIndicatorSpecular, extraDegrees = -45f)
-    val pillHighlight = rememberGravityRotatedHighlight(iosIndicatorSpecular, extraDegrees = 90f)
+    val baseHighlight = rememberIsolatedGlassHighlight(iosIndicatorSpecular, extraDegrees = -45f)
+    val pillHighlight = rememberIsolatedGlassHighlight(iosIndicatorSpecular, extraDegrees = 90f)
 
     val combinedBackdrop = if (blurActive && backdrop != null && tabsBackdrop != null) {
         rememberCombinedBackdrop(backdrop, tabsBackdrop)

@@ -166,9 +166,8 @@ public final class FriendMapOverlay extends FrameLayout{
 	private void open(MapSheetState.Page page){ sheetState.open(page); rebuild(true); }
 	private void toggleHeight(){ sheetState.setHeight(sheetState.height()==MapSheetState.Height.COLLAPSED ? MapSheetState.Height.HALF : MapSheetState.Height.COLLAPSED); rebuild(true); }
 	private FrameLayout glass(int radius,boolean large){
-		FrameLayout shell=new FrameLayout(getContext());
 		MapGlassMaterial material=new MapGlassMaterial(getContext(),radius,large); materials.add(material);
-		shell.addView(material.getView(),new LayoutParams(-1,-1)); shell.setClipChildren(true);
+		MapGlassContainer shell=new MapGlassContainer(getContext(),material.getView()); shell.setClipChildren(true);
 		// Shadow belongs on the shell so the content added after the glass stays above it.
 		shell.setOutlineProvider(org.joinmastodon.android.ui.OutlineProviders.roundedRect(radius));
 		shell.setElevation(V.dp(large?10:5));
