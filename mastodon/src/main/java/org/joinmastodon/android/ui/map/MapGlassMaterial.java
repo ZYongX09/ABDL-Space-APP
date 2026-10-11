@@ -22,6 +22,8 @@ final class MapGlassMaterial{
 	private final int radius;
 	private final boolean large;
 	private MapGlassSurface liquid;
+	// The live map view can arrive before the first snapshot creates the liquid surface.
+	private View pendingSource;
 
 	MapGlassMaterial(Context context,int radius,boolean large){
 		this.radius=radius; this.large=large;
@@ -38,7 +40,11 @@ final class MapGlassMaterial{
 		boolean supported=MapGlassPolicy.supportsLiquid(Build.VERSION.SDK_INT,view.isHardwareAccelerated(),
 				GlobalUserPreferences.isIosLiquidNavigationEnabled(),bitmap!=null && !bitmap.isRecycled());
 		if(supported){
-			if(liquid==null){ liquid=new MapGlassSurface(view.getContext(),radius,large); view.addView(liquid.getView(),new FrameLayout.LayoutParams(-1,-1)); }
+			if(liquid==null){
+				liquid=new MapGlassSurface(view.getContext(),radius,large);
+				view.addView(liquid.getView(),new FrameLayout.LayoutParams(-1,-1));
+				if(pendingSource!=null) liquid.setSampleSource(pendingSource);
+			}
 			view.setLiquidVisible(true);
 			liquid.getView().setVisibility(View.VISIBLE); liquid.update(bitmap,left,top);
 		}else{
@@ -48,10 +54,14 @@ final class MapGlassMaterial{
 		view.invalidate();
 	}
 
-	void setSampleSource(View source){ liquid.setSampleSource(source); }
+	void setSampleSource(View source){
+		pendingSource=source;
+		if(liquid!=null) liquid.setSampleSource(source);
+	}
 
 	void dispose(){
 		if(liquid!=null){ liquid.dispose(); view.removeAllViews(); liquid=null; }
+		pendingSource=null;
 		view.liquidVisible=false;
 	}
 

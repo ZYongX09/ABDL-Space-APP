@@ -89,11 +89,11 @@ public class FriendMapFragment extends AppKitFragment implements MapProvider.Lis
 		boolean next=!destroyed && resumed && tabVisible && overlay!=null && sessionValid();
 		if(next==active) return;
 		active=next;
-		if(active){ if(provider!=null) provider.onResume(); loadSettings(); }
+		if(active){ if(provider!=null) provider.onResume(); overlay.setSampleSource(provider!=null?provider.getSampleSource():null); loadSettings(); }
 		else{
 			generation++; queryGeneration++; cancelAll(); clearSnapshotWork();
 			if(provider!=null) provider.onPause();
-			if(overlay!=null){ overlay.setBusy(false); overlay.setSnapshot(null); }
+			if(overlay!=null){ overlay.setBusy(false); overlay.setSampleSource(null); overlay.setSnapshot(null); }
 		}
 	}
 	@Override public void refresh(){ attemptedProviders.clear(); if(provider==null && consentAccepted()) startProvider(preferredProvider); loadSettings(); }
@@ -119,13 +119,14 @@ public class FriendMapFragment extends AppKitFragment implements MapProvider.Lis
 		MapProvider.CameraState camera=provider==null?lastLegalCamera:provider.getCamera();
 		clearSnapshotWork();
 		if(provider!=null){ provider.onPause(); provider.destroy(); provider=null; }
-		overlay.mapHost().removeAllViews(); overlay.setSnapshot(null);
+		overlay.mapHost().removeAllViews(); overlay.setSnapshot(null); overlay.setSampleSource(null);
 		if(chosen==null){ overlay.setMessage(getString(R.string.map_presence_provider_unavailable),true); return; }
 		attemptedProviders.add(chosen);
 		try{
 			provider=MapProviderRegistry.create(getActivity(),chosen); provider.onCreate(providerState); providerState=null;
 			overlay.mapHost().addView(provider.getView(),new ViewGroup.LayoutParams(-1,-1));
 			provider.initialize(this); provider.renderSafe(visiblePoints); provider.onResume(); overlay.setProvider(chosen);
+			overlay.setSampleSource(provider.getSampleSource());
 			if(camera!=null) provider.setCamera(camera);
 		}catch(RuntimeException | LinkageError error){ onProviderError("sdk_init_failed"); }
 	}
