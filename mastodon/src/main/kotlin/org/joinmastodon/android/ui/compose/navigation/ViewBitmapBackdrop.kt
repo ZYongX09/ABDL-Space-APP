@@ -41,6 +41,7 @@ internal class ViewBitmapBackdrop : Backdrop {
 	private var generation by mutableIntStateOf(0)
 	private var originInWindow by mutableStateOf(Offset.Zero)
 	private var sampleSource by mutableStateOf<View?>(null)
+	private val sourceOrigin=IntArray(2)
 
 	override val isCoordinatesDependent = true
 	override var offsetResidualX = 0f
@@ -67,11 +68,23 @@ internal class ViewBitmapBackdrop : Backdrop {
 		val source = sampleSource
 		val hardware = drawContext.canvas.nativeCanvas.isHardwareAccelerated
 		if(source!=null && source.isAttachedToWindow && hardware && source.width>0 && source.height>0){
-			val offset=currentCoordinates.positionInWindow()-originInWindow
+			// The recorded layer is downsampled by `downscaleFactor`; content must be drawn in
+			// that space or the blur upscales it into a magnifier. Mirrors the bitmap path below.
+			source.getLocationInWindow(sourceOrigin)
+			val offset=currentCoordinates.positionInWindow()-Offset(sourceOrigin[0].toFloat(),sourceOrigin[1].toFloat())
+			val factor=downscaleFactor.coerceAtLeast(1)
+			val inv=1f/factor
+			val x=offset.x*inv
+			val y=offset.y*inv
+			val roundedX=if(factor>1) round(x*.5f)*2f else x
+			val roundedY=if(factor>1) round(y*.5f)*2f else y
+			offsetResidualX=(x-roundedX)*factor
+			offsetResidualY=(y-roundedY)*factor
 			drawIntoCanvas { canvas->
 				val native=canvas.nativeCanvas
 				native.save()
-				native.translate(-offset.x,-offset.y)
+				native.translate(-roundedX,-roundedY)
+				if(factor>1) native.scale(inv,inv)
 				try{ source.draw(native) } finally { native.restore() }
 			}
 			return

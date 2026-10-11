@@ -51,8 +51,10 @@ public final class BaiduMapProvider extends AbstractMapProvider{
 		map.setOnMapLoadedCallback(this::loaded);
 		map.setOnMapStatusChangeListener(new BaiduMap.OnMapStatusChangeListener(){
 			@Override public void onMapStatusChangeStart(MapStatus status){}
-			@Override public void onMapStatusChangeStart(MapStatus status,int reason){}
-			@Override public void onMapStatusChange(MapStatus status){}
+			@Override public void onMapStatusChangeStart(MapStatus status,int reason){
+				if(reason==BaiduMap.OnMapStatusChangeListener.REASON_GESTURE) cameraMoved();
+			}
+			@Override public void onMapStatusChange(MapStatus status){ cameraMoved(); }
 			@Override public void onMapStatusChangeFinish(MapStatus status){ cameraIdle(); }
 		});
 		map.setOnMarkerClickListener(marker->{

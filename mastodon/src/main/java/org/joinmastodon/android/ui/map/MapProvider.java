@@ -18,6 +18,8 @@ public interface MapProvider{
 		void onProviderError(String code);
 		default void onMapReady(){}
 		default void onLocationSelected(double latitude, double longitude){}
+		/** Camera changed for any reason; gesture filtering happens at the caller. */
+		default void onCameraMove(){}
 	}
 	record CameraState(double minLat, double minLng, double maxLat, double maxLng,
 			double centerLat, double centerLng, int zoom, String regionId){}

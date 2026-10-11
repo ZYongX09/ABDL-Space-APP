@@ -97,6 +97,10 @@ abstract class AbstractMapProvider implements MapProvider{
 		});
 	}
 
+	protected final void cameraMoved(){
+		main.post(()->{ if(isReady() && listener!=null) listener.onCameraMove(); });
+	}
+
 	protected final void markerClicked(String id){
 		MapModels.Point point=points.get(id);
 		if(!destroyed && listener!=null && point!=null) listener.onMarkerClick(point);

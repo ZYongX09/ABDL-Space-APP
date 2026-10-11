@@ -809,6 +809,7 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 				});
 				liquidCaptureStarted=true;
 				updateCaptureHeights();
+				updateMapTabVisibility();
 			}
 		};
 		ownedContent.post(liquidStartupRunnable);
@@ -919,8 +920,17 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 	private void updateMapTabVisibility(){
 		if(friendMapFragment!=null){
 			updateMapNavigationInsets();
-			friendMapFragment.setTabVisible(parentActive && currentTab==R.id.tab_map && friendMapFragment.isAdded() && !friendMapFragment.isHidden());
+			boolean mapVisible=parentActive && currentTab==R.id.tab_map && friendMapFragment.isAdded() && !friendMapFragment.isHidden();
+			friendMapFragment.setTabVisible(mapVisible);
+			updateNavigationMapSource(mapVisible);
 		}
+	}
+
+	private void updateNavigationMapSource(boolean mapVisible){
+		if(liquidNavigationController==null)
+			return;
+		View source=mapVisible && friendMapFragment!=null ? friendMapFragment.getMapSampleView() : null;
+		liquidNavigationController.setSampleSource(source);
 	}
 
 	private void updateCaptureHeights(){

@@ -3,6 +3,7 @@ package org.joinmastodon.android.ui.compose.navigation
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.PorterDuff
+import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import androidx.annotation.DrawableRes
@@ -112,6 +113,11 @@ class HomeLiquidNavigationController(
 
 	fun setBackdropBitmap(bitmap: Bitmap?) {
 		backdrop.update(bitmap)
+	}
+
+	/** Live sample for the map tab; null restores the captured-strip bitmap path. */
+	fun setSampleSource(source: View?) {
+		backdrop.updateSampleSource(source)
 	}
 
 	fun dispose() {

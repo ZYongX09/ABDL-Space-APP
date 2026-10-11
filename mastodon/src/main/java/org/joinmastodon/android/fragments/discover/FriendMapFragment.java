@@ -45,6 +45,8 @@ import org.joinmastodon.android.ui.utils.UiUtils;
 public class FriendMapFragment extends AppKitFragment implements MapProvider.Listener,FriendMapOverlay.Actions{
 	private static final int LOCATION_REQUEST=7041;
 	private static final String CONSENT_VERSION="map-presence-v1";
+	// The privacy summary shows fully only on the first map open of this app process.
+	private static boolean firstPrivacyReveal=true;
 	private final Handler main=new Handler(Looper.getMainLooper());
 	private final Set<String> attemptedProviders=new HashSet<>();
 	private final List<MapModels.Point> visiblePoints=new ArrayList<>();
@@ -89,8 +91,12 @@ public class FriendMapFragment extends AppKitFragment implements MapProvider.Lis
 		boolean next=!destroyed && resumed && tabVisible && overlay!=null && sessionValid();
 		if(next==active) return;
 		active=next;
-		if(active){ if(provider!=null) provider.onResume(); overlay.setSampleSource(provider!=null?provider.getSampleSource():null); loadSettings(); }
-		else{
+		if(active){
+			if(provider!=null) provider.onResume();
+			overlay.setSampleSource(provider!=null?provider.getSampleSource():null);
+			if(firstPrivacyReveal){ firstPrivacyReveal=false; if(!overlay.privacyExpanded()) overlay.setPrivacyExpanded(true,false); }
+			loadSettings();
+		}else{
 			generation++; queryGeneration++; cancelAll(); clearSnapshotWork();
 			if(provider!=null) provider.onPause();
 			if(overlay!=null){ overlay.setBusy(false); overlay.setSampleSource(null); overlay.setSnapshot(null); }
@@ -138,9 +144,9 @@ public class FriendMapFragment extends AppKitFragment implements MapProvider.Lis
 				if(!live(expected)) return;
 				presenceRequest=null;
 				if(result.active && result.point!=null){ self=result.point; centerOnSelf(); }
-				else if("hidden".equals(settings.visibility)) overlay.setMessage(getString(R.string.map_ui_enable_first),false);
-				else if("pinned".equals(settings.locationMode) && settings.canChooseLocation){ if(provider!=null) provider.setCamera(new MapProvider.CameraState(18,73,54,135,35,105,5,null)); }
-				else locate();
+				else if("hidden".equals(settings.visibility)){ overlay.setMessage(getString(R.string.map_ui_enable_first),false); return; }
+				if("pinned".equals(settings.locationMode) && settings.canChooseLocation){ if(provider!=null) provider.setCamera(new MapProvider.CameraState(18,73,54,135,35,105,5,null)); return; }
+				locate();
 			}
 			@Override public void onError(ErrorResponse error){ if(live(expected)){ presenceRequest=null; showError(error); } }
 		}).exec(accountID);
@@ -247,6 +253,8 @@ public class FriendMapFragment extends AppKitFragment implements MapProvider.Lis
 		}).show();
 	}
 	@Override public void onMapReady(){ if(active){ if(lastLegalCamera!=null) provider.setCamera(lastLegalCamera); scheduleSnapshot(); } }
+	@Override public void onCameraMove(){ if(active && overlay!=null) overlay.onCameraMoved(); }
+	public View getMapSampleView(){ return overlay!=null?overlay.mapHost():null; }
 	@Override public void onCameraIdle(MapProvider.CameraState camera){
 		if(!active || camera==null || settings==null) return;
 		snapshotGeneration++; scheduleSnapshot();

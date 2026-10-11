@@ -51,7 +51,7 @@ public final class AMapProvider extends AbstractMapProvider{
 		map.getUiSettings().setScaleControlsEnabled(true);
 		map.setOnMapLoadedListener(this::loaded);
 		map.setOnCameraChangeListener(new AMap.OnCameraChangeListener(){
-			@Override public void onCameraChange(CameraPosition position){}
+			@Override public void onCameraChange(CameraPosition position){ cameraMoved(); }
 			@Override public void onCameraChangeFinish(CameraPosition position){ cameraIdle(); }
 		});
 		map.setOnMarkerClickListener(marker->{ markerClicked((String)marker.getObject()); return true; });
