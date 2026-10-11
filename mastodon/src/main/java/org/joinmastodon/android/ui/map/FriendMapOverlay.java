@@ -161,6 +161,9 @@ public final class FriendMapOverlay extends FrameLayout{
 		int[] origin=new int[2]; mapHost.getLocationInWindow(origin);
 		for(MapGlassMaterial material:materials) material.update(bitmap,origin[0],origin[1]);
 	}
+	public void setSampleSource(View source){
+		for(MapGlassMaterial material:materials) material.setSampleSource(source);
+	}
 	public void dispose(){ if(animator!=null) animator.cancel(); for(MapGlassMaterial material:materials) material.dispose(); materials.clear(); }
 
 	private void open(MapSheetState.Page page){ sheetState.open(page); rebuild(true); }

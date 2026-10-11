@@ -17,4 +17,10 @@ public class MapGlassPolicyTest{
 		assertEquals(.48f,MapGlassPolicy.surfaceAlpha(true,true),0);
 		assertEquals(.96f,MapGlassPolicy.surfaceAlpha(false,true),0);
 	}
+	@Test public void darkThemeGlassIsDarkRegardlessOfLightMapTiles(){
+		assertEquals(.72f,MapGlassPolicy.liquidSurfaceAlpha(true,false),0);
+		assertEquals(.78f,MapGlassPolicy.liquidSurfaceAlpha(true,true),0);
+		assertEquals(.28f,MapGlassPolicy.liquidSurfaceAlpha(false,false),0);
+		assertTrue(MapGlassPolicy.liquidSurfaceAlpha(true,true)>.6f);
+	}
 }

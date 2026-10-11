@@ -22,6 +22,8 @@ public interface MapProvider{
 	record CameraState(double minLat, double minLng, double maxLat, double maxLng,
 			double centerLat, double centerLng, int zoom, String regionId){}
 	View getView();
+	/** The view whose rendered content the glass samples live (Texture map view), or null. */
+	default View getSampleSource(){ return null; }
 	void initialize(Listener listener);
 	void setCamera(CameraState camera);
 	CameraState getCamera();

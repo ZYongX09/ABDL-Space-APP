@@ -10,11 +10,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -26,12 +28,11 @@ import org.joinmastodon.android.GlobalUserPreferences
 import org.joinmastodon.android.R
 import org.joinmastodon.android.ui.map.MapGlassPolicy
 import org.joinmastodon.android.ui.utils.UiUtils
+import org.joinmastodon.android.ui.utils.UiUtils.isDarkTheme
 import org.joinmastodon.android.ui.compose.navigation.liquid.iosIndicatorSpecular
 import org.joinmastodon.android.ui.compose.navigation.liquid.lens
-import org.joinmastodon.android.ui.compose.navigation.liquid.rememberGravityRotatedHighlight
 import org.joinmastodon.android.ui.compose.navigation.liquid.vibrancy
 import top.yukonga.miuix.kmp.blur.Backdrop
-import top.yukonga.miuix.kmp.blur.LocalRuntimeShaderCache
 import top.yukonga.miuix.kmp.blur.blur
 import top.yukonga.miuix.kmp.blur.drawBackdrop
 
@@ -40,7 +41,9 @@ class MapGlassSurface(context: Context, private val radiusDp: Int, private val l
 	private val backdrop = ViewBitmapBackdrop()
 	private var sampleReady by mutableStateOf(false)
 	private var hardware by mutableStateOf(false)
+	private var sampleSourceView by mutableStateOf<View?>(null)
 	private var mapOrigin by mutableStateOf(androidx.compose.ui.geometry.Offset.Zero)
+	private var frameTick by mutableIntStateOf(0)
 	private val surfaceColor = Color(UiUtils.getThemeColor(context, R.attr.colorM3Surface))
 	private val outlineColor = Color(UiUtils.getThemeColor(context, R.attr.colorM3OutlineVariant))
 	val view = ComposeView(context).apply {
@@ -58,14 +61,23 @@ class MapGlassSurface(context: Context, private val radiusDp: Int, private val l
 		hardware = view.isHardwareAccelerated
 		backdrop.update(if (sampleReady) bitmap else null)
 	}
-	fun dispose() { sampleReady = false; backdrop.update(null); view.disposeComposition() }
+	fun setSampleSource(source: View?) { sampleSourceView = source; backdrop.updateSampleSource(source) }
+	fun dispose() { sampleReady = false; sampleSourceView = null; backdrop.updateSampleSource(null); backdrop.update(null); view.disposeComposition() }
 
 	@Composable
 	private fun Surface() {
 		val shape = RoundedCornerShape(radiusDp.dp)
+		val darkTheme = isDarkTheme()
 		val liquid = MapGlassPolicy.supportsLiquid(android.os.Build.VERSION.SDK_INT, hardware,
 			GlobalUserPreferences.isIosLiquidNavigationEnabled(), sampleReady)
-		val fill = surfaceColor.copy(alpha = if (liquid) .16f else MapGlassPolicy.surfaceAlpha(false, largePanel))
+		val fill = surfaceColor.copy(alpha = if (liquid) MapGlassPolicy.liquidSurfaceAlpha(darkTheme, largePanel)
+			else MapGlassPolicy.surfaceAlpha(false, largePanel))
+		if (liquid && sampleSourceView != null && hardware) {
+			// Real-time glass: recompose per frame so drawBackdrop reads the live map texture,
+			// exactly like the home glass over scrolling content.
+			LaunchedEffect(sampleSourceView) { while (true) { withFrameNanos { }; frameTick++ } }
+		}
+		@Suppress("UNUSED_EXPRESSION") frameTick
 		val material = if (liquid) liquidMaterial(backdrop, shape, fill) else Modifier.background(fill, shape)
 		Box(Modifier.fillMaxSize()
 			.onGloballyPositioned { backdrop.updateOriginInWindow(mapOrigin) }
@@ -77,7 +89,7 @@ class MapGlassSurface(context: Context, private val radiusDp: Int, private val l
 /** Only reached on API33+ hardware rendering; low API code never constructs a shader. */
 @Composable
 private fun liquidMaterial(backdrop: Backdrop, shape: RoundedCornerShape, fill: Color): Modifier {
-		val highlight = rememberIsolatedGlassHighlight(iosIndicatorSpecular, extraDegrees = -45f)
+	val highlight = rememberIsolatedGlassHighlight(iosIndicatorSpecular, extraDegrees = -45f)
 	return Modifier.drawBackdrop(
 		backdrop = backdrop,
 		shape = { shape },

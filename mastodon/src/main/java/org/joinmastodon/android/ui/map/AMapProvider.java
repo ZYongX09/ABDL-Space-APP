@@ -3,6 +3,7 @@ package org.joinmastodon.android.ui.map;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.os.Bundle;
+import android.view.View;
 import java.util.function.Consumer;
 import org.joinmastodon.android.R;
 import org.joinmastodon.android.ui.utils.UiUtils;
@@ -12,7 +13,7 @@ import com.amap.api.maps.model.CircleOptions;
 import com.amap.api.maps.AMap;
 import com.amap.api.maps.CameraUpdateFactory;
 import com.amap.api.maps.ExceptionLogger;
-import com.amap.api.maps.MapView;
+import com.amap.api.maps.TextureMapView;
 import com.amap.api.maps.MapsInitializer;
 import com.amap.api.maps.model.BitmapDescriptor;
 import com.amap.api.maps.model.BitmapDescriptorFactory;
@@ -23,7 +24,7 @@ import com.amap.api.maps.model.Marker;
 import com.amap.api.maps.model.MarkerOptions;
 
 public final class AMapProvider extends AbstractMapProvider{
-	private MapView mapView;
+	private TextureMapView mapView;
 	private AMap map;
 	private Circle fuzzCircle;
 	private final ExceptionLogger exceptionLogger=new ExceptionLogger(){
@@ -41,7 +42,7 @@ public final class AMapProvider extends AbstractMapProvider{
 		MapsInitializer.setProtocol(MapsInitializer.HTTPS);
 		MapsInitializer.setDownloadCoordinateConvertLibrary(false);
 		MapsInitializer.setExceptionLogger(exceptionLogger);
-		mapView=new MapView(context); mapView.onCreate(state);
+		mapView=new TextureMapView(context); mapView.onCreate(state);
 		map=mapView.getMap();
 		if(map==null) throw new IllegalStateException("Map unavailable");
 		map.setMyLocationEnabled(false);
@@ -114,6 +115,7 @@ public final class AMapProvider extends AbstractMapProvider{
 			@Override public void remove(){ marker.remove(); descriptor.recycle(); }
 		};
 	}
+	@Override public View getSampleSource(){ return mapView; }
 	@Override protected void resumeMap(){ if(mapView!=null) mapView.onResume(); }
 	@Override protected void pauseMap(){ if(mapView!=null) mapView.onPause(); }
 	@Override protected void saveMap(Bundle state){ if(mapView!=null) mapView.onSaveInstanceState(state); }

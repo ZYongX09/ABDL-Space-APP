@@ -4,6 +4,7 @@ import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Point;
 import android.os.Bundle;
+import android.view.View;
 import java.util.function.Consumer;
 
 import com.baidu.mapapi.CoordType;
@@ -19,13 +20,13 @@ import org.joinmastodon.android.R;
 import org.joinmastodon.android.ui.utils.UiUtils;
 import com.baidu.mapapi.map.MapStatus;
 import com.baidu.mapapi.map.MapStatusUpdateFactory;
-import com.baidu.mapapi.map.MapView;
 import com.baidu.mapapi.map.Marker;
 import com.baidu.mapapi.map.MarkerOptions;
+import com.baidu.mapapi.map.TextureMapView;
 import com.baidu.mapapi.model.LatLng;
 
 public final class BaiduMapProvider extends AbstractMapProvider{
-	private MapView mapView;
+	private TextureMapView mapView;
 	private BaiduMap map;
 	private Circle fuzzCircle;
 	private final RequestAuthResultListener authListener=(status,message)->{ if(status!=0) fail("sdk_auth_failed"); };
@@ -41,7 +42,7 @@ public final class BaiduMapProvider extends AbstractMapProvider{
 		SDKInitializer.setCoordType(CoordType.BD09LL);
 		SDKInitializer.addAuthResultListener(authListener);
 		if(!SDKInitializer.isInitialized()) SDKInitializer.initialize(app);
-		mapView=new MapView(context);
+		mapView=new TextureMapView(context);
 		mapView.onCreate(context,state);
 		map=mapView.getMap();
 		map.setMyLocationEnabled(false);
@@ -118,6 +119,7 @@ public final class BaiduMapProvider extends AbstractMapProvider{
 			@Override public void remove(){ marker.remove(); descriptor.recycle(); }
 		};
 	}
+	@Override public View getSampleSource(){ return mapView; }
 	@Override protected void resumeMap(){ if(mapView!=null){ SDKInitializer.onForeground(); mapView.onResume(); } }
 	@Override protected void pauseMap(){ if(mapView!=null) mapView.onPause(); }
 	@Override protected void saveMap(Bundle state){ if(mapView!=null) mapView.onSaveInstanceState(state); }

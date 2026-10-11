@@ -48,6 +48,8 @@ final class MapGlassMaterial{
 		view.invalidate();
 	}
 
+	void setSampleSource(View source){ liquid.setSampleSource(source); }
+
 	void dispose(){
 		if(liquid!=null){ liquid.dispose(); view.removeAllViews(); liquid=null; }
 		view.liquidVisible=false;

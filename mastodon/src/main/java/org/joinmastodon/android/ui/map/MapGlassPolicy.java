@@ -8,4 +8,8 @@ public final class MapGlassPolicy{
 	public static float surfaceAlpha(boolean liquid,boolean largePanel){
 		return liquid ? (largePanel ? .48f : .35f) : .96f;
 	}
+	/** Dark theme draws a dark glass regardless of the light map tiles behind it. */
+	public static float liquidSurfaceAlpha(boolean darkTheme,boolean largePanel){
+		return darkTheme ? (largePanel ? .78f : .72f) : .28f;
+	}
 }
