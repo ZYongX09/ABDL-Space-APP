@@ -30,6 +30,9 @@
 	<string name="map_ui_person_summary">这里展示的是经过软件模糊处理的位置。</string>
 	<string name="map_ui_privacy_summary">由你决定是否出现，以及位置显示的精度。</string>
 	<string name="map_ui_privacy_toggle">隐私与模糊设置</string>
+	<string name="map_ui_consent_location_note">点击“我同意以上协议”即表示你允许平台按所选精度向其他用户展示你的地理位置，直到你手动隐藏或删除。</string>
+	<string name="map_ui_verification_required">使用交友地图前，需要先完成宝宝认证。</string>
+	<string name="map_ui_go_verification">去宝宝认证</string>
 	<string name="map_ui_visibility_summary">系统位置授权不等于向其他用户公开位置。</string>
 	<string name="map_ui_precision_summary">对外只展示模糊点，不显示设备原始 GPS 坐标。</string>
 	<string name="map_ui_provider_summary">切换地图服务不会改变你的出现范围或赞助权益。</string>

@@ -17,16 +17,19 @@ import org.joinmastodon.android.ui.utils.UiUtils;
 import me.grishka.appkit.utils.V;
 
 /** Shader content is hardware-only; software backdrop capture receives the ordinary material. */
-final class MapGlassMaterial{
+	final class MapGlassMaterial{
 	private final GlassFrame view;
 	private final int radius;
 	private final boolean large;
+	private final float fillAlphaOverride;
 	private MapGlassSurface liquid;
 	// The live map view can arrive before the first snapshot creates the liquid surface.
 	private View pendingSource;
 
-	MapGlassMaterial(Context context,int radius,boolean large){
-		this.radius=radius; this.large=large;
+	MapGlassMaterial(Context context,int radius,boolean large){ this(context,radius,large,-1f); }
+
+	MapGlassMaterial(Context context,int radius,boolean large,float fillAlphaOverride){
+		this.radius=radius; this.large=large; this.fillAlphaOverride=fillAlphaOverride;
 		int surface=UiUtils.getThemeColor(context,R.attr.colorM3Surface);
 		int outline=UiUtils.getThemeColor(context,R.attr.colorM3OutlineVariant);
 		GradientDrawable fallback=SponsorUi.rounded((surface&0x00ffffff)|0xf5000000,radius);
@@ -41,7 +44,7 @@ final class MapGlassMaterial{
 				GlobalUserPreferences.isIosLiquidNavigationEnabled(),bitmap!=null && !bitmap.isRecycled());
 		if(supported){
 			if(liquid==null){
-				liquid=new MapGlassSurface(view.getContext(),radius,large);
+				liquid=new MapGlassSurface(view.getContext(),radius,large,fillAlphaOverride);
 				view.addView(liquid.getView(),new FrameLayout.LayoutParams(-1,-1));
 				if(pendingSource!=null) liquid.setSampleSource(pendingSource);
 			}

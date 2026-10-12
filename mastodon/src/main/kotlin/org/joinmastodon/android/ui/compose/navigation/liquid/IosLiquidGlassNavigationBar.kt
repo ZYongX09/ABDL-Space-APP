@@ -203,6 +203,7 @@ internal fun IosLiquidGlassNavigationBar(
     iconContent: (@Composable (index: Int, selected: Boolean, animationToken: Int) -> Unit)? = null,
     onItemLongClick: (Int) -> Boolean = { false },
     bottomPaddingOverride: Dp? = null,
+    surfaceAlphaOverride: Float = -1f,
 ) {
     val isDark = isInDarkTheme()
     val pillShape = remember { CircleShape }
@@ -211,7 +212,8 @@ internal fun IosLiquidGlassNavigationBar(
     val surfaceContainer = MiuixTheme.colorScheme.surfaceContainer
     val graphicsSupported = rememberGraphicsEffectsSupported()
     val blurActive = isBlurActive && graphicsSupported
-    val containerColor = if (blurActive) surfaceContainer.copy(alpha = 0.4f) else surfaceContainer
+    // The map tab asks for the same glass alpha as the map panels so the page reads as one material.
+    val containerColor = if (blurActive) surfaceContainer.copy(alpha = if (surfaceAlphaOverride >= 0f) surfaceAlphaOverride else 0.4f) else surfaceContainer
 
     val tabsBackdrop = if (blurActive) rememberLayerBackdrop() else null
     val density = LocalDensity.current

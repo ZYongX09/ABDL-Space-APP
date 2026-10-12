@@ -82,6 +82,8 @@ class HomeLiquidNavigationController(
 	private var unreadBadgeState by mutableStateOf<String?>(null)
 	private var diaperBadgeVisibleState by mutableStateOf(false)
 	private var bottomInsetState by mutableIntStateOf(0)
+	private var sampleSourceState by mutableStateOf<View?>(null)
+	private var fillAlphaState by mutableStateOf(-1f)
 	private val backdrop = ViewBitmapBackdrop()
 
 	val view = ComposeView(context).apply {
@@ -117,6 +119,13 @@ class HomeLiquidNavigationController(
 
 	/** Live sample for the map tab; null restores the captured-strip bitmap path. */
 	fun setSampleSource(source: View?) {
+		setSampleSource(source, -1f)
+	}
+
+	/** Map tab fills the nav glass with the same surface alpha as the map panels; -1 restores default. */
+	fun setSampleSource(source: View?, fillAlpha: Float) {
+		sampleSourceState = source
+		fillAlphaState = fillAlpha
 		backdrop.updateSampleSource(source)
 	}
 
@@ -155,6 +164,7 @@ class HomeLiquidNavigationController(
 				backdrop = backdrop,
 				isBlurActive = isRuntimeShaderSupported(),
 				bottomPaddingOverride = bottomPadding,
+				surfaceAlphaOverride = fillAlphaState,
 				badge = { index ->
 					when {
 						index == HomeNavigationTabs.indexOf(R.id.tab_diaper) && diaperBadgeVisibleState -> ({ Badge { Text("新功能") } })
@@ -172,7 +182,7 @@ class HomeLiquidNavigationController(
 						)
 						HomeNavigationTabs.indexOf(R.id.tab_map) -> Icon(
 							modifier = Modifier.size(22.dp),
-							painter = painterResource(R.drawable.ic_fluent_map_24_regular),
+							painter = painterResource(R.drawable.ic_tab_map),
 							contentDescription = null,
 							tint = LocalContentColor.current,
 						)

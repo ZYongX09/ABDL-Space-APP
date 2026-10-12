@@ -34,7 +34,7 @@ public final class MapModels{
 		public Consent consent;
 		public String visibility, precisionLevel, locationMode;
 		public int fuzzRadiusM;
-		public boolean anonymous, autoRefresh, active, canViewNationwide, canChooseLocation;
+		public boolean anonymous, autoRefresh, active, canViewNationwide, canChooseLocation, babyVerified;
 		public String mapScope;
 		public Region currentRegion;
 		@Override public void postprocess() throws ObjectValidationException{

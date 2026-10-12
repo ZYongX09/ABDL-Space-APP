@@ -10,7 +10,7 @@ public final class MapSheetState{
 	public Height height(){ return height; }
 	public void open(Page page){
 		this.page=page;
-		height=page==Page.SETTINGS || page==Page.CONSENT ? Height.EXPANDED : Height.HALF;
+		height=page==Page.SETTINGS || page==Page.CONSENT || page==Page.VISIBILITY || page==Page.PRECISION ? Height.EXPANDED : Height.HALF;
 	}
 	public void setHeight(Height height){ this.height=height; }
 	public boolean back(){

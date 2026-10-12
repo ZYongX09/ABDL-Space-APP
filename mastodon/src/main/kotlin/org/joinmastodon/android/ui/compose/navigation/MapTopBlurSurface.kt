@@ -70,7 +70,8 @@ class MapTopBlurSurface(context: Context) {
 		}
 		@Suppress("UNUSED_EXPRESSION") frameTick
 		if (!active) return
-		// Bottom of the strip first: blur and tint grow toward the status bar.
+		// Bottom of the strip first: blur and tint grow toward the status bar. Six narrow
+		// strips with small steps keep the boundaries soft; coarse steps read as hard bands.
 		Column(Modifier.fillMaxSize()) {
 			for (i in StripProfiles.indices) {
 				val profile = StripProfiles[i]
@@ -93,10 +94,12 @@ class MapTopBlurSurface(context: Context) {
 	private data class StripProfile(val blurDp: Int, val tintAlpha: Float)
 	private companion object {
 		val StripProfiles = arrayOf(
-			StripProfile(5, .10f),
-			StripProfile(11, .16f),
-			StripProfile(18, .22f),
-			StripProfile(26, .28f),
+			StripProfile(4, .08f),
+			StripProfile(7, .11f),
+			StripProfile(10, .14f),
+			StripProfile(14, .18f),
+			StripProfile(19, .22f),
+			StripProfile(25, .26f),
 		)
 	}
 }

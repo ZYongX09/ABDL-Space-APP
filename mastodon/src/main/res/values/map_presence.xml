@@ -9,8 +9,8 @@
 	<string name="map_presence_city_scope">仅限定位所在城市：%s</string>
 	<string name="map_presence_nationwide">全国地图 · 长按可指定展示位置</string>
 	<string name="map_presence_privacy_title">交友地图与第三方地图服务</string>
-	<string name="map_presence_privacy_body">地图使用百度地图与高德地图 SDK 显示底图，两家服务会处理必要的设备与网络信息。我们不会开启厂商持续定位或后台定位。你的位置只在主动开启地图出现时发送给 ABDL Space，软件模糊处理后才向其他用户显示。\n\n普通用户只能查看定位所在城市；赞助者可以查看全国并指定展示位置。你可以选择公开、仅互关或隐藏，随时关闭地图出现。关闭页面停止刷新，位置最多保留 30 分钟后过期。\n\n请阅读应用隐私政策以及百度、高德的 SDK 隐私政策后决定是否同意。</string>
-	<string name="map_presence_agree">同意并继续</string>
+	<string name="map_presence_privacy_body">地图使用百度地图与高德地图 SDK 显示底图，两家服务会处理必要的设备与网络信息。我们不会开启厂商持续定位或后台定位。你的位置只在主动开启地图出现时发送给 ABDL Space，软件模糊处理后才向其他用户显示。\n\n你可以在设置中选择公开、仅互关或隐藏，随时关闭地图出现。上报的位置会一直保留并按所选精度向其他用户展示，直到你手动隐藏或删除；即使你不在线或退出登录，其他用户仍可能看到。\n\n请阅读应用隐私政策以及百度、高德的 SDK 隐私政策后决定是否同意。</string>
+	<string name="map_presence_agree">我同意以上协议</string>
 	<string name="map_presence_privacy_link">阅读隐私政策</string>
 	<string name="map_presence_later">暂不</string>
 	<string name="map_presence_settings_failed">地图设置暂时不可用，请重试</string>

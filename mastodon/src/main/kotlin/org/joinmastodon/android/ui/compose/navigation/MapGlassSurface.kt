@@ -37,7 +37,7 @@ import top.yukonga.miuix.kmp.blur.blur
 import top.yukonga.miuix.kmp.blur.drawBackdrop
 
 /** Native map samples never include the overlay itself. Content remains fully opaque. */
-class MapGlassSurface(context: Context, private val radiusDp: Int, private val largePanel: Boolean) {
+class MapGlassSurface(context: Context, private val radiusDp: Int, private val largePanel: Boolean, private val fillAlphaOverride: Float = -1f) {
 	private val backdrop = ViewBitmapBackdrop()
 	private var sampleReady by mutableStateOf(false)
 	private var hardware by mutableStateOf(false)
@@ -70,8 +70,11 @@ class MapGlassSurface(context: Context, private val radiusDp: Int, private val l
 		val darkTheme = isDarkTheme()
 		val liquid = MapGlassPolicy.supportsLiquid(android.os.Build.VERSION.SDK_INT, hardware,
 			GlobalUserPreferences.isIosLiquidNavigationEnabled(), sampleReady)
-		val fill = surfaceColor.copy(alpha = if (liquid) MapGlassPolicy.liquidSurfaceAlpha(darkTheme, largePanel)
-			else MapGlassPolicy.surfaceAlpha(false, largePanel))
+		val fill = surfaceColor.copy(alpha = when {
+			fillAlphaOverride >= 0f && liquid -> fillAlphaOverride
+			liquid -> MapGlassPolicy.liquidSurfaceAlpha(darkTheme, largePanel)
+			else -> MapGlassPolicy.surfaceAlpha(false, largePanel)
+		})
 		if (liquid && sampleSourceView != null && hardware) {
 			// Real-time glass: recompose per frame so drawBackdrop reads the live map texture,
 			// exactly like the home glass over scrolling content.

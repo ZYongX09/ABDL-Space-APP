@@ -33,6 +33,7 @@ import org.joinmastodon.android.api.requests.map.MapRequest;
 import org.joinmastodon.android.api.session.AccountSession;
 import org.joinmastodon.android.api.session.AccountSessionManager;
 import org.joinmastodon.android.fragments.ProfileFragment;
+import org.joinmastodon.android.fragments.settings.BabyVerificationFragment;
 import org.joinmastodon.android.fragments.sponsors.SponsorCenterFragment;
 import org.joinmastodon.android.model.map.MapModels;
 import org.joinmastodon.android.ui.map.FriendMapOverlay;
@@ -95,6 +96,7 @@ public class FriendMapFragment extends AppKitFragment implements MapProvider.Lis
 			if(provider!=null) provider.onResume();
 			overlay.setSampleSource(provider!=null?provider.getSampleSource():null);
 			if(firstPrivacyReveal){ firstPrivacyReveal=false; if(!overlay.privacyExpanded()) overlay.setPrivacyExpanded(true,false); }
+			else overlay.enterMapDefaults();
 			loadSettings();
 		}else{
 			generation++; queryGeneration++; cancelAll(); clearSnapshotWork();
@@ -111,6 +113,8 @@ public class FriendMapFragment extends AppKitFragment implements MapProvider.Lis
 			@Override public void onSuccess(MapModels.Settings result){
 				if(!live(expected)) return;
 				settingsRequest=null; settings=result; overlay.setBusy(false); overlay.updateSettings(result); overlay.setMessage("",false);
+				if(!result.babyVerified){ overlay.showVerificationGate(); return; }
+				overlay.hideVerificationGate();
 				if(!consentAccepted()){ overlay.showConsent(); return; }
 				if(provider==null) startProvider(preferredProvider); readSelf();
 			}
@@ -119,6 +123,10 @@ public class FriendMapFragment extends AppKitFragment implements MapProvider.Lis
 	}
 	@Override public void consent(){ saveSettings(Map.of("consent_version",CONSENT_VERSION),this::loadSettings); }
 	@Override public void privacy(){ UiUtils.launchWebBrowser(getActivity(),"https://abdl-space.top/privacy"); }
+	@Override public void verification(){
+		Bundle args=new Bundle(); args.putString("account",accountID);
+		Nav.go(getActivity(),BabyVerificationFragment.class,args);
+	}
 	private void startProvider(String preferred){
 		if(!active || !consentAccepted()) return;
 		String chosen=MapProviderRegistry.next(MapProviderRegistry.available(),"auto".equals(preferred)?"baidu":preferred,attemptedProviders);
@@ -319,7 +327,7 @@ public class FriendMapFragment extends AppKitFragment implements MapProvider.Lis
 	}
 	public boolean onBackPressed(){ return overlay!=null && overlay.onBackPressed(); }
 	@Override public void onStart(){ super.onStart(); if(provider!=null && active) provider.onStart(); }
-	@Override public void onResume(){ super.onResume(); resumed=true; updateActivityState(); }
+	@Override public void onResume(){ super.onResume(); resumed=true; updateActivityState(); if(active && consentAccepted()) loadSettings(); }
 	@Override public void onPause(){ resumed=false; updateActivityState(); super.onPause(); }
 	@Override public void onSaveInstanceState(Bundle state){
 		super.onSaveInstanceState(state); state.putString("map_provider",preferredProvider);

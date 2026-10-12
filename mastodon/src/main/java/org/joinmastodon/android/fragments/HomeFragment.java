@@ -50,6 +50,7 @@ import org.joinmastodon.android.ui.compose.navigation.HomeLiquidToolbarControlle
 import org.joinmastodon.android.ui.compose.navigation.HomeToolbarComposeMenuItem;
 import org.joinmastodon.android.ui.sheets.AccountSwitcherSheet;
 import org.joinmastodon.android.ui.utils.UiUtils;
+import org.joinmastodon.android.ui.map.MapGlassPolicy;
 import org.joinmastodon.android.ui.views.BackdropCaptureFrameLayout;
 import org.joinmastodon.android.ui.views.TabBar;
 import org.joinmastodon.android.utils.ObjectIdComparator;
@@ -930,7 +931,9 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 		if(liquidNavigationController==null)
 			return;
 		View source=mapVisible && friendMapFragment!=null ? friendMapFragment.getMapSampleView() : null;
-		liquidNavigationController.setSampleSource(source);
+		float fillAlpha=mapVisible && friendMapFragment!=null
+				? MapGlassPolicy.liquidSurfaceAlpha(UiUtils.isDarkTheme(),true) : -1f;
+		liquidNavigationController.setSampleSource(source,fillAlpha);
 	}
 
 	private void updateCaptureHeights(){
