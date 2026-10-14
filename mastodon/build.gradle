@@ -195,6 +195,8 @@ android {
 			maxHeapSize = '512m'
 			maxParallelForks = 1
 			forkEvery = 1
+			// Gson reflects into java.time.Instant on Status; JDK 17+ blocks that unless opened.
+			jvmArgs '--add-opens=java.base/java.time=ALL-UNNAMED'
 		}
 	}
 	secrets {

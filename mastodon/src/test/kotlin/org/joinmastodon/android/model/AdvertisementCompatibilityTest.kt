@@ -1,10 +1,16 @@
 package org.joinmastodon.android.model
 
 import com.google.gson.Gson
+import org.joinmastodon.android.CompatibilityTestApplication
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [26, 28, 30, 31, 35], application = CompatibilityTestApplication::class)
 class AdvertisementCompatibilityTest {
     private val gson = Gson()
 
@@ -24,9 +30,10 @@ class AdvertisementCompatibilityTest {
             """.trimIndent(), Status::class.java
         )
 
-        assertEquals("ad-1", status.advertisement.id)
-        assertEquals("官方广告", status.advertisement.getLabel())
-        assertEquals("https://example.com/campaign", status.advertisement.targetUrl)
+        val advertisement = requireNotNull(status.advertisement)
+        assertEquals("ad-1", advertisement.id)
+        assertEquals("官方广告", advertisement.getLabel())
+        assertEquals("https://example.com/campaign", advertisement.targetUrl)
     }
 
     @Test
@@ -40,6 +47,13 @@ class AdvertisementCompatibilityTest {
         val advertisement = Advertisement()
         assertEquals("headline", advertisement.getBody("headline\nsecond line"))
         assertEquals("", advertisement.getBody(null))
+    }
+
+    @Test
+    fun advertiserBodyIsNotTruncatedToFirstLine() {
+        val advertisement = Advertisement()
+        advertisement.description = "第一行\n第二行\n第三行"
+        assertEquals("第一行\n第二行\n第三行", advertisement.getBody("ignored fallback"))
     }
 
     @Test

@@ -56,7 +56,8 @@ public class Advertisement {
 
 	public String getBody(String statusContent){
 		if(!TextUtils.isEmpty(description))
-			return firstLine(description);
+			return description;
+		// statusContent is the server-built fallback and is not the advertiser's own text, so only its first line is used.
 		return firstLine(statusContent);
 	}
 
