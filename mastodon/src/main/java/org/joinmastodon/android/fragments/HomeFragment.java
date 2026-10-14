@@ -34,6 +34,7 @@ import org.joinmastodon.android.events.NotificationsMarkerUpdatedEvent;
 import org.joinmastodon.android.events.StatusDisplaySettingsChangedEvent;
 import org.joinmastodon.android.chat.ui.ConversationsFragment;
 import org.joinmastodon.android.fragments.diapers.DiaperListFragment;
+import org.joinmastodon.android.fragments.discover.FriendMapFragment;
 import org.joinmastodon.android.fragments.onboarding.OnboardingFollowSuggestionsFragment;
 import org.joinmastodon.android.model.Account;
 import org.joinmastodon.android.model.Instance;
@@ -49,6 +50,7 @@ import org.joinmastodon.android.ui.compose.navigation.HomeLiquidToolbarControlle
 import org.joinmastodon.android.ui.compose.navigation.HomeToolbarComposeMenuItem;
 import org.joinmastodon.android.ui.sheets.AccountSwitcherSheet;
 import org.joinmastodon.android.ui.utils.UiUtils;
+import org.joinmastodon.android.ui.map.MapGlassPolicy;
 import org.joinmastodon.android.ui.views.BackdropCaptureFrameLayout;
 import org.joinmastodon.android.ui.views.TabBar;
 import org.joinmastodon.android.utils.ObjectIdComparator;
@@ -86,6 +88,7 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 	private FragmentRootLinearLayout content;
 	private HomeTabFragment homeTabFragment;
 	private ConversationsFragment conversationsFragment;
+	private FriendMapFragment friendMapFragment;
 	private ProfileFragment profileFragment;
 	private DiaperListFragment diaperListFragment;
 	private BackdropCaptureFrameLayout fragmentContainer;
@@ -101,6 +104,7 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 	private boolean liquidToolbarMenuOpen;
 	private boolean liquidHardwareVerified;
 	private boolean liquidCaptureStarted;
+	private boolean parentActive;
 	private Runnable liquidStartupRunnable;
 	private View.OnAttachStateChangeListener liquidAttachListener;
 	@IdRes
@@ -132,10 +136,11 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 			args.putBoolean("noAutoLoad", true);
 			conversationsFragment=new ConversationsFragment();
 			conversationsFragment.setArguments(args);
+			friendMapFragment=createEmbeddedFriendMapFragment();
 			args=new Bundle(args);
 			diaperListFragment=new DiaperListFragment();
-		diaperListFragment.setArguments(args);
-		args=new Bundle(args);
+			diaperListFragment.setArguments(args);
+			args=new Bundle(args);
 			args.putParcelable("profileAccount", Parcels.wrap(AccountSessionManager.getInstance().getAccount(accountID).self));
 			args.putBoolean("noAutoLoad", true);
 			profileFragment=new ProfileFragment();
@@ -143,6 +148,19 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 		}
 
 		E.register(this);
+	}
+
+	private FriendMapFragment createEmbeddedFriendMapFragment(){
+		Bundle args=new Bundle();
+		args.putString("account", accountID);
+		args.putBoolean("__is_tab", true);
+		args.putBoolean("noAutoLoad", true);
+		args.putBoolean("hidden", true);
+		FriendMapFragment fragment=new FriendMapFragment();
+		fragment.setArguments(args);
+		fragment.setTabVisible(false);
+		fragment.setNavigationInsets(topSystemInset, navigationHost==null ? 0 : navigationHost.getHeight());
+		return fragment;
 	}
 
 	@Override
@@ -153,6 +171,8 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 
 	@Override
 	public void onDestroyView(){
+		parentActive=false;
+		updateMapTabVisibility();
 		cancelLiquidStartup();
 		stopLiquidCapture();
 		if(content!=null && liquidAttachListener!=null)
@@ -205,6 +225,7 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 		navigationHost.addOnLayoutChangeListener((v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom)->{
 			if(fragmentContainer!=null)
 				updateCaptureHeights();
+			updateMapNavigationInsets();
 		});
 		liquidAttachListener=new View.OnAttachStateChangeListener(){
 			@Override
@@ -231,9 +252,11 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 			getChildFragmentManager().beginTransaction()
 					.add(me.grishka.appkit.R.id.fragment_wrap, homeTabFragment)
 					.add(me.grishka.appkit.R.id.fragment_wrap, conversationsFragment).hide(conversationsFragment)
+					.add(me.grishka.appkit.R.id.fragment_wrap, friendMapFragment, "friendMapFragment").hide(friendMapFragment)
 					.add(me.grishka.appkit.R.id.fragment_wrap, diaperListFragment).hide(diaperListFragment)
 					.add(me.grishka.appkit.R.id.fragment_wrap, profileFragment).hide(profileFragment)
 					.commitNow();
+			updateMapTabVisibility();
 
 			String defaultTab=getArguments().getString("tab");
 			if("notifications".equals(defaultTab)){
@@ -262,6 +285,13 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 			return;
 		homeTabFragment=(HomeTabFragment) restoreChildFragment(savedInstanceState, "homeTabFragment");
 		conversationsFragment=(ConversationsFragment) restoreChildFragment(savedInstanceState, "conversationsFragment");
+		friendMapFragment=(FriendMapFragment) restoreChildFragment(savedInstanceState, "friendMapFragment");
+		if(friendMapFragment==null && getChildFragmentManager().findFragmentByTag("friendMapFragment") instanceof FriendMapFragment restoredMap)
+			friendMapFragment=restoredMap;
+		if(friendMapFragment==null)
+			friendMapFragment=createEmbeddedFriendMapFragment();
+		else
+			friendMapFragment.setTabVisible(false);
 		diaperListFragment=(DiaperListFragment) restoreChildFragment(savedInstanceState, "diaperListFragment");
 		profileFragment=(ProfileFragment) restoreChildFragment(savedInstanceState, "profileFragment");
 		Fragment legacySearch=restoreChildFragment(savedInstanceState, "searchFragment");
@@ -277,6 +307,8 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 		android.app.FragmentTransaction transaction=getChildFragmentManager().beginTransaction();
 		if(!conversationsFragment.isAdded())
 			transaction.add(me.grishka.appkit.R.id.fragment_wrap, conversationsFragment);
+		if(!friendMapFragment.isAdded())
+			transaction.add(me.grishka.appkit.R.id.fragment_wrap, friendMapFragment, "friendMapFragment");
 		if(legacySearch!=null && legacySearch.isAdded())
 			transaction.remove(legacySearch);
 		if(legacyFriend!=null && legacyFriend.isAdded())
@@ -284,10 +316,13 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 		Fragment current=fragmentForTab(currentTab);
 		transaction.hide(homeTabFragment)
 				.hide(conversationsFragment)
+				.hide(friendMapFragment)
 				.hide(diaperListFragment)
 				.hide(profileFragment)
 				.show(current)
+				.runOnCommit(this::updateMapTabVisibility)
 				.commit();
+		updateMapNavigationInsets();
 		createLiquidToolbar();
 		selectTabInNavigation(currentTab);
 		updateLiquidToolbarVisibility();
@@ -296,9 +331,33 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 	}
 
 	@Override
+	protected void onHidden(){
+		parentActive=false;
+		updateMapTabVisibility();
+		super.onHidden();
+	}
+
+	@Override
 	public void onHiddenChanged(boolean hidden){
 		super.onHiddenChanged(hidden);
-		fragmentForTab(currentTab).onHiddenChanged(hidden);
+		parentActive=!hidden && isResumed();
+		Fragment current=fragmentForTab(currentTab);
+		if(current!=null && current!=friendMapFragment)
+			current.onHiddenChanged(hidden);
+		updateMapTabVisibility();
+	}
+
+	@Override
+	public void onResume(){
+		super.onResume();
+		updateMapTabVisibility();
+	}
+
+	@Override
+	public void onPause(){
+		parentActive=false;
+		updateMapTabVisibility();
+		super.onPause();
 	}
 
 	@Override
@@ -318,6 +377,7 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 		applyNavigationBottomInset();
 		applyLiquidToolbarInsets();
 		super.onApplyWindowInsets(insets.replaceSystemWindowInsets(insets.getSystemWindowInsetLeft(), 0, insets.getSystemWindowInsetRight(), 0));
+		updateMapNavigationInsets();
 		WindowInsets topOnlyInsets=insets.replaceSystemWindowInsets(0, insets.getSystemWindowInsetTop(), 0, 0);
 		homeTabFragment.onApplyWindowInsets(topOnlyInsets);
 		conversationsFragment.onApplyWindowInsets(topOnlyInsets);
@@ -330,7 +390,7 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 			return R.id.tab_messages;
 		if(tab==R.id.tab_friend_request)
 			return R.id.tab_home;
-		if(tab==R.id.tab_home || tab==R.id.tab_messages || tab==R.id.tab_diaper || tab==R.id.tab_profile)
+		if(tab==R.id.tab_home || tab==R.id.tab_messages || tab==R.id.tab_map || tab==R.id.tab_diaper || tab==R.id.tab_profile)
 			return tab;
 		return R.id.tab_home;
 	}
@@ -349,6 +409,8 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 			return homeTabFragment;
 		}else if(tab==R.id.tab_messages){
 			return conversationsFragment;
+		}else if(tab==R.id.tab_map){
+			return friendMapFragment;
 		}else if(tab==R.id.tab_diaper){
 			return diaperListFragment;
 		}else{
@@ -376,13 +438,16 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 			return;
 		}
 
+		if(friendMapFragment!=null)
+			friendMapFragment.setTabVisible(false);
 		getChildFragmentManager()
 			.beginTransaction()
 			.hide(fragmentForTab(currentTab))
 			.show(newFragment)
 			.commitNow();
-		maybeTriggerLoading(newFragment);
 		currentTab=tab;
+		updateMapTabVisibility();
+		maybeTriggerLoading(newFragment);
 		updateLiquidToolbarVisibility();
 		((FragmentStackActivity)getActivity()).invalidateSystemBarColors(this);
 	}
@@ -409,7 +474,9 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 	}
 
 	private void maybeTriggerLoading(Fragment newFragment){
-		if(newFragment instanceof LoaderFragment lf){
+		if(newFragment instanceof FriendMapFragment){
+			updateMapTabVisibility();
+		}else if(newFragment instanceof LoaderFragment lf){
 			if(!lf.loaded && !lf.dataLoading)
 				lf.loadData();
 		}else if(newFragment instanceof ConversationsFragment){
@@ -440,6 +507,8 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 
 		if (conversationsFragment.isAdded()) getChildFragmentManager().putFragment(outState, "conversationsFragment", conversationsFragment);
 
+		if (friendMapFragment!=null && friendMapFragment.isAdded()) getChildFragmentManager().putFragment(outState, "friendMapFragment", friendMapFragment);
+
 		if (diaperListFragment.isAdded()) getChildFragmentManager().putFragment(outState, "diaperListFragment", diaperListFragment);
 
 		if (profileFragment.isAdded()) getChildFragmentManager().putFragment(outState, "profileFragment", profileFragment);
@@ -448,6 +517,8 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 	@Override
 	protected void onShown(){
 		super.onShown();
+		parentActive=true;
+		updateMapTabVisibility();
 		showFeatureDialogIfNeeded();
 		// 引导序列：位置权限 → 关闭后 2s → 开启实时通知
 		// 同一版本只完整引导一次；用版本键控制升级用户也会重新触发
@@ -739,6 +810,7 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 				});
 				liquidCaptureStarted=true;
 				updateCaptureHeights();
+				updateMapTabVisibility();
 			}
 		};
 		ownedContent.post(liquidStartupRunnable);
@@ -783,6 +855,7 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 		updateDiaperNewFeatureBadge();
 		applyNavigationBottomInset();
 		updateCaptureHeights();
+		updateMapNavigationInsets();
 	}
 
 	private void createLiquidToolbar(){
@@ -840,6 +913,29 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 		updateCaptureHeights();
 	}
 
+	private void updateMapNavigationInsets(){
+		if(friendMapFragment!=null)
+			friendMapFragment.setNavigationInsets(topSystemInset, navigationHost==null ? 0 : navigationHost.getHeight());
+	}
+
+	private void updateMapTabVisibility(){
+		if(friendMapFragment!=null){
+			updateMapNavigationInsets();
+			boolean mapVisible=parentActive && currentTab==R.id.tab_map && friendMapFragment.isAdded() && !friendMapFragment.isHidden();
+			friendMapFragment.setTabVisible(mapVisible);
+			updateNavigationMapSource(mapVisible);
+		}
+	}
+
+	private void updateNavigationMapSource(boolean mapVisible){
+		if(liquidNavigationController==null)
+			return;
+		View source=mapVisible && friendMapFragment!=null ? friendMapFragment.getMapSampleView() : null;
+		float fillAlpha=mapVisible && friendMapFragment!=null
+				? MapGlassPolicy.liquidSurfaceAlpha(UiUtils.isDarkTheme(),true) : -1f;
+		liquidNavigationController.setSampleSource(source,fillAlpha);
+	}
+
 	private void updateCaptureHeights(){
 		if(fragmentContainer==null)
 			return;
@@ -854,6 +950,8 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 	}
 
 	public boolean onBackPressed(){
+		if(parentActive && currentTab==R.id.tab_map && friendMapFragment!=null && friendMapFragment.onBackPressed())
+			return true;
 		return liquidToolbarController!=null && liquidToolbarController.onBackPressed();
 	}
 

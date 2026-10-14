@@ -53,7 +53,9 @@ public class LocationUtils{
 	private static final OkHttpClient httpClient=new OkHttpClient();
 	private static final Gson gson=new Gson();
 
-	public record ResolvedLocation(String province, @Nullable String city, @Nullable String district){}
+	public record ResolvedLocation(String province, @Nullable String city, @Nullable String district, @Nullable Double latitude, @Nullable Double longitude){
+		public ResolvedLocation(String province, @Nullable String city, @Nullable String district){ this(province, city, district, null, null); }
+	}
 
 	public static boolean hasLocationPermission(Context context){
 		return ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED
@@ -161,7 +163,7 @@ public class LocationUtils{
 			if(TextUtils.isEmpty(province)) return null;
 			// 天地图对直辖市返回 province="北京市", city="北京市" — 去重
 			if(city!=null && city.equals(province)) city=province;
-			return new ResolvedLocation(province, city, district);
+			return new ResolvedLocation(province, city, district, lat, lng);
 		}catch(Exception e){
 			Log.w(TAG, "Tianditu reverse geocode failed", e);
 			return null;

@@ -11,6 +11,9 @@
 .cxx
 local.properties
 *.jks
+*.keystore
+secrets.properties
+*.secret
 /fastlane/report.xml
 .mimocode
 AGENTS.md

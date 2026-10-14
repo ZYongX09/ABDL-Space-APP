@@ -3,6 +3,7 @@ package org.joinmastodon.android.ui.compose.navigation
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.PorterDuff
+import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import androidx.annotation.DrawableRes
@@ -54,6 +55,7 @@ object HomeNavigationTabs {
 	val ids = intArrayOf(
 		R.id.tab_home,
 		R.id.tab_messages,
+		R.id.tab_map,
 		R.id.tab_diaper,
 		R.id.tab_profile,
 	)
@@ -80,6 +82,8 @@ class HomeLiquidNavigationController(
 	private var unreadBadgeState by mutableStateOf<String?>(null)
 	private var diaperBadgeVisibleState by mutableStateOf(false)
 	private var bottomInsetState by mutableIntStateOf(0)
+	private var sampleSourceState by mutableStateOf<View?>(null)
+	private var fillAlphaState by mutableStateOf(-1f)
 	private val backdrop = ViewBitmapBackdrop()
 
 	val view = ComposeView(context).apply {
@@ -113,6 +117,18 @@ class HomeLiquidNavigationController(
 		backdrop.update(bitmap)
 	}
 
+	/** Live sample for the map tab; null restores the captured-strip bitmap path. */
+	fun setSampleSource(source: View?) {
+		setSampleSource(source, -1f)
+	}
+
+	/** Map tab fills the nav glass with the same surface alpha as the map panels; -1 restores default. */
+	fun setSampleSource(source: View?, fillAlpha: Float) {
+		sampleSourceState = source
+		fillAlphaState = fillAlpha
+		backdrop.updateSampleSource(source)
+	}
+
 	fun dispose() {
 		view.disposeComposition()
 	}
@@ -123,6 +139,7 @@ class HomeLiquidNavigationController(
 		val items = listOf(
 			NavigationItem("首页", androidx.compose.ui.graphics.vector.ImageVector.vectorResource(R.drawable.ic_tab_rating)),
 			NavigationItem(view.context.getString(R.string.messages), androidx.compose.ui.graphics.vector.ImageVector.vectorResource(R.drawable.ic_tab_messages)),
+			NavigationItem(view.context.getString(R.string.map_presence_title), androidx.compose.ui.graphics.vector.ImageVector.vectorResource(R.drawable.ic_fluent_map_24_regular)),
 			NavigationItem(view.context.getString(R.string.diaper), androidx.compose.ui.graphics.vector.ImageVector.vectorResource(R.drawable.ic_tab_rating)),
 			NavigationItem(view.context.getString(R.string.my_profile), androidx.compose.ui.graphics.vector.ImageVector.vectorResource(R.drawable.ic_tab_rating)),
 		)
@@ -147,6 +164,7 @@ class HomeLiquidNavigationController(
 				backdrop = backdrop,
 				isBlurActive = isRuntimeShaderSupported(),
 				bottomPaddingOverride = bottomPadding,
+				surfaceAlphaOverride = fillAlphaState,
 				badge = { index ->
 					when {
 						index == HomeNavigationTabs.indexOf(R.id.tab_diaper) && diaperBadgeVisibleState -> ({ Badge { Text("新功能") } })
@@ -159,6 +177,12 @@ class HomeLiquidNavigationController(
 						HomeNavigationTabs.indexOf(R.id.tab_messages) -> Icon(
 							modifier = Modifier.size(22.dp),
 							painter = painterResource(R.drawable.ic_tab_messages),
+							contentDescription = null,
+							tint = LocalContentColor.current,
+						)
+						HomeNavigationTabs.indexOf(R.id.tab_map) -> Icon(
+							modifier = Modifier.size(22.dp),
+							painter = painterResource(R.drawable.ic_tab_map),
 							contentDescription = null,
 							tint = LocalContentColor.current,
 						)

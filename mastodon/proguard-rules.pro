@@ -64,3 +64,10 @@
 }
 # Keep splash screen resources referenced only in XML themes
 -keep class org.joinmastodon.android.R$drawable { *; }
+
+# Map SDK native bindings use reflective Java class names.
+-keep class com.baidu.mapapi.** { *; }
+-keep class com.baidu.mapsdkplatform.** { *; }
+-keep class com.baidu.platform.** { *; }
+-keep class com.amap.api.** { *; }
+-keep class com.autonavi.** { *; }

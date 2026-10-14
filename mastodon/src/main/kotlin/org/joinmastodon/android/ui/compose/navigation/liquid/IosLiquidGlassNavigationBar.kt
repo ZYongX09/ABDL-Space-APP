@@ -76,6 +76,7 @@ import org.joinmastodon.android.ui.compose.ui.isInDarkTheme
 import org.joinmastodon.android.ui.compose.navigation.animation.DampedDragAnimation
 import org.joinmastodon.android.ui.compose.navigation.animation.InteractiveHighlight
 import org.joinmastodon.android.ui.compose.navigation.snapNavigationDragTarget
+import org.joinmastodon.android.ui.compose.navigation.rememberIsolatedGlassHighlight
 import top.yukonga.miuix.kmp.basic.BadgedBox
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.NavigationItem
@@ -202,6 +203,7 @@ internal fun IosLiquidGlassNavigationBar(
     iconContent: (@Composable (index: Int, selected: Boolean, animationToken: Int) -> Unit)? = null,
     onItemLongClick: (Int) -> Boolean = { false },
     bottomPaddingOverride: Dp? = null,
+    surfaceAlphaOverride: Float = -1f,
 ) {
     val isDark = isInDarkTheme()
     val pillShape = remember { CircleShape }
@@ -210,7 +212,8 @@ internal fun IosLiquidGlassNavigationBar(
     val surfaceContainer = MiuixTheme.colorScheme.surfaceContainer
     val graphicsSupported = rememberGraphicsEffectsSupported()
     val blurActive = isBlurActive && graphicsSupported
-    val containerColor = if (blurActive) surfaceContainer.copy(alpha = 0.4f) else surfaceContainer
+    // The map tab asks for the same glass alpha as the map panels so the page reads as one material.
+    val containerColor = if (blurActive) surfaceContainer.copy(alpha = if (surfaceAlphaOverride >= 0f) surfaceAlphaOverride else 0.4f) else surfaceContainer
 
     val tabsBackdrop = if (blurActive) rememberLayerBackdrop() else null
     val density = LocalDensity.current
@@ -325,8 +328,8 @@ internal fun IosLiquidGlassNavigationBar(
     }
 
     // Read .value only inside highlight lambdas (draw phase), never in composition.
-    val baseHighlight = rememberGravityRotatedHighlight(iosIndicatorSpecular, extraDegrees = -45f)
-    val pillHighlight = rememberGravityRotatedHighlight(iosIndicatorSpecular, extraDegrees = 90f)
+    val baseHighlight = rememberIsolatedGlassHighlight(iosIndicatorSpecular, extraDegrees = -45f)
+    val pillHighlight = rememberIsolatedGlassHighlight(iosIndicatorSpecular, extraDegrees = 90f)
 
     val combinedBackdrop = if (blurActive && backdrop != null && tabsBackdrop != null) {
         rememberCombinedBackdrop(backdrop, tabsBackdrop)

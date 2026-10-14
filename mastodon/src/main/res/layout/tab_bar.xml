@@ -53,6 +53,24 @@
 		</FrameLayout>
 
 		<FrameLayout
+			android:id="@id/tab_map"
+			android:layout_width="0dp"
+			android:layout_height="match_parent"
+			android:layout_weight="1"
+			android:paddingHorizontal="4dp"
+			android:contentDescription="@string/map_presence_title">
+
+			<ImageView
+				android:layout_width="28dp"
+				android:layout_height="28dp"
+				android:layout_gravity="center"
+				android:importantForAccessibility="no"
+				android:duplicateParentState="true"
+				android:src="@drawable/ic_fluent_map_24_regular"
+				android:tint="@color/tab_bar_icon"/>
+		</FrameLayout>
+
+		<FrameLayout
 			android:id="@+id/tab_diaper"
 			android:layout_width="0dp"
 			android:layout_height="match_parent"

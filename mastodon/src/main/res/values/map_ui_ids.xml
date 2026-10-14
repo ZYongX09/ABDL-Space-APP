@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+	<item name="friend_map_canvas" type="id" />
+	<item name="friend_map_privacy" type="id" />
+	<item name="friend_map_panel" type="id" />
+	<item name="friend_map_tools" type="id" />
+</resources>

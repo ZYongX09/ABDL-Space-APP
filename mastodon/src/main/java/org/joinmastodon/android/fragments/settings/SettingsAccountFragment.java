@@ -30,6 +30,7 @@ import org.joinmastodon.android.model.viewmodel.SectionHeaderListItem;
 import org.joinmastodon.android.ui.M3AlertDialogBuilder;
 import org.joinmastodon.android.ui.sheets.DonationSheet;
 import org.joinmastodon.android.ui.sheets.DonationSuccessfulSheet;
+import org.joinmastodon.android.fragments.discover.FriendMapFragment;
 import org.joinmastodon.android.ui.utils.UiUtils;
 
 import java.io.IOException;
@@ -109,6 +110,7 @@ public class SettingsAccountFragment extends BaseSettingsFragment<Void>{
 		// 赞助者中心：独立栏目，始终作用于当前点击的账号会话
 		items.add(new SectionHeaderListItem(R.string.sponsor_section));
 		items.add(new ListItem<>(R.string.sponsor_center, 0, R.drawable.ic_volunteer_activism_24px, this::onSponsorCenterClick));
+		items.add(new ListItem<>(R.string.map_presence_title, R.string.map_presence_settings_summary, R.drawable.ic_fluent_globe_location_24_filled, this::onFriendMapClick));
 
 		items.add(new SectionHeaderListItem(account.domain));
 		items.add(new ListItem<>(getString(R.string.settings_about_this_server), getString(R.string.settings_server_explanation), R.drawable.ic_dns_24px, this::onServerClick));
@@ -240,9 +242,14 @@ public class SettingsAccountFragment extends BaseSettingsFragment<Void>{
 		Nav.go(getActivity(), SettingsServerFragment.class, makeFragmentArgs());
 	}
 
-	private void onSponsorCenterClick(ListItem<?> item_){
-		Nav.go(getActivity(), org.joinmastodon.android.fragments.sponsors.SponsorCenterFragment.class, makeFragmentArgs());
-	}
+		private void onSponsorCenterClick(ListItem<?> item_){
+			Nav.go(getActivity(), org.joinmastodon.android.fragments.sponsors.SponsorCenterFragment.class, makeFragmentArgs());
+		}
+
+		private void onFriendMapClick(ListItem<?> item_){
+			Nav.go(getActivity(), FriendMapFragment.class, makeFragmentArgs());
+		}
+
 
 	private void onVerificationClick(ListItem<?> item_){
 		Nav.go(getActivity(), BabyVerificationFragment.class, makeFragmentArgs());
