@@ -12,4 +12,4 @@
     android:scaleType="center"
     android:stateListAnimator="@animator/fab_shadow"
     android:contentDescription="@string/new_post"
-    android:src="@drawable/ic_fluent_compose_24_filled" />
+    android:src="@drawable/compose_fab_icon" />
