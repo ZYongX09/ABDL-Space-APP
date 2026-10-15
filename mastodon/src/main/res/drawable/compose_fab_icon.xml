@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Home compose FAB icon. Level 0 draws a plus, level 10000 rotates it 45° into a close cross. -->
+<rotate xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/ic_add_24px"
+    android:fromDegrees="0"
+    android:toDegrees="45"
+    android:pivotX="50%"
+    android:pivotY="50%" />

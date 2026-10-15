@@ -6,6 +6,7 @@ import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
+import android.animation.ValueAnimator;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.Fragment;
@@ -14,6 +15,8 @@ import android.app.assist.AssistContent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.Configuration;
+import android.graphics.drawable.Drawable;
+import android.graphics.drawable.RotateDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -27,6 +30,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewParent;
 import android.view.ViewTreeObserver;
+import android.view.animation.DecelerateInterpolator;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.ImageButton;
@@ -69,10 +73,10 @@ import org.joinmastodon.android.model.viewmodel.ListItem;
 import org.joinmastodon.android.novel.editor.NovelEditorActivity;
 import org.joinmastodon.android.ui.ExtendedPopupMenu;
 import org.joinmastodon.android.ui.SimpleViewHolder;
+import org.joinmastodon.android.ui.compose.navigation.ComposeFanMenuController;
 import org.joinmastodon.android.ui.compose.navigation.HomeLiquidToolbarController;
 import org.joinmastodon.android.ui.compose.navigation.HomeToolbarMenuItem;
 import org.joinmastodon.android.ui.compose.navigation.HomeToolbarTimeline;
-import org.joinmastodon.android.ui.sheets.ComposeActionSheet;
 import org.joinmastodon.android.ui.utils.LocationUtils;
 import org.joinmastodon.android.ui.utils.UiUtils;
 import org.joinmastodon.android.updater.GithubSelfUpdater;
@@ -134,12 +138,15 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 	private boolean announcementsBadged, settingsBadged;
 	private ImageButton fab;
 	private int fabBottomInset;
+	private ComposeFanMenuController fanMenu;
 	private Intent scannerIntent;
 	private ElevationOnScrollListener elevationOnScrollListener;
 	private HomeLiquidToolbarController liquidToolbarController;
 
 	// TODO: rename this
 	private Runnable returnToBeginningOfPager=this::returnToBeginningOfPager;
+
+	private final Runnable collapseFanMenuOnBack=()->collapseFanMenu();
 
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
@@ -275,6 +282,11 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		fab = view.findViewById(R.id.fab);
 		fab.setOnClickListener(this::onFabClick);
 		fab.setOnLongClickListener(this::onFabLongClick);
+		// The fan overlay is a sibling of the FAB and must stay below it so the cross stays tappable.
+		fab.setTranslationZ(V.dp(2));
+		fanMenu = new ComposeFanMenuController(getContext(), this::openComposeAction, this::onFanMenuExpandedChanged);
+		fanMenu.getView().setTranslationZ(V.dp(1));
+		view.addView(fanMenu.getView(), new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 		pager = new ViewPager2(getContext());
 		toolbarFrame = (FrameLayout) LayoutInflater.from(getContext()).inflate(R.layout.home_toolbar, getToolbar(), false);
 
@@ -489,6 +501,8 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 			lp.bottomMargin=V.dp(16)+fabBottomInset;
 			fab.setLayoutParams(lp);
 		}
+		if(fanMenu!=null)
+			fanMenu.setBottomInset(insetPx);
 	}
 
 	public void openSearch(){
@@ -537,8 +551,44 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 	}
 
 	private void onFabClick(View v){
-		if(getActivity()!=null)
-			new ComposeActionSheet(getActivity(), this::openComposeAction).show();
+		if(fanMenu==null)
+			return;
+		if(fanMenu.isExpanded())
+			fanMenu.collapse();
+		else
+			fanMenu.expand();
+	}
+
+	/** Keeps the plus→cross rotation, the back gesture and the pager in sync with the fan state. */
+	private void onFanMenuExpandedChanged(boolean expanded){
+		animateFabIcon(expanded);
+		if(expanded)
+			addBackCallback(collapseFanMenuOnBack);
+		else
+			removeBackCallback(collapseFanMenuOnBack);
+	}
+
+	/** Folds the fan away; the icon rotation follows from [onFanMenuExpandedChanged]. */
+	private void collapseFanMenu(){
+		if(fanMenu!=null)
+			fanMenu.collapseIfExpanded();
+	}
+
+	private void animateFabIcon(boolean open){
+		if(fab==null)
+			return;
+		Drawable drawable=fab.getDrawable();
+		if(!(drawable instanceof RotateDrawable))
+			return;
+		ValueAnimator animator=ValueAnimator.ofInt(((RotateDrawable) drawable).getLevel(), open ? 10000 : 0);
+		animator.setDuration(reduceMotion ? 0 : 220);
+		animator.setInterpolator(new DecelerateInterpolator());
+		animator.addUpdateListener(a->{
+			Drawable current=fab.getDrawable();
+			if(current instanceof RotateDrawable)
+				((RotateDrawable) current).setLevel((int) a.getAnimatedValue());
+		});
+		animator.start();
 	}
 
 	private boolean onFabLongClick(View v) {
@@ -646,6 +696,8 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 
 	private void updateLiquidToolbarMode(){
 		boolean liquid=GlobalUserPreferences.isIosLiquidNavigationEnabled() && liquidToolbarController!=null;
+		if(liquid)
+			collapseFanMenu();
 		Toolbar toolbar=getToolbar();
 		if(toolbar!=null)
 			toolbar.setVisibility(liquid ? View.GONE : View.VISIBLE);
@@ -831,6 +883,8 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 
 	@Override
 	public void hideFab() {
+		// The FAB cannot slide away while it anchors the open fan.
+		collapseFanMenu();
 		if (fragments[pager.getCurrentItem()] instanceof BaseStatusListFragment<?> l) l.hideFab();
 		updateLiquidToolbarMode();
 	}
@@ -1021,6 +1075,11 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 	@Override
 	public void onDestroyView(){
 		liquidToolbarController=null;
+		if(fanMenu!=null){
+			if(fanMenu.isExpanded())
+				removeBackCallback(collapseFanMenuOnBack);
+			fanMenu=null;
+		}
 		if (overflowPopup != null) {
 			overflowPopup.dismiss();
 			overflowPopup = null;

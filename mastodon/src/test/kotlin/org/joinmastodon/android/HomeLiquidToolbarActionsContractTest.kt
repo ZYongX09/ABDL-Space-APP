@@ -53,7 +53,10 @@ class HomeLiquidToolbarActionsContractTest {
 		assertTrue(sharedAction.contains("destination=FriendRequestCreateFragment.class"))
 		assertTrue(sharedAction.contains("destination=org.joinmastodon.android.fragments.albums.AlbumUploadFragment.class"))
 		val fabAction = homeTab.substringAfter("private void onFabClick(View v){").substringBefore("\n\t}")
-		assertTrue(fabAction.contains("new ComposeActionSheet(getActivity(), this::openComposeAction).show()"))
+		assertTrue(fabAction.contains("fanMenu.isExpanded()"))
+		assertTrue(fabAction.contains("fanMenu.expand()"))
+		assertTrue(fabAction.contains("fanMenu.collapse()"))
+		assertFalse(fabAction.contains("ComposeActionSheet"))
 		assertFalse(fabAction.contains("l.onFabClick"))
 	}
 
