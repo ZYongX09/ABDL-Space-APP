@@ -12,6 +12,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Guardrail: this workflow is deprecated and its repository secret store is empty. Without the
+      # map keys the release package would build fine and then show "地图服务未配置" on a real device,
+      # so fail here instead of publishing a keyless package.
+      - name: Require map credentials
+        env:
+          BAIDU_MAP_ANDROID_AK: ${{ secrets.BAIDU_MAP_ANDROID_AK }}
+          AMAP_ANDROID_KEY: ${{ secrets.AMAP_ANDROID_KEY }}
+        run: |
+          missing=""
+          [ -n "$BAIDU_MAP_ANDROID_AK" ] || missing="$missing BAIDU_MAP_ANDROID_AK"
+          [ -n "$AMAP_ANDROID_KEY" ] || missing="$missing AMAP_ANDROID_KEY"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing map credentials:$missing. Add them as repository secrets, or build locally with ~/.config/abdl-space/android-maps.env (see docs/android-friend-map-native-sdk.md)."
+            exit 1
+          fi
+
       - name: Set up JDK
         uses: actions/setup-java@v2
         with:

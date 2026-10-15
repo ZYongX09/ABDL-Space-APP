@@ -5,8 +5,37 @@ plugins {
 	id 'org.jetbrains.kotlin.plugin.compose'
 }
 
+// Map credentials land in the manifest as placeholders, so a build that cannot see them still
+// succeeds and silently ships a package with a dead map tab (see docs/android-friend-map-native-sdk.md).
+// Resolution order is environment variable, then the user-level file below, so a plain
+// ./gradlew build no longer depends on remembering to source anything.
+def mapCredentialsFile = {
+	// Override with ABDL_MAP_ENV_FILE or -PmapEnvFile when the file lives elsewhere.
+	def override = System.getenv('ABDL_MAP_ENV_FILE') ?: project.findProperty('mapEnvFile')
+	if (override) return new File(override.toString())
+	return new File(System.getProperty('user.home'), '.config/abdl-space/android-maps.env')
+}
+def readMapCredentialsFile = { File file ->
+	def credentials = [:]
+	if (file == null || !file.isFile()) return credentials
+	file.eachLine('UTF-8') { raw ->
+		def line = raw.trim()
+		if (!line || line.startsWith('#')) return
+		if (line.startsWith('export ')) line = line.substring('export '.length()).trim()
+		def equals = line.indexOf('=')
+		if (equals <= 0) return
+		def value = line.substring(equals + 1).trim()
+		if (value.length() >= 2 && ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))))
+			value = value.substring(1, value.length() - 1)
+		credentials[line.substring(0, equals).trim()] = value
+	}
+	return credentials
+}
+def mapCredentialsFromFile = readMapCredentialsFile(mapCredentialsFile())
 def mapCredential = { String name ->
-	def value = System.getenv(name) ?: ''
+	def value = System.getenv(name)
+	if (!value) value = mapCredentialsFromFile[name]
+	value = value ?: ''
 	if (value && !(value ==~ /[A-Za-z0-9_-]{16,128}/)) {
 		throw new GradleException("Invalid map credential format: ${name}")
 	}
@@ -14,6 +43,8 @@ def mapCredential = { String name ->
 }
 def baiduAndroidKey = mapCredential('BAIDU_MAP_ANDROID_AK')
 def amapAndroidKey = mapCredential('AMAP_ANDROID_KEY')
+if (!System.getenv('BAIDU_MAP_ANDROID_AK') && !System.getenv('AMAP_ANDROID_KEY') && (baiduAndroidKey || amapAndroidKey))
+	logger.lifecycle("Map credentials loaded from ${mapCredentialsFile()}")
 
 android {
 		androidResources {
@@ -328,4 +359,132 @@ dependencies {
 
 	// JPush SDK
 	implementation project(':jiguang-sdk:jiguang_sdk:jiguang')
+}
+
+// --- Map credential guardrails -------------------------------------------------------------------
+// A release package whose manifest carries no map keys still builds and installs; the map tab then
+// only reports "地图服务未配置…" on a real device (see docs/android-friend-map-native-sdk.md).
+// The two gates below turn that silent failure into a build failure.
+
+def releasePackageTaskPattern = ~/(?i)^(assemble|bundle|package)(Release|GithubRelease|FdroidRelease)(Bundle)?$/
+
+def missingMapCredentials = {
+	def missing = []
+	if (!baiduAndroidKey) missing << 'BAIDU_MAP_ANDROID_AK'
+	if (!amapAndroidKey) missing << 'AMAP_ANDROID_KEY'
+	return missing
+}
+
+def allowMissingMapKeys = {
+	def value = System.getenv('ABDL_ALLOW_MISSING_MAP_KEYS') ?: project.findProperty('allowMissingMapKeys')
+	return value != null && value.toString().equalsIgnoreCase('true')
+}
+
+// Gate 1: refuse to package a release without credentials. `assertMapCredentials` is hooked onto the
+// pre*Build tasks so the build stops before compiling, and onto the packaging tasks themselves as a
+// last line of defence. Gradle sync, compilation of non-release variants and unit tests are
+// unaffected; a deliberately keyless package can pass -PallowMissingMapKeys=true
+// (or ABDL_ALLOW_MISSING_MAP_KEYS=true).
+tasks.register('assertMapCredentials') {
+	group = 'verification'
+	description = 'Fails when the map credentials are unavailable for a release build.'
+	doLast {
+		def missing = missingMapCredentials()
+		if (missing && !allowMissingMapKeys()) {
+			throw new GradleException(
+				"Missing map credentials: ${missing.join(', ')}.\n" +
+				"Provide them as environment variables, or place them in ${mapCredentialsFile()}\n" +
+				"(override the path with ABDL_MAP_ENV_FILE or -PmapEnvFile=<path>).\n" +
+				"Packaging anyway would ship a build whose map tab reports '地图服务未配置'.\n" +
+				"Pass -PallowMissingMapKeys=true to produce such a package on purpose.")
+		}
+	}
+}
+
+// Gate 2: check the finished artifact. Android binary AXML stores manifest strings as UTF-16LE, so
+// the configured values are searched as both UTF-16LE and UTF-8 bytes.
+def manifestContainsValue = { byte[] data, String value ->
+	def find = { byte[] needle ->
+		if (needle.length == 0 || data.length < needle.length) return false
+		for (int i = 0; i <= data.length - needle.length; i++) {
+			boolean matched = true
+			for (int j = 0; j < needle.length; j++) {
+				if (data[i + j] != needle[j]) {
+					matched = false
+					break
+				}
+			}
+			if (matched) return true
+		}
+		return false
+	}
+	return find(value.getBytes('UTF-16LE')) || find(value.getBytes('UTF-8'))
+}
+
+def manifestBytesOf = { File artifact ->
+	def zip = new java.util.zip.ZipFile(artifact)
+	try {
+		def entry = null
+		for (def candidate : zip.entries()) {
+			// APKs keep it at the root; app bundles nest it under the base module.
+			if (candidate.name == 'AndroidManifest.xml' || candidate.name == 'base/manifest/AndroidManifest.xml') {
+				entry = candidate
+				break
+			}
+		}
+		return entry == null ? null : zip.getInputStream(entry).bytes
+	} finally {
+		zip.close()
+	}
+}
+
+tasks.register('verifyMapKeys') {
+	group = 'verification'
+	description = 'Asserts that built release packages carry the configured map keys in their manifests.'
+	// Nothing to verify when keys were absent on purpose (gate 1 reports those builds instead).
+	onlyIf { missingMapCredentials().isEmpty() && !allowMissingMapKeys() }
+	doLast {
+		def expected = [:]
+		if (baiduAndroidKey) expected['BAIDU_MAP_ANDROID_AK'] = baiduAndroidKey
+		if (amapAndroidKey) expected['AMAP_ANDROID_KEY'] = amapAndroidKey
+
+		def artifacts = []
+		['release', 'githubRelease', 'fdroidRelease'].each { variant ->
+			[['outputs/apk', '.apk'], ['outputs/bundle', '.aab']].each { layoutName, extension ->
+				def dir = layout.buildDirectory.dir("${layoutName}/${variant}").get().asFile
+				if (dir.isDirectory()) artifacts.addAll(dir.listFiles().findAll { it.name.endsWith(extension) })
+			}
+		}
+		if (artifacts.isEmpty()) {
+			logger.lifecycle('verifyMapKeys: no release packages found, nothing to check.')
+			return
+		}
+		def failures = []
+		artifacts.each { artifact ->
+			def manifest = manifestBytesOf(artifact)
+			if (manifest == null) {
+				failures << "${artifact.name}: no AndroidManifest.xml inside the package"
+				return
+			}
+			expected.each { name, value ->
+				if (!manifestContainsValue(manifest, value)) failures << "${artifact.name}: ${name} not present in the packaged manifest"
+			}
+		}
+		if (failures) {
+			throw new GradleException('Map key verification failed:\n  - ' + failures.join('\n  - '))
+		}
+		logger.lifecycle("verifyMapKeys: ${artifacts.size()} release package(s) carry the configured map keys.")
+	}
+}
+
+afterEvaluate {
+	['preReleaseBuild', 'preGithubReleaseBuild', 'preFdroidReleaseBuild'].each { name ->
+		tasks.matching { it.name == name }.configureEach { it.dependsOn 'assertMapCredentials' }
+	}
+	tasks.configureEach { task ->
+		if (releasePackageTaskPattern.matcher(task.name).matches()) {
+			task.dependsOn 'assertMapCredentials'
+			task.finalizedBy 'verifyMapKeys'
+		}
+	}
 }
