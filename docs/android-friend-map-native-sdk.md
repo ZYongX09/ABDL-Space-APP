@@ -15,7 +15,9 @@ The application retains vendor map logos, copyright and approval-number overlays
 
 ## Credential boundaries
 
-`BAIDU_MAP_ANDROID_AK` and `AMAP_ANDROID_KEY` are read only from build environment variables and injected into Android Manifest placeholders. Source, tests and this document contain no usable values. A controlled local secret file outside the repository can supply the environment. CI can use its secret store.
+`BAIDU_MAP_ANDROID_AK` and `AMAP_ANDROID_KEY` are injected into Android Manifest placeholders. They are resolved from the build environment variable of the same name, falling back to the user-level file `~/.config/abdl-space/android-maps.env` (override the path with `ABDL_MAP_ENV_FILE` or `-PmapEnvFile=<path>`). Source, tests and this document contain no usable values; that file lives outside the repository. CI can use its secret store.
+
+Because the keys reach the package as manifest placeholders, a build that cannot see them still succeeds and installs — the map tab then only reports "地图服务未配置". Two guardrails in `mastodon/build.gradle` make that failure loud: the release packaging tasks (`assembleRelease`/`bundleRelease`/`package*` and the same names for `githubRelease`/`fdroidRelease`) fail at execution time when a key is missing, and the `verifyMapKeys` task, wired as `finalizedBy` on those tasks, opens each built APK/AAB and asserts the configured values are present in the packaged manifest (binary AXML stores manifest strings as UTF-16LE). `-PallowMissingMapKeys=true` (or `ABDL_ALLOW_MISSING_MAP_KEYS=true`) is the documented bypass for deliberately producing a keyless package; debug variants are not gated. Both `.github/workflows/build_and_deploy*.yml` workflows also refuse to start without the keys, since their repository secret store is empty and they are deprecated.
 
 Android SDK keys are public identifiers once packaged. Bind them to the release application ID `top.abdl_space.app` and the vendor-required **SHA1** signing fingerprint, plus service/quota restrictions. Debug builds use a different package and certificate and cannot be assumed to work with the release keys.
 
