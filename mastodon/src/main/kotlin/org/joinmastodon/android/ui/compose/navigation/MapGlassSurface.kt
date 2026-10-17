@@ -39,6 +39,7 @@ import top.yukonga.miuix.kmp.blur.drawBackdrop
 /** Native map samples never include the overlay itself. Content remains fully opaque. */
 class MapGlassSurface(context: Context, private val radiusDp: Int, private val largePanel: Boolean, private val fillAlphaOverride: Float = -1f) {
 	private val backdrop = ViewBitmapBackdrop()
+	private var cornerRadiusDp by mutableStateOf(radiusDp.toFloat())
 	private var sampleReady by mutableStateOf(false)
 	private var hardware by mutableStateOf(false)
 	private var sampleSourceView by mutableStateOf<View?>(null)
@@ -61,12 +62,13 @@ class MapGlassSurface(context: Context, private val radiusDp: Int, private val l
 		hardware = view.isHardwareAccelerated
 		backdrop.update(if (sampleReady) bitmap else null)
 	}
+	fun setCornerRadius(radiusDp: Float) { cornerRadiusDp = radiusDp.coerceAtLeast(0f) }
 	fun setSampleSource(source: View?) { sampleSourceView = source; backdrop.updateSampleSource(source) }
 	fun dispose() { sampleReady = false; sampleSourceView = null; backdrop.updateSampleSource(null); backdrop.update(null); view.disposeComposition() }
 
 	@Composable
 	private fun Surface() {
-		val shape = RoundedCornerShape(radiusDp.dp)
+		val shape = RoundedCornerShape(cornerRadiusDp.dp)
 		val darkTheme = isDarkTheme()
 		val liquid = MapGlassPolicy.supportsLiquid(android.os.Build.VERSION.SDK_INT, hardware,
 			GlobalUserPreferences.isIosLiquidNavigationEnabled(), sampleReady)
@@ -98,10 +100,10 @@ private fun liquidMaterial(backdrop: Backdrop, shape: RoundedCornerShape, fill: 
 		shape = { shape },
 		effects = {
 			vibrancy()
-			blur(18.dp.toPx(), 18.dp.toPx())
-			lens(refractionHeight = 8.dp.toPx(), refractionAmount = 10.dp.toPx())
+			blur(MapGlassPolicy.BLUR_DP.dp.toPx(), MapGlassPolicy.BLUR_DP.dp.toPx())
+			lens(refractionHeight = MapGlassPolicy.REFRACTION_HEIGHT_DP.dp.toPx(), refractionAmount = MapGlassPolicy.REFRACTION_AMOUNT_DP.dp.toPx())
 		},
-		highlight = { highlight.value.copy(alpha = .62f) },
+		highlight = { highlight.value.copy(alpha = MapGlassPolicy.HIGHLIGHT_ALPHA) },
 		onDrawSurface = { drawRect(fill) },
 	)
 }

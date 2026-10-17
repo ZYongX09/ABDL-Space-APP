@@ -19,7 +19,7 @@ import me.grishka.appkit.utils.V;
 /** Shader content is hardware-only; software backdrop capture receives the ordinary material. */
 	final class MapGlassMaterial{
 	private final GlassFrame view;
-	private final int radius;
+	private float radius;
 	private final boolean large;
 	private final float fillAlphaOverride;
 	private MapGlassSurface liquid;
@@ -39,12 +39,20 @@ import me.grishka.appkit.utils.V;
 
 	View getView(){ return view; }
 
+	void setCornerRadius(float radiusDp){
+		radius=Math.max(0f,radiusDp);
+		view.fallback.setCornerRadius(V.dp(radius));
+		if(liquid!=null) liquid.setCornerRadius(radius);
+		view.invalidate();
+	}
+
 	void update(Bitmap bitmap,int left,int top){
 		boolean supported=MapGlassPolicy.supportsLiquid(Build.VERSION.SDK_INT,view.isHardwareAccelerated(),
 				GlobalUserPreferences.isIosLiquidNavigationEnabled(),bitmap!=null && !bitmap.isRecycled());
 		if(supported){
 			if(liquid==null){
-				liquid=new MapGlassSurface(view.getContext(),radius,large,fillAlphaOverride);
+				liquid=new MapGlassSurface(view.getContext(),Math.round(radius),large,fillAlphaOverride);
+				liquid.setCornerRadius(radius);
 				view.addView(liquid.getView(),new FrameLayout.LayoutParams(-1,-1));
 				if(pendingSource!=null) liquid.setSampleSource(pendingSource);
 			}

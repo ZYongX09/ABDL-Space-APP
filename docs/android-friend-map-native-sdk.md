@@ -39,9 +39,13 @@ Baidu server AK/SK and AMap Web key/security secret are neither consumed nor pac
 
 This is a local native SDK integration, not a published release. No production Worker deployment, production D1 migration, APK upload, version update or provider-console mutation is implied.
 
-The existing experimental map backend still uses `cn-grid-*` buckets, **not real city administrative polygons**. That must not be described as the completed ordinary-user city restriction. It also needs full privacy/ACL, entitlement-expiry and route-level integration acceptance before deployment. This SDK work does not silently replace that server rule with a client-only city check.
+Nationwide browsing has no city/region/sponsor paywall. Region buckets are metadata, not administrative city boundaries or access-control rules. Specifying a display location remains an active-sponsor benefit; this is separate from browsing. Both the Android flow and backend enforce this distinction.
 
-No online USB device or usable emulator was available during preflight. Native GPU rendering, real SDK key authentication, city-crossing sponsor dialogs, dual-account visibility, coarse-permission behavior, sponsor expiry and vendor failure switching require real-device acceptance. Compile/unit tests alone do not prove those behaviors.
+The 2026-10-17 update uses `map-presence-v2`: current-version agreement must be read to the bottom and explicitly accepted before SDK initialization. Effective baby verification is required for personal map data. Unverified users may see only an empty, neutral basemap behind the verification gate after SDK consent; loading and errors remain blocked. Location writes and privacy changes carry `settings_version`; conflicts reload settings without replaying the old public intent. Offline/logout never retract a position, while explicit hiding is persistent and prevents stale uploads from reviving it.
+
+Deploy backend migration `0078_map_privacy_consent.sql` once before deploying the matching backend and installing the adapted client. This work does not apply production migrations or publish a package. An old backend without the v2 consent contract is intentionally rejected by the new client rather than silently accepting outdated permission semantics.
+
+No online USB device or usable emulator was available during preflight. Native GPU rendering, real SDK key authentication, liquid shape morphs, dark glass parity, gesture arbitration, dual-account visibility, coarse-permission behavior, pinned-location sponsor expiry and vendor failure switching require real-device acceptance. Compile/unit tests alone do not prove those behaviors.
 
 ## Official references
 

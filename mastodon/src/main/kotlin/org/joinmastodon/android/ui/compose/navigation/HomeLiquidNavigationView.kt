@@ -139,7 +139,7 @@ class HomeLiquidNavigationController(
 		val items = listOf(
 			NavigationItem("首页", androidx.compose.ui.graphics.vector.ImageVector.vectorResource(R.drawable.ic_tab_rating)),
 			NavigationItem(view.context.getString(R.string.messages), androidx.compose.ui.graphics.vector.ImageVector.vectorResource(R.drawable.ic_tab_messages)),
-			NavigationItem(view.context.getString(R.string.map_presence_title), androidx.compose.ui.graphics.vector.ImageVector.vectorResource(R.drawable.ic_fluent_map_24_regular)),
+			NavigationItem(view.context.getString(R.string.map_presence_title), androidx.compose.ui.graphics.vector.ImageVector.vectorResource(R.drawable.ic_tab_map)),
 			NavigationItem(view.context.getString(R.string.diaper), androidx.compose.ui.graphics.vector.ImageVector.vectorResource(R.drawable.ic_tab_rating)),
 			NavigationItem(view.context.getString(R.string.my_profile), androidx.compose.ui.graphics.vector.ImageVector.vectorResource(R.drawable.ic_tab_rating)),
 		)

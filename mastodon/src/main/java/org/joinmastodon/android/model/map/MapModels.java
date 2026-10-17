@@ -9,9 +9,26 @@ import java.util.List;
 public final class MapModels{
 	private MapModels(){}
 
+	public static final String CONSENT_VERSION="map-presence-v2";
+	public enum Access{ LOADING, CONSENT, VERIFICATION, READY, ERROR }
+
+	/** Missing, legacy or unknown terms fail closed: this client only presents the v2 text. */
+	public static boolean consentAccepted(Consent consent){
+		return consent!=null && consent.accepted && CONSENT_VERSION.equals(consent.version)
+				&& CONSENT_VERSION.equals(consent.acceptedVersion);
+	}
+	public static Access accessFor(Settings settings){
+		if(settings==null) return Access.LOADING;
+		if(!consentAccepted(settings.consent)) return Access.CONSENT;
+		return settings.babyVerified?Access.READY:Access.VERIFICATION;
+	}
+	public static boolean allowsPersonalData(Access access){ return access==Access.READY; }
+	public static boolean allowsBaseMap(Access access){ return access==Access.READY || access==Access.VERIFICATION; }
+
 	public static class Consent{
 		public boolean accepted;
-		public String version, acceptedAt;
+		/** version is required/current; accepted_version is separately returned by the v2 API. */
+		public String version, acceptedVersion, acceptedAt;
 	}
 
 	public static class Region{
@@ -34,6 +51,7 @@ public final class MapModels{
 		public Consent consent;
 		public String visibility, precisionLevel, locationMode;
 		public int fuzzRadiusM;
+		public long settingsVersion;
 		public boolean anonymous, autoRefresh, active, canViewNationwide, canChooseLocation, babyVerified;
 		public String mapScope;
 		public Region currentRegion;
@@ -47,6 +65,7 @@ public final class MapModels{
 	public static class Presence extends BaseModel{
 		public String coordinateSystem;
 		public boolean active;
+		public long settingsVersion;
 		public Point point;
 		public String expiresAt, mapScope;
 		public Region currentRegion;

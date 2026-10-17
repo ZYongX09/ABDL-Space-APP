@@ -45,7 +45,6 @@ import org.joinmastodon.android.ui.utils.UiUtils;
 
 public class FriendMapFragment extends AppKitFragment implements MapProvider.Listener,FriendMapOverlay.Actions{
 	private static final int LOCATION_REQUEST=7041;
-	private static final String CONSENT_VERSION="map-presence-v1";
 	// The privacy summary shows fully only on the first map open of this app process.
 	private static boolean firstPrivacyReveal=true;
 	private final Handler main=new Handler(Looper.getMainLooper());
@@ -55,12 +54,13 @@ public class FriendMapFragment extends AppKitFragment implements MapProvider.Lis
 	private AccountSession session;
 	private MapProvider provider;
 	private MapModels.Settings settings;
+	private MapModels.Access access=MapModels.Access.LOADING;
 	private MapModels.Point self;
-	private MapProvider.CameraState lastLegalCamera;
+	private MapProvider.CameraState lastCamera;
 	private MapDeviceLocation.Request locationRequest;
 	private MastodonAPIRequest<?> settingsRequest,presenceRequest,viewportRequest;
 	private FriendMapOverlay overlay;
-	private boolean destroyed=true,resumed,tabVisible,active,picking,restoringCamera,snapshotBusy;
+	private boolean destroyed=true,resumed,tabVisible,active,picking,snapshotBusy;
 	private int generation,queryGeneration,snapshotGeneration,topInset,bottomInset;
 	private long lastGateAt;
 	private Runnable viewportDebounce,snapshotDebounce,snapshotTimeout;
@@ -71,12 +71,13 @@ public class FriendMapFragment extends AppKitFragment implements MapProvider.Lis
 	}
 	@Override public void onCreate(Bundle state){
 		super.onCreate(state); accountID=getArguments().getString("account"); session=AccountSessionManager.getInstance().tryGetAccount(accountID);
-		tabVisible=!getArguments().getBoolean("__is_tab",false); setTitle(R.string.map_presence_title);
+		// The bottom-tab label belongs to navigation, not this standalone page's toolbar.
+		tabVisible=!getArguments().getBoolean("__is_tab",false); setTitle("");
 		if(state!=null){ preferredProvider=state.getString("map_provider","auto"); providerState=state.getBundle("map_sdk_state"); }
 	}
 	@Override public View onCreateView(LayoutInflater inflater,ViewGroup container,Bundle state){
 		destroyed=false; generation++;
-		overlay=new FriendMapOverlay(getActivity(),this); overlay.setNavigationInsets(topInset,bottomInset);
+		overlay=new FriendMapOverlay(getActivity(),this); overlay.setNavigationInsets(topInset,bottomInset); overlay.showLoadingGate();
 		updateActivityState(); return overlay;
 	}
 	public void setNavigationInsets(int top,int bottom){ topInset=Math.max(0,top); bottomInset=Math.max(0,bottom); if(overlay!=null) overlay.setNavigationInsets(topInset,bottomInset); }
@@ -87,86 +88,131 @@ public class FriendMapFragment extends AppKitFragment implements MapProvider.Lis
 	}
 	private boolean sessionValid(){ return session!=null && AccountSessionManager.getInstance().tryGetAccount(accountID)==session; }
 	private boolean live(int expected){ return !destroyed && active && generation==expected && getActivity()!=null && sessionValid(); }
-	private boolean consentAccepted(){ return settings!=null && settings.consent!=null && settings.consent.accepted; }
+	private boolean consentAccepted(){ return settings!=null && MapModels.consentAccepted(settings.consent); }
+	private boolean personalDataAllowed(){ return active && !destroyed && sessionValid() && consentAccepted() && settings.babyVerified && MapModels.allowsPersonalData(access); }
+	private boolean baseMapAllowed(){ return active && !destroyed && sessionValid() && consentAccepted() && MapModels.allowsBaseMap(access); }
 	private void updateActivityState(){
 		boolean next=!destroyed && resumed && tabVisible && overlay!=null && sessionValid();
 		if(next==active) return;
 		active=next;
 		if(active){
-			if(provider!=null) provider.onResume();
-			overlay.setSampleSource(provider!=null?provider.getSampleSource():null);
+			overlay.enterMapDefaults();
 			if(firstPrivacyReveal){ firstPrivacyReveal=false; if(!overlay.privacyExpanded()) overlay.setPrivacyExpanded(true,false); }
-			else overlay.enterMapDefaults();
 			loadSettings();
 		}else{
-			generation++; queryGeneration++; cancelAll(); clearSnapshotWork();
+			blockAccess(MapModels.Access.LOADING);
 			if(provider!=null) provider.onPause();
-			if(overlay!=null){ overlay.setBusy(false); overlay.setSampleSource(null); overlay.setSnapshot(null); }
+			if(overlay!=null){ overlay.setBusy(false); overlay.setSampleSource(null); overlay.setSnapshot(null); overlay.showLoadingGate(); }
 		}
 	}
-	@Override public void refresh(){ attemptedProviders.clear(); if(provider==null && consentAccepted()) startProvider(preferredProvider); loadSettings(); }
-	private void loadSettings(){
+	/** Local cancellation must never delete/hide server presence: offline and logout retain it. */
+	private void blockAccess(MapModels.Access next){
+		access=next; generation++; queryGeneration++; cancelAll(); clearSnapshotWork();
+		self=null; lastCamera=null; visiblePoints.clear();
+		if(provider!=null){ provider.renderSafe(visiblePoints); provider.showFuzzArea(null); }
+		if(overlay!=null){ if(picking) cancelPin(); overlay.setPoints(visiblePoints); overlay.setSnapshot(null); overlay.setSampleSource(null); }
+	}
+	@Override public void refresh(){ attemptedProviders.clear(); loadSettings(); }
+	private void loadSettings(){ loadSettings(true); }
+	private void loadSettings(boolean readPresence){
 		if(!active || destroyed) return;
-		if(settingsRequest!=null) settingsRequest.cancel();
-		int expected=generation; overlay.setBusy(true);
+		blockAccess(MapModels.Access.LOADING); overlay.showLoadingGate(); overlay.setBusy(true);
+		int expected=generation;
 		settingsRequest=MapRequest.settings().setCallback(new Callback<>(){
 			@Override public void onSuccess(MapModels.Settings result){
 				if(!live(expected)) return;
-				settingsRequest=null; settings=result; overlay.setBusy(false); overlay.updateSettings(result); overlay.setMessage("",false);
-				if(!result.babyVerified){ overlay.showVerificationGate(); return; }
-				overlay.hideVerificationGate();
-				if(!consentAccepted()){ overlay.showConsent(); return; }
-				if(provider==null) startProvider(preferredProvider); readSelf();
+				settingsRequest=null;
+				if(applySettings(result) && personalDataAllowed()){
+					if(readPresence) readSelf();
+					else{ overlay.setMessage(getString(R.string.map_ui_settings_changed),false); queryCurrentViewport(); }
+				}
 			}
-			@Override public void onError(ErrorResponse error){ if(live(expected)){ settingsRequest=null; overlay.setBusy(false); showError(error); } }
+			@Override public void onError(ErrorResponse error){ if(live(expected)){ settingsRequest=null; showError(error); } }
 		}).exec(accountID);
 	}
-	@Override public void consent(){ saveSettings(Map.of("consent_version",CONSENT_VERSION),this::loadSettings); }
+	/** Consent is checked before verification: even a decorative base map must await SDK authorization. */
+	private boolean applySettings(MapModels.Settings result){
+		settings=result; overlay.setBusy(false);
+		if(result==null || result.consent==null || !MapModels.CONSENT_VERSION.equals(result.consent.version)){
+			failAccess(getString(R.string.map_ui_protocol_failed)); return false;
+		}
+		overlay.updateSettings(result); overlay.setMessage("",false); access=MapModels.accessFor(result);
+		if(access==MapModels.Access.CONSENT){
+			providerState=null;
+			if(provider!=null){ provider.onPause(); provider.destroy(); provider=null; overlay.mapHost().removeAllViews(); }
+			overlay.showConsent(); return false;
+		}
+		if(access==MapModels.Access.VERIFICATION){
+			// No personal markers, saved SDK camera state, viewport reads, permission request or upload.
+			providerState=null; lastCamera=null; overlay.showVerificationGate();
+			// Recreate instead of sampling a previous verified user's rendered frame.
+			if(provider!=null){ provider.onPause(); provider.destroy(); provider=null; overlay.mapHost().removeAllViews(); }
+			attemptedProviders.clear(); startProvider(preferredProvider);
+			return false;
+		}
+		overlay.hideAccessGate();
+		if(provider==null) startProvider(preferredProvider);
+		else{ provider.onResume(); overlay.setSampleSource(provider.getSampleSource()); }
+		return personalDataAllowed();
+	}
+	private MapProvider.CameraState neutralCamera(){ return new MapProvider.CameraState(18,73,54,135,35,105,5,null); }
+	@Override public void consent(){
+		if(!active || access!=MapModels.Access.CONSENT || settings==null || settings.consent==null
+				|| !MapModels.CONSENT_VERSION.equals(settings.consent.version) || !overlay.canSubmitConsent()) return;
+		saveSettings(Map.of("consent_version",MapModels.CONSENT_VERSION),this::readSelf);
+	}
 	@Override public void privacy(){ UiUtils.launchWebBrowser(getActivity(),"https://abdl-space.top/privacy"); }
 	@Override public void verification(){
-		Bundle args=new Bundle(); args.putString("account",accountID);
-		Nav.go(getActivity(),BabyVerificationFragment.class,args);
+		if(!active || access!=MapModels.Access.VERIFICATION) return;
+		Bundle args=new Bundle(); args.putString("account",accountID); Nav.go(getActivity(),BabyVerificationFragment.class,args);
 	}
 	private void startProvider(String preferred){
-		if(!active || !consentAccepted()) return;
+		if(!baseMapAllowed()) return;
 		String chosen=MapProviderRegistry.next(MapProviderRegistry.available(),"auto".equals(preferred)?"baidu":preferred,attemptedProviders);
-		MapProvider.CameraState camera=provider==null?lastLegalCamera:provider.getCamera();
+		MapProvider.CameraState camera=provider==null?lastCamera:provider.getCamera();
+		if(!personalDataAllowed()){ camera=neutralCamera(); providerState=null; }
 		clearSnapshotWork();
 		if(provider!=null){ provider.onPause(); provider.destroy(); provider=null; }
 		overlay.mapHost().removeAllViews(); overlay.setSnapshot(null); overlay.setSampleSource(null);
-		if(chosen==null){ overlay.setMessage(getString(R.string.map_presence_provider_unavailable),true); return; }
+		if(chosen==null){ failAccess(getString(R.string.map_presence_provider_unavailable)); return; }
 		attemptedProviders.add(chosen);
 		try{
-			provider=MapProviderRegistry.create(getActivity(),chosen); provider.onCreate(providerState); providerState=null;
-			overlay.mapHost().addView(provider.getView(),new ViewGroup.LayoutParams(-1,-1));
-			provider.initialize(this); provider.renderSafe(visiblePoints); provider.onResume(); overlay.setProvider(chosen);
-			overlay.setSampleSource(provider.getSampleSource());
-			if(camera!=null) provider.setCamera(camera);
+			MapProvider current=MapProviderRegistry.create(getActivity(),chosen); provider=current;
+			current.onCreate(providerState); providerState=null;
+			overlay.mapHost().addView(current.getView(),new ViewGroup.LayoutParams(-1,-1));
+			current.initialize(this);
+			// initialize may synchronously fail and replace/destroy this provider.
+			if(provider!=current || !baseMapAllowed()) return;
+			current.renderSafe(visiblePoints); current.onResume(); overlay.setProvider(chosen); overlay.setSampleSource(current.getSampleSource());
+			if(camera!=null) current.setCamera(camera);
 		}catch(RuntimeException | LinkageError error){ onProviderError("sdk_init_failed"); }
 	}
-	@Override public void provider(String id){ preferredProvider=id; attemptedProviders.clear(); startProvider(id); }
+	@Override public void provider(String id){ if(!personalDataAllowed()) return; preferredProvider=id; attemptedProviders.clear(); startProvider(id); }
 	private void readSelf(){
+		if(!personalDataAllowed()) return;
 		int expected=generation; if(presenceRequest!=null) presenceRequest.cancel();
 		presenceRequest=MapRequest.mine().setCallback(new Callback<>(){
 			@Override public void onSuccess(MapModels.Presence result){
-				if(!live(expected)) return;
+				if(!live(expected) || !personalDataAllowed()) return;
 				presenceRequest=null;
 				if(result.active && result.point!=null){ self=result.point; centerOnSelf(); }
-				else if("hidden".equals(settings.visibility)){ overlay.setMessage(getString(R.string.map_ui_enable_first),false); return; }
-				if("pinned".equals(settings.locationMode) && settings.canChooseLocation){ if(provider!=null) provider.setCamera(new MapProvider.CameraState(18,73,54,135,35,105,5,null)); return; }
+				queryCurrentViewport();
+				if(result.active && result.point!=null) return; // Retain an existing location until an explicit update.
+				if("hidden".equals(settings.visibility)){ overlay.setMessage(getString(R.string.map_ui_enable_first),false); return; }
+				if("pinned".equals(settings.locationMode)) return;
 				locate();
 			}
 			@Override public void onError(ErrorResponse error){ if(live(expected)){ presenceRequest=null; showError(error); } }
 		}).exec(accountID);
 	}
 	@Override public void locate(){
-		if(!active) return;
-		if(!consentAccepted()){ if(settings!=null) overlay.showConsent(); return; }
+		if(!personalDataAllowed()) return;
 		if(self!=null && "pinned".equals(settings.locationMode)){ centerOnSelf(); return; }
 		if("hidden".equals(settings.visibility)){ overlay.setMessage(getString(R.string.map_ui_enable_first),false); overlay.showSettings(); return; }
 		requestDeviceLocation();
 	}
 	private void requestDeviceLocation(){
+		if(!personalDataAllowed() || "hidden".equals(settings.visibility) || !"device".equals(settings.locationMode)) return;
 		if(!MapDeviceLocation.permitted(getActivity())){
 			boolean requested=getActivity().getSharedPreferences("map_permissions",Context.MODE_PRIVATE).getBoolean("requested",false);
 			if(requested && !shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_FINE_LOCATION) && !shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_COARSE_LOCATION)){
@@ -181,7 +227,7 @@ public class FriendMapFragment extends AppKitFragment implements MapProvider.Lis
 		if(locationRequest!=null) locationRequest.cancel();
 		int expected=generation; overlay.setBusy(true); overlay.setMessage(getString(R.string.map_presence_locating),false);
 		locationRequest=MapDeviceLocation.once(getActivity(),location->{
-			if(!live(expected)) return;
+			if(!live(expected) || !personalDataAllowed()) return;
 			locationRequest=null; overlay.setBusy(false);
 			if(location==null){ overlay.setMessage(getString(R.string.map_presence_location_failed),false); return; }
 			upload(location.getLatitude(),location.getLongitude(),"device");
@@ -189,127 +235,140 @@ public class FriendMapFragment extends AppKitFragment implements MapProvider.Lis
 	}
 	@Override public void onRequestPermissionsResult(int code,String[] permissions,int[] results){
 		super.onRequestPermissionsResult(code,permissions,results);
-		if(code==LOCATION_REQUEST && active){ if(MapDeviceLocation.permitted(getActivity())) requestDeviceLocation(); else overlay.setMessage(getString(R.string.map_presence_permission_needed),false); }
+		if(code==LOCATION_REQUEST && personalDataAllowed()){ if(MapDeviceLocation.permitted(getActivity())) requestDeviceLocation(); else overlay.setMessage(getString(R.string.map_presence_permission_needed),false); }
 	}
 	private void upload(double lat,double lng,String mode){
+		if(!personalDataAllowed() || "hidden".equals(settings.visibility) || !mode.equals(settings.locationMode)
+				|| ("pinned".equals(mode) && !settings.canChooseLocation)) return;
 		int expected=generation; Map<String,Object> body=new HashMap<>(); body.put("latitude",lat); body.put("longitude",lng);
-		body.put("coordinate_system","wgs84"); body.put("precision_level",settings.precisionLevel); body.put("visibility",settings.visibility); body.put("anonymous",settings.anonymous); body.put("location_mode",mode);
+		body.put("coordinate_system","wgs84"); body.put("location_mode",mode); body.put("settings_version",settings.settingsVersion);
 		if(presenceRequest!=null) presenceRequest.cancel(); overlay.setBusy(true);
 		presenceRequest=MapRequest.updatePresence(body).setCallback(new Callback<>(){
 			@Override public void onSuccess(MapModels.Presence result){
-				if(!live(expected)) return;
-				presenceRequest=null; self=result.point; settings.currentRegion=result.currentRegion!=null?result.currentRegion:self==null?null:self.region;
-				settings.locationMode=mode; overlay.setBusy(false); overlay.setMessage("",false); overlay.updateSettings(settings); if(picking) cancelPin(); centerOnSelf();
+				if(!live(expected) || !personalDataAllowed()) return;
+				presenceRequest=null; self=result.point;
+				if(result.settingsVersion>0) settings.settingsVersion=result.settingsVersion;
+				settings.currentRegion=result.currentRegion!=null?result.currentRegion:self==null?null:self.region;
+				settings.locationMode=mode; overlay.setBusy(false); overlay.setMessage("",false); overlay.updateSettings(settings); if(picking) cancelPin(); centerOnSelf(); queryCurrentViewport();
 			}
 			@Override public void onError(ErrorResponse error){ if(live(expected)){ presenceRequest=null; overlay.setBusy(false); showError(error); } }
 		}).exec(accountID);
 	}
 	private void centerOnSelf(){
-		if(self==null || self.region==null || provider==null) return;
-		MapProvider.CameraState camera=new MapProvider.CameraState(self.lat-.05,self.lng-.05,self.lat+.05,self.lng+.05,self.lat,self.lng,11,self.region.id);
-		lastLegalCamera=camera; provider.setCamera(camera); provider.showFuzzArea(self);
+		if(!personalDataAllowed() || self==null || provider==null) return;
+		MapProvider.CameraState camera=new MapProvider.CameraState(self.lat-.05,self.lng-.05,self.lat+.05,self.lng+.05,self.lat,self.lng,11,null);
+		lastCamera=camera; provider.setCamera(camera); provider.showFuzzArea(self);
 	}
 	@Override public void visibility(String value){
-		if(!consentAccepted()){ if(settings!=null) overlay.showConsent(); return; }
+		if(!personalDataAllowed() || !MapModels.validVisibility(value)) return;
 		saveSettings(Map.of("visibility",value),()->{
-			if("hidden".equals(value)){ self=null; if(provider!=null) provider.showFuzzArea(null); overlay.setMessage(getString(R.string.map_ui_enable_first),false); }
+			if("hidden".equals(value)){ overlay.setMessage(getString(R.string.map_ui_enable_first),false); queryCurrentViewport(); }
 			else requestDeviceLocation();
 		});
 	}
-	@Override public void precision(String value){ saveSettings(Map.of("precision_level",value),this::requestDeviceLocation); }
-	@Override public void anonymous(boolean value){ saveSettings(Map.of("anonymous",value),this::requestDeviceLocation); }
-	@Override public void useDeviceLocation(){ saveSettings(Map.of("location_mode","device"),this::requestDeviceLocation); }
+	@Override public void precision(String value){ if(personalDataAllowed() && MapModels.validPrecision(value)) saveSettings(Map.of("precision_level",value),this::readSelf); }
+	@Override public void anonymous(boolean value){ if(personalDataAllowed()) saveSettings(Map.of("anonymous",value),this::readSelf); }
+	@Override public void useDeviceLocation(){ if(personalDataAllowed()) saveSettings(Map.of("location_mode","device"),this::requestDeviceLocation); }
 	private void saveSettings(Map<String,Object> changes,Runnable done){
-		if(!active) return;
-		int expected=generation; if(settingsRequest!=null) settingsRequest.cancel(); overlay.setBusy(true);
-		settingsRequest=MapRequest.updateSettings(changes).setCallback(new Callback<>(){
-			@Override public void onSuccess(MapModels.Settings result){ if(live(expected)){ settingsRequest=null; settings=result; overlay.setBusy(false); overlay.updateSettings(result); done.run(); } }
-			@Override public void onError(ErrorResponse error){ if(live(expected)){ settingsRequest=null; overlay.setBusy(false); showError(error); } }
+		if(!active || (!personalDataAllowed() && !(access==MapModels.Access.CONSENT && changes.containsKey("consent_version")))) return;
+		Map<String,Object> body=new HashMap<>(changes);
+		if(!"hidden".equals(changes.get("visibility"))) body.put("settings_version",settings.settingsVersion);
+		blockAccess(MapModels.Access.LOADING); overlay.showLoadingGate(); overlay.setBusy(true);
+		int expected=generation;
+		settingsRequest=MapRequest.updateSettings(body).setCallback(new Callback<>(){
+			@Override public void onSuccess(MapModels.Settings result){ if(live(expected)){ settingsRequest=null; if(applySettings(result)) done.run(); } }
+			@Override public void onError(ErrorResponse error){ if(live(expected)){ settingsRequest=null; showError(error); } }
 		}).exec(accountID);
 	}
 	@Override public void beginPin(){
-		if(settings==null || !active) return;
+		if(!personalDataAllowed()) return;
 		if(!settings.canChooseLocation){ sponsor(); return; }
 		if("hidden".equals(settings.visibility)){ overlay.setMessage(getString(R.string.map_ui_enable_first),false); return; }
 		picking=true; overlay.showPin();
 	}
 	@Override public void confirmPin(){
-		if(!picking || provider==null || !settings.canChooseLocation) return;
-		MapProvider.CameraState camera=provider.getCamera(); if(camera!=null) upload(camera.centerLat(),camera.centerLng(),"pinned");
+		if(!personalDataAllowed() || !picking || provider==null || !settings.canChooseLocation) return;
+		MapProvider.CameraState camera=provider.getCamera(); if(camera==null) return;
+		double lat=camera.centerLat(),lng=camera.centerLng();
+		if("pinned".equals(settings.locationMode)) upload(lat,lng,"pinned");
+		else saveSettings(Map.of("location_mode","pinned"),()->upload(lat,lng,"pinned"));
 	}
 	@Override public void cancelPin(){ picking=false; if(overlay!=null) overlay.finishPin(); }
 	@Override public void onLocationSelected(double lat,double lng){
-		if(settings==null || !active) return;
+		if(!personalDataAllowed()) return;
 		if(!settings.canChooseLocation){ sponsor(); return; }
 		beginPin(); if(picking && provider!=null) provider.setCamera(new MapProvider.CameraState(lat-.03,lng-.03,lat+.03,lng+.03,lat,lng,13,null));
 	}
 	@Override public void focus(MapModels.Point point){
-		if(provider==null) return;
-		provider.setCamera(new MapProvider.CameraState(point.lat-.03,point.lng-.03,point.lat+.03,point.lng+.03,point.lat,point.lng,13,settings.currentRegion==null?null:settings.currentRegion.id));
+		if(!personalDataAllowed() || provider==null || point==null) return;
+		provider.setCamera(new MapProvider.CameraState(point.lat-.03,point.lng-.03,point.lat+.03,point.lng+.03,point.lat,point.lng,13,null));
 		provider.selectPoint(point.id); provider.showFuzzArea(point);
 	}
 	@Override public void profile(MapModels.Point point){
-		if(point==null || point.anonymous || point.account==null || point.account.id==null) return;
+		if(!personalDataAllowed() || point==null || point.anonymous || point.account==null || point.account.id==null) return;
 		Bundle args=new Bundle(); args.putString("account",accountID); args.putString("profileAccountID",point.account.id); Nav.go(getActivity(),ProfileFragment.class,args);
 	}
-	@Override public void onMarkerClick(MapModels.Point point){ if(active){ focus(point); overlay.showPerson(point); } }
+	@Override public void onMarkerClick(MapModels.Point point){ if(personalDataAllowed()){ focus(point); overlay.showPerson(point); } }
 	@Override public void sponsor(){
-		if(!active) return;
+		if(!personalDataAllowed()) return;
 		long now=System.currentTimeMillis(); if(now-lastGateAt<10_000) return; lastGateAt=now;
-		new SponsorNoticeSheet(getActivity(),getString(R.string.map_presence_other_city),getString(R.string.map_presence_sponsor_body),getString(R.string.map_presence_back_city),this::centerOnSelf,()->{
+		new SponsorNoticeSheet(getActivity(),getString(R.string.map_presence_pin),getString(R.string.map_presence_sponsor_body),getString(R.string.map_ui_cancel),()->{},()->{
 			Bundle args=new Bundle(); args.putString("account",accountID); Nav.go(getActivity(),SponsorCenterFragment.class,args);
 		}).show();
 	}
-	@Override public void onMapReady(){ if(active){ if(lastLegalCamera!=null) provider.setCamera(lastLegalCamera); scheduleSnapshot(); } }
-	@Override public void onCameraMove(){ if(active && overlay!=null) overlay.onCameraMoved(); }
-	public View getMapSampleView(){ return overlay!=null?overlay.mapHost():null; }
+	@Override public void onMapReady(){ if(baseMapAllowed() && provider!=null){ if(personalDataAllowed() && lastCamera!=null) provider.setCamera(lastCamera); scheduleSnapshot(); queryCurrentViewport(); } }
+	@Override public void onCameraMove(){ if(personalDataAllowed() && overlay!=null) overlay.onCameraMoved(); }
+	public View getMapSampleView(){ return baseMapAllowed() && overlay!=null?overlay.mapHost():null; }
 	@Override public void onCameraIdle(MapProvider.CameraState camera){
-		if(!active || camera==null || settings==null) return;
+		if(!baseMapAllowed() || camera==null) return;
 		snapshotGeneration++; scheduleSnapshot();
-		if(picking) return;
-		if(!settings.canViewNationwide && (self==null || settings.currentRegion==null)) return;
-		if(restoringCamera){ restoringCamera=false; return; }
+		if(!personalDataAllowed() || picking) return;
 		if(viewportDebounce!=null) main.removeCallbacks(viewportDebounce);
 		viewportDebounce=()->queryViewport(camera); main.postDelayed(viewportDebounce,400);
 	}
+	private void queryCurrentViewport(){ if(personalDataAllowed() && provider!=null && provider.isReady()){ MapProvider.CameraState camera=provider.getCamera(); if(camera!=null) onCameraIdle(camera); } }
 	private void queryViewport(MapProvider.CameraState camera){
-		if(!active || !consentAccepted()) return;
+		if(!personalDataAllowed()) return;
 		if(viewportRequest!=null) viewportRequest.cancel(); int expected=generation,query=++queryGeneration;
-		String region=settings.currentRegion==null?null:settings.currentRegion.id;
-		viewportRequest=MapRequest.list(camera.minLat(),camera.minLng(),camera.maxLat(),camera.maxLng(),camera.centerLat(),camera.centerLng(),region,camera.zoom(),100).setCallback(new Callback<>(){
+		// Browsing has no sponsor/current-city constraint, including for hidden users without a location.
+		viewportRequest=MapRequest.list(camera.minLat(),camera.minLng(),camera.maxLat(),camera.maxLng(),camera.centerLat(),camera.centerLng(),null,camera.zoom(),100).setCallback(new Callback<>(){
 			@Override public void onSuccess(MapModels.PresenceList result){
-				if(!live(expected) || query!=queryGeneration) return;
-				viewportRequest=null; lastLegalCamera=camera; visiblePoints.clear(); visiblePoints.addAll(result.points);
+				if(!live(expected) || !personalDataAllowed() || query!=queryGeneration) return;
+				viewportRequest=null; lastCamera=camera; visiblePoints.clear(); visiblePoints.addAll(result.points);
 				if(provider!=null) provider.renderSafe(visiblePoints); overlay.setPoints(visiblePoints); overlay.setMessage("",false); scheduleSnapshot();
 			}
-			@Override public void onError(ErrorResponse error){
-				if(!live(expected) || query!=queryGeneration) return;
-				viewportRequest=null;
-				if(error instanceof MapRequest.MapErrorResponse mapError && "map_sponsor_required".equals(mapError.code)){
-					if(provider!=null && lastLegalCamera!=null){ restoringCamera=true; provider.setCamera(lastLegalCamera); } sponsor();
-				}else showError(error);
-			}
+			@Override public void onError(ErrorResponse error){ if(!live(expected) || query!=queryGeneration) return; viewportRequest=null; showError(error); }
 		}).exec(accountID);
 	}
 	private void showError(ErrorResponse error){
 		if(overlay==null) return;
-		if(error instanceof MapRequest.MapErrorResponse mapError && "map_sponsor_required".equals(mapError.code)){ sponsor(); return; }
+		if(error instanceof MapRequest.MapErrorResponse mapError && ("map_settings_changed".equals(mapError.code)
+				|| "map_verification_required".equals(mapError.code) || "map_baby_verification_required".equals(mapError.code)
+				|| "map_consent_required".equals(mapError.code))){
+			// Re-read current gates/settings, never replay a stale setting write or location upload.
+			loadSettings(false); return;
+		}
 		int status=error instanceof MastodonErrorResponse response?response.httpStatus:-1;
 		int message=status==404?R.string.map_ui_not_deployed:status==401?R.string.map_ui_login_required:status>=500?R.string.map_ui_server_failed:status<0?R.string.map_ui_network_failed:R.string.map_ui_protocol_failed;
-		overlay.setMessage(getString(message),status==404 || settings==null);
+		failAccess(getString(message));
 	}
-	@Override public void onProviderError(String code){ if(active){ overlay.setMessage(getString(R.string.map_presence_switching),false); startProvider(preferredProvider); } }
+	private void failAccess(CharSequence message){
+		blockAccess(MapModels.Access.ERROR);
+		if(overlay!=null){ overlay.setBusy(false); overlay.showErrorGate(message); }
+	}
+	@Override public void onProviderError(String code){ if(baseMapAllowed()){ overlay.setMessage(getString(R.string.map_presence_switching),false); startProvider(preferredProvider); } }
 	@Override public void panelChanged(int top,int bottom){ if(provider!=null) provider.setContentInsets(top,bottom); }
 	private void scheduleSnapshot(){
-		if(!active || provider==null || !provider.isReady() || !GlobalUserPreferences.isIosLiquidNavigationEnabled()) return;
+		if(!baseMapAllowed() || provider==null || !provider.isReady()
+				|| (access!=MapModels.Access.VERIFICATION && !GlobalUserPreferences.isIosLiquidNavigationEnabled())) return;
 		if(snapshotDebounce!=null) main.removeCallbacks(snapshotDebounce); snapshotDebounce=this::sampleMap; main.postDelayed(snapshotDebounce,300);
 	}
 	private void sampleMap(){
-		if(!active || snapshotBusy || provider==null || !provider.isReady()) return;
+		if(!baseMapAllowed() || snapshotBusy || provider==null || !provider.isReady()) return;
 		MapProvider current=provider; int expected=generation,sample=++snapshotGeneration; snapshotBusy=true;
 		snapshotTimeout=()->{ snapshotBusy=false; }; main.postDelayed(snapshotTimeout,2500);
 		current.requestSnapshot(bitmap->main.post(()->{
-			if(!live(expected) || current!=provider) return;
+			if(!live(expected) || !baseMapAllowed() || current!=provider) return;
 			snapshotBusy=false; if(snapshotTimeout!=null) main.removeCallbacks(snapshotTimeout);
 			if(sample!=snapshotGeneration){ scheduleSnapshot(); return; }
 			if(bitmap!=null && !bitmap.isRecycled()) overlay.setSnapshot(bitmap);
@@ -327,11 +386,11 @@ public class FriendMapFragment extends AppKitFragment implements MapProvider.Lis
 	}
 	public boolean onBackPressed(){ return overlay!=null && overlay.onBackPressed(); }
 	@Override public void onStart(){ super.onStart(); if(provider!=null && active) provider.onStart(); }
-	@Override public void onResume(){ super.onResume(); resumed=true; updateActivityState(); if(active && consentAccepted()) loadSettings(); }
+	@Override public void onResume(){ super.onResume(); resumed=true; updateActivityState(); }
 	@Override public void onPause(){ resumed=false; updateActivityState(); super.onPause(); }
 	@Override public void onSaveInstanceState(Bundle state){
 		super.onSaveInstanceState(state); state.putString("map_provider",preferredProvider);
-		if(provider!=null){ Bundle sdk=new Bundle(); provider.onSaveInstanceState(sdk); state.putBundle("map_sdk_state",sdk); }
+		if(provider!=null && personalDataAllowed()){ Bundle sdk=new Bundle(); provider.onSaveInstanceState(sdk); state.putBundle("map_sdk_state",sdk); }
 	}
 	@Override public void onLowMemory(){ super.onLowMemory(); if(provider!=null) provider.onLowMemory(); }
 	@Override public void onDestroyView(){

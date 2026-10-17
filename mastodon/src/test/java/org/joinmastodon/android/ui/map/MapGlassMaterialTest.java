@@ -28,6 +28,9 @@ public class MapGlassMaterialTest{
 	@Test public void sampleSourceBeforeFirstSnapshotDoesNotCrash(){
 		MapGlassMaterial material=new MapGlassMaterial(context,24,false);
 		try{
+			material.setCornerRadius(24f);
+			material.setCornerRadius(18.5f);
+			material.setCornerRadius(-1f);
 			material.setSampleSource(new View(context));
 			material.setSampleSource(null);
 			material.update(null,0,0);

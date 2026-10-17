@@ -4,11 +4,14 @@ import android.animation.ValueAnimator;
 import android.content.Context;
 import android.content.res.ColorStateList;
 import android.graphics.Bitmap;
+import android.graphics.Outline;
+import android.graphics.RenderEffect;
+import android.graphics.Shader;
 import android.graphics.Typeface;
-import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.RippleDrawable;
 import android.os.Build;
-import android.os.SystemClock;
+import android.view.ViewGroup;
+import android.view.ViewOutlineProvider;
 import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -35,8 +38,6 @@ import org.joinmastodon.android.GlobalUserPreferences;
 import org.joinmastodon.android.R;
 import org.joinmastodon.android.model.map.MapModels;
 import org.joinmastodon.android.sponsors.SponsorUi;
-import org.joinmastodon.android.ui.compose.navigation.MapGlassSurface;
-import org.joinmastodon.android.ui.compose.navigation.MapTopBlurSurface;
 import org.joinmastodon.android.ui.utils.UiUtils;
 
 /** Map content stays interactive outside the controls and the embedded sheet. */
@@ -63,15 +64,24 @@ public final class FriendMapOverlay extends FrameLayout{
 
 	private final Actions actions;
 	private final MapSheetState sheetState=new MapSheetState();
-	private final FrameLayout mapHost, header, privacyCard, tools, panel;
+	private final FrameLayout mapHost, header, privacyShell, privacyCard, tools, panel;
+	private final MapGlassMaterial privacyMaterial;
 	private final LinearLayout privacyRows, panelColumn, panelHeader;
 	private final ScrollView scroll;
 	private final LinearLayout body;
 	private final TextView visibilityValue, precisionValue, panelTitle, panelSummary, message;
 	private final ImageButton settingsButton, backButton, refreshButton, privacyButton;
-	private final MapTopBlurSurface topBlur;
 	private FrameLayout verificationGate;
-	private MapGlassMaterial gateMaterial;
+	private LinearLayout gateColumn;
+	private MapModels.Access access=MapModels.Access.READY;
+	private View sampleSource;
+	private boolean hasSnapshot, consentRead, consentLayoutReady, pendingEnterDefaults;
+	private final View gateBlanket;
+	private Button consentButton;
+	private float privacyProgress=1f, privacyRadius;
+	private final ViewOutlineProvider privacyOutline=new ViewOutlineProvider(){
+		@Override public void getOutline(View view,Outline outline){ outline.setRoundRect(0,0,view.getWidth(),view.getHeight(),privacyRadius); }
+	};
 	private final View handle;
 	private final List<MapGlassMaterial> materials=new ArrayList<>();
 	private final List<MapModels.Point> points=new ArrayList<>();
@@ -82,14 +92,13 @@ public final class FriendMapOverlay extends FrameLayout{
 	private String providerId="auto";
 	private CharSequence messageText="";
 	private boolean busy, serviceUnavailable;
-	private int topInset,bottomInset, panelHeight;
+	private int topInset,bottomInset, panelHeight, overlayWidth,overlayHeight;
 	private ValueAnimator animator;
 	private ValueAnimator privacyAnimator;
 	private float dragY;
 	private int dragHeight;
 	private boolean dragged;
 	private boolean privacyExpanded=true;
-	private long lastMapTouch;
 
 	public FriendMapOverlay(Context context,Actions actions){
 		super(context); this.actions=actions;
@@ -97,18 +106,25 @@ public final class FriendMapOverlay extends FrameLayout{
 		surface=color(R.attr.colorM3Surface); outline=color(R.attr.colorM3OutlineVariant);
 		setBackgroundColor(surface);
 		mapHost=new MapTouchHost(context); mapHost.setId(R.id.friend_map_canvas); addView(mapHost,new LayoutParams(-1,-1));
-		topBlur=new MapTopBlurSurface(context); addView(topBlur.getView(),new LayoutParams(-1,V.dp(24),Gravity.TOP));
-
+		gateBlanket=new View(context); gateBlanket.setBackgroundColor(surface); gateBlanket.setClickable(true); gateBlanket.setVisibility(GONE); addView(gateBlanket,new LayoutParams(-1,-1));
 		header=new FrameLayout(context); header.setClipChildren(false); header.setClipToPadding(false); addView(header,new LayoutParams(-1,V.dp(48),Gravity.TOP));
-		FrameLayout privacyShell=glass(24,false); privacyButton=icon(R.drawable.ic_fluent_wrench_24_regular,R.string.map_ui_privacy_toggle,this::togglePrivacy);
-		privacyShell.addView(privacyButton,new LayoutParams(-1,-1));
-		LayoutParams privacyShellParams=new LayoutParams(V.dp(48),V.dp(48),Gravity.END); privacyShellParams.rightMargin=V.dp(56);
-		header.addView(privacyShell,privacyShellParams);
+		privacyMaterial=new MapGlassMaterial(context,24,false); materials.add(privacyMaterial);
+		privacyShell=new MapGlassContainer(context,privacyMaterial.getView());
+		privacyShell.setOutlineProvider(privacyOutline); privacyShell.setClipToOutline(true); privacyShell.setElevation(V.dp(5));
+		privacyButton=icon(R.drawable.ic_fluent_wrench_24_regular,R.string.map_ui_privacy_toggle,this::togglePrivacy);
+		privacyShell.addView(privacyButton,new LayoutParams(V.dp(48),V.dp(48),Gravity.TOP|Gravity.END));
+		addView(privacyShell,new LayoutParams(V.dp(48),V.dp(48),Gravity.TOP|Gravity.LEFT));
 		FrameLayout settingsShell=glass(24,false); settingsButton=icon(R.drawable.ic_settings_24px,R.string.map_presence_preferences,this::showSettings);
 		settingsShell.addView(settingsButton,new LayoutParams(-1,-1));
 		header.addView(settingsShell,new LayoutParams(V.dp(48),V.dp(48),Gravity.END));
 
-		privacyCard=glass(24,false); privacyCard.setId(R.id.friend_map_privacy); addView(privacyCard,new LayoutParams(-1,-2,Gravity.TOP));
+		privacyCard=new FrameLayout(context){
+			@Override public boolean onInterceptTouchEvent(MotionEvent event){ return privacyProgress>0f&&privacyProgress<1f; }
+			@Override public boolean onTouchEvent(MotionEvent event){
+				if(event.getActionMasked()==MotionEvent.ACTION_UP) togglePrivacy();
+				return true;
+			}
+		}; privacyCard.setId(R.id.friend_map_privacy); privacyShell.addView(privacyCard,new LayoutParams(-1,-1));
 		privacyRows=new LinearLayout(context); privacyRows.setOrientation(LinearLayout.VERTICAL); privacyRows.setPadding(V.dp(16),V.dp(4),V.dp(16),V.dp(4));
 		privacyCard.addView(privacyRows,new LayoutParams(-1,-2));
 		visibilityValue=summaryRow(privacyRows,R.string.map_ui_visibility,"—",()->open(MapSheetState.Page.VISIBILITY));
@@ -126,7 +142,7 @@ public final class FriendMapOverlay extends FrameLayout{
 		addView(crosshair,new LayoutParams(V.dp(40),V.dp(40),Gravity.CENTER));
 
 		panel=glass(32,true); panel.setId(R.id.friend_map_panel); addView(panel,new LayoutParams(-1,V.dp(112),Gravity.BOTTOM));
-		panelColumn=new LinearLayout(context); panelColumn.setOrientation(LinearLayout.VERTICAL); panelColumn.setPadding(V.dp(20),0,V.dp(20),0); panel.addView(panelColumn,new LayoutParams(-1,-1));
+		panelColumn=new BlankDragColumn(context); panelColumn.setOrientation(LinearLayout.VERTICAL); panelColumn.setPadding(V.dp(20),0,V.dp(20),0); panel.addView(panelColumn,new LayoutParams(-1,-1));
 		FrameLayout handleArea=new FrameLayout(context); handleArea.setMinimumHeight(V.dp(22));
 		handle=new View(context); handle.setBackground(SponsorUi.rounded(withAlpha(secondary,.40f),2));
 		LayoutParams handleParams=new LayoutParams(V.dp(36),V.dp(4),Gravity.CENTER); handleArea.addView(handle,handleParams);
@@ -134,7 +150,7 @@ public final class FriendMapOverlay extends FrameLayout{
 		handleArea.setOnClickListener(v->toggleHeight()); panelColumn.addView(handleArea,new LinearLayout.LayoutParams(-1,V.dp(24)));
 
 		panelHeader=new LinearLayout(context); panelHeader.setGravity(Gravity.CENTER_VERTICAL); panelHeader.setMinimumHeight(V.dp(48));
-		backButton=icon(R.drawable.ic_arrow_back_24,R.string.map_ui_back,()->{ sheetState.back(); rebuild(true); }); panelHeader.addView(backButton,new LinearLayout.LayoutParams(V.dp(44),V.dp(44)));
+		backButton=icon(R.drawable.ic_arrow_back_24,R.string.map_ui_back,this::onBackPressed); panelHeader.addView(backButton,new LinearLayout.LayoutParams(V.dp(44),V.dp(44)));
 		panelTitle=text(getString(R.string.map_ui_nearby),R.style.m3_title_large,onSurface); panelTitle.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
 		panelTitle.setOnClickListener(v->toggleHeight()); panelHeader.addView(panelTitle,new LinearLayout.LayoutParams(0,-2,1));
 		refreshButton=icon(R.drawable.ic_fluent_arrow_clockwise_24_regular,R.string.map_presence_refresh,actions::refresh); panelHeader.addView(refreshButton,new LinearLayout.LayoutParams(V.dp(44),V.dp(44)));
@@ -142,40 +158,104 @@ public final class FriendMapOverlay extends FrameLayout{
 		panelSummary=text(getString(R.string.map_ui_loading_summary),R.style.m3_body_medium,secondary); panelSummary.setMaxLines(2);
 		panelSummary.setPadding(0,0,0,V.dp(12)); panelColumn.addView(panelSummary,new LinearLayout.LayoutParams(-1,-2));
 		scroll=new ScrollView(context); scroll.setFillViewport(false); scroll.setClipToPadding(false);
-		body=new LinearLayout(context); body.setOrientation(LinearLayout.VERTICAL); body.setPadding(0,V.dp(4),0,V.dp(20)); scroll.addView(body,new ScrollView.LayoutParams(-1,-2));
+		body=new LinearLayout(context){
+			@Override protected void onLayout(boolean changed,int left,int top,int right,int bottom){
+				super.onLayout(changed,left,top,right,bottom);
+				consentLayoutReady=sheetState.page()==MapSheetState.Page.CONSENT; updateConsentRead();
+			}
+		}; body.setOrientation(LinearLayout.VERTICAL); body.setPadding(0,V.dp(4),0,V.dp(20)); scroll.addView(body,new ScrollView.LayoutParams(-1,-2));
 		panelColumn.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
 		message=text("",R.style.m3_body_medium,secondary);
-		panelColumn.setOnTouchListener(this::drag);
+		scroll.setOnScrollChangeListener((v,x,y,oldX,oldY)->updateConsentRead());
+		scroll.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->updateConsentRead());
 		buildVerificationGate(context);
-		addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{ if(r-l!=or-ol || b-t!=ob-ot) layoutOverlays(false); });
 		rebuild(false);
 	}
+	@Override protected void onMeasure(int widthMeasureSpec,int heightMeasureSpec){
+		int width=MeasureSpec.getSize(widthMeasureSpec),height=MeasureSpec.getSize(heightMeasureSpec);
+		if(width!=overlayWidth || height!=overlayHeight){
+			overlayWidth=width; overlayHeight=height;
+			layoutOverlays(false);
+		}
+		super.onMeasure(widthMeasureSpec,heightMeasureSpec);
+	}
 
-	/** Baby-verification gate: live blurred map behind a near-opaque glass sheet, or solid color. */
+	/** Access protection is separate from decorative glass and never follows its preference. */
 	private void buildVerificationGate(Context context){
-		gateMaterial=new MapGlassMaterial(getContext(),0,true,0.9f); materials.add(gateMaterial);
-		verificationGate=new FrameLayout(context);
-		verificationGate.addView(gateMaterial.getView(),new LayoutParams(-1,-1));
-		LinearLayout gateColumn=new LinearLayout(context); gateColumn.setOrientation(LinearLayout.VERTICAL); gateColumn.setGravity(Gravity.CENTER);
-		ImageView gateIcon=new ImageView(context); gateIcon.setImageResource(R.drawable.ic_fluent_person_24_regular); gateIcon.setImageTintList(ColorStateList.valueOf(onSurface));
-		gateIcon.setBackground(roundRipple(withAlpha(primary,.12f),28)); gateIcon.setPadding(V.dp(16),V.dp(16),V.dp(16),V.dp(16));
-		gateColumn.addView(gateIcon,new LinearLayout.LayoutParams(V.dp(56),V.dp(56)));
-		TextView gateTitle=text(getString(R.string.map_ui_verification_required),R.style.m3_title_medium,onSurface);
-		gateTitle.setGravity(Gravity.CENTER); gateTitle.setPadding(V.dp(32),V.dp(16),V.dp(32),V.dp(20));
-		gateColumn.addView(gateTitle,new LinearLayout.LayoutParams(-1,-2));
-		TextView gateAction=(TextView)text(getString(R.string.map_ui_go_verification),R.style.m3_label_large,primary);
-		gateAction.setGravity(Gravity.CENTER); gateAction.setBackground(roundRipple(withAlpha(primary,.16f),20)); gateAction.setPadding(V.dp(24),V.dp(12),V.dp(24),V.dp(12));
-		gateAction.setOnClickListener(v->actions.verification());
-		gateColumn.addView(gateAction,new LinearLayout.LayoutParams(-2,-2));
-		LinearLayout.LayoutParams gateColumnParams=new LinearLayout.LayoutParams(-1,-1); gateColumnParams.setMargins(V.dp(40),0,V.dp(40),V.dp(80));
-		verificationGate.addView(gateColumn,gateColumnParams);
-		verificationGate.setVisibility(GONE);
-		LayoutParams gateParams=new LayoutParams(-1,-1,Gravity.TOP); gateParams.bottomMargin=bottomInset;
-		addView(verificationGate,gateParams);
+		verificationGate=new FrameLayout(context); verificationGate.setClickable(true); verificationGate.setFocusable(true);
+		gateColumn=new LinearLayout(context); gateColumn.setOrientation(LinearLayout.VERTICAL); gateColumn.setGravity(Gravity.CENTER);
+		gateColumn.setPadding(V.dp(32),V.dp(24),V.dp(32),V.dp(24));
+		ScrollView gateScroll=new ScrollView(context); gateScroll.setFillViewport(true);
+		gateScroll.addView(gateColumn,new ScrollView.LayoutParams(-1,-1));
+		verificationGate.addView(gateScroll,new LayoutParams(-1,-1));
+		verificationGate.setVisibility(GONE); addView(verificationGate,new LayoutParams(-1,-1));
+	}
+	private boolean accessBlocked(){ return access!=MapModels.Access.READY || sheetState.consentRequired(); }
+	private void renderAccessGate(CharSequence error){
+		gateColumn.removeAllViews();
+		boolean verification=access==MapModels.Access.VERIFICATION;
+		if(verification){
+			ImageView icon=new ImageView(getContext()); icon.setImageResource(R.drawable.ic_badge_verified_pill_icon); icon.setImageTintList(ColorStateList.valueOf(onSurface));
+			icon.setContentDescription(getString(R.string.map_ui_go_verification)); icon.setBackground(roundRipple(withAlpha(primary,.12f),28));
+			icon.setPadding(V.dp(16),V.dp(16),V.dp(16),V.dp(16)); icon.setOnClickListener(v->actions.verification());
+			gateColumn.addView(icon,new LinearLayout.LayoutParams(V.dp(56),V.dp(56)));
+		}
+		TextView title=text(verification?getString(R.string.map_ui_verification_required):access==MapModels.Access.ERROR?error:getString(R.string.map_ui_loading_summary),R.style.m3_title_medium,onSurface);
+		title.setGravity(Gravity.CENTER); title.setPadding(0,V.dp(16),0,V.dp(20));
+		if(verification){ title.setBackground(roundRipple(0,16)); title.setOnClickListener(v->actions.verification()); }
+		gateColumn.addView(title,new LinearLayout.LayoutParams(-1,-2));
+		if(verification) SponsorUi.button(gateColumn,getString(R.string.map_ui_go_verification),actions::verification);
+		else if(access==MapModels.Access.ERROR) SponsorUi.button(gateColumn,getString(R.string.map_ui_retry),actions::refresh);
+		updateAccessPresentation();
+	}
+	private void updateAccessPresentation(){
+		boolean blocked=accessBlocked(), consent=access==MapModels.Access.CONSENT;
+		verificationGate.setVisibility(blocked&&!consent?VISIBLE:GONE);
+		panel.setVisibility(!blocked||consent?VISIBLE:GONE);
+		header.setVisibility(blocked?GONE:VISIBLE); tools.setVisibility(blocked || panelHeight>availablePanel()*.8f?GONE:VISIBLE);
+		if(blocked) crosshair.setVisibility(GONE);
+		mapHost.setImportantForAccessibility(blocked?IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS:IMPORTANT_FOR_ACCESSIBILITY_AUTO);
+		panel.setImportantForAccessibility(!blocked||consent?IMPORTANT_FOR_ACCESSIBILITY_AUTO:IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
+		updateGateBackdrop(); applyPrivacyProgress(privacyProgress);
+	}
+	private void updateGateBackdrop(){
+		boolean blur=access==MapModels.Access.VERIFICATION && Build.VERSION.SDK_INT>=31 && isHardwareAccelerated()
+				&& (hasSnapshot || sampleSource!=null && mapHost.getChildCount()>0);
+		if(Build.VERSION.SDK_INT>=31) mapHost.setRenderEffect(blur?RenderEffect.createBlurEffect(V.dp(30),V.dp(30),Shader.TileMode.CLAMP):null);
+		verificationGate.setBackgroundColor(blur?withAlpha(surface,.70f):surface);
+		// Keep the SDK rendering behind an opaque fallback until a blurred backdrop is available.
+		gateBlanket.setVisibility(accessBlocked()&&!blur?VISIBLE:GONE);
+		mapHost.setVisibility(VISIBLE);
+	}
+	public void showLoadingGate(){ access=MapModels.Access.LOADING; renderAccessGate(null); }
+	public void showErrorGate(CharSequence error){ access=MapModels.Access.ERROR; renderAccessGate(error); }
+	public void hideAccessGate(){
+		access=MapModels.Access.READY;
+		sheetState.setConsentRequired(settings==null || !MapModels.consentAccepted(settings.consent));
+		if(sheetState.consentRequired()){ showConsent(); return; }
+		if(sheetState.page()==MapSheetState.Page.CONSENT){ sheetState.open(MapSheetState.Page.NEARBY); rebuild(false); }
+		if(pendingEnterDefaults){ pendingEnterDefaults=false; sheetState.open(MapSheetState.Page.NEARBY); rebuild(false); }
+		updateAccessPresentation();
+	}
+	public boolean canSubmitConsent(){
+		return access==MapModels.Access.CONSENT && sheetState.page()==MapSheetState.Page.CONSENT && consentRead && !busy
+				&& settings!=null && settings.consent!=null && MapModels.CONSENT_VERSION.equals(settings.consent.version);
+	}
+	private void updateConsentRead(){
+		if(!consentLayoutReady || sheetState.page()!=MapSheetState.Page.CONSENT || access!=MapModels.Access.CONSENT || scroll.getHeight()<=0 || body.getHeight()<=0) return;
+		int viewport=scroll.getHeight()-scroll.getPaddingTop()-scroll.getPaddingBottom();
+		if(body.getBottom()<=scroll.getScrollY()+viewport+1) consentRead=true;
+		if(consentButton!=null) consentButton.setEnabled(canSubmitConsent());
 	}
 
 	public FrameLayout mapHost(){ return mapHost; }
-	public void updateSettings(MapModels.Settings settings){ this.settings=settings; rebuild(false); }
+	public void updateSettings(MapModels.Settings settings){
+		boolean wasRequired=sheetState.consentRequired(); this.settings=settings;
+		boolean required=settings==null || !MapModels.consentAccepted(settings.consent);
+		sheetState.setConsentRequired(required);
+		if(required&&!wasRequired){ consentRead=false; scroll.scrollTo(0,0); }
+		rebuild(false);
+	}
 	public void setBusy(boolean busy){ this.busy=busy; refreshButton.setEnabled(!busy); rebuild(false); }
 	public void setProvider(String id){ providerId=id; if(sheetState.page()==MapSheetState.Page.PROVIDER || sheetState.page()==MapSheetState.Page.SETTINGS) rebuild(false); }
 	public void setMessage(CharSequence value,boolean unavailable){
@@ -186,104 +266,110 @@ public final class FriendMapOverlay extends FrameLayout{
 	public void setPoints(List<MapModels.Point> newPoints){ points.clear(); points.addAll(newPoints); rebuild(false); }
 	public void showPerson(MapModels.Point point){ selected=point; open(MapSheetState.Page.PERSON); }
 	public void showSettings(){ open(MapSheetState.Page.SETTINGS); }
-	public void showConsent(){ open(MapSheetState.Page.CONSENT); }
-	public void showPin(){ crosshair.setVisibility(VISIBLE); open(MapSheetState.Page.PIN); }
+	public void showConsent(){
+		if(access!=MapModels.Access.CONSENT && !sheetState.consentRequired()) consentRead=false;
+		access=MapModels.Access.CONSENT;
+		sheetState.setConsentRequired(settings==null || !MapModels.consentAccepted(settings.consent));
+		open(MapSheetState.Page.CONSENT); updateAccessPresentation();
+	}
+	public void showPin(){ if(accessBlocked()) return; crosshair.setVisibility(VISIBLE); open(MapSheetState.Page.PIN); }
 	public void finishPin(){ crosshair.setVisibility(GONE); sheetState.back(); rebuild(true); }
 	public void setNavigationInsets(int top,int bottom){ topInset=Math.max(0,top); bottomInset=Math.max(0,bottom); layoutOverlays(false); }
 	public boolean onBackPressed(){
+		if(accessBlocked()) return true;
 		if(sheetState.page()==MapSheetState.Page.PIN){ actions.cancelPin(); return true; }
-		// The first-run consent sheet cannot be dismissed before agreeing.
-		if(sheetState.page()==MapSheetState.Page.CONSENT && (settings==null || settings.consent==null || !settings.consent.accepted)) return true;
 		if(sheetState.back()){ rebuild(true); return true; } return false;
 	}
 	public MapSheetState state(){ return sheetState; }
 	public void setSnapshot(Bitmap bitmap){
+		hasSnapshot=bitmap!=null&&!bitmap.isRecycled(); updateGateBackdrop();
 		int[] origin=new int[2]; mapHost.getLocationInWindow(origin);
 		for(MapGlassMaterial material:materials) material.update(bitmap,origin[0],origin[1]);
 	}
 	public void setSampleSource(View source){
-		topBlur.setSampleSource(source);
+		sampleSource=source; updateGateBackdrop();
 		for(MapGlassMaterial material:materials) material.setSampleSource(source);
 	}
 	public void dispose(){
 		if(animator!=null) animator.cancel();
 		if(privacyAnimator!=null) privacyAnimator.cancel();
-		topBlur.dispose();
+		if(Build.VERSION.SDK_INT>=31) mapHost.setRenderEffect(null);
+		sampleSource=null; hasSnapshot=false;
 		for(MapGlassMaterial material:materials) material.dispose(); materials.clear();
 	}
 	public boolean privacyExpanded(){ return privacyExpanded; }
 	private boolean liquidMorph(){ return Build.VERSION.SDK_INT>=33 && isHardwareAccelerated() && GlobalUserPreferences.isIosLiquidNavigationEnabled(); }
 	public void setPrivacyExpanded(boolean expanded,boolean animate){
-		if(privacyAnimator!=null) privacyAnimator.cancel();
+		if(privacyAnimator!=null){ privacyAnimator.cancel(); privacyAnimator=null; }
 		privacyExpanded=expanded;
-		if(!animate){
-			privacyCard.setVisibility(expanded?VISIBLE:GONE);
-			privacyCard.setAlpha(1f); privacyCard.setTranslationY(0f); privacyCard.setScaleX(1f); privacyCard.setScaleY(1f);
-			privacyButton.setVisibility(expanded?GONE:VISIBLE);
-			privacyButton.setAlpha(1f); privacyButton.setTranslationY(0f); privacyButton.setScaleX(1f); privacyButton.setScaleY(1f);
-			return;
-		}
-		privacyAnimator=ValueAnimator.ofFloat(0f,1f); privacyAnimator.setDuration(240);
+		float target=expanded?1f:0f;
+		if(!animate || !liquidMorph() || overlayWidth==0){ applyPrivacyProgress(target); return; }
+		// Reversals start from the current shell geometry.
+		privacyAnimator=ValueAnimator.ofFloat(privacyProgress,target);
+		privacyAnimator.setDuration(Math.max(1,Math.round(240*Math.abs(target-privacyProgress))));
 		privacyAnimator.setInterpolator(new DecelerateInterpolator());
-		if(!liquidMorph()){
-			// Non-liquid: plain fade; the wrench button hides instantly while the card is open.
-			if(expanded){ privacyButton.setVisibility(GONE); privacyCard.setVisibility(VISIBLE); }
-			else privacyButton.setVisibility(VISIBLE);
-			privacyAnimator.addUpdateListener(value->{
-				float t=(float)value.getAnimatedValue();
-				privacyCard.setAlpha(expanded?t:1f-t);
-				if(t>=1f && !expanded) privacyCard.setVisibility(GONE);
-			});
-			privacyAnimator.start();
-			return;
-		}
-		// Liquid mode morphs between the wrench button and the card: the button drops to the
-		// card position while the card unfolds from that corner; collapse plays it backwards.
-		float drop=V.dp(56);
-		privacyCard.setPivotX(Math.max(0f,getWidth()-V.dp(72))); privacyCard.setPivotY(0f);
-		privacyAnimator.addUpdateListener(value->{
-			float t=(float)value.getAnimatedValue();
-			if(expanded){
-				float cardScale=.12f+.88f*t;
-				privacyCard.setVisibility(VISIBLE);
-				privacyCard.setAlpha(Math.min(1f,t*1.6f)); privacyCard.setScaleX(cardScale); privacyCard.setScaleY(cardScale);
-				privacyButton.setTranslationY(drop*t);
-				privacyButton.setAlpha(Math.max(0f,(t-.55f)/.45f));
-				privacyButton.setScaleX(1f+1.4f*t); privacyButton.setScaleY(1f+.6f*t);
-				if(t>=1f){ privacyButton.setVisibility(GONE); privacyButton.setTranslationY(0f); privacyButton.setAlpha(1f); privacyButton.setScaleX(1f); privacyButton.setScaleY(1f);
-					privacyCard.setScaleX(1f); privacyCard.setScaleY(1f); privacyCard.setAlpha(1f); }
-			}else{
-				privacyButton.setVisibility(VISIBLE);
-				float cardScale=1f-.88f*t;
-				privacyCard.setAlpha(Math.max(0f,1f-t*1.35f)); privacyCard.setScaleX(cardScale); privacyCard.setScaleY(cardScale);
-				privacyButton.setTranslationY(drop*(1f-t));
-				privacyButton.setAlpha(Math.max(0f,(t-.45f)/.55f));
-				privacyButton.setScaleX(2.4f-1.4f*t); privacyButton.setScaleY(1.6f-.6f*t);
-				if(t>=1f){ privacyCard.setVisibility(GONE); privacyCard.setScaleX(1f); privacyCard.setScaleY(1f); privacyCard.setAlpha(1f);
-					privacyButton.setTranslationY(0f); privacyButton.setAlpha(1f); privacyButton.setScaleX(1f); privacyButton.setScaleY(1f); }
-			}
-		});
+		privacyAnimator.addUpdateListener(value->applyPrivacyProgress((float)value.getAnimatedValue()));
 		privacyAnimator.start();
 	}
-	private void togglePrivacy(){ setPrivacyExpanded(!privacyExpanded,true); }
-	/** User began dragging the map: fold the privacy summary away and shrink a half-open nearby sheet. */
-	public void onCameraMoved(){
-		if(SystemClock.uptimeMillis()-lastMapTouch>=1500) return;
+	private void applyPrivacyProgress(float progress){
+		privacyProgress=Math.max(0f,Math.min(1f,progress));
+		float t=privacyProgress;
+		boolean high=sheetState.height()==MapSheetState.Height.EXPANDED;
+		boolean morph=liquidMorph();
+		if(!morph) t=privacyExpanded?1f:0f;
+		if(high){ t=0f; privacyProgress=0f; }
+		int cardWidth=Math.max(V.dp(48),overlayWidth-V.dp(32));
+		privacyRows.measure(MeasureSpec.makeMeasureSpec(cardWidth,MeasureSpec.EXACTLY),MeasureSpec.makeMeasureSpec(0,MeasureSpec.UNSPECIFIED));
+		int cardHeight=Math.max(V.dp(48),privacyRows.getMeasuredHeight());
+		float buttonLeft=Math.max(V.dp(16),overlayWidth-V.dp(120));
+		LayoutParams params=(LayoutParams)privacyShell.getLayoutParams();
+		params.leftMargin=Math.round(buttonLeft+(V.dp(16)-buttonLeft)*t);
+		params.topMargin=topInset+V.dp(12)+Math.round(V.dp(60)*t);
+		params.width=Math.round(V.dp(48)+(cardWidth-V.dp(48))*t);
+		params.height=Math.round(V.dp(48)+(cardHeight-V.dp(48))*t);
+		privacyShell.setLayoutParams(params);
+		float radiusDp=24f-4f*t;
+		privacyRadius=V.dp(radiusDp); privacyMaterial.setCornerRadius(radiusDp); privacyShell.invalidateOutline();
+		privacyCard.setVisibility(t>0f?VISIBLE:GONE); privacyCard.setAlpha(t);
+		privacyButton.setVisibility(t<1f?VISIBLE:GONE); privacyButton.setAlpha(1f-t);
+		// During a morph, the shell remains a reversal target; rows only activate at completion.
+		privacyShell.setOnClickListener(v->togglePrivacy()); privacyShell.setClickable(true);
+		privacyCard.setImportantForAccessibility(t==1f?IMPORTANT_FOR_ACCESSIBILITY_AUTO:IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
+		privacyShell.setVisibility(accessBlocked()?GONE:VISIBLE);
+	}
+	private void togglePrivacy(){
+		if(accessBlocked()) return;
+		if(sheetState.height()==MapSheetState.Height.EXPANDED){
+			sheetState.setHeight(MapSheetState.Height.HALF); setPrivacyExpanded(true,true); rebuild(true);
+		}else setPrivacyExpanded(!privacyExpanded,true);
+	}
+	/** Kept for provider compatibility. Only real map gestures, not camera callbacks, resize UI. */
+	public void onCameraMoved(){}
+	private void onMapDragStarted(){
+		if(accessBlocked()) return;
 		if(privacyExpanded) setPrivacyExpanded(false,true);
-		if(sheetState.page()==MapSheetState.Page.NEARBY && sheetState.height()==MapSheetState.Height.HALF){
-			sheetState.setHeight(MapSheetState.Height.COLLAPSED); rebuild(true);
-		}
+		if(sheetState.onMapDragStarted()) rebuild(true);
 	}
-	/** Entering the map tab opens the nearby sheet fully; the first-run privacy reveal keeps it collapsed. */
+	/** Entering the map opens HIGH without weakening an outstanding consent lock. */
 	public void enterMapDefaults(){
-		if(sheetState.page()!=MapSheetState.Page.NEARBY) sheetState.open(MapSheetState.Page.NEARBY);
-		if(sheetState.height()!=MapSheetState.Height.EXPANDED){ sheetState.setHeight(MapSheetState.Height.EXPANDED); rebuild(true); }
+		if(accessBlocked()){ pendingEnterDefaults=true; return; }
+		sheetState.open(MapSheetState.Page.NEARBY); rebuild(true);
 	}
-	public void showVerificationGate(){ verificationGate.setVisibility(VISIBLE); }
-	public void hideVerificationGate(){ verificationGate.setVisibility(GONE); }
+	public void showVerificationGate(){
+		if(settings==null || !MapModels.consentAccepted(settings.consent)){ showConsent(); return; }
+		access=MapModels.Access.VERIFICATION; renderAccessGate(null);
+	}
+	public void hideVerificationGate(){ hideAccessGate(); }
 
-	private void open(MapSheetState.Page page){ sheetState.open(page); rebuild(true); }
-	private void toggleHeight(){ sheetState.setHeight(sheetState.height()==MapSheetState.Height.COLLAPSED ? MapSheetState.Height.HALF : MapSheetState.Height.COLLAPSED); rebuild(true); }
+	private void open(MapSheetState.Page page){
+		if(accessBlocked() && page!=MapSheetState.Page.CONSENT) return;
+		if(sheetState.page()!=page){ scroll.scrollTo(0,0); if(page==MapSheetState.Page.CONSENT) consentRead=false; }
+		sheetState.open(page); rebuild(true);
+	}
+	private void toggleHeight(){
+		if(accessBlocked()) return;
+		sheetState.setHeight(sheetState.height()==MapSheetState.Height.COLLAPSED ? MapSheetState.Height.HALF : MapSheetState.Height.COLLAPSED); rebuild(true);
+	}
 	private FrameLayout glass(int radius,boolean large){
 		MapGlassMaterial material=new MapGlassMaterial(getContext(),radius,large); materials.add(material);
 		MapGlassContainer shell=new MapGlassContainer(getContext(),material.getView()); shell.setClipChildren(true);
@@ -317,10 +403,12 @@ public final class FriendMapOverlay extends FrameLayout{
 		if(panel==null) return;
 		boolean known=settings!=null;
 		visibilityValue.setText(known?visibilityLabel(settings.visibility):"—"); precisionValue.setText(known?precisionLabel(settings.precisionLevel):"—");
-		backButton.setVisibility(sheetState.page()==MapSheetState.Page.NEARBY?GONE:VISIBLE);
+		backButton.setVisibility(sheetState.page()==MapSheetState.Page.NEARBY || sheetState.consentRequired()?GONE:VISIBLE);
 		refreshButton.setVisibility(sheetState.page()==MapSheetState.Page.NEARBY?VISIBLE:GONE); refreshButton.setEnabled(!busy);
 		panelTitle.setText(titleForPage());
 		panelSummary.setText(summaryForPage());
+		consentButton=null; consentLayoutReady=false;
+		int oldScroll=scroll.getScrollY();
 		body.removeAllViews();
 		switch(sheetState.page()){
 			case NEARBY -> nearby();
@@ -333,6 +421,8 @@ public final class FriendMapOverlay extends FrameLayout{
 			case PIN -> pinContent();
 		}
 		layoutOverlays(animate);
+		updateAccessPresentation();
+		if(sheetState.page()==MapSheetState.Page.CONSENT) scroll.post(()->{ scroll.scrollTo(0,oldScroll); updateConsentRead(); });
 	}
 	private int titleForPage(){ return switch(sheetState.page()){
 		case NEARBY -> R.string.map_ui_nearby; case PERSON -> R.string.map_ui_person; case SETTINGS -> R.string.map_presence_preferences;
@@ -431,7 +521,9 @@ public final class FriendMapOverlay extends FrameLayout{
 	private void consentContent(){
 		TextView consent=text(getString(R.string.map_presence_privacy_body),R.style.m3_body_medium,onSurface); consent.setLineSpacing(V.dp(3),1f); body.addView(consent,new LinearLayout.LayoutParams(-1,-2));
 		TextView note=text(getString(R.string.map_ui_consent_location_note),R.style.m3_body_medium,primary); note.setLineSpacing(V.dp(3),1f); note.setPadding(0,V.dp(12),0,0); body.addView(note,new LinearLayout.LayoutParams(-1,-2));
-		action(getString(R.string.map_presence_privacy_link),actions::privacy,false); action(getString(R.string.map_presence_agree),actions::consent,true);
+		action(getString(R.string.map_presence_privacy_link),actions::privacy,false);
+		consentButton=SponsorUi.button(body,getString(R.string.map_presence_agree),()->{ if(canSubmitConsent()) actions.consent(); });
+		consentButton.setEnabled(canSubmitConsent());
 	}
 	private void pinContent(){
 		body.addView(text(getString(R.string.map_ui_pin_instructions),R.style.m3_body_medium,secondary));
@@ -462,16 +554,14 @@ public final class FriendMapOverlay extends FrameLayout{
 		Button button=SponsorUi.inlineAction(parent,title,action); button.setBackground(roundRipple(withAlpha(primary,.09f),20)); button.setTextColor(primary); button.setMinHeight(V.dp(44));
 		button.getLayoutParams().height=V.dp(44);
 	}
-	private int availablePanel(){ return Math.max(0,getHeight()-topInset-bottomInset-V.dp(88)); }
+	private int availablePanel(){ return Math.max(0,overlayHeight-topInset-bottomInset-V.dp(88)); }
 	private int collapsedPanel(){ return V.dp(getResources().getConfiguration().fontScale>1.2f?128:112); }
 	private void layoutOverlays(boolean animate){
-		if(getHeight()==0) return;
+		if(overlayHeight==0) return;
 		LayoutParams headerParams=(LayoutParams)header.getLayoutParams(); headerParams.topMargin=topInset+V.dp(12); headerParams.leftMargin=headerParams.rightMargin=V.dp(16); header.setLayoutParams(headerParams);
-		LayoutParams privacyParams=(LayoutParams)privacyCard.getLayoutParams(); privacyParams.topMargin=topInset+V.dp(72); privacyParams.leftMargin=privacyParams.rightMargin=V.dp(16); privacyCard.setLayoutParams(privacyParams);
-		LayoutParams topBlurParams=(LayoutParams)topBlur.getView().getLayoutParams(); topBlurParams.height=topInset+V.dp(24); topBlur.getView().setLayoutParams(topBlurParams);
-		LayoutParams gateParams=(LayoutParams)verificationGate.getLayoutParams(); gateParams.bottomMargin=bottomInset; verificationGate.setLayoutParams(gateParams);
-		privacyCard.setVisibility(!privacyExpanded || sheetState.height()==MapSheetState.Height.EXPANDED?GONE:VISIBLE);
-		privacyButton.setVisibility(privacyExpanded?GONE:VISIBLE);
+		LayoutParams gateParams=(LayoutParams)verificationGate.getLayoutParams(); gateParams.topMargin=topInset; gateParams.bottomMargin=bottomInset; verificationGate.setLayoutParams(gateParams);
+		LayoutParams blanketParams=(LayoutParams)gateBlanket.getLayoutParams(); blanketParams.bottomMargin=bottomInset; gateBlanket.setLayoutParams(blanketParams);
+		applyPrivacyProgress(privacyProgress);
 		int target=MapSheetState.panelHeight(availablePanel(),collapsedPanel(),sheetState.height());
 		if(animator!=null) animator.cancel();
 		if(animate && panelHeight>0){ animator=ValueAnimator.ofInt(panelHeight,target); animator.setDuration(240); animator.addUpdateListener(value->applyPanelHeight((int)value.getAnimatedValue())); animator.start(); }
@@ -482,32 +572,68 @@ public final class FriendMapOverlay extends FrameLayout{
 		panelHeight=height;
 		LayoutParams params=(LayoutParams)panel.getLayoutParams(); params.height=height; params.leftMargin=params.rightMargin=V.dp(12); params.bottomMargin=bottomInset+V.dp(10); panel.setLayoutParams(params);
 		LayoutParams toolParams=(LayoutParams)tools.getLayoutParams(); toolParams.rightMargin=V.dp(16); toolParams.bottomMargin=bottomInset+V.dp(26)+height; tools.setLayoutParams(toolParams);
-		tools.setVisibility(height>availablePanel()*.8f?GONE:VISIBLE);
+		tools.setVisibility(accessBlocked() || height>availablePanel()*.8f?GONE:VISIBLE);
 		actions.panelChanged(topInset+V.dp(184),bottomInset+height+V.dp(20));
 	}
 	private boolean drag(View view,MotionEvent event){
+		if(accessBlocked()) return true;
 		switch(event.getActionMasked()){
 			case MotionEvent.ACTION_DOWN -> { dragY=event.getRawY(); dragHeight=panelHeight; dragged=false; return true; }
 			case MotionEvent.ACTION_MOVE -> {
 				float delta=dragY-event.getRawY();
 				if(Math.abs(delta)>ViewConfiguration.get(getContext()).getScaledTouchSlop()) dragged=true;
-				if(dragged){ if(animator!=null) animator.cancel(); getParent().requestDisallowInterceptTouchEvent(true); scroll.setVisibility(VISIBLE); applyPanelHeight(Math.max(Math.min(collapsedPanel(),availablePanel()),Math.min(availablePanel(),dragHeight+Math.round(delta)))); }
+				if(dragged){ if(animator!=null) animator.cancel(); if(getParent()!=null) getParent().requestDisallowInterceptTouchEvent(true); scroll.setVisibility(VISIBLE); applyPanelHeight(Math.max(Math.min(collapsedPanel(),availablePanel()),Math.min(availablePanel(),dragHeight+Math.round(delta)))); }
 				return true;
 			}
 			case MotionEvent.ACTION_UP,MotionEvent.ACTION_CANCEL -> {
-				getParent().requestDisallowInterceptTouchEvent(false);
-				if(dragged){ sheetState.setHeight(MapSheetState.settleHeight(panelHeight,availablePanel(),collapsedPanel())); rebuild(true); }else view.performClick();
+				if(getParent()!=null) getParent().requestDisallowInterceptTouchEvent(false);
+				if(dragged){ sheetState.setHeight(MapSheetState.settleHeight(panelHeight,availablePanel(),collapsedPanel())); rebuild(true); }
+				else if(event.getActionMasked()==MotionEvent.ACTION_UP) view.performClick();
 				return true;
 			}
 		}
 			return false;
 	}
-	/** Observes map touches without stealing them, so gesture-driven camera changes can be told apart. */
-	private static final class MapTouchHost extends FrameLayout{
-		MapTouchHost(Context context){ super(context); }
+	/** Blank sheet space drags the sheet; any actually scrollable descendant keeps its gesture. */
+	private final class BlankDragColumn extends LinearLayout{
+		private boolean scrollGesture;
+		private float downY;
+		BlankDragColumn(Context context){ super(context); }
 		@Override public boolean onInterceptTouchEvent(MotionEvent event){
-			if(event.getActionMasked()==MotionEvent.ACTION_DOWN && getParent() instanceof FriendMapOverlay overlay) overlay.lastMapTouch=SystemClock.uptimeMillis();
-			return false;
+			if(event.getActionMasked()==MotionEvent.ACTION_DOWN){
+				scrollGesture=scrollableAt(this,event.getX(),event.getY()); downY=event.getRawY();
+				dragY=downY; dragHeight=panelHeight; dragged=false;
+			}
+			if(accessBlocked() || scrollGesture) return false;
+			return event.getActionMasked()==MotionEvent.ACTION_MOVE && Math.abs(event.getRawY()-downY)>ViewConfiguration.get(getContext()).getScaledTouchSlop();
+		}
+		@Override public boolean onTouchEvent(MotionEvent event){ return drag(this,event); }
+	}
+	private boolean scrollableAt(View view,float x,float y){
+		if(view.canScrollVertically(-1)||view.canScrollVertically(1)) return true;
+		if(view instanceof ViewGroup group){
+			for(int i=group.getChildCount()-1;i>=0;i--){
+				View child=group.getChildAt(i);
+				float cx=x+group.getScrollX()-child.getLeft(),cy=y+group.getScrollY()-child.getTop();
+				if(child.getVisibility()==VISIBLE && cx>=0 && cy>=0 && cx<child.getWidth() && cy<child.getHeight() && scrollableAt(child,cx,cy)) return true;
+			}
+		}
+		return false;
+	}
+	/** Observes the very start of a user drag without stealing SDK gestures. */
+	private static final class MapTouchHost extends FrameLayout{
+		private float downX,downY;
+		private boolean notified;
+		MapTouchHost(Context context){ super(context); }
+		@Override public boolean dispatchTouchEvent(MotionEvent event){
+			if(getParent() instanceof FriendMapOverlay overlay){
+				if(overlay.accessBlocked()) return true;
+				if(event.getActionMasked()==MotionEvent.ACTION_DOWN){ downX=event.getX(); downY=event.getY(); notified=false; }
+				if(event.getActionMasked()==MotionEvent.ACTION_MOVE && !notified && Math.hypot(event.getX()-downX,event.getY()-downY)>ViewConfiguration.get(getContext()).getScaledTouchSlop()){
+					notified=true; overlay.onMapDragStarted();
+				}
+			}
+			return super.dispatchTouchEvent(event);
 		}
 	}
 }

@@ -60,7 +60,8 @@ class HomeNavigationTabsTest {
 		assertEquals(5, Regex("NavigationItem\\(").findAll(items).count())
 		assertTrue(items.indexOf("R.string.messages") < items.indexOf("R.string.map_presence_title"))
 		assertTrue(items.indexOf("R.string.map_presence_title") < items.indexOf("R.string.diaper"))
-		assertTrue(liquid.contains("painterResource(R.drawable.ic_fluent_map_24_regular)"))
+		assertTrue(liquid.contains("painterResource(R.drawable.ic_tab_map)"))
+		assertFalse(liquid.contains("R.drawable.ic_fluent_map_24_regular"))
 	}
 
 	@Test
@@ -89,6 +90,18 @@ class HomeNavigationTabsTest {
 		val back = home.substringAfter("public boolean onBackPressed(){").substringBefore("private void selectTabInNavigation(")
 		assertTrue(back.contains("parentActive && currentTab==R.id.tab_map"))
 		assertTrue(back.indexOf("friendMapFragment.onBackPressed()") < back.indexOf("liquidToolbarController.onBackPressed()"))
+	}
+
+	@Test
+	fun mapNavigationAndPanelsUseTheSameGlassProfile() {
+		val projectDir = File(requireNotNull(System.getProperty("user.dir")))
+		val navigation = File(projectDir, "src/main/kotlin/org/joinmastodon/android/ui/compose/navigation/liquid/IosLiquidGlassNavigationBar.kt").readText()
+		val panel = File(projectDir, "src/main/kotlin/org/joinmastodon/android/ui/compose/navigation/MapGlassSurface.kt").readText()
+		listOf("BLUR_DP", "REFRACTION_HEIGHT_DP", "REFRACTION_AMOUNT_DP", "HIGHLIGHT_ALPHA").forEach {
+			assertTrue(navigation.contains("MapGlassPolicy.$it"))
+			assertTrue(panel.contains("MapGlassPolicy.$it"))
+		}
+		assertTrue(navigation.contains("val mapMaterial = surfaceAlphaOverride >= 0f"))
 	}
 
 	@Test

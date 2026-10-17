@@ -77,6 +77,7 @@ import org.joinmastodon.android.ui.compose.navigation.animation.DampedDragAnimat
 import org.joinmastodon.android.ui.compose.navigation.animation.InteractiveHighlight
 import org.joinmastodon.android.ui.compose.navigation.snapNavigationDragTarget
 import org.joinmastodon.android.ui.compose.navigation.rememberIsolatedGlassHighlight
+import org.joinmastodon.android.ui.map.MapGlassPolicy
 import top.yukonga.miuix.kmp.basic.BadgedBox
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.NavigationItem
@@ -212,8 +213,12 @@ internal fun IosLiquidGlassNavigationBar(
     val surfaceContainer = MiuixTheme.colorScheme.surfaceContainer
     val graphicsSupported = rememberGraphicsEffectsSupported()
     val blurActive = isBlurActive && graphicsSupported
-    // The map tab asks for the same glass alpha as the map panels so the page reads as one material.
-    val containerColor = if (blurActive) surfaceContainer.copy(alpha = if (surfaceAlphaOverride >= 0f) surfaceAlphaOverride else 0.4f) else surfaceContainer
+    val mapMaterial = surfaceAlphaOverride >= 0f
+    val materialBlur = if (mapMaterial) MapGlassPolicy.BLUR_DP.dp else 14.dp
+    val materialLensHeight = if (mapMaterial) MapGlassPolicy.REFRACTION_HEIGHT_DP.dp else 24.dp
+    val materialLensAmount = if (mapMaterial) MapGlassPolicy.REFRACTION_AMOUNT_DP.dp else 24.dp
+    val materialHighlightAlpha = if (mapMaterial) MapGlassPolicy.HIGHLIGHT_ALPHA else 0.75f
+    val containerColor = if (blurActive) surfaceContainer.copy(alpha = if (mapMaterial) surfaceAlphaOverride else 0.4f) else surfaceContainer
 
     val tabsBackdrop = if (blurActive) rememberLayerBackdrop() else null
     val density = LocalDensity.current
@@ -447,15 +452,15 @@ internal fun IosLiquidGlassNavigationBar(
                                         padding = maxOf(padding, 40.dp.toPx())
                                         vibrancy()
                                         blur(
-                                            14.dp.toPx(),
-                                            14.dp.toPx(),
+                                            materialBlur.toPx(),
+                                            materialBlur.toPx(),
                                         )
                                         lens(
-                                            refractionHeight = 24.dp.toPx(),
-                                            refractionAmount = 24.dp.toPx(),
+                                            refractionHeight = materialLensHeight.toPx(),
+                                            refractionAmount = materialLensAmount.toPx(),
                                         )
                                     },
-                                    highlight = { baseHighlight.value.copy(alpha = 0.75f) },
+                                    highlight = { baseHighlight.value.copy(alpha = materialHighlightAlpha) },
                                     layerBlock = {
                                         val width = size.width.coerceAtLeast(1f)
                                         val s = lerp(1f, 1f + 16.dp.toPx() / width, dampedDrag.pressProgress)
@@ -493,10 +498,10 @@ internal fun IosLiquidGlassNavigationBar(
                                 shape = { pillShape },
                                 effects = {
                                     vibrancy()
-                                    blur(14.dp.toPx(), 14.dp.toPx())
+                                    blur(materialBlur.toPx(), materialBlur.toPx())
                                     lens(
-                                        refractionHeight = 24.dp.toPx(),
-                                        refractionAmount = 24.dp.toPx(),
+                                        refractionHeight = materialLensHeight.toPx(),
+                                        refractionAmount = materialLensAmount.toPx(),
                                     )
                                 },
                                 onDrawSurface = { drawRect(containerColor) },
