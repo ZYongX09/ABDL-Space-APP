@@ -37,13 +37,13 @@ Baidu server AK/SK and AMap Web key/security secret are neither consumed nor pac
 
 ## Release boundaries
 
-This is a local native SDK integration, not a published release. No production Worker deployment, production D1 migration, APK upload, version update or provider-console mutation is implied.
+The Android implementation is committed to `develop` but is not a published app release. The user explicitly deferred the app release: do not merge these changes into Android `main`, trigger publication, upload a replacement production APK or change production version metadata without a new release instruction. The matching backend and migration were separately authorized and deployed on 2026-10-17; this does not publish the app.
 
 Nationwide browsing has no city/region/sponsor paywall. Region buckets are metadata, not administrative city boundaries or access-control rules. Specifying a display location remains an active-sponsor benefit; this is separate from browsing. Both the Android flow and backend enforce this distinction.
 
 The 2026-10-17 update uses `map-presence-v2`: current-version agreement must be read to the bottom and explicitly accepted before SDK initialization. Effective baby verification is required for personal map data. Unverified users may see only an empty, neutral basemap behind the verification gate after SDK consent; loading and errors remain blocked. Location writes and privacy changes carry `settings_version`; conflicts reload settings without replaying the old public intent. Offline/logout never retract a position, while explicit hiding is persistent and prevents stale uploads from reviving it.
 
-Deploy backend migration `0078_map_privacy_consent.sql` once before deploying the matching backend and installing the adapted client. This work does not apply production migrations or publish a package. An old backend without the v2 consent contract is intentionally rejected by the new client rather than silently accepting outdated permission semantics.
+Backend migration `0078_map_privacy_consent.sql` and the matching backend (`57af711`, active Worker version `f2550209-a07a-4964-8f29-328054315882`) were deployed on 2026-10-17, preserving existing locations and requiring explicit v2 re-consent. See the backend repository's `docs/map-v2-production-2026-10-17.md` for evidence. This is separate from the unpublished Android test package. An old backend without the v2 consent contract is intentionally rejected rather than silently accepting outdated permission semantics.
 
 No online USB device or usable emulator was available during preflight. Native GPU rendering, real SDK key authentication, liquid shape morphs, dark glass parity, gesture arbitration, dual-account visibility, coarse-permission behavior, pinned-location sponsor expiry and vendor failure switching require real-device acceptance. Compile/unit tests alone do not prove those behaviors.
 
