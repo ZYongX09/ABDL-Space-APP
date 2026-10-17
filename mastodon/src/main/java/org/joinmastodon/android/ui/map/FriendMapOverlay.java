@@ -46,6 +46,9 @@ public final class FriendMapOverlay extends FrameLayout{
 		void refresh();
 		void locate();
 		void visibility(String value);
+		void confirmVisibility(String value);
+		void stopAppearance();
+		void visibilitySponsor();
 		void precision(String value);
 		void anonymous(boolean value);
 		void provider(String value);
@@ -90,6 +93,8 @@ public final class FriendMapOverlay extends FrameLayout{
 	private MapModels.Settings settings;
 	private MapModels.Point selected;
 	private String providerId="auto";
+	/** A first-use decision is never inferred from the server's existing/default visibility. */
+	private String pendingVisibility;
 	private CharSequence messageText="";
 	private boolean busy, serviceUnavailable;
 	private int topInset,bottomInset, panelHeight, overlayWidth,overlayHeight;
@@ -206,16 +211,18 @@ public final class FriendMapOverlay extends FrameLayout{
 		gateColumn.addView(title,new LinearLayout.LayoutParams(-1,-2));
 		if(verification) SponsorUi.button(gateColumn,getString(R.string.map_ui_go_verification),actions::verification);
 		else if(access==MapModels.Access.ERROR) SponsorUi.button(gateColumn,getString(R.string.map_ui_retry),actions::refresh);
+		if(!busy && settings!=null && !"hidden".equals(settings.visibility))
+			SponsorUi.secondary(gateColumn,getString(R.string.map_ui_stop_appearance),actions::stopAppearance);
 		updateAccessPresentation();
 	}
 	private void updateAccessPresentation(){
-		boolean blocked=accessBlocked(), consent=access==MapModels.Access.CONSENT;
-		verificationGate.setVisibility(blocked&&!consent?VISIBLE:GONE);
-		panel.setVisibility(!blocked||consent?VISIBLE:GONE);
+		boolean blocked=accessBlocked(), decision=access==MapModels.Access.CONSENT || access==MapModels.Access.VISIBILITY;
+		verificationGate.setVisibility(blocked&&!decision?VISIBLE:GONE);
+		panel.setVisibility(!blocked||decision?VISIBLE:GONE);
 		header.setVisibility(blocked?GONE:VISIBLE); tools.setVisibility(blocked || panelHeight>availablePanel()*.8f?GONE:VISIBLE);
 		if(blocked) crosshair.setVisibility(GONE);
 		mapHost.setImportantForAccessibility(blocked?IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS:IMPORTANT_FOR_ACCESSIBILITY_AUTO);
-		panel.setImportantForAccessibility(!blocked||consent?IMPORTANT_FOR_ACCESSIBILITY_AUTO:IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
+		panel.setImportantForAccessibility(!blocked||decision?IMPORTANT_FOR_ACCESSIBILITY_AUTO:IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
 		updateGateBackdrop(); applyPrivacyProgress(privacyProgress);
 	}
 	private void updateGateBackdrop(){
@@ -230,10 +237,14 @@ public final class FriendMapOverlay extends FrameLayout{
 	public void showLoadingGate(){ access=MapModels.Access.LOADING; renderAccessGate(null); }
 	public void showErrorGate(CharSequence error){ access=MapModels.Access.ERROR; renderAccessGate(error); }
 	public void hideAccessGate(){
+		if(settings==null){ showLoadingGate(); return; }
+		MapModels.Access next=MapModels.accessFor(settings);
+		if(next==MapModels.Access.CONSENT){ showConsent(); return; }
+		if(next==MapModels.Access.VERIFICATION){ showVerificationGate(); return; }
+		if(next==MapModels.Access.VISIBILITY){ showVisibilityGate(); return; }
 		access=MapModels.Access.READY;
-		sheetState.setConsentRequired(settings==null || !MapModels.consentAccepted(settings.consent));
-		if(sheetState.consentRequired()){ showConsent(); return; }
-		if(sheetState.page()==MapSheetState.Page.CONSENT){ sheetState.open(MapSheetState.Page.NEARBY); rebuild(false); }
+		sheetState.setConsentRequired(false); sheetState.setVisibilityRequired(false); pendingVisibility=null;
+		if(sheetState.page()==MapSheetState.Page.CONSENT || sheetState.page()==MapSheetState.Page.VISIBILITY){ sheetState.open(MapSheetState.Page.NEARBY); rebuild(false); }
 		if(pendingEnterDefaults){ pendingEnterDefaults=false; sheetState.open(MapSheetState.Page.NEARBY); rebuild(false); }
 		updateAccessPresentation();
 	}
@@ -250,9 +261,12 @@ public final class FriendMapOverlay extends FrameLayout{
 
 	public FrameLayout mapHost(){ return mapHost; }
 	public void updateSettings(MapModels.Settings settings){
-		boolean wasRequired=sheetState.consentRequired(); this.settings=settings;
+		boolean wasRequired=sheetState.consentRequired();
+		// A server refresh invalidates an unsubmitted decision; never select its stored default.
+		this.settings=settings; pendingVisibility=null;
 		boolean required=settings==null || !MapModels.consentAccepted(settings.consent);
 		sheetState.setConsentRequired(required);
+		sheetState.setVisibilityRequired(!required && settings.babyVerified && !settings.visibilityConfirmed);
 		if(required&&!wasRequired){ consentRead=false; scroll.scrollTo(0,0); }
 		rebuild(false);
 	}
@@ -360,9 +374,17 @@ public final class FriendMapOverlay extends FrameLayout{
 		access=MapModels.Access.VERIFICATION; renderAccessGate(null);
 	}
 	public void hideVerificationGate(){ hideAccessGate(); }
+	public void showVisibilityGate(){
+		if(settings==null || !MapModels.consentAccepted(settings.consent)){ showConsent(); return; }
+		if(!settings.babyVerified){ showVerificationGate(); return; }
+		access=MapModels.Access.VISIBILITY;
+		sheetState.setConsentRequired(false); sheetState.setVisibilityRequired(true);
+		open(MapSheetState.Page.VISIBILITY); updateAccessPresentation();
+	}
 
 	private void open(MapSheetState.Page page){
-		if(accessBlocked() && page!=MapSheetState.Page.CONSENT) return;
+		if(accessBlocked() && !(access==MapModels.Access.CONSENT && page==MapSheetState.Page.CONSENT)
+				&& !(access==MapModels.Access.VISIBILITY && page==MapSheetState.Page.VISIBILITY)) return;
 		if(sheetState.page()!=page){ scroll.scrollTo(0,0); if(page==MapSheetState.Page.CONSENT) consentRead=false; }
 		sheetState.open(page); rebuild(true);
 	}
@@ -403,7 +425,7 @@ public final class FriendMapOverlay extends FrameLayout{
 		if(panel==null) return;
 		boolean known=settings!=null;
 		visibilityValue.setText(known?visibilityLabel(settings.visibility):"—"); precisionValue.setText(known?precisionLabel(settings.precisionLevel):"—");
-		backButton.setVisibility(sheetState.page()==MapSheetState.Page.NEARBY || sheetState.consentRequired()?GONE:VISIBLE);
+		backButton.setVisibility(sheetState.page()==MapSheetState.Page.NEARBY || sheetState.locked()?GONE:VISIBLE);
 		refreshButton.setVisibility(sheetState.page()==MapSheetState.Page.NEARBY?VISIBLE:GONE); refreshButton.setEnabled(!busy);
 		panelTitle.setText(titleForPage());
 		panelSummary.setText(summaryForPage());
@@ -490,7 +512,7 @@ public final class FriendMapOverlay extends FrameLayout{
 	private void preferences(){
 		if(settings==null){ messageBlock(); action(getString(R.string.map_ui_retry),actions::refresh,false); return; }
 		heading(R.string.map_ui_my_appearance);
-		switchRow(R.string.map_ui_appear_on_map,!"hidden".equals(settings.visibility),value->actions.visibility(value?"public":"hidden"));
+		switchRow(R.string.map_ui_appear_on_map,!"hidden".equals(settings.visibility),value->{ if(value) open(MapSheetState.Page.VISIBILITY); else actions.stopAppearance(); });
 		settingRow(R.string.map_ui_visibility,visibilityLabel(settings.visibility),()->open(MapSheetState.Page.VISIBILITY));
 		switchRow(R.string.map_ui_anonymous,settings.anonymous,actions::anonymous);
 		settingRow(R.string.map_ui_precision,precisionLabel(settings.precisionLevel),()->open(MapSheetState.Page.PRECISION));
@@ -501,13 +523,42 @@ public final class FriendMapOverlay extends FrameLayout{
 		settingRow(R.string.map_ui_update_location,"",actions::locate);
 		settingRow(R.string.map_presence_provider,providerLabel(providerId),()->open(MapSheetState.Page.PROVIDER));
 		settingRow(R.string.map_presence_privacy_link,"",actions::privacy);
-		if(!"hidden".equals(settings.visibility)) action(getString(R.string.map_ui_stop_appearance),()->actions.visibility("hidden"),false);
+		if(!"hidden".equals(settings.visibility)) action(getString(R.string.map_ui_stop_appearance),actions::stopAppearance,false);
 	}
 	private void visibilityOptions(){
 		if(settings==null){ messageBlock(); return; }
-		choice(R.string.map_ui_everyone,R.string.map_ui_everyone_summary,"public".equals(settings.visibility),()->actions.visibility("public"));
-		choice(R.string.map_ui_mutual,R.string.map_ui_mutual_summary,"friends".equals(settings.visibility),()->actions.visibility("friends"));
-		choice(R.string.map_ui_invisible,R.string.map_ui_invisible_summary,"hidden".equals(settings.visibility),()->actions.visibility("hidden"));
+		boolean first=sheetState.visibilityRequired();
+		messageBlock();
+		if(first){
+			TextView note=text(getString(R.string.map_presence_visibility_required),R.style.m3_body_medium,onSurface);
+			note.setPadding(0,0,0,V.dp(12)); body.addView(note);
+		}
+		String[] values={"public","friends","hidden"};
+		int[] titles={R.string.map_ui_everyone,R.string.map_ui_mutual,R.string.map_ui_invisible};
+		int[] hints={R.string.map_ui_everyone_summary,R.string.map_ui_mutual_summary,R.string.map_ui_invisible_summary};
+		for(int i=0;i<values.length;i++){
+			String value=values[i]; boolean allowed=MapModels.canChooseVisibility(settings,value);
+choice(titles[i],allowed?hints[i]:R.string.map_presence_visibility_sponsor_only,
+						value.equals(first?pendingVisibility:settings.visibility),!allowed,()->{
+				if(!allowed){ actions.visibilitySponsor(); return; }
+				if(first){ pendingVisibility=value; rebuild(false); }
+				else actions.visibility(value);
+			});
+		}
+		if(first){
+			Button confirm=SponsorUi.button(body,getString(R.string.map_presence_visibility_continue),()->{
+				if(!busy && pendingVisibility!=null && MapModels.canConfirmVisibility(settings,pendingVisibility)) actions.confirmVisibility(pendingVisibility);
+			});
+			confirm.setEnabled(!busy && pendingVisibility!=null && MapModels.canConfirmVisibility(settings,pendingVisibility));
+			// Retention is distinct from choosing a restricted option. No stored value is preselected.
+			if(!"public".equals(settings.visibility) && MapModels.canConfirmVisibility(settings,settings.visibility)){
+				Button retain=SponsorUi.secondary(body,getContext().getString(R.string.map_presence_visibility_keep,visibilityLabel(settings.visibility)),()->{
+					if(!busy) actions.confirmVisibility(settings.visibility);
+				});
+				retain.setEnabled(!busy);
+			}
+		}
+		if(!"hidden".equals(settings.visibility)) action(getString(R.string.map_ui_stop_appearance),actions::stopAppearance,false);
 	}
 	private void precisionOptions(){
 		if(settings==null){ messageBlock(); return; }
@@ -524,6 +575,7 @@ public final class FriendMapOverlay extends FrameLayout{
 		action(getString(R.string.map_presence_privacy_link),actions::privacy,false);
 		consentButton=SponsorUi.button(body,getString(R.string.map_presence_agree),()->{ if(canSubmitConsent()) actions.consent(); });
 		consentButton.setEnabled(canSubmitConsent());
+		if(settings!=null && !"hidden".equals(settings.visibility)) action(getString(R.string.map_ui_stop_appearance),actions::stopAppearance,false);
 	}
 	private void pinContent(){
 		body.addView(text(getString(R.string.map_ui_pin_instructions),R.style.m3_body_medium,secondary));
@@ -537,9 +589,16 @@ public final class FriendMapOverlay extends FrameLayout{
 		Switch control=new Switch(getContext()); control.setChecked(checked); control.setContentDescription(getString(title)); control.setButtonTintList(ColorStateList.valueOf(primary)); control.setOnCheckedChangeListener((button,value)->action.accept(value)); row.addView(control);
 		body.addView(row,new LinearLayout.LayoutParams(-1,-2)); divider(body);
 	}
-	private void choice(int title,int hint,boolean selected,Runnable action){
+	private void choice(int title,int hint,boolean selected,Runnable action){ choice(title,hint,selected,false,action); }
+	private void choice(int title,int hint,boolean selected,boolean restricted,Runnable action){
 		LinearLayout card=new LinearLayout(getContext()); card.setOrientation(LinearLayout.VERTICAL); card.setPadding(V.dp(16),V.dp(14),V.dp(16),V.dp(14));
-		TextView label=text(getString(title)+(selected?"  ✓":""),R.style.m3_title_medium,selected?primary:onSurface); card.addView(label);
+		TextView label=text(getString(title)+(selected?"  ✓":""),R.style.m3_title_medium,restricted?secondary:selected?primary:onSurface); card.addView(label);
+		if(restricted){
+			label.setCompoundDrawablesRelativeWithIntrinsicBounds(R.drawable.ic_fluent_lock_closed_24_regular,0,0,0);
+			label.setCompoundDrawableTintList(ColorStateList.valueOf(secondary)); label.setCompoundDrawablePadding(V.dp(8));
+			label.setAlpha(.6f);
+			card.setContentDescription(getString(title)+"，"+getString(hint));
+		}
 		TextView summary=text(getString(hint),R.style.m3_body_small,secondary); summary.setPadding(0,V.dp(6),0,0); card.addView(summary);
 		SponsorUi.selectable(card,selected,!busy,action); LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(-1,-2); params.bottomMargin=V.dp(10); body.addView(card,params);
 	}

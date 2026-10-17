@@ -1,6 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
-	<string name="app_name" translatable="false">ABDL Space</string>
+		<string name="app_name" translatable="false">ABDL Space</string>
+	<string name="sponsor_thanks_entry">感谢赞助者</string>
+	<string name="sponsor_thanks_title">赞助者感谢页</string>
+	<string name="sponsor_thanks_sort">按累计赞助排序 · 感谢每一份支持</string>
+	<string name="sponsor_thanks_support">我也想支持</string>
+	<string name="sponsor_thanks_voluntary">支持秉持自愿原则，仅部分高成本功能赞助者专享</string>
+	<string name="sponsor_thanks_loading">正在更新感谢榜…</string>
+	<string name="sponsor_thanks_empty">暂时还没有赞助记录，感谢每一份心意</string>
+	<string name="sponsor_thanks_error">感谢榜暂不可用，请重试</string>
+	<string name="sponsor_thanks_retry">重试刷新</string>
+	<string name="sponsor_thanks_more">加载更多赞助者</string>
+	<string name="sponsor_thanks_accessibility">第 %1$d 名，%2$s</string>
 <string name="oauth_redirect_uri" translatable="false">abdl-space://callback</string>
 <string name="oauth_login">使用网页端授权登录</string>
 	<string name="password_login">使用账号密码登录</string>

@@ -98,6 +98,8 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 	private View tabBarWrap;
 	private ImageView tabBarAvatar;
 	private HomeLiquidNavigationController liquidNavigationController;
+	private FriendMapFragment navigationBackdropFragment;
+	private HomeLiquidNavigationController navigationBackdropController;
 	private HomeLiquidToolbarController liquidToolbarController;
 	private int bottomSystemInset;
 	private int topSystemInset;
@@ -240,6 +242,7 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 			public void onViewDetachedFromWindow(View view){
 				cancelLiquidStartup();
 				stopLiquidCapture();
+				clearNavigationMapSource();
 				liquidHardwareVerified=false;
 			}
 		};
@@ -739,6 +742,7 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 	}
 
 	private void disposeLiquidNavigation(){
+		clearNavigationMapSource();
 		HomeLiquidNavigationController controller=liquidNavigationController;
 		liquidNavigationController=null;
 		if(controller!=null)
@@ -922,18 +926,45 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 		if(friendMapFragment!=null){
 			updateMapNavigationInsets();
 			boolean mapVisible=parentActive && currentTab==R.id.tab_map && friendMapFragment.isAdded() && !friendMapFragment.isHidden();
-			friendMapFragment.setTabVisible(mapVisible);
+			// Bind before activation: setTabVisible can synchronously enter LOADING, while
+			// the provider View is only created later when access becomes READY.
 			updateNavigationMapSource(mapVisible);
+			friendMapFragment.setTabVisible(mapVisible);
+		}else{
+			clearNavigationMapSource();
 		}
 	}
 
+	private void clearNavigationMapSource(){
+		if(navigationBackdropFragment!=null)
+			navigationBackdropFragment.setMapBackdropListener(null);
+		navigationBackdropFragment=null;
+		navigationBackdropController=null;
+		if(liquidNavigationController!=null)
+			liquidNavigationController.setMapBackdropActive(false,-1f);
+	}
+
 	private void updateNavigationMapSource(boolean mapVisible){
-		if(liquidNavigationController==null)
+		if(!mapVisible || liquidNavigationController==null){
+			clearNavigationMapSource();
 			return;
-		View source=mapVisible && friendMapFragment!=null ? friendMapFragment.getMapSampleView() : null;
-		float fillAlpha=mapVisible && friendMapFragment!=null
-				? MapGlassPolicy.liquidSurfaceAlpha(UiUtils.isDarkTheme(),true) : -1f;
-		liquidNavigationController.setSampleSource(source,fillAlpha);
+		}
+		HomeLiquidNavigationController ownedNavigation=liquidNavigationController;
+		FriendMapFragment ownedMap=friendMapFragment;
+		ownedNavigation.setMapBackdropActive(true,MapGlassPolicy.liquidSurfaceAlpha(UiUtils.isDarkTheme(),true));
+		if(navigationBackdropFragment==ownedMap && navigationBackdropController==ownedNavigation)
+			return;
+		if(navigationBackdropFragment!=null)
+			navigationBackdropFragment.setMapBackdropListener(null);
+		navigationBackdropFragment=ownedMap;
+		navigationBackdropController=ownedNavigation;
+		ownedMap.setMapBackdropListener((source,snapshot)->{
+			if(liquidNavigationController!=ownedNavigation || navigationBackdropController!=ownedNavigation
+					|| navigationBackdropFragment!=ownedMap || friendMapFragment!=ownedMap
+					|| !parentActive || currentTab!=R.id.tab_map || content==null)
+				return;
+			ownedNavigation.setMapBackdrop(source,snapshot);
+		});
 	}
 
 	private void updateCaptureHeights(){

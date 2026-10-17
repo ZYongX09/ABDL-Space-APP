@@ -10,7 +10,7 @@ public final class MapModels{
 	private MapModels(){}
 
 	public static final String CONSENT_VERSION="map-presence-v2";
-	public enum Access{ LOADING, CONSENT, VERIFICATION, READY, ERROR }
+	public enum Access{ LOADING, CONSENT, VERIFICATION, VISIBILITY, READY, ERROR }
 
 	/** Missing, legacy or unknown terms fail closed: this client only presents the v2 text. */
 	public static boolean consentAccepted(Consent consent){
@@ -20,10 +20,23 @@ public final class MapModels{
 	public static Access accessFor(Settings settings){
 		if(settings==null) return Access.LOADING;
 		if(!consentAccepted(settings.consent)) return Access.CONSENT;
-		return settings.babyVerified?Access.READY:Access.VERIFICATION;
+		if(!settings.babyVerified) return Access.VERIFICATION;
+		return settings.visibilityConfirmed?Access.READY:Access.VISIBILITY;
 	}
 	public static boolean allowsPersonalData(Access access){ return access==Access.READY; }
-	public static boolean allowsBaseMap(Access access){ return access==Access.READY || access==Access.VERIFICATION; }
+	public static boolean allowsBaseMap(Access access){ return access==Access.READY || access==Access.VERIFICATION || access==Access.VISIBILITY; }
+	/** Missing capabilities fail closed; browsing and safe withdrawal never require sponsorship. */
+	public static boolean canChooseVisibility(Settings settings,String value){
+		return settings!=null && validVisibility(value) && ("public".equals(value)
+				|| settings.capabilities!=null && settings.capabilities.canChooseVisibility);
+	}
+	public static boolean canConfirmVisibility(Settings settings,String value){
+		return canChooseVisibility(settings,value) || settings!=null && validVisibility(value) && value.equals(settings.visibility);
+	}
+	public static boolean canPublishDeviceLocation(Settings settings){
+		return settings!=null && consentAccepted(settings.consent) && settings.babyVerified && settings.visibilityConfirmed
+				&& ("public".equals(settings.visibility) || "friends".equals(settings.visibility)) && "device".equals(settings.locationMode);
+	}
 
 	public static class Consent{
 		public boolean accepted;
@@ -47,8 +60,14 @@ public final class MapModels{
 		public String id, username, displayName, avatar;
 	}
 
+	public static class Capabilities{
+		public boolean canChooseVisibility;
+	}
+
 	public static class Settings extends BaseModel{
 		public Consent consent;
+		public Capabilities capabilities;
+		public boolean visibilityConfirmed;
 		public String visibility, precisionLevel, locationMode;
 		public int fuzzRadiusM;
 		public long settingsVersion;

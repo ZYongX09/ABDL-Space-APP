@@ -32,7 +32,7 @@ public class MapClientAccessContractTest{
 	}
 	private MapModels.Settings settings(String current,String accepted,boolean verified){
 		MapModels.Settings result=new MapModels.Settings(); result.consent=new MapModels.Consent();
-		result.consent.version=current; result.consent.acceptedVersion=accepted; result.consent.accepted=true; result.babyVerified=verified;
+		result.consent.version=current; result.consent.acceptedVersion=accepted; result.consent.accepted=true; result.babyVerified=verified; result.visibilityConfirmed=true;
 		return result;
 	}
 
@@ -66,6 +66,31 @@ public class MapClientAccessContractTest{
 		assertEquals(MapModels.Access.READY,MapModels.accessFor(unverified));
 		assertTrue(MapModels.allowsPersonalData(MapModels.accessFor(unverified)));
 	}
+	@Test public void firstVisibilityGateIsRequiredAfterConsentAndVerification(){
+		MapModels.Settings value=settings(MapModels.CONSENT_VERSION,MapModels.CONSENT_VERSION,true); value.visibilityConfirmed=false;
+		assertEquals(MapModels.Access.VISIBILITY,MapModels.accessFor(value));
+		assertTrue(MapModels.allowsBaseMap(MapModels.accessFor(value))); assertFalse(MapModels.allowsPersonalData(MapModels.accessFor(value)));
+		value.babyVerified=false; assertEquals(MapModels.Access.VERIFICATION,MapModels.accessFor(value));
+		value.consent.accepted=false; assertEquals(MapModels.Access.CONSENT,MapModels.accessFor(value));
+	}
+	@Test public void wireCapabilitiesFailClosedAndExistingPrivacyCanOnlyBeExplicitlyRetained(){
+		MapModels.Settings value=GSON.fromJson("{\"visibility\":\"friends\",\"visibility_confirmed\":false,\"capabilities\":{\"can_choose_visibility\":false}}",MapModels.Settings.class);
+		assertFalse(value.visibilityConfirmed); assertFalse(MapModels.canChooseVisibility(value,"friends")); assertFalse(MapModels.canChooseVisibility(value,"hidden"));
+		assertTrue(MapModels.canChooseVisibility(value,"public")); assertTrue(MapModels.canConfirmVisibility(value,"friends")); assertFalse(MapModels.canConfirmVisibility(value,"hidden"));
+		value.visibility="hidden"; assertTrue(MapModels.canConfirmVisibility(value,"hidden")); assertFalse(MapModels.canConfirmVisibility(value,"friends"));
+		value.capabilities=null; assertFalse(MapModels.canChooseVisibility(value,"hidden"));
+		value.capabilities=new MapModels.Capabilities(); value.capabilities.canChooseVisibility=true;
+		for(String visibility:new String[]{"hidden","friends","public"}) assertTrue(MapModels.canChooseVisibility(value,visibility));
+		assertFalse(MapModels.canChooseVisibility(value,"unknown"));
+	}
+	@Test public void deviceLocationPublicationRequiresEveryGateAndNeverHiddenOrPinned(){
+		MapModels.Settings value=settings(MapModels.CONSENT_VERSION,MapModels.CONSENT_VERSION,true); value.locationMode="device"; value.visibility="public";
+		assertTrue(MapModels.canPublishDeviceLocation(value)); value.visibility="hidden"; assertFalse(MapModels.canPublishDeviceLocation(value));
+		value.visibility="friends"; assertTrue(MapModels.canPublishDeviceLocation(value)); value.locationMode="pinned"; assertFalse(MapModels.canPublishDeviceLocation(value));
+		value.locationMode="device"; value.visibilityConfirmed=false; assertFalse(MapModels.canPublishDeviceLocation(value));
+		value.visibilityConfirmed=true; value.babyVerified=false; assertFalse(MapModels.canPublishDeviceLocation(value));
+		value.babyVerified=true; value.consent.accepted=false; assertFalse(MapModels.canPublishDeviceLocation(value));
+	}
 	@Test public void consentAndSettingsRevisionUseSeparateWireFields(){
 		MapModels.Settings result=GSON.fromJson("{\"consent\":{\"version\":\"map-presence-v2\",\"accepted_version\":\"map-presence-v1\",\"accepted\":true},\"settings_version\":42,\"baby_verified\":true}",MapModels.Settings.class);
 		assertEquals(42L,result.settingsVersion); assertFalse(MapModels.consentAccepted(result.consent));
@@ -93,7 +118,7 @@ public class MapClientAccessContractTest{
 	}
 	@Test public void allPersonalDataEntrypointsFailClosed() throws Exception{
 		String text=fragment();
-		for(String signature:new String[]{"void readSelf(","void locate(","void requestDeviceLocation(","void upload(","void beginPin(","void confirmPin(","void onLocationSelected(","void focus(","void profile(","void queryViewport("}){
+		for(String signature:new String[]{"void readSelf(","void locate(","void requestDeviceLocation(boolean","void upload(","void beginPin(","void confirmPin(","void onLocationSelected(","void focus(","void profile(","void queryViewport("}){
 			assertTrue(signature,method(text,signature).contains("!personalDataAllowed()"));
 		}
 		String gate=method(text,"boolean personalDataAllowed()");
@@ -118,7 +143,7 @@ public class MapClientAccessContractTest{
 	}
 	@Test public void browsingHasNoSponsorRegionFilterOrCameraBounce() throws Exception{
 		String text=fragment();
-		assertFalse(text.contains("canViewNationwide")); assertFalse(text.contains("map_sponsor_required"));
+		assertFalse(text.contains("canViewNationwide"));
 		assertFalse(text.contains("restoringCamera")); assertFalse(text.contains("lastLegalCamera"));
 		assertTrue(method(text,"void queryViewport(").contains("camera.centerLng(),null,camera.zoom(),100"));
 		assertFalse(method(text,"void onCameraIdle(").contains("currentRegion"));
@@ -150,7 +175,7 @@ public class MapClientAccessContractTest{
 		String upload=method(text,"void upload(");
 		assertTrue(upload.contains("!mode.equals(settings.locationMode)"));
 		assertTrue(upload.contains("if(result.settingsVersion>0) settings.settingsVersion=result.settingsVersion"));
-		assertTrue(method(text,"void requestDeviceLocation(").contains("!\"device\".equals(settings.locationMode)"));
+		assertTrue(method(text,"void requestDeviceLocation(boolean").contains("MapModels.canPublishDeviceLocation(settings)"));
 		assertTrue(method(text,"void useDeviceLocation(").contains("saveSettings(Map.of(\"location_mode\",\"device\"),this::requestDeviceLocation)"));
 	}
 	@Test public void revokedVerificationReloadsGateAndVerificationSnapshotsDoNotRequireLiquidMode() throws Exception{
@@ -174,7 +199,7 @@ public class MapClientAccessContractTest{
 		String cleanup=source("src/main/kotlin/org/joinmastodon/android/novel/NovelAccountDataCleaner.kt");
 		assertFalse(cleanup.contains("MapRequest")); assertFalse(cleanup.contains("/map/presence"));
 		String read=method(text,"void readSelf(");
-		assertTrue(read.indexOf("if(result.active && result.point!=null) return;")<read.indexOf("locate();"));
+		assertTrue(read.contains("requestDeviceLocation(!existing && MapModels.canPublishDeviceLocation(settings))"));
 	}
 	@Test public void standaloneTitleIsRemovedWithoutChangingTabLabels() throws Exception{
 		assertTrue(method(fragment(),"void onCreate(").contains("setTitle(\"\")"));

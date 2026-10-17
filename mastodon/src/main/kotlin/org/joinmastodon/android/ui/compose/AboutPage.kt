@@ -83,6 +83,7 @@ import androidx.compose.ui.graphics.BlendMode as ComposeBlendMode
 fun AboutPage(
 	padding: PaddingValues = PaddingValues(0.dp),
 	onOpenSourceLicenses: () -> Unit = {},
+	onSponsorThanks: () -> Unit = {},
 ) {
 	val activity = LocalContext.current as? Activity
 	val topAppBarScrollBehavior = MiuixScrollBehavior()
@@ -134,6 +135,7 @@ fun AboutPage(
 				lazyListState = lazyListState,
 				scrollProgressProvider = { scrollProgress },
 				onOpenSourceLicenses = onOpenSourceLicenses,
+				onSponsorThanks = onSponsorThanks,
 			)
 		}
 	}
@@ -146,6 +148,7 @@ private fun AboutContent(
 	lazyListState: LazyListState,
 	scrollProgressProvider: () -> Float,
 	onOpenSourceLicenses: () -> Unit,
+	onSponsorThanks: () -> Unit,
 ) {
 	val appState = LocalAppState.current
 	val context = LocalContext.current
@@ -339,6 +342,7 @@ private fun AboutContent(
 								ArrowPreference(title = "隐私政策", onClick = { uriHandler.openUri("https://abdl-space.top/privacy") })
 								ArrowPreference(title = "Cookie 政策", onClick = { uriHandler.openUri("https://abdl-space.top/cookies") })
 								ArrowPreference(title = "支持我们", onClick = { uriHandler.openUri("https://ifdian.net/a/ZYongX") })
+								ArrowPreference(title = context.getString(R.string.sponsor_thanks_entry), onClick = onSponsorThanks)
 								ArrowPreference(title = "开源许可", endActions = { ValueText("GPL-3.0") }, onClick = { uriHandler.openUri("https://www.gnu.org/licenses/gpl-3.0.html") })
 								ArrowPreference(
 									title = context.getString(R.string.open_source_licenses),

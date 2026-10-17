@@ -12,6 +12,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import org.joinmastodon.android.MainActivity
 import org.joinmastodon.android.api.session.AccountSessionManager
+import org.joinmastodon.android.fragments.sponsors.SponsorThanksActivity
 import org.joinmastodon.android.ui.compose.AboutPage
 import org.joinmastodon.android.ui.compose.AppState
 import org.joinmastodon.android.ui.compose.LocalAppState
@@ -40,11 +41,21 @@ class ComposeAboutActivity : ComponentActivity() {
 			}
 			CompositionLocalProvider(LocalAppState provides AppState()) {
 				MiuixAppTheme {
-					AboutPage(onOpenSourceLicenses = ::openSourceLicenses)
+					AboutPage(
+						onOpenSourceLicenses = ::openSourceLicenses,
+						onSponsorThanks = ::openSponsorThanks,
+					)
 				}
 			}
 		}
     }
+
+	private fun openSponsorThanks() {
+		// Keep this activity (including its scroll state) below the native sponsor stack.
+		startActivity(Intent(this, SponsorThanksActivity::class.java).apply {
+			putExtra(SponsorThanksActivity.EXTRA_ACCOUNT, intent.getStringExtra(EXTRA_ACCOUNT_ID))
+		})
+	}
 
 	private fun openSourceLicenses() {
 		val accountID = intent.getStringExtra(EXTRA_ACCOUNT_ID)

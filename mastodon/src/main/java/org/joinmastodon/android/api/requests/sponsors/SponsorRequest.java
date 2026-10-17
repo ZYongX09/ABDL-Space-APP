@@ -33,6 +33,14 @@ public class SponsorRequest<T> extends MastodonAPIRequest<T>{
 	public static SponsorRequest<Me> claim(String benefit, String operation){
 		return new SponsorRequest<>(HttpMethod.POST, "/claims", Me.class, Map.of("benefit_id", benefit, "operation_id", operation));
 	}
+	public static SponsorRequest<ThanksPage> thanks(int offset){
+		if(offset<0 || offset>1000000) throw new IllegalArgumentException("Invalid thanks offset");
+		SponsorRequest<ThanksPage> request=new SponsorRequest<>(HttpMethod.GET, "/thanks", ThanksPage.class, null);
+		request.addHeader("Cache-Control", "no-store");
+		request.addQueryParameter("limit", "100");
+		request.addQueryParameter("offset", String.valueOf(offset));
+		return request;
+	}
 	public static SponsorRequest<History> history(int offset){
 		SponsorRequest<History> request=new SponsorRequest<>(HttpMethod.GET, "/redemptions", History.class, null);
 		request.addQueryParameter("limit", "20");

@@ -25,6 +25,19 @@ public class MapSheetStateTest{
 		state.setConsentRequired(false); state.open(MapSheetState.Page.PROVIDER);
 		assertEquals(MapSheetState.Page.PROVIDER,state.page()); assertTrue(state.back());
 	}
+	@Test public void visibilityLockCannotBeDismissedAndConsentStillHasPriority(){
+		MapSheetState state=new MapSheetState(); state.setVisibilityRequired(true);
+		for(MapSheetState.Page page:MapSheetState.Page.values()){
+			state.open(page); assertTrue(state.back()); assertFalse(state.onMapDragStarted());
+			for(MapSheetState.Height height:MapSheetState.Height.values()) state.setHeight(height);
+			assertEquals(MapSheetState.Page.VISIBILITY,state.page()); assertEquals(MapSheetState.Height.EXPANDED,state.height());
+		}
+		state.setConsentRequired(true); state.setVisibilityRequired(true);
+		assertEquals(MapSheetState.Page.CONSENT,state.page());
+		state.setConsentRequired(false); assertEquals(MapSheetState.Page.VISIBILITY,state.page());
+		state.setVisibilityRequired(false); state.open(MapSheetState.Page.NEARBY); assertTrue(state.back());
+		assertEquals(MapSheetState.Height.COLLAPSED,state.height());
+	}
 	@Test public void onlyHalfNearbyYieldsToMapDrag(){
 		MapSheetState state=new MapSheetState();
 		for(MapSheetState.Page page:MapSheetState.Page.values()){

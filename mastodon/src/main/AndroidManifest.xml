@@ -74,6 +74,9 @@
 			android:name=".fragments.settings.ComposeAboutActivity"
 			android:exported="false" />
 		<activity
+			android:name=".fragments.sponsors.SponsorThanksActivity"
+			android:exported="false" />
+		<activity
 			android:name="org.joinmastodon.android.security.ui.lock.LockActivity"
 			android:exported="false"
 			android:launchMode="singleTop"

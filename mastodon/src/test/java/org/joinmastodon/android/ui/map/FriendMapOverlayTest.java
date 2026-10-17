@@ -41,6 +41,7 @@ public class FriendMapOverlayTest{
 	}
 	private MapModels.Settings settings(boolean accepted){
 		MapModels.Settings settings=new MapModels.Settings(); settings.visibility="hidden"; settings.precisionLevel="city";
+		settings.babyVerified=true; settings.visibilityConfirmed=true;
 		settings.consent=new MapModels.Consent(); settings.consent.accepted=accepted;
 		settings.consent.version=MapModels.CONSENT_VERSION; settings.consent.acceptedVersion=accepted?MapModels.CONSENT_VERSION:null;
 		return settings;
@@ -185,6 +186,72 @@ public class FriendMapOverlayTest{
 			}
 		}finally{ context.getResources().updateConfiguration(original,context.getResources().getDisplayMetrics()); }
 	}
+	@Test public void firstVisibilityHasNoDefaultAndEveryNavigationPathRemainsLocked(){
+		FriendMapOverlay overlay=overlay(true); MapModels.Settings first=settings(true); first.visibility="public"; first.visibilityConfirmed=false;
+		overlay.updateSettings(first); overlay.hideAccessGate(); layout(overlay,360,800);
+		assertEquals(MapSheetState.Page.VISIBILITY,overlay.state().page());
+		Button confirm=(Button)findText(overlay,context.getString(R.string.map_presence_visibility_continue));
+		assertFalse(confirm.isEnabled()); confirm.performClick(); assertNull(actions.confirmed);
+		assertFalse(hasSelectedLabel(field(overlay,"body")));
+		overlay.enterMapDefaults(); overlay.showSettings(); overlay.showPin(); overlay.showPerson(new MapModels.Point());
+		assertTrue(overlay.onBackPressed()); overlay.state().setHeight(MapSheetState.Height.COLLAPSED);
+		assertEquals(MapSheetState.Page.VISIBILITY,overlay.state().page()); assertEquals(MapSheetState.Height.EXPANDED,overlay.state().height());
+		assertEquals(View.IMPORTANT_FOR_ACCESSIBILITY_AUTO,overlay.findViewById(R.id.friend_map_panel).getImportantForAccessibility());
+		((View)findText(field(overlay,"body"),context.getString(R.string.map_ui_everyone)).getParent()).performClick();
+		assertNull(actions.confirmed); assertNull(actions.changed);
+		confirm=(Button)findText(overlay,context.getString(R.string.map_presence_visibility_continue)); assertTrue(confirm.isEnabled());
+		confirm.performClick(); assertEquals("public",actions.confirmed); overlay.dispose();
+	}
+	@Test public void restrictedChoicesOnlyShowNoticeAndExistingPrivacyHasExplicitRetention(){
+		for(String existing:new String[]{"hidden","friends"}){
+			FriendMapOverlay overlay=overlay(true); MapModels.Settings first=settings(true); first.visibility=existing; first.visibilityConfirmed=false;
+			overlay.updateSettings(first); overlay.showVisibilityGate(); layout(overlay,360,800);
+			assertFalse(hasSelectedLabel(field(overlay,"body")));
+			assertFalse(((Button)findText(overlay,context.getString(R.string.map_presence_visibility_continue))).isEnabled());
+			int previous=actions.visibilityNotices;
+			TextView restricted=(TextView)findText(field(overlay,"body"),context.getString(R.string.map_ui_mutual));
+			assertTrue(restricted.getAlpha()<1f); assertNotNull(restricted.getCompoundDrawablesRelative()[0]);
+			View restrictedCard=(View)restricted.getParent(); assertTrue(restrictedCard.isEnabled());
+			assertTrue(restrictedCard.getContentDescription().toString().contains("此选项仅赞助者可选"));
+			restrictedCard.performClick();
+			((View)findText(field(overlay,"body"),context.getString(R.string.map_ui_invisible)).getParent()).performClick();
+			assertEquals(previous+2,actions.visibilityNotices); assertNull(actions.changed); assertNull(actions.confirmed);
+			assertNotNull(findText(overlay,"此选项仅赞助者可选"));
+			findText(overlay,context.getString(R.string.map_presence_visibility_keep,context.getString("hidden".equals(existing)?R.string.map_ui_invisible:R.string.map_ui_mutual))).performClick();
+			assertEquals(existing,actions.confirmed); actions.confirmed=null; overlay.dispose();
+		}
+	}
+	@Test public void sponsorCanExplicitlyChooseHiddenAndRefreshClearsUnsubmittedDecision(){
+		FriendMapOverlay overlay=overlay(true); MapModels.Settings first=settings(true); first.visibilityConfirmed=false;
+		first.capabilities=new MapModels.Capabilities(); first.capabilities.canChooseVisibility=true;
+		overlay.updateSettings(first); overlay.showVisibilityGate();
+		((View)findText(field(overlay,"body"),context.getString(R.string.map_ui_invisible)).getParent()).performClick();
+		findText(overlay,context.getString(R.string.map_presence_visibility_continue)).performClick(); assertEquals("hidden",actions.confirmed);
+		overlay.updateSettings(first); assertFalse(((Button)findText(overlay,context.getString(R.string.map_presence_visibility_continue))).isEnabled()); overlay.dispose();
+	}
+	@Test public void stopIsNotRestrictedAndEnablingAppearanceDoesNotSilentlyChoosePublic(){
+		FriendMapOverlay overlay=overlay(true); MapModels.Settings ready=settings(true); ready.visibility="friends";
+		overlay.updateSettings(ready); overlay.hideAccessGate(); overlay.showSettings();
+		findText(overlay,context.getString(R.string.map_ui_stop_appearance)).performClick(); assertEquals(1,actions.stops); assertNull(actions.changed);
+		ready.visibility="hidden"; overlay.updateSettings(ready); overlay.showSettings();
+		android.widget.Switch control=findSwitch(field(overlay,"body")); assertNotNull(control); control.performClick();
+		assertEquals(MapSheetState.Page.VISIBILITY,overlay.state().page()); assertNull(actions.changed); overlay.dispose();
+	}
+	private android.widget.Switch findSwitch(View view){
+		if(view instanceof android.widget.Switch control) return control;
+		if(view instanceof ViewGroup group) for(int i=0;i<group.getChildCount();i++){ android.widget.Switch result=findSwitch(group.getChildAt(i)); if(result!=null) return result; }
+		return null;
+	}
+	private View findText(View view,String text){
+		if(view instanceof TextView label && text.contentEquals(label.getText())) return view;
+		if(view instanceof ViewGroup group) for(int i=0;i<group.getChildCount();i++){ View result=findText(group.getChildAt(i),text); if(result!=null) return result; }
+		return null;
+	}
+	private boolean hasSelectedLabel(View view){
+		if(view instanceof TextView label && label.getText().toString().contains("✓")) return true;
+		if(view instanceof ViewGroup group) for(int i=0;i<group.getChildCount();i++) if(hasSelectedLabel(group.getChildAt(i))) return true;
+		return false;
+	}
 	private void collectButtons(View view,List<Button> buttons){
 		if(view instanceof Button button) buttons.add(button);
 		if(view instanceof ViewGroup group) for(int i=0;i<group.getChildCount();i++) collectButtons(group.getChildAt(i),buttons);
@@ -193,8 +260,12 @@ public class FriendMapOverlayTest{
 		MotionEvent event=MotionEvent.obtain(1,2,action,x,y,0); try{ view.dispatchTouchEvent(event); }finally{ event.recycle(); }
 	}
 	private static final class RecordingActions implements FriendMapOverlay.Actions{
-		int consents,refreshes,verifications;
-		public void refresh(){ refreshes++; } public void locate(){} public void visibility(String value){} public void precision(String value){}
+		int consents,refreshes,verifications,visibilityNotices,stops;
+		String confirmed,changed;
+		public void confirmVisibility(String value){ confirmed=value; }
+		public void visibilitySponsor(){ visibilityNotices++; }
+		public void stopAppearance(){ stops++; }
+		public void refresh(){ refreshes++; } public void locate(){} public void visibility(String value){ changed=value; } public void precision(String value){}
 		public void anonymous(boolean value){} public void provider(String value){} public void useDeviceLocation(){} public void beginPin(){}
 		public void confirmPin(){} public void cancelPin(){} public void consent(){ consents++; } public void privacy(){}
 		public void verification(){ verifications++; } public void sponsor(){} public void profile(MapModels.Point point){}

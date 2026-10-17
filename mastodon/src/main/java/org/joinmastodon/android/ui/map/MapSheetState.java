@@ -5,31 +5,38 @@ public final class MapSheetState{
 	public enum Height{ COLLAPSED, HALF, EXPANDED }
 	private Page page=Page.NEARBY;
 	private Height height=Height.EXPANDED;
-	private boolean consentRequired;
+	private boolean consentRequired, visibilityRequired;
 
 	public Page page(){ return page; }
 	public Height height(){ return height; }
 	public boolean consentRequired(){ return consentRequired; }
+	public boolean visibilityRequired(){ return visibilityRequired; }
+	public boolean locked(){ return consentRequired || visibilityRequired; }
+	public void setVisibilityRequired(boolean required){
+		visibilityRequired=required;
+		if(required && !consentRequired){ page=Page.VISIBILITY; height=Height.EXPANDED; }
+	}
 	/** Lock navigation and all height changes until current-version consent is accepted. */
 	public void setConsentRequired(boolean required){
 		consentRequired=required;
 		if(required){ page=Page.CONSENT; height=Height.EXPANDED; }
+		else if(visibilityRequired){ page=Page.VISIBILITY; height=Height.EXPANDED; }
 	}
 	public void open(Page page){
-		if(consentRequired && page!=Page.CONSENT) return;
+		if(consentRequired && page!=Page.CONSENT || !consentRequired && visibilityRequired && page!=Page.VISIBILITY) return;
 		this.page=page;
 		height=page==Page.PERSON || page==Page.PIN ? Height.HALF : Height.EXPANDED;
 	}
-	public void setHeight(Height height){ this.height=consentRequired?Height.EXPANDED:height; }
+	public void setHeight(Height height){ this.height=locked()?Height.EXPANDED:height; }
 	public boolean back(){
-		if(consentRequired) return true;
+		if(locked()) return true;
 		if(page!=Page.NEARBY){ page=Page.NEARBY; height=Height.HALF; return true; }
 		if(height!=Height.COLLAPSED){ height=Height.COLLAPSED; return true; }
 		return false;
 	}
 	/** Only an explicitly half-open nearby sheet yields to a user map gesture. */
 	public boolean onMapDragStarted(){
-		if(consentRequired || page!=Page.NEARBY || height!=Height.HALF) return false;
+		if(locked() || page!=Page.NEARBY || height!=Height.HALF) return false;
 		height=Height.COLLAPSED;
 		return true;
 	}

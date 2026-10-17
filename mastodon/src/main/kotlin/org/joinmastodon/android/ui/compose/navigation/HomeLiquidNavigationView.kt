@@ -18,6 +18,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.ComposeView
@@ -82,9 +83,13 @@ class HomeLiquidNavigationController(
 	private var unreadBadgeState by mutableStateOf<String?>(null)
 	private var diaperBadgeVisibleState by mutableStateOf(false)
 	private var bottomInsetState by mutableIntStateOf(0)
-	private var sampleSourceState by mutableStateOf<View?>(null)
+	private var mapBackdropActive by mutableStateOf(false)
+	private var mapSourceState by mutableStateOf<View?>(null)
 	private var fillAlphaState by mutableStateOf(-1f)
 	private val backdrop = ViewBitmapBackdrop()
+	private val mapBackdrop = MapNavigationBackdrop()
+	internal val currentBackdrop: top.yukonga.miuix.kmp.blur.Backdrop
+		get() = if (mapBackdropActive) mapBackdrop else backdrop
 
 	val view = ComposeView(context).apply {
 		setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
@@ -114,28 +119,47 @@ class HomeLiquidNavigationController(
 	}
 
 	fun setBackdropBitmap(bitmap: Bitmap?) {
-		backdrop.update(bitmap)
+		if (!mapBackdropActive) backdrop.update(bitmap)
 	}
 
-	/** Live sample for the map tab; null restores the captured-strip bitmap path. */
-	fun setSampleSource(source: View?) {
-		setSampleSource(source, -1f)
+	/** Enter map mode even during LOADING: a normal strip must never replace a map sample. */
+	fun setMapBackdropActive(active: Boolean, fillAlpha: Float) {
+		if (mapBackdropActive != active) {
+			mapBackdrop.clear()
+			mapSourceState = null
+			backdrop.update(null) // Do not resurrect the previous tab's capture when leaving the map.
+		}
+		mapBackdropActive = active
+		fillAlphaState = if (active) fillAlpha else -1f
 	}
 
-	/** Map tab fills the nav glass with the same surface alpha as the map panels; -1 restores default. */
-	fun setSampleSource(source: View?, fillAlpha: Float) {
-		sampleSourceState = source
-		fillAlphaState = fillAlpha
-		backdrop.updateSampleSource(source)
+	/** The source's window origin and size describe the complete SDK snapshot. */
+	fun setMapBackdrop(source: View?, snapshot: Bitmap?) {
+		if (!mapBackdropActive) return
+		mapSourceState = source
+		mapBackdrop.update(source, snapshot)
 	}
 
 	fun dispose() {
+		mapBackdrop.clear()
+		mapSourceState = null
+		backdrop.update(null)
 		view.disposeComposition()
 	}
 
 	@Composable
 	private fun HomeLiquidNavigationContent() {
 		val selectedIndex = HomeNavigationTabs.indexOf(selectedTabState)
+		// Cancels on map exit/source replacement/composition detach. Only map pixels are read;
+		// source.draw cannot capture an SDK TextureView and is never used for this backdrop.
+		LaunchedEffect(mapBackdropActive, mapSourceState) {
+			if (mapBackdropActive && mapSourceState != null) {
+				while (true) {
+					withFrameNanos { }
+					mapBackdrop.captureLiveFrame()
+				}
+			}
+		}
 		val items = listOf(
 			NavigationItem("首页", androidx.compose.ui.graphics.vector.ImageVector.vectorResource(R.drawable.ic_tab_rating)),
 			NavigationItem(view.context.getString(R.string.messages), androidx.compose.ui.graphics.vector.ImageVector.vectorResource(R.drawable.ic_tab_messages)),
@@ -161,7 +185,7 @@ class HomeLiquidNavigationController(
 				selectedIndex = selectedIndex,
 				onItemClick = { index -> onTabClick.accept(HomeNavigationTabs.ids[index]) },
 				onItemLongClick = { index -> onTabLongClick.test(HomeNavigationTabs.ids[index]) },
-				backdrop = backdrop,
+				backdrop = currentBackdrop,
 				isBlurActive = isRuntimeShaderSupported(),
 				bottomPaddingOverride = bottomPadding,
 				surfaceAlphaOverride = fillAlphaState,

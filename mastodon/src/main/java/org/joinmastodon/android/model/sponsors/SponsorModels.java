@@ -125,6 +125,30 @@ public final class SponsorModels{
 				throw new ObjectValidationException("兑换记录不完整，请重试");
 		}
 	}
+	/** Public presentation only. Amounts are server-calculated redeemed CNY snapshots. */
+	public static class ThanksItem{
+		public String accountId, displayName, username, avatar, avatarStatic;
+		public int rank;
+		public long totalAmountCents;
+		public String name(){ return displayName==null || displayName.isBlank() ? username : displayName; }
+	}
+	public static class ThanksPage extends BaseModel{
+		public List<ThanksItem> items;
+		public int total, limit, offset;
+		@Override public void postprocess() throws ObjectValidationException{
+			if(items==null || total<0 || limit<1 || limit>100 || offset<0 || offset>1000000
+					|| items.size()!=Math.min(limit, Math.max(0, total-offset)))
+				throw new ObjectValidationException("感谢榜分页无效，请重试");
+			Set<String> ids=new HashSet<>();
+			for(int i=0;i<items.size();i++){
+				ThanksItem item=items.get(i);
+				if(item==null || item.accountId==null || item.accountId.isBlank() || !ids.add(item.accountId)
+						|| item.username==null || item.username.isBlank() || item.displayName==null
+						|| item.avatar==null || item.avatarStatic==null || item.rank!=offset+i+1 || item.totalAmountCents<=0)
+					throw new ObjectValidationException("感谢榜内容无效，请重试");
+			}
+		}
+	}
 	public static boolean validTemplate(String text){
 		if(text==null || text.isBlank()) return false;
 		// A literal parser avoids differences between Android ICU and desktop JVM regex engines.
