@@ -25,6 +25,11 @@ import org.joinmastodon.android.api.MastodonErrorResponse;
 import org.joinmastodon.android.api.requests.accounts.GetOwnAccount;
 import org.joinmastodon.android.api.requests.nbw.RecommendNBWForum;
 import org.joinmastodon.android.api.requests.statuses.CreateStatus;
+import org.joinmastodon.android.api.requests.statuses.EditStatus;
+import org.joinmastodon.android.api.requests.friendcards.FriendCardRequest;
+import org.joinmastodon.android.api.requests.friendcards.FriendCardResponses;
+import org.joinmastodon.android.model.FriendCard;
+import org.joinmastodon.android.model.FriendCardAttachment;
 import org.joinmastodon.android.api.session.AccountSession;
 import org.joinmastodon.android.api.session.AccountSessionManager;
 import org.joinmastodon.android.model.Account;
@@ -366,7 +371,74 @@ public class ComposeReplyPublishingBehaviorTest{
 		assertEquals("  "+BODY+"  ", sentStatus().status);
 	}
 
-	private void launch(String replyId) throws Exception{
+	@Test public void insertPreviewRemoveAndCardOnlyPublishUseCurrentAccountAndNeverSyncNbw() throws Exception{
+		launch(null);
+		int checks=count(GetOwnAccount.class);
+		assertTrue(menu.performIdentifierAction(R.id.compose_insert_friend_card, 0));
+		MastodonAPIRequest<?> me=last(FriendCardRequest.class);
+		assertEquals(session.getID(), LocalRequests.accounts.get(LocalRequests.accounts.size()-1));
+		FriendCardResponses.Me response=new FriendCardResponses.Me(); response.card=friendCard();
+		succeed(me, response);
+		assertEquals(View.VISIBLE, fragment.getView().findViewById(R.id.compose_friend_card).getVisibility());
+		assertEquals("Current card", ((android.widget.TextView)fragment.getView().findViewById(R.id.compose_friend_card_title)).getText().toString());
+		assertEquals(View.GONE, fragment.getView().findViewById(R.id.btn_visibility).getVisibility());
+		assertEquals(View.GONE, fragment.getView().findViewById(R.id.newbabyworld_card).getVisibility());
+		assertTrue("A card-only post can publish without NBW binding", publishItem().isEnabled());
+		assertTrue(fragment.getView().findViewById(R.id.compose_friend_card_remove).performClick());
+		assertEquals(View.GONE, fragment.getView().findViewById(R.id.compose_friend_card).getVisibility());
+		assertFalse(publishItem().isEnabled());
+		assertTrue(menu.performIdentifierAction(R.id.compose_insert_friend_card, 0));
+		succeed(last(FriendCardRequest.class), response);
+		// Deliberately corrupt stale forum state: every publish guard still prevents NBW sync.
+		field(ComposeFragment.class, "selectedNBWForumId").setInt(fragment, 27);
+		field(ComposeFragment.class, "resolvedNBWForumId").setInt(fragment, 27);
+		clickPublish();
+		JsonObject wire=json(last(CreateStatus.class));
+		assertEquals("current-card", wire.get("friend_card_id").getAsString());
+		assertEquals("", wire.get("status").getAsString());
+		assertFalse(wire.has("nbw_fid"));
+		assertEquals(checks, count(GetOwnAccount.class));
+		assertEquals(0, count(RecommendNBWForum.class));
+	}
+
+	@Test public void editingEchoPreservesReferenceUntilRemoveSendsExplicitNull() throws Exception{
+		launch(null, true);
+		assertEquals(BODY, body.getText().toString());
+		assertEquals(View.VISIBLE, fragment.getView().findViewById(R.id.compose_friend_card).getVisibility());
+		assertEquals(0, count(GetOwnAccount.class));
+		clickPublish();
+		JsonObject unchanged=json(last(EditStatus.class));
+		assertFalse("Omission preserves the original link", unchanged.has("friend_card_id"));
+		assertFalse(unchanged.has("nbw_fid"));
+		launch(null, true);
+		fragment.getView().findViewById(R.id.compose_friend_card_remove).performClick();
+		clickPublish();
+		JsonObject removed=json(last(EditStatus.class));
+		assertTrue(removed.has("friend_card_id"));
+		assertTrue("Null must survive actual request serialization", removed.get("friend_card_id").isJsonNull());
+		assertFalse(removed.has("nbw_fid"));
+		assertEquals(0, count(RecommendNBWForum.class));
+	}
+
+	@Test public void failedInsertDoesNotAttachInventedEmptyCardOrEnableCardOnlyPublishing() throws Exception{
+		launch(null);
+		assertTrue(menu.performIdentifierAction(R.id.compose_insert_friend_card, 0));
+		callback(last(FriendCardRequest.class)).onError(new MastodonErrorResponse("Unavailable", 503, null));
+		idle();
+		assertEquals(View.GONE, fragment.getView().findViewById(R.id.compose_friend_card).getVisibility());
+		assertNull(field(ComposeFragment.class, "friendCardId").get(fragment));
+		assertFalse(publishItem().isEnabled());
+		assertEquals(0, count(CreateStatus.class));
+	}
+
+	private FriendCard friendCard(){
+		FriendCard card=new FriendCard(); card.id="current-card"; card.schemaVersion=1;
+		card.title="Current card"; card.state="active"; return card;
+	}
+
+	private void launch(String replyId) throws Exception{ launch(replyId, false); }
+
+	private void launch(String replyId, boolean editingFriendCard) throws Exception{
 		closeScreen();
 		LocalRequests.sent.clear();
 		LocalRequests.accounts.clear();
@@ -378,6 +450,15 @@ public class ComposeReplyPublishingBehaviorTest{
 		Bundle args=new Bundle();
 		args.putString("account", session.getID());
 		if(replyId!=null) args.putParcelable("replyTo", Parcels.wrap(status(replyId)));
+		if(editingFriendCard){
+			Status edited=status("p_edit");
+			edited.friendCard=new FriendCardAttachment();
+			edited.friendCard.schemaVersion=1; edited.friendCard.mode="link"; edited.friendCard.id="current-card";
+			edited.friendCard.available=true; edited.friendCard.title="Current card";
+			args.putParcelable("editStatus", Parcels.wrap(edited));
+			args.putString("sourceText", BODY); args.putString("sourceSpoiler", "");
+			args.putString("sourceFriendCardId", "current-card");
+		}
 		fragment.setArguments(args);
 		activity.showFragment(fragment);
 		controller.start().resume().visible();
@@ -486,7 +567,7 @@ public class ComposeReplyPublishingBehaviorTest{
 	}
 
 	private CreateStatus.Request sentStatus() throws Exception{
-		return (CreateStatus.Request)field(MastodonAPIRequest.class, "requestBody").get(last(CreateStatus.class));
+		return org.joinmastodon.android.api.MastodonAPIController.gson.fromJson(json(last(CreateStatus.class)), CreateStatus.Request.class);
 	}
 	private static int count(Class<?> type){ return (int)LocalRequests.sent.stream().filter(type::isInstance).count(); }
 	private static <T extends MastodonAPIRequest<?>> T last(Class<T> type){

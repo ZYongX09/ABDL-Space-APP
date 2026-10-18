@@ -33,6 +33,7 @@ import org.joinmastodon.android.api.session.AccountSessionManager;
 import org.joinmastodon.android.events.StatusUpdatedEvent;
 import org.joinmastodon.android.fragments.AddAccountToListsFragment;
 import org.joinmastodon.android.fragments.ComposeFragment;
+import org.joinmastodon.android.fragments.friendcards.FriendCardCreateFragment;
 import org.joinmastodon.android.fragments.NotificationsListFragment;
 import org.joinmastodon.android.fragments.ProfileFragment;
 import org.joinmastodon.android.fragments.report.ReportReasonChoiceFragment;
@@ -156,8 +157,13 @@ public class HeaderStatusDisplayItem extends StatusDisplayItem{
 				if(id==R.id.edit){
 					final Bundle args=new Bundle();
 					args.putString("account", item.accountID);
+					if(item.status.friendCard!=null && item.status.friendCard.isSupported() && "publication".equals(item.status.friendCard.mode)){
+						args.putString("card_id", item.status.friendCard.id);
+						Nav.go((Activity)item.context, FriendCardCreateFragment.class, args);
+						return true;
+					}
 					args.putParcelable("editStatus", Parcels.wrap(item.status));
-					if(TextUtils.isEmpty(item.status.content) && TextUtils.isEmpty(item.status.spoilerText)){
+					if(item.status.friendCard==null && TextUtils.isEmpty(item.status.content) && TextUtils.isEmpty(item.status.spoilerText)){
 						Nav.go((Activity) item.context, ComposeFragment.class, args);
 					}else{
 						new GetStatusSourceText(item.status.id)
@@ -166,6 +172,7 @@ public class HeaderStatusDisplayItem extends StatusDisplayItem{
 									public void onSuccess(GetStatusSourceText.Response result){
 										args.putString("sourceText", result.text);
 										args.putString("sourceSpoiler", result.spoilerText);
+										args.putString("sourceFriendCardId", result.friendCardId);
 										Nav.go((Activity) item.context, ComposeFragment.class, args);
 									}
 

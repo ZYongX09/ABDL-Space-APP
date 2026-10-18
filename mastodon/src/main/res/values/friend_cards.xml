@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="friend_cards_feed_title">扩列</string>
+    <string name="friend_cards_mine_title">我的扩列卡</string>
+    <string name="friend_cards_create_title">创建扩列卡</string>
+    <string name="friend_cards_edit_title">编辑扩列卡</string>
+    <string name="friend_cards_detail_title">扩列卡</string>
+    <string name="friend_cards_diaper_title">选择纸尿裤</string>
+    <string name="friend_cards_unavailable">扩列服务或此卡暂不可用，请稍后重试</string>
+    <string name="friend_cards_publish_help">创建成功后，会自动发布一条带扩列标记的帖子。以后编辑会更新原帖，不会重复发帖。</string>
+    <string name="friend_cards_pending_help">结果尚不确定。原操作与输入快照已保存，只能使用同一操作重试，不会创建第二条帖子。</string>
+    <string name="friend_cards_cover_limit">封面图片不能超过10 MiB</string>
+    <string name="friend_cards_school_private">学校默认仅自己可见</string>
+</resources>

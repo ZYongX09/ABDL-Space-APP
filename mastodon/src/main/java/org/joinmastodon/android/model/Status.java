@@ -70,6 +70,11 @@ public class Status extends BaseModel implements DisplayItemsParent, Searchable 
 	public double heat;			// 热度（后端计算下发，App 不重算）
 	@SerializedName("friend_request")
 	public FriendRequest friendRequest;	// 交友宇宙卡片载荷（非标准字段，仅在跨站时间线内存在）
+	/** Optional, independently versioned extension. Invalid payloads must not drop the post. */
+	@SerializedName("friend_card")
+	@com.google.gson.annotations.JsonAdapter(FriendCardDeserializer.class)
+	@Nullable
+	public FriendCardAttachment friendCard;
 		@SerializedName("album_update")
 		public org.joinmastodon.android.model.albums.AlbumModels.AlbumUpdate albumUpdate;
 
@@ -263,6 +268,74 @@ public class Status extends BaseModel implements DisplayItemsParent, Searchable 
 	public enum SpoilerType{
 		CONTENT_WARNING,
 		FILTER
+	}
+
+	/** Keep a bad/unknown optional extension from failing an otherwise valid status or reblog. */
+	public static class FriendCardDeserializer implements JsonDeserializer<FriendCardAttachment>{
+		@Override
+		public FriendCardAttachment deserialize(JsonElement json, Type type, JsonDeserializationContext context){
+			try{
+				if(!json.isJsonObject()) return null;
+				JsonObject object=json.getAsJsonObject();
+				if(!object.has("schema_version") || !object.get("schema_version").isJsonPrimitive()
+						|| !object.getAsJsonPrimitive("schema_version").isNumber()
+						|| object.get("schema_version").getAsDouble()!=1) return null;
+				if(!object.has("mode") || !object.get("mode").isJsonPrimitive()
+						|| !object.getAsJsonPrimitive("mode").isString()) return null;
+				String mode=object.get("mode").getAsString();
+				if(!"publication".equals(mode) && !"link".equals(mode)) return null;
+				if(!object.has("available") || !object.get("available").isJsonPrimitive()
+						|| !object.getAsJsonPrimitive("available").isBoolean() || !requiredString(object, "id")) return null;
+				if(!strings(object, "title", "url", "fallback_suffix")) return null;
+				// Unavailable cards must never retain stale private/title/cover metadata on the client.
+				if(!object.get("available").getAsBoolean()){
+					object=object.deepCopy();
+					object.remove("title"); object.remove("url"); object.remove("card");
+				}else if(object.has("card") && !object.get("card").isJsonNull() && !validCard(object.get("card"))){
+					return null;
+				}
+				return context.deserialize(object, FriendCardAttachment.class);
+			}catch(RuntimeException malformedExtension){
+				return null;
+			}
+		}
+
+		private static boolean requiredString(JsonObject object, String key){
+			return object.has(key) && !object.get(key).isJsonNull() && strings(object, key)
+					&& !object.get(key).getAsString().isBlank();
+		}
+		private static boolean strings(JsonObject object, String... keys){
+			for(String key:keys){
+				JsonElement value=object.get(key);
+				if(value!=null && !value.isJsonNull() && (!value.isJsonPrimitive() || !value.getAsJsonPrimitive().isString())) return false;
+			}
+			return true;
+		}
+		private static boolean stringLists(JsonObject object, String... keys){
+			for(String key:keys){
+				JsonElement value=object.get(key);
+				if(value==null || value.isJsonNull()) continue;
+				if(!value.isJsonArray()) return false;
+				for(JsonElement entry:value.getAsJsonArray())
+					if(!entry.isJsonPrimitive() || !entry.getAsJsonPrimitive().isString()) return false;
+			}
+			return true;
+		}
+		private static boolean validCard(JsonElement value){
+			if(!value.isJsonObject()) return false;
+			JsonObject card=value.getAsJsonObject();
+			if(!card.has("schema_version") || !card.get("schema_version").isJsonPrimitive()
+					|| !card.getAsJsonPrimitive("schema_version").isNumber() || card.get("schema_version").getAsDouble()!=1) return false;
+			if(!requiredString(card, "id") || !requiredString(card, "title") || !strings(card, "owner_id", "post_id", "state", "url",
+					"gender", "age", "zodiac", "region", "school", "mbti", "interaction_habits", "looking_for", "boundaries", "cover_url")
+					|| !stringLists(card, "interests", "games", "public_fields")) return false;
+			for(String key:List.of("cover_focus_x", "cover_focus_y")){
+				JsonElement focus=card.get(key);
+				if(focus!=null && !focus.isJsonNull() && (!focus.isJsonPrimitive() || !focus.getAsJsonPrimitive().isNumber()
+						|| !Double.isFinite(focus.getAsDouble()))) return false;
+			}
+			return true;
+		}
 	}
 
 	// MOSHIDON: we use this for akkoma quotes

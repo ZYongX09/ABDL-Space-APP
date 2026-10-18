@@ -216,6 +216,8 @@
 
 					</FrameLayout>
 
+					<include layout="@layout/include_compose_friend_card" />
+
 					<RelativeLayout
 						android:id="@+id/poll_wrap"
 						android:layout_width="match_parent"

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+	android:id="@+id/compose_friend_card"
+	android:layout_width="match_parent"
+	android:layout_height="wrap_content"
+	android:layout_marginHorizontal="16dp"
+	android:layout_marginBottom="12dp"
+	android:padding="12dp"
+	android:orientation="vertical"
+	android:background="@drawable/bg_card_with_border"
+	android:visibility="gone">
+	<TextView
+		android:id="@+id/compose_friend_card_title"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:maxLines="2"
+		android:ellipsize="end"
+		android:textAppearance="@style/m3_title_medium"
+		android:textColor="?colorM3OnSurface" />
+	<TextView
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:layout_marginTop="4dp"
+		android:text="@string/friend_card_compose_no_nbw"
+		android:textAppearance="@style/m3_body_small"
+		android:textColor="?colorM3OnSurfaceVariant" />
+	<TextView
+		android:id="@+id/compose_friend_card_remove"
+		android:layout_width="wrap_content"
+		android:layout_height="48dp"
+		android:gravity="center_vertical"
+		android:paddingHorizontal="8dp"
+		android:text="@string/friend_card_compose_remove"
+		android:textAppearance="@style/m3_label_large"
+		android:textColor="?colorM3Primary"
+		android:background="@drawable/bg_rect_4dp_ripple" />
+</LinearLayout>

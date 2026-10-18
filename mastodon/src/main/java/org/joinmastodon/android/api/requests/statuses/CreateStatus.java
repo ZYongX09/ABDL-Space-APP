@@ -1,6 +1,9 @@
 package org.joinmastodon.android.api.requests.statuses;
 
+import com.google.gson.JsonObject;
 import com.google.gson.annotations.SerializedName;
+
+import org.joinmastodon.android.api.MastodonAPIController;
 
 import org.joinmastodon.android.api.MastodonAPIRequest;
 import org.joinmastodon.android.model.Status;
@@ -14,7 +17,7 @@ import java.util.List;
 public class CreateStatus extends MastodonAPIRequest<Status>{
 	public CreateStatus(CreateStatus.Request req, String uuid){
 		super(HttpMethod.POST, "/statuses", Status.class);
-		setRequestBody(req);
+		setRequestBody(req.toJson());
 		addHeader("Idempotency-Key", uuid);
 	}
 
@@ -35,6 +38,25 @@ public class CreateStatus extends MastodonAPIRequest<Status>{
 		public String quotedStatusId;
 		@SerializedName("nbw_fid")
 		public Integer nbwFid;
+		/** Absent preserves an edit's current reference; setFriendCard(null) explicitly removes it. */
+		@SerializedName("friend_card_id")
+		public String friendCardId;
+		private transient boolean friendCardSpecified;
+
+		public void setFriendCard(String id){
+			friendCardId=id;
+			friendCardSpecified=true;
+		}
+
+		public JsonObject toJson(){
+			JsonObject body=MastodonAPIController.gson.toJsonTree(this).getAsJsonObject();
+			if(friendCardSpecified || friendCardId!=null){
+				body.addProperty("friend_card_id", friendCardId);
+				// NBW has no friend-card representation. Never silently synchronize an attached card.
+				if(friendCardId!=null) body.remove("nbw_fid");
+			}
+			return body;
+		}
 		@SerializedName("geo_province")
 		public String geoProvince;
 		@SerializedName("geo_city")

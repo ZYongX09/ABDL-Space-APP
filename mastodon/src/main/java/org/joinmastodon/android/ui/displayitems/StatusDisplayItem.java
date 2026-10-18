@@ -116,6 +116,7 @@ public abstract class StatusDisplayItem{
 				case EMOJI_REACTIONS -> new EmojiReactionsStatusDisplayItem.Holder(activity, parent);
 				case FRIEND_REQUEST_ITEM -> new FriendRequestStatusDisplayItem.Holder(activity, parent);
 				case ALBUM_UPDATE -> new AlbumUpdateStatusDisplayItem.Holder(activity, parent);
+				case FRIEND_CARD -> new FriendCardStatusDisplayItem.Holder(activity, parent);
 				case ADVERTISEMENT -> new AdvertisementStatusDisplayItem.Holder(activity, parent);
 			};
 	}
@@ -145,7 +146,7 @@ public abstract class StatusDisplayItem{
 			result.add(adItem);
 			return result;
 		}
-		if(statusForContent.friendRequest!=null){
+		if(statusForContent.friendRequest!=null && statusForContent.friendCard==null){
 			ArrayList<StatusDisplayItem> result=new ArrayList<>();
 			FriendRequestStatusDisplayItem friendRequestItem=new FriendRequestStatusDisplayItem(parentID, callbacks, context, statusForContent, accountID);
 			friendRequestItem.index=1;
@@ -202,8 +203,11 @@ public abstract class StatusDisplayItem{
 			needAddCWItems=status.revealedSpoilers.contains(Status.SpoilerType.CONTENT_WARNING);
 		}
 
-		boolean albumUpdate=AlbumUpdateStatusDisplayItem.supported(statusForContent.albumUpdate);
-		String displayedContent=albumUpdate ? statusForContent.albumUpdate.description : statusForContent.content;
+		FriendCardStatusDisplayItem.Presentation friendCard=FriendCardStatusDisplayItem.presentation(statusForContent.friendCard);
+		boolean friendCardBody=FriendCardStatusDisplayItem.replacesBody(friendCard);
+		boolean albumUpdate=!friendCardBody && AlbumUpdateStatusDisplayItem.supported(statusForContent.albumUpdate);
+		String displayedContent=friendCardBody ? null : albumUpdate ? statusForContent.albumUpdate.description
+				: FriendCardStatusDisplayItem.contentWithoutFallback(statusForContent.content, statusForContent.friendCard);
 		if(!TextUtils.isEmpty(displayedContent)){
 			SpannableStringBuilder parsedText=albumUpdate ? new SpannableStringBuilder(displayedContent)
 					: HtmlParser.parse(displayedContent, statusForContent.emojis, statusForContent.mentions, statusForContent.tags, accountID, statusForContent, context);
@@ -215,6 +219,9 @@ public abstract class StatusDisplayItem{
 		}else if(header instanceof HeaderStatusDisplayItem hsdi){
 			hsdi.needBottomPadding=true;
 		}
+
+		if(friendCard!=FriendCardStatusDisplayItem.Presentation.NONE)
+			contentItems.add(new FriendCardStatusDisplayItem(parentID, callbacks, context, statusForContent, accountID, (flags & FLAG_MEDIA_FORCE_HIDDEN)!=0));
 
 		if(albumUpdate)
 			contentItems.add(new AlbumUpdateStatusDisplayItem(parentID, callbacks, context, statusForContent, accountID));
@@ -331,6 +338,7 @@ public abstract class StatusDisplayItem{
 			EMOJI_REACTIONS,
 			FRIEND_REQUEST_ITEM,
 			ALBUM_UPDATE,
+			FRIEND_CARD,
 			ADVERTISEMENT
 		}
 

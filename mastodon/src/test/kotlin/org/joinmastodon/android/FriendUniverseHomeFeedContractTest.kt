@@ -12,7 +12,7 @@ class FriendUniverseHomeFeedContractTest {
 	fun aggregateFriendRequestsUseDedicatedDisplayItem() {
 		val factory = source("src/main/java/org/joinmastodon/android/ui/displayitems/StatusDisplayItem.java")
 		assertTrue(factory.contains("Status statusForContent=status.getContentStatus()"))
-		assertTrue(factory.contains("if(statusForContent.friendRequest!=null)"))
+		assertTrue(factory.contains("if(statusForContent.friendRequest!=null && statusForContent.friendCard==null)"))
 		assertTrue(factory.contains("new FriendRequestStatusDisplayItem(parentID, callbacks, context, statusForContent, accountID)"))
 		assertTrue(factory.contains("case FRIEND_REQUEST_ITEM -> new FriendRequestStatusDisplayItem.Holder"))
 		assertTrue(factory.contains("EMOJI_REACTIONS,\n\t\t\tFRIEND_REQUEST_ITEM"))

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+	<string name="friend_card_post_about">关于我</string>
+	<string name="friend_card_post_interests">兴趣 / 游戏</string>
+	<string name="friend_card_post_looking_for">我想找</string>
+	<string name="friend_card_post_details">查看完整扩列卡</string>
+	<string name="friend_card_post_unavailable">扩列卡暂不可用</string>
+	<string name="friend_card_feed_entry">扩列卡推荐</string>
+	<string name="friend_card_my_entry">我的扩列卡</string>
+	<string name="friend_card_compose_insert">插入我的扩列卡</string>
+	<string name="friend_card_compose_replace">更换为我的当前扩列卡</string>
+	<string name="friend_card_compose_remove">移除扩列卡</string>
+	<string name="friend_card_compose_attached">已附加扩列卡</string>
+	<string name="friend_card_compose_no_nbw">含扩列卡的帖子仅发布到本站，不同步宝宝新天地。</string>
+	<string name="friend_card_compose_no_current">你还没有可插入的当前扩列卡。可前往我的扩列卡创建或恢复。</string>
+</resources>

@@ -9,6 +9,8 @@ import org.joinmastodon.android.CompatibilityTestApplication;
 import org.joinmastodon.android.MastodonApp;
 import org.joinmastodon.android.R;
 import org.joinmastodon.android.fragments.albums.AlbumUploadFragment;
+import org.joinmastodon.android.fragments.friendcards.FriendCardCreateFragment;
+import org.joinmastodon.android.fragments.friendcards.FriendCardFeedFragment;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -82,7 +84,7 @@ public class HomeComposeActionRoutingTest{
 
 	@Test public void productionFanAndLiquidActionsRouteIdenticallyForEachCurrentAccount() throws Exception{
 		int[] ids={R.id.compose_post, R.id.compose_friend_request, R.id.compose_album};
-		Class<?>[] targets={ComposeFragment.class, FriendRequestCreateFragment.class, AlbumUploadFragment.class};
+		Class<?>[] targets={ComposeFragment.class, FriendCardCreateFragment.class, AlbumUploadFragment.class};
 		for(String account:new String[]{"account-one@example.test", "account-two@example.test"}){
 			setAccount(account);
 			for(int i=0; i<ids.length; i++){
@@ -106,6 +108,17 @@ public class HomeComposeActionRoutingTest{
 		home.openComposeAction(-1);
 		assertEquals(List.of(ComposeFragment.class), LocalNavigation.destinations);
 		assertEquals(List.of("current-fragment-account"), LocalNavigation.accounts);
+	}
+
+	@Test public void classicAndLiquidMoreOpenFeedWithoutChangingComposeOrLegacyReading() throws Exception{
+		setAccount("selected-account");
+		home.onLiquidMenuItem(R.id.friend_card_feed);
+		android.widget.PopupMenu popup=new android.widget.PopupMenu(activity, new View(activity));
+		popup.inflate(R.menu.home_overflow);
+		home.onOptionsItemSelected(popup.getMenu().findItem(R.id.friend_card_feed));
+		assertEquals(List.of(FriendCardFeedFragment.class, FriendCardFeedFragment.class), LocalNavigation.destinations);
+		assertEquals(List.of("selected-account", "selected-account"), LocalNavigation.accounts);
+		assertNotNull(FriendRequestListFragment.class);
 	}
 
 	@Test public void fabClickWithoutAnInflatedViewIsANoOpInsteadOfCrashing() throws Exception{

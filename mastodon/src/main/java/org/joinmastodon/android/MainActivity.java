@@ -434,6 +434,23 @@ public class MainActivity extends FragmentStackActivity implements LifecycleOwne
 			return;
 		}
 
+		// Resolve local post URLs through the ordinary Status endpoint, retaining all extensions.
+		String sharedStatusID=statusIDFromSharedURL(uri);
+		if(sharedStatusID!=null){
+			AccountSession selected=accountID==null ? AccountSessionManager.getInstance().getLastActiveAccount() : AccountSessionManager.get(accountID);
+			if(selected==null || !selected.activated) return;
+			new org.joinmastodon.android.api.requests.statuses.GetStatusByID(sharedStatusID)
+					.setCallback(new Callback<org.joinmastodon.android.model.Status>(){
+						@Override public void onSuccess(org.joinmastodon.android.model.Status result){
+							Bundle args=new Bundle(); args.putString("account", selected.getID());
+							args.putParcelable("status", Parcels.wrap(result));
+							Nav.go(MainActivity.this, ThreadFragment.class, args);
+						}
+						@Override public void onError(ErrorResponse error){ error.showToast(MainActivity.this); }
+					}).wrapProgress(this, R.string.opening_link, true).exec(selected.getID());
+			return;
+		}
+
 		// QR 登录链接处理
 		if("abdl-space.top".equals(uri.getHost()) && uri.getPath().startsWith("/qr-login")){
 			String sessionId=uri.getQueryParameter("session");
@@ -506,6 +523,25 @@ public class MainActivity extends FragmentStackActivity implements LifecycleOwne
 		if(session==null || !session.activated)
 			return;
 		openSearchQuery(uri.toString(), session.getID(), R.string.opening_link, false, null);
+	}
+
+	/** Only known first-party shapes may bypass federated URL search. */
+	public static String statusIDFromSharedURL(Uri uri){
+		if(uri==null || (!"https".equals(uri.getScheme()) && !"http".equals(uri.getScheme()))
+				|| (!"abdl-space.top".equalsIgnoreCase(uri.getHost()) && !"api.abdl-space.top".equalsIgnoreCase(uri.getHost()))
+				|| uri.getUserInfo()!=null || (uri.getPort()!=-1 && uri.getPort()!=80 && uri.getPort()!=443)) return null;
+		String path=uri.getEncodedPath();
+		if(path==null) return null;
+		if(path.matches("/forum/[0-9]+/?")){
+			String id=path.substring("/forum/".length()).replace("/", "");
+			return "p_"+id;
+		}
+		if(path.matches("/api/v1/statuses/(p_)?[0-9]+/?")){
+			String trimmed=path.endsWith("/") ? path.substring(0,path.length()-1) : path;
+			String id=trimmed.substring(trimmed.lastIndexOf('/')+1);
+			return id.startsWith("p_") ? id : "p_"+id;
+		}
+		return null;
 	}
 
 	private void showQRLoginDialog(String sessionId){
