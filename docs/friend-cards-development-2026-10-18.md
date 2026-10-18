@@ -41,7 +41,7 @@
 
 ### 未通过/未完成
 
-- Android完整release回归曾实跑 **1243测试 / 14失败**：旧FriendUniverse源码合同断言和AlbumReport异步Toast时序两处之后做了修正；但完整run还包含11项Robolectric SDK资源加载 `OutOfMemoryError` 及1项旧QQ xxxhdpi WebP VP8L格式断言（资源实际为VP8X）。完整suite修正后的最终结果**尚未取得**。之后两项兼容测试没有得到一份可信的干净完成结果，不能据此宣称full绿或回归0失败。
+- Android完整release回归曾实跑 **1243测试 / 14失败**：旧FriendUniverse源码合同断言和AlbumReport异步Toast时序两处之后做了修正；但完整run还包含11项Robolectric SDK资源加载 `OutOfMemoryError` 及1项旧QQ xxxhdpi WebP VP8L格式断言（资源实际为VP8X）。完整suite修正后的最终结果**尚未取得**。之后尝试1GB Robolectric堆的full rerun，仍有Android 15 SDK资源加载OOM，完整报告未能完成；两项兼容测试被同时运行的full任务抢占过一次，也没有得到最终定向重跑报告。因此不能宣称full绿或回归0失败。
 - Android扩列 release专项重跑 **79/79通过**，涵盖对应模块/合入的旧导航及Compose行为测试。
 - 正式签名release包确已构建并交付，详见已完成项。Linux无模拟器/USB，未完成真机视觉、小屏大字/暗色、真实服务端/COS网络、双账号及真实旧安装包闭环；构建和单测不替代这些验收。
 - 再次完整测试若需稳定，应在有足够可用内存的环境/Android CI顺序运行；保留QQ资源格式独立失败，不替换既有资源、伪造全绿。
