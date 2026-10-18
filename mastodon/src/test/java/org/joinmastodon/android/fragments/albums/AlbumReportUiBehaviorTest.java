@@ -252,9 +252,9 @@ public class AlbumReportUiBehaviorTest{
 		mode=Mode.RATE_LIMITED;
 		fragment.getView().findViewById(R.id.album_report_submit).performClick();
 		await(()->reportCalls.get()==1);
-			await(()->ShadowToast.getLatestToast()!=null && "举报提交过于频繁，请稍后再试".contentEquals(ShadowToast.getTextOfLatestToast()));
-			assertEquals("举报提交过于频繁，请稍后再试", ShadowToast.getTextOfLatestToast());
-			assertFalse(fragment.finished); assertEquals(0, RecordingNav.finishCount);
+		await(()->ShadowToast.getLatestToast()!=null && "举报提交过于频繁，请稍后再试".contentEquals(ShadowToast.getTextOfLatestToast()));
+		assertEquals("举报提交过于频繁，请稍后再试", ShadowToast.getTextOfLatestToast());
+		assertFalse(fragment.finished); assertEquals(0, RecordingNav.finishCount);
 		assertTrue(((Button)fragment.getView().findViewById(R.id.album_report_submit)).isEnabled());
 	}
 
