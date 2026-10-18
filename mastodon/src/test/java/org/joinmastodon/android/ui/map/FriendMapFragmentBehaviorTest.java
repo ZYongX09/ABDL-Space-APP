@@ -190,6 +190,15 @@ public class FriendMapFragmentBehaviorTest{
         assertEquals("device",body(last()).get("location_mode"));
         assertEquals(7L,body(last()).get("settings_version")); assertEquals(0,presenceWrites());
     }
+    @Test public void cityPrecisionRequiresCapabilityAndExistingCityMayBeRetained() throws Exception{
+        accepted(); settings.babyVerified=true; settings.visibilityConfirmed=true; settings.visibility="public"; settings.precisionLevel="5km"; reply(last(),settings);
+        int count=ApiExecution.requests.size(); fragment.precision("city");
+        assertNotNull(ReflectionHelpers.getField(fragment,"sponsorSheet")); assertEquals(count,ApiExecution.requests.size());
+        ((android.app.Dialog)ReflectionHelpers.getField(fragment,"sponsorSheet")).dismiss();
+        fragment.refresh(); settings.precisionLevel="city"; reply(last(),settings); fragment.precision("city");
+        assertEquals("city",body(last()).get("precision_level")); assertEquals(7L,body(last()).get("settings_version"));
+        assertEquals(0,presenceWrites());
+    }
     @Test public void sdkBackdropReplaysProviderMapIdentityAndInvalidatesOnExitAndLateCallback() throws Exception{
         assertNull(sources.get(0)); assertNull(snapshots.get(0));
         accepted(); settings.babyVerified=true; settings.visibilityConfirmed=true; reply(last(),settings);
@@ -201,16 +210,26 @@ public class FriendMapFragmentBehaviorTest{
         List<Bitmap> replay=new ArrayList<>(); fragment.setMapBackdropListener((source,snapshot)->{ assertSame(provider.map,source); replay.add(snapshot); });
         assertEquals(1,replay.size()); assertSame(bitmap,replay.get(0));
         fragment.setMapBackdropListener((source,snapshot)->{ sources.add(source); snapshots.add(snapshot); });
-        fragment.onCameraMove(); assertSame(provider.map,sources.get(sources.size()-1)); assertNull(snapshots.get(snapshots.size()-1));
+        fragment.onCameraMove(); assertSame(provider.map,sources.get(sources.size()-1)); assertSame(bitmap,snapshots.get(snapshots.size()-1));
         fragment.setTabVisible(false); assertNull(sources.get(sources.size()-1)); assertNull(snapshots.get(snapshots.size()-1));
         int events=sources.size(); provider.snapshot.accept(bitmap); ShadowLooper.idleMainLooper(); assertEquals(events,sources.size());
         fragment.onDestroyView(); assertNull(sources.get(sources.size()-1)); assertNull(snapshots.get(snapshots.size()-1));
     }
-    @Test public void snapshotTimeoutRejectsLateBitmapAndClearsPublishedSnapshot() throws Exception{
+    @Test public void cameraMoveKeepsLastSnapshotUntilTheProviderCanPublishAnother() throws Exception{
+        accepted(); settings.babyVerified=true; settings.visibilityConfirmed=true; reply(last(),settings);
+        RecordingProvider provider=Providers.current;
+        ShadowLooper.idleMainLooper(350,TimeUnit.MILLISECONDS); Bitmap first=Bitmap.createBitmap(8,8,Bitmap.Config.ARGB_8888); provider.snapshot.accept(first); ShadowLooper.idleMainLooper();
+        fragment.onCameraMove(); assertSame(first,snapshots.get(snapshots.size()-1));
+        fragment.onCameraIdle(provider.getCamera());
+        assertSame(first,snapshots.get(snapshots.size()-1));
+    }
+    @Test public void snapshotTimeoutRejectsLateBitmapAndPreservesPublishedSnapshot() throws Exception{
         accepted(); settings.babyVerified=true; settings.visibilityConfirmed=true; reply(last(),settings);
         ShadowLooper.idleMainLooper(350,TimeUnit.MILLISECONDS); Consumer<Bitmap> late=Providers.current.snapshot;
+        Bitmap first=Bitmap.createBitmap(8,8,Bitmap.Config.ARGB_8888); late.accept(first); ShadowLooper.idleMainLooper();
+        fragment.onCameraIdle(Providers.current.getCamera()); ShadowLooper.idleMainLooper(350,TimeUnit.MILLISECONDS); late=Providers.current.snapshot;
         ShadowLooper.idleMainLooper(2600,TimeUnit.MILLISECONDS);
-        assertNull(snapshots.get(snapshots.size()-1));
+        assertNotNull(snapshots.get(snapshots.size()-1));
         int events=sources.size(); late.accept(Bitmap.createBitmap(8,8,Bitmap.Config.ARGB_8888)); ShadowLooper.idleMainLooper(); assertEquals(events,sources.size());
     }
     @Implements(android.app.Fragment.class) public static class Permissions{

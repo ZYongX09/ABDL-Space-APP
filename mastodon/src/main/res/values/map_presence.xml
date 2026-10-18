@@ -26,7 +26,9 @@
 	<string name="map_presence_switching">地图服务暂时不可用，正在切换备用地图…</string>
 	<string name="map_presence_other_city">指定展示位置</string>
 	<string name="map_presence_sponsor_body">所有通过协议与宝宝认证的用户均可浏览各地区地图，无需赞助。赞助者可额外指定展示位置，仍按所选精度和可见性展示。购买后返回地图将重新读取权益。</string>
-	<string name="map_presence_visibility_sponsor_only">此选项仅赞助者可选</string>
+		<string name="map_presence_visibility_sponsor_only">此选项仅赞助者可选</string>
+		<string name="map_presence_city_sponsor_only">城市级精度仅赞助者可选</string>
+		<string name="map_presence_city_precision_sponsor_body">更大范围的城市级模糊可降低精确定位与查询成本，因此仅赞助者可选。已使用城市级的现有设置可保留，也可进一步改为更模糊的范围；赞助到期不会自动提高定位精度。</string>
 	<string name="map_presence_visibility_sponsor_body">地图服务的调用、带宽与维护会产生成本，因此新选择“隐藏”或“仅互关”仅向赞助者开放。已有的隐藏或仅互关设置可以明确保留，不会自动改为公开；停止展示或撤回位置不受赞助身份限制。浏览各地区地图无需赞助。</string>
 	<string name="map_presence_visibility_required">请先明确选择谁可以看到我，至少选择一项后才能继续，没有默认选项。下一步才会申请前台定位权限并将地图居中；系统定位授权不代表公开位置。选择隐藏时，定位仅用于本地地图居中，不上报地图出现坐标。</string>
 	<string name="map_presence_visibility_continue">确认选择并继续</string>

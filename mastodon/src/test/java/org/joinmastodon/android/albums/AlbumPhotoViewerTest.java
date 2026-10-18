@@ -20,6 +20,7 @@ import android.widget.ImageView;
 import org.joinmastodon.android.MastodonApp;
 import org.joinmastodon.android.R;
 import org.joinmastodon.android.fragments.HomeTimelineFragment;
+import org.joinmastodon.android.fragments.albums.AlbumDetailFragment;
 import org.joinmastodon.android.model.Status;
 import org.joinmastodon.android.model.StatusPrivacy;
 import org.joinmastodon.android.api.MastodonAPIRequest;

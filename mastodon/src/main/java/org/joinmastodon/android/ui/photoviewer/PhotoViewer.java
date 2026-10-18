@@ -76,6 +76,7 @@ import org.joinmastodon.android.api.session.AccountSessionManager;
 import org.joinmastodon.android.events.StatusCountersUpdatedEvent;
 import org.joinmastodon.android.fragments.BaseStatusListFragment;
 import org.joinmastodon.android.fragments.ComposeFragment;
+import org.joinmastodon.android.fragments.albums.AlbumUi;
 import org.joinmastodon.android.fragments.sponsors.SponsorCenterFragment;
 import org.joinmastodon.android.sponsors.SponsorOriginalGate;
 import org.joinmastodon.android.model.Attachment;
@@ -507,7 +508,7 @@ public class PhotoViewer implements ZoomPanView.Listener{
 		activity.getSharedPreferences("account_manager", Context.MODE_PRIVATE).registerOnSharedPreferenceChangeListener(originalAccountListener);
 		E.register(this);
 		if(albumDelegate!=null) windowView.post(()->{
-			for(PhotoViewHolder holder:albumPhotoHolders){ int position=holder.getAbsoluteAdapterPosition(); if(position>=0) loadAlbumPreview(holder, this.attachments.get(position)); }
+			for(PhotoViewHolder holder:albumPhotoHolders){ int position=holder.getAbsoluteAdapterPosition(); if(position>=0){ Attachment attachment=this.attachments.get(position); if(attachment.adminBlocked) holder.setImageDrawable(AlbumUi.adminBlockedPlaceholder(activity)); else loadAlbumPreview(holder,attachment); } }
 			updateAlbumViewport();
 		});
 	}
@@ -521,7 +522,7 @@ public class PhotoViewer implements ZoomPanView.Listener{
 		replyBtn.setFocusable(true);
 		favoriteBtn.setFocusable(true);
 		replyBtn.setOnClickListener(v->openAlbumComments());
-		favoriteBtn.setOnClickListener(v->albumDelegate.onLike(currentIndex));
+		favoriteBtn.setOnClickListener(v->{ if(!albumDelegate.getInfo(currentIndex).adminBlocked) albumDelegate.onLike(currentIndex); });
 		ViewGroup.LayoutParams actionParams=postActions.getLayoutParams();
 		actionParams.height=V.dp(48);
 		postActions.setLayoutParams(actionParams);
@@ -574,7 +575,7 @@ public class PhotoViewer implements ZoomPanView.Listener{
 
 	private void openAlbumComments(){
 		// Gate the action too: performClick() can invoke listeners on a GONE/disabled view.
-		if(albumDelegate==null || closing || dismissed || !albumDelegate.supportsComments()) return;
+			if(albumDelegate==null || closing || dismissed || albumDelegate.getInfo(currentIndex).adminBlocked || !albumDelegate.supportsComments()) return;
 		albumDelegate.onComments(currentIndex);
 	}
 
@@ -603,26 +604,27 @@ public class PhotoViewer implements ZoomPanView.Listener{
 		if(albumDelegate==null || closing || dismissed || albumLosslessButton==null) return;
 		AlbumInfo info=albumDelegate.getInfo(currentIndex);
 		updateAlbumSecureWindow(info);
-		boolean protectedNonowner=protectedAlbumNonowner(info);
-		boolean commentsEnabled=albumDelegate.supportsComments();
-		replyBtn.setVisibility(commentsEnabled ? View.VISIBLE : View.GONE);
-		replyBtn.setEnabled(commentsEnabled); replyBtn.setFocusable(commentsEnabled);
+			boolean protectedNonowner=protectedAlbumNonowner(info);
+			boolean commentsEnabled=albumDelegate.supportsComments() && !info.adminBlocked;
+		replyBtn.setVisibility(commentsEnabled && !info.adminBlocked ? View.VISIBLE : View.GONE);
+		replyBtn.setEnabled(commentsEnabled && !info.adminBlocked); replyBtn.setFocusable(commentsEnabled && !info.adminBlocked);
 		bindActionButton(replyText, info.commentsCount);
 		bindActionButton(favoriteText, info.likesCount);
 		favoriteBtn.setSelected(info.liked);
-		favoriteBtn.setEnabled(!info.likeBusy);
+		favoriteBtn.setEnabled(!info.adminBlocked && !info.likeBusy);
+		favoriteBtn.setFocusable(!info.adminBlocked && !info.likeBusy);
 		favoriteBtn.setContentDescription(activity.getString(info.liked ? R.string.album_viewer_unlike : R.string.album_viewer_like, info.likesCount));
 		replyBtn.setContentDescription(activity.getString(R.string.album_viewer_comment_count, info.commentsCount));
-		viewOriginalBtn.setVisibility(protectedNonowner || info.hdLoaded ? View.GONE : View.VISIBLE);
+		viewOriginalBtn.setVisibility(info.adminBlocked || protectedNonowner || info.hdLoaded ? View.GONE : View.VISIBLE);
 		viewOriginalBtn.setText(info.mediaBusy ? R.string.album_viewer_busy : R.string.album_viewer_hd);
-		viewOriginalBtn.setEnabled(!protectedNonowner && !info.mediaBusy);
-		viewOriginalBtn.setFocusable(!protectedNonowner && !info.mediaBusy);
-		albumLosslessButton.setVisibility(info.isOwner && info.originalAvailable && !info.originalLoaded ? View.VISIBLE : View.GONE);
+			viewOriginalBtn.setEnabled(!info.adminBlocked && !protectedNonowner && !info.mediaBusy);
+			viewOriginalBtn.setFocusable(!info.adminBlocked && !protectedNonowner && !info.mediaBusy);
+		albumLosslessButton.setVisibility(!info.adminBlocked && info.isOwner && info.originalAvailable && !info.originalLoaded ? View.VISIBLE : View.GONE);
 		albumLosslessButton.setText(info.mediaBusy ? R.string.album_viewer_busy : R.string.album_viewer_lossless);
 		albumLosslessButton.setEnabled(!info.mediaBusy);
 		albumQualityControls.setVisibility(albumCommentsVisible || viewOriginalBtn.getVisibility()!=View.VISIBLE && albumLosslessButton.getVisibility()!=View.VISIBLE ? View.GONE : View.VISIBLE);
 		postActions.setVisibility(albumCommentsVisible && albumImeInset>0 ? View.GONE : View.VISIBLE);
-		boolean downloadable=info.canDownload && !protectedNonowner;
+			boolean downloadable=info.canDownload && !info.adminBlocked && !protectedNonowner;
 		downloadButton.setVisibility(downloadable ? View.VISIBLE : View.GONE);
 		downloadButton.setEnabled(downloadable && !info.mediaBusy);
 		downloadButton.setFocusable(downloadable && !info.mediaBusy);
@@ -729,7 +731,7 @@ public class PhotoViewer implements ZoomPanView.Listener{
 
 	/** Signed image bytes and drawables are transient; album media NEVER uses ImageCache. */
 	public void updateAlbumSource(int position, String url, AlbumSourceCallback callback){
-		if(!isAlbumHostValid() || position!=currentIndex || protectedAlbumNonowner(albumDelegate.getInfo(position))
+		if(!isAlbumHostValid() || position!=currentIndex || albumDelegate.getInfo(position).adminBlocked || protectedAlbumNonowner(albumDelegate.getInfo(position))
 				|| !isAcceptableImageUrl(url) || !url.startsWith("https://")){
 			callback.onFailed(); return;
 		}
@@ -782,7 +784,8 @@ public class PhotoViewer implements ZoomPanView.Listener{
 				if(TextUtils.isEmpty(previewUrl) || !isAcceptableImageUrl(previewUrl) || !previewUrl.startsWith("https://")){ onFailed(); return; }
 				Attachment attachment=attachments.get(position);
 				// Only renewed preview enters Attachment. HD/lossless remain transient separate sources.
-				setAlbumPreviewMetadata(attachment, previewUrl, description, width, height);
+					attachment.adminBlocked=false;
+					setAlbumPreviewMetadata(attachment, previewUrl, description, width, height);
 				albumPreviewRefreshing=false;
 				albumPreviewGeneration=generation;
 				albumPreviewPosition=position;
@@ -801,11 +804,23 @@ public class PhotoViewer implements ZoomPanView.Listener{
 				albumPreviewRetryButton.setVisibility(View.VISIBLE);
 				refreshAlbumControls();
 			}
-			@Override public void onAccessDenied(){
-				if(!live()) return;
-				Toast.makeText(activity, R.string.album_viewer_access_denied, Toast.LENGTH_LONG).show();
-				onDismissed(); // Clears every drawable/request before returning to the album screen.
-			}
+				@Override public void onAccessDenied(){
+					if(!live()) return;
+					Toast.makeText(activity, R.string.album_viewer_access_denied, Toast.LENGTH_LONG).show();
+					onDismissed(); // Clears every drawable/request before returning to the album screen.
+				}
+				@Override public void onBlocked(){
+					if(!live()) return;
+					if(albumCommentsVisible){ setAlbumCommentsVisible(false); albumDelegate.onCommentsClosed(); }
+					Attachment attachment=attachments.get(position);
+					attachment.adminBlocked=true; attachment.url=null; attachment.previewUrl=null;
+					for(PhotoViewHolder holder:albumPhotoHolders) if(holder.getAbsoluteAdapterPosition()==position){
+						Call call=albumPreviewCalls.remove(holder); if(call!=null) call.cancel();
+						holder.setImageDrawable(AlbumUi.adminBlockedPlaceholder(activity));
+					}
+					albumPreviewRetryButton.setVisibility(View.GONE);
+					refreshAlbumControls();
+				}
 		});
 	}
 
@@ -818,6 +833,7 @@ public class PhotoViewer implements ZoomPanView.Listener{
 	}
 
 	private void loadAlbumPreview(PhotoViewHolder holder, Attachment attachment){
+		if(attachment.adminBlocked){ holder.setImageDrawable(AlbumUi.adminBlockedPlaceholder(activity)); return; }
 		int position=holder.getAbsoluteAdapterPosition();
 		if(position<0 || position!=currentIndex || !isAlbumHostValid()) return;
 		if(albumPreviewRefreshing) return;
@@ -889,7 +905,7 @@ public class PhotoViewer implements ZoomPanView.Listener{
 
 	/** Saves fresh authorized bytes directly; never reuses the displayed image or a disk cache. */
 	public void saveAlbumSource(int position, String url, AlbumSourceCallback callback){
-		if(!isAlbumHostValid() || position!=currentIndex || !albumDelegate.getInfo(position).canDownload || protectedAlbumNonowner(albumDelegate.getInfo(position))
+		if(!isAlbumHostValid() || position!=currentIndex || albumDelegate.getInfo(position).adminBlocked || !albumDelegate.getInfo(position).canDownload || protectedAlbumNonowner(albumDelegate.getInfo(position))
 				|| !isAcceptableImageUrl(url) || !url.startsWith("https://")){
 			callback.onFailed(); return;
 		}
@@ -1204,7 +1220,7 @@ public class PhotoViewer implements ZoomPanView.Listener{
 			albumDelegate.onPhotoChanged(index);
 			refreshAlbumControls();
 			windowView.post(()->{
-				for(PhotoViewHolder holder:albumPhotoHolders){ int position=holder.getAbsoluteAdapterPosition(); if(position>=0) loadAlbumPreview(holder, attachments.get(position)); }
+				for(PhotoViewHolder holder:albumPhotoHolders){ int position=holder.getAbsoluteAdapterPosition(); if(position>=0){ Attachment attachment=attachments.get(position); if(attachment.adminBlocked) holder.setImageDrawable(AlbumUi.adminBlockedPlaceholder(activity)); else loadAlbumPreview(holder,attachment); } }
 			});
 		}
 	}
@@ -1289,7 +1305,7 @@ public class PhotoViewer implements ZoomPanView.Listener{
 
 	private void startOriginalDownload(){
 		if(albumDelegate!=null){
-			if(isAlbumHostValid() && !protectedAlbumNonowner(albumDelegate.getInfo(currentIndex))) albumDelegate.onView(currentIndex, "hd");
+			if(isAlbumHostValid() && !albumDelegate.getInfo(currentIndex).adminBlocked && !protectedAlbumNonowner(albumDelegate.getInfo(currentIndex))) albumDelegate.onView(currentIndex, "hd");
 			return;
 		}
 		int position=pager.getCurrentItem();
@@ -1516,7 +1532,7 @@ public class PhotoViewer implements ZoomPanView.Listener{
 		if(albumDelegate!=null){
 			if(isAlbumHostValid()){
 				AlbumInfo info=albumDelegate.getInfo(currentIndex);
-				if(info.canDownload && !protectedAlbumNonowner(info)) albumDelegate.onDownload(currentIndex);
+				if(info.canDownload && !info.adminBlocked && !protectedAlbumNonowner(info)) albumDelegate.onDownload(currentIndex);
 			}
 			return;
 		}
@@ -1788,7 +1804,7 @@ public class PhotoViewer implements ZoomPanView.Listener{
 	}
 
 	public static final class AlbumInfo{
-		public boolean isOwner, originalAvailable, liked, hdLoaded, originalLoaded, mediaBusy, likeBusy, downloadProtected;
+		public boolean isOwner, originalAvailable, liked, hdLoaded, originalLoaded, mediaBusy, likeBusy, downloadProtected, adminBlocked;
 		public boolean canDownload=true; // Legacy delegates/unprotected servers retain their existing controls.
 		public int likesCount, commentsCount;
 	}
@@ -1800,6 +1816,7 @@ public class PhotoViewer implements ZoomPanView.Listener{
 
 	public interface AlbumPreviewCallback{
 		void onRefreshed(String previewUrl, String description, int width, int height);
+		default void onBlocked(){}
 		void onFailed();
 		void onAccessDenied();
 	}
@@ -1947,7 +1964,7 @@ public class PhotoViewer implements ZoomPanView.Listener{
 			}
 			if(albumDelegate!=null){
 				albumPhotoHolders.add(this);
-				imageView.setContentDescription(activity.getString(R.string.album_viewer_photo_position, getAbsoluteAdapterPosition()+1, attachments.size()));
+				imageView.setContentDescription(activity.getString(item.adminBlocked?R.string.album_photo_admin_blocked:R.string.album_viewer_photo_position, getAbsoluteAdapterPosition()+1, attachments.size()));
 				loadAlbumPreview(this, item);
 				return;
 			}

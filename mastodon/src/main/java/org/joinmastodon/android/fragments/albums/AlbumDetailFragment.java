@@ -141,7 +141,7 @@ public class AlbumDetailFragment extends LoaderFragment{
 		int requestedOffset=offset, token=generation; render();
 		execute(AlbumRequest.get("/"+albumId+"/photos", PhotoResponse.class).query("limit", 60).query("offset", requestedOffset), token, result->{
 			if(result.photos==null || result.photos.size()>60 || (result.hasMore && result.photos.isEmpty())){ fail(invalid()); return; }
-			for(Photo photo:result.photos) if(photo==null || photo.id==null || !albumId.equals(photo.albumId) || photo.previewUrl==null || photo.sortAt<0){ fail(invalid()); return; }
+			for(Photo photo:result.photos) if(!validPhoto(photo, albumId)){ fail(invalid()); return; }
 			Set<String> ids=new HashSet<>(); for(Photo previous:photos) ids.add(previous.id);
 			for(Photo photo:result.photos){
 				if(photo.downloadProtected && !photo.isOwner){ album.downloadProtected=true; updateSecureScope(); }
@@ -225,6 +225,11 @@ public class AlbumDetailFragment extends LoaderFragment{
 		}
 		if(adapter!=null) adapter.notifyDataSetChanged();
 	}
+	static boolean validPhoto(Photo photo, String albumId){
+		return photo!=null && photo.id!=null && albumId!=null && albumId.equals(photo.albumId) && photo.sortAt>=0
+				&& (Boolean.TRUE.equals(photo.adminBlocked) || photo.previewUrl!=null);
+	}
+
 	static String groupLabel(long seconds, boolean bySecond, ZoneId zone){
 		return (bySecond ? DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss") : DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL))
 				.withZone(zone).format(Instant.ofEpochSecond(seconds));
@@ -371,15 +376,21 @@ public class AlbumDetailFragment extends LoaderFragment{
 		@Override public void onBindViewHolder(PhotoHolder holder, int position){
 			Row row=rows.get(position);
 			if(row.header!=null){ ((TextView)holder.itemView).setText(row.header); return; }
-			Photo photo=photos.get(row.photoIndex);
-			boolean protectedTile=protectedVisitor() || (photo.downloadProtected && !photo.isOwner);
-			holder.image.setImageDrawable(protectedTile ? AlbumUi.protectedPlaceholder(getActivity()) : AlbumUi.gradient(getActivity(), photo.id));
-			// Protected previews are fetched only by the transient, secure viewer, never this disk-caching loader.
-			if(!protectedTile) AlbumUi.loadImage(holder.image, photo.previewUrl, V.dp(140));
-			holder.itemView.setContentDescription(getString(R.string.album_photo_accessibility, groupLabel(photo.sortAt, true, ZoneId.systemDefault()), row.photoIndex+1)
-					+(protectedTile ? " · "+getString(R.string.album_protection_thumbnail) : ""));
-				holder.itemView.setOnClickListener(v->{ if(fresh && sessionValid()) AlbumPhotoViewer.open(getActivity(), accountId, new ArrayList<>(photos), row.photoIndex); });
-				holder.itemView.setOnLongClickListener(v->{ if(!owner() || !photo.isOwner) return false; confirmDeletePhoto(photo); return true; });
+				Photo photo=photos.get(row.photoIndex);
+				boolean adminBlocked=Boolean.TRUE.equals(photo.adminBlocked);
+				boolean protectedTile=protectedVisitor() || (photo.downloadProtected && !photo.isOwner);
+				if(adminBlocked){
+					AlbumUi.cancelImage(holder.image);
+					holder.image.setImageDrawable(AlbumUi.adminBlockedPlaceholder(getActivity()));
+				}else{
+					holder.image.setImageDrawable(protectedTile ? AlbumUi.protectedPlaceholder(getActivity()) : AlbumUi.gradient(getActivity(), photo.id));
+					// Protected previews are fetched only by the transient, secure viewer, never this disk-caching loader.
+					if(!protectedTile) AlbumUi.loadImage(holder.image, photo.previewUrl, V.dp(140));
+				}
+				holder.itemView.setContentDescription(getString(R.string.album_photo_accessibility, groupLabel(photo.sortAt, true, ZoneId.systemDefault()), row.photoIndex+1)
+						+(adminBlocked ? " · "+getString(R.string.album_photo_admin_blocked) : protectedTile ? " · "+getString(R.string.album_protection_thumbnail) : ""));
+				holder.itemView.setOnClickListener(v->{ if(!adminBlocked && fresh && sessionValid()) AlbumPhotoViewer.open(getActivity(), accountId, new ArrayList<>(photos), row.photoIndex); });
+				holder.itemView.setOnLongClickListener(v->{ if(adminBlocked || !owner() || !photo.isOwner) return false; confirmDeletePhoto(photo); return true; });
 		}
 		@Override public int getItemCount(){ return rows.size(); }
 	}

@@ -36,7 +36,7 @@ import java.util.function.Consumer;
 
 import me.grishka.appkit.utils.V;
 
-final class AlbumUi{
+public final class AlbumUi{
 	private AlbumUi(){}
 	static final List<String> VISIBILITIES=List.of("private", "public", "shared");
 	static String visibility(Context context, String value){
@@ -62,6 +62,11 @@ final class AlbumUi{
 		Drawable lock=context.getDrawable(R.drawable.ic_lock_24px).mutate(); lock.setTint(UiUtils.getThemeColor(context, R.attr.colorM3OnSurfaceVariant));
 		LayerDrawable placeholder=new LayerDrawable(new Drawable[]{gradient(context, null), lock});
 		placeholder.setLayerSize(1, V.dp(32), V.dp(32)); placeholder.setLayerGravity(1, Gravity.CENTER); return placeholder;
+	}
+	public static Drawable adminBlockedPlaceholder(Context context){
+		Drawable lock=context.getDrawable(R.drawable.ic_block_24px).mutate(); lock.setTint(UiUtils.getThemeColor(context, R.attr.colorM3Error));
+		LayerDrawable placeholder=new LayerDrawable(new Drawable[]{gradient(context, null), lock});
+		placeholder.setLayerSize(1, V.dp(36), V.dp(36)); placeholder.setLayerGravity(1, Gravity.CENTER); return placeholder;
 	}
 	private static final java.util.WeakHashMap<ImageView, ImageLoad> imageLoads=new java.util.WeakHashMap<>();
 	/** Use the cache's public cancellation handle, rather than ViewImageLoader's private LoadTask. */

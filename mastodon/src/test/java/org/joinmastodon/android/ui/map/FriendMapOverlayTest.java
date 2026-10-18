@@ -194,7 +194,8 @@ public class FriendMapOverlayTest{
 		assertFalse(confirm.isEnabled()); confirm.performClick(); assertNull(actions.confirmed);
 		assertFalse(hasSelectedLabel(field(overlay,"body")));
 		overlay.enterMapDefaults(); overlay.showSettings(); overlay.showPin(); overlay.showPerson(new MapModels.Point());
-		assertTrue(overlay.onBackPressed()); overlay.state().setHeight(MapSheetState.Height.COLLAPSED);
+			assertTrue(overlay.findViewById(R.id.friend_map_canvas).getImportantForAccessibility()==View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
+			assertTrue(overlay.onBackPressed()); overlay.state().setHeight(MapSheetState.Height.COLLAPSED);
 		assertEquals(MapSheetState.Page.VISIBILITY,overlay.state().page()); assertEquals(MapSheetState.Height.EXPANDED,overlay.state().height());
 		assertEquals(View.IMPORTANT_FOR_ACCESSIBILITY_AUTO,overlay.findViewById(R.id.friend_map_panel).getImportantForAccessibility());
 		((View)findText(field(overlay,"body"),context.getString(R.string.map_ui_everyone)).getParent()).performClick();
@@ -216,9 +217,10 @@ public class FriendMapOverlayTest{
 			restrictedCard.performClick();
 			((View)findText(field(overlay,"body"),context.getString(R.string.map_ui_invisible)).getParent()).performClick();
 			assertEquals(previous+2,actions.visibilityNotices); assertNull(actions.changed); assertNull(actions.confirmed);
-			assertNotNull(findText(overlay,"此选项仅赞助者可选"));
-			findText(overlay,context.getString(R.string.map_presence_visibility_keep,context.getString("hidden".equals(existing)?R.string.map_ui_invisible:R.string.map_ui_mutual))).performClick();
-			assertEquals(existing,actions.confirmed); actions.confirmed=null; overlay.dispose();
+				assertNotNull(findText(overlay,"此选项仅赞助者可选"));
+				assertNull(findText(field(overlay,"body"),context.getString(R.string.map_presence_visibility_keep,context.getString("hidden".equals(existing)?R.string.map_ui_invisible:R.string.map_ui_mutual))));
+				assertNull(findText(field(overlay,"body"),context.getString(R.string.map_ui_stop_appearance)));
+				overlay.dispose();
 		}
 	}
 	@Test public void sponsorCanExplicitlyChooseHiddenAndRefreshClearsUnsubmittedDecision(){
@@ -229,7 +231,26 @@ public class FriendMapOverlayTest{
 		findText(overlay,context.getString(R.string.map_presence_visibility_continue)).performClick(); assertEquals("hidden",actions.confirmed);
 		overlay.updateSettings(first); assertFalse(((Button)findText(overlay,context.getString(R.string.map_presence_visibility_continue))).isEnabled()); overlay.dispose();
 	}
-	@Test public void stopIsNotRestrictedAndEnablingAppearanceDoesNotSilentlyChoosePublic(){
+	@Test public void visibilityGateShowsNeutralBasemapWithoutEscapeOrRetentionShortcuts(){
+			FriendMapOverlay overlay=overlay(true); MapModels.Settings first=settings(true); first.visibility="public"; first.visibilityConfirmed=false;
+			overlay.updateSettings(first); overlay.showVisibilityGate(); View source=new View(context); overlay.mapHost().addView(source,new FrameLayout.LayoutParams(-1,-1)); overlay.setSampleSource(source); layout(overlay,360,800);
+			assertEquals(View.GONE,((View)field(overlay,"gateBlanket")).getVisibility());
+			assertEquals(View.VISIBLE,overlay.findViewById(R.id.friend_map_canvas).getVisibility());
+			assertEquals(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS,overlay.findViewById(R.id.friend_map_canvas).getImportantForAccessibility());
+			ViewGroup body=field(overlay,"body");
+			assertNull(findText(body,context.getString(R.string.map_ui_stop_appearance)));
+			assertNull(findText(body,context.getString(R.string.map_presence_visibility_keep,context.getString(R.string.map_ui_everyone))));
+			overlay.dispose();
+		}
+	@Test public void cityPrecisionIsLockedVisuallyButClickOnlyShowsSponsorNotice(){
+			FriendMapOverlay overlay=overlay(true); MapModels.Settings ready=settings(true); ready.visibilityConfirmed=true;
+			ready.precisionLevel="5km"; overlay.updateSettings(ready); overlay.hideAccessGate(); overlay.showSettings(); ((View)findText(field(overlay,"body"),context.getString(R.string.map_ui_precision)).getParent()).performClick(); layout(overlay,360,800);
+			View city=findText(field(overlay,"body"),context.getString(R.string.map_ui_city_precision)); assertNotNull(city);
+			View card=(View)city.getParent(); assertTrue(card.isEnabled()); assertTrue(((TextView)city).getAlpha()<1f);
+			int notices=actions.cityPrecisionNotices; card.performClick(); assertEquals(notices+1,actions.cityPrecisionNotices); assertNull(actions.precision);
+			overlay.dispose();
+		}
+		@Test public void stopIsNotRestrictedAndEnablingAppearanceDoesNotSilentlyChoosePublic(){
 		FriendMapOverlay overlay=overlay(true); MapModels.Settings ready=settings(true); ready.visibility="friends";
 		overlay.updateSettings(ready); overlay.hideAccessGate(); overlay.showSettings();
 		findText(overlay,context.getString(R.string.map_ui_stop_appearance)).performClick(); assertEquals(1,actions.stops); assertNull(actions.changed);
@@ -260,12 +281,15 @@ public class FriendMapOverlayTest{
 		MotionEvent event=MotionEvent.obtain(1,2,action,x,y,0); try{ view.dispatchTouchEvent(event); }finally{ event.recycle(); }
 	}
 	private static final class RecordingActions implements FriendMapOverlay.Actions{
-		int consents,refreshes,verifications,visibilityNotices,stops;
+		int consents,refreshes,verifications,visibilityNotices,cityPrecisionNotices,stops;
 		String confirmed,changed;
 		public void confirmVisibility(String value){ confirmed=value; }
 		public void visibilitySponsor(){ visibilityNotices++; }
+		public void cityPrecisionSponsor(){ cityPrecisionNotices++; }
+		String precision;
+		public void precision(String value){ precision=value; }
 		public void stopAppearance(){ stops++; }
-		public void refresh(){ refreshes++; } public void locate(){} public void visibility(String value){ changed=value; } public void precision(String value){}
+		public void refresh(){ refreshes++; } public void locate(){} public void visibility(String value){ changed=value; }
 		public void anonymous(boolean value){} public void provider(String value){} public void useDeviceLocation(){} public void beginPin(){}
 		public void confirmPin(){} public void cancelPin(){} public void consent(){ consents++; } public void privacy(){}
 		public void verification(){ verifications++; } public void sponsor(){} public void profile(MapModels.Point point){}

@@ -124,7 +124,7 @@ public final class AlbumPhotoViewer implements PhotoViewer.AlbumDelegate, Applic
 			Toast.makeText(activity, R.string.album_viewer_invalid_session, Toast.LENGTH_LONG).show(); return;
 		}
 		for(AlbumModels.Photo photo:photos){
-			if(photo==null || TextUtils.isEmpty(photo.id) || TextUtils.isEmpty(photo.previewUrl)){
+			if(photo==null || TextUtils.isEmpty(photo.id) || !Boolean.TRUE.equals(photo.adminBlocked) && TextUtils.isEmpty(photo.previewUrl)){
 				Toast.makeText(activity, R.string.album_viewer_image_error, Toast.LENGTH_LONG).show(); return;
 			}
 		}
@@ -169,6 +169,10 @@ public final class AlbumPhotoViewer implements PhotoViewer.AlbumDelegate, Applic
 		main.post(()->onPhotoChanged(currentIndex));
 	}
 
+	public static android.graphics.drawable.Drawable adminBlockedPlaceholder(android.content.Context context){
+		return org.joinmastodon.android.fragments.albums.AlbumUi.adminBlockedPlaceholder(context);
+	}
+
 	static Attachment attachment(AlbumModels.Photo photo){
 		Attachment attachment=new Attachment();
 		attachment.id=photo.id;
@@ -176,6 +180,7 @@ public final class AlbumPhotoViewer implements PhotoViewer.AlbumDelegate, Applic
 		// An authorized original/HD URL must never be installed in an Attachment or ImageCache.
 		attachment.url=photo.previewUrl;
 		attachment.previewUrl=photo.previewUrl;
+		attachment.adminBlocked=Boolean.TRUE.equals(photo.adminBlocked);
 		attachment.description=photo.description;
 		attachment.meta=new Attachment.Metadata();
 		attachment.meta.width=photo.width;
@@ -245,7 +250,8 @@ public final class AlbumPhotoViewer implements PhotoViewer.AlbumDelegate, Applic
 		PhotoViewer.AlbumInfo info=new PhotoViewer.AlbumInfo();
 		info.isOwner=photo.isOwner;
 		info.downloadProtected=photo.downloadProtected;
-		info.canDownload=mayDownload(photo);
+		info.adminBlocked=Boolean.TRUE.equals(photo.adminBlocked);
+		info.canDownload=!info.adminBlocked && mayDownload(photo);
 		info.originalAvailable=photo.originalAvailable;
 		info.liked=photo.liked;
 		info.likesCount=photo.likesCount;
@@ -267,6 +273,11 @@ public final class AlbumPhotoViewer implements PhotoViewer.AlbumDelegate, Applic
 		comments.clear(); commentsOffset=0; commentsHasMore=false;
 		if(commentInput!=null) commentInput.setText("");
 		if(commentAdapter!=null) commentAdapter.notifyDataSetChanged();
+		if(Boolean.TRUE.equals(photos.get(position).adminBlocked) && commentsOpen){
+			commentsOpen=false; comments.clear(); commentsOffset=0; commentsHasMore=false;
+			if(commentsPanel!=null) commentsPanel.setVisibility(View.GONE);
+			viewer.setAlbumCommentsVisible(false);
+		}
 		if(supportsComments() && commentsOpen) loadComments(true);
 		viewer.refreshAlbumControls();
 	}
@@ -289,8 +300,17 @@ public final class AlbumPhotoViewer implements PhotoViewer.AlbumDelegate, Applic
 			if(revision!=previewRevision || position!=currentIndex) return;
 			previewRequest=null; previewRefreshing=false;
 			AlbumModels.Photo photo=result==null ? null : result.photo;
-			if(photo==null || !previous.id.equals(photo.id) || TextUtils.isEmpty(photo.previewUrl)){
+			if(photo==null || !previous.id.equals(photo.id)){
 				callback.onFailed(); Toast.makeText(activity, R.string.album_viewer_image_error, Toast.LENGTH_LONG).show(); return;
+			}
+			if(Boolean.TRUE.equals(photo.adminBlocked) || TextUtils.isEmpty(photo.previewUrl)){
+				photos.set(position, photo);
+				revokeChangedPolicy(previous, photo);
+				try{ if(policyListener!=null) policyListener.onPhotoPolicyChanged(photo); }
+				catch(RuntimeException error){ cancelPending(); viewer.blockAlbumDismissal(); callback.onFailed(); return; }
+				viewer.refreshAlbumControls();
+				if(Boolean.TRUE.equals(photo.adminBlocked)) callback.onBlocked(); else callback.onAccessDenied();
+				return;
 			}
 			photos.set(position, photo); // Owner/sponsor/original availability and social metadata come from renewed ACL DTO.
 			revokeChangedPolicy(previous, photo);
@@ -322,7 +342,8 @@ public final class AlbumPhotoViewer implements PhotoViewer.AlbumDelegate, Applic
 	}
 
 	private void revokeChangedPolicy(AlbumModels.Photo previous, AlbumModels.Photo photo){
-		if(!(!protectedNonowner(previous) && protectedNonowner(photo)
+		if(!(Boolean.TRUE.equals(photo.adminBlocked) && !Boolean.TRUE.equals(previous.adminBlocked)
+				|| !protectedNonowner(previous) && protectedNonowner(photo)
 				|| mayDownload(previous) && !mayDownload(photo)
 				|| mayUseLossless(previous) && !mayUseLossless(photo))) return;
 		// Invalidate authorization/retry/permission generations and in-flight byte saves.

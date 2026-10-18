@@ -104,6 +104,17 @@ public class MapClientAccessContractTest{
 		assertTrue(action.contains("!overlay.canSubmitConsent()"));
 		assertTrue(action.contains("Map.of(\"consent_version\",MapModels.CONSENT_VERSION)"));
 	}
+	@Test public void cityPrecisionIsSponsorGatedButStoredCityCanBeRetainedOrCoarsened(){
+		MapModels.Settings value=GSON.fromJson("{\"precision_level\":\"5km\",\"capabilities\":{\"can_choose_city_precision\":false}}",MapModels.Settings.class);
+		assertFalse(MapModels.canChoosePrecision(value,"city"));
+		assertTrue(MapModels.canChoosePrecision(value,"5km"));
+		assertTrue(MapModels.canChoosePrecision(value,"1km"));
+		value.precisionLevel="city";
+		assertTrue(MapModels.canChoosePrecision(value,"city"));
+		assertTrue(MapModels.canChoosePrecision(value,"5km"));
+		value.capabilities.canChooseCityPrecision=true;
+		assertTrue(MapModels.canChoosePrecision(value,"city"));
+	}
 	@Test public void noSdkInitializationBeforeConsentAndUnverifiedBaseMapHasNoSavedLocation() throws Exception{
 		String text=fragment();
 		String start=method(text,"void startProvider(");

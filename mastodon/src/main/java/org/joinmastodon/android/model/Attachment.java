@@ -25,6 +25,8 @@ public class Attachment extends BaseModel{
 	public String previewUrl;
 	public String remoteUrl;
 	public String description;
+	/** Album-only marker; blocked photos must not trigger image or action requests. */
+	public transient boolean adminBlocked;
 	@ParcelProperty("blurhash")
 	public String blurhash;
 	public Metadata meta;

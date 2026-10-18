@@ -41,6 +41,7 @@
     <string name="album_group_second">按秒分组</string>
     <string name="album_upload">上传照片</string>
     <string name="album_photo_accessibility">%1$s，第 %2$d 张照片</string>
+    <string name="album_photo_admin_blocked">此照片已被管理员屏蔽</string>
     <string name="album_invite">邀请加入</string>
     <string name="album_invite_help">邀请链接 7 天有效；每次生成会使之前的链接失效。仅共享相册可以邀请成员。</string>
     <string name="album_invite_rotate">生成新的邀请</string>

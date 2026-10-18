@@ -33,6 +33,10 @@ public final class MapModels{
 	public static boolean canConfirmVisibility(Settings settings,String value){
 		return canChooseVisibility(settings,value) || settings!=null && validVisibility(value) && value.equals(settings.visibility);
 	}
+	public static boolean canChoosePrecision(Settings settings,String value){
+		return settings!=null && validPrecision(value) && (!"city".equals(value) || "city".equals(settings.precisionLevel)
+				|| settings.capabilities!=null && settings.capabilities.canChooseCityPrecision);
+	}
 	public static boolean canPublishDeviceLocation(Settings settings){
 		return settings!=null && consentAccepted(settings.consent) && settings.babyVerified && settings.visibilityConfirmed
 				&& ("public".equals(settings.visibility) || "friends".equals(settings.visibility)) && "device".equals(settings.locationMode);
@@ -61,7 +65,7 @@ public final class MapModels{
 	}
 
 	public static class Capabilities{
-		public boolean canChooseVisibility;
+		public boolean canChooseVisibility, canChooseCityPrecision;
 	}
 
 	public static class Settings extends BaseModel{

@@ -49,6 +49,7 @@ public final class FriendMapOverlay extends FrameLayout{
 		void confirmVisibility(String value);
 		void stopAppearance();
 		void visibilitySponsor();
+		default void cityPrecisionSponsor(){ sponsor(); }
 		void precision(String value);
 		void anonymous(boolean value);
 		void provider(String value);
@@ -211,8 +212,6 @@ public final class FriendMapOverlay extends FrameLayout{
 		gateColumn.addView(title,new LinearLayout.LayoutParams(-1,-2));
 		if(verification) SponsorUi.button(gateColumn,getString(R.string.map_ui_go_verification),actions::verification);
 		else if(access==MapModels.Access.ERROR) SponsorUi.button(gateColumn,getString(R.string.map_ui_retry),actions::refresh);
-		if(!busy && settings!=null && !"hidden".equals(settings.visibility))
-			SponsorUi.secondary(gateColumn,getString(R.string.map_ui_stop_appearance),actions::stopAppearance);
 		updateAccessPresentation();
 	}
 	private void updateAccessPresentation(){
@@ -227,11 +226,12 @@ public final class FriendMapOverlay extends FrameLayout{
 	}
 	private void updateGateBackdrop(){
 		boolean blur=access==MapModels.Access.VERIFICATION && Build.VERSION.SDK_INT>=31 && isHardwareAccelerated()
-				&& (hasSnapshot || sampleSource!=null && mapHost.getChildCount()>0);
+					&& (hasSnapshot || sampleSource!=null && mapHost.getChildCount()>0);
+		boolean showNeutralBasemap=access==MapModels.Access.VISIBILITY && sampleSource!=null && mapHost.getChildCount()>0;
 		if(Build.VERSION.SDK_INT>=31) mapHost.setRenderEffect(blur?RenderEffect.createBlurEffect(V.dp(30),V.dp(30),Shader.TileMode.CLAMP):null);
 		verificationGate.setBackgroundColor(blur?withAlpha(surface,.70f):surface);
 		// Keep the SDK rendering behind an opaque fallback until a blurred backdrop is available.
-		gateBlanket.setVisibility(accessBlocked()&&!blur?VISIBLE:GONE);
+		gateBlanket.setVisibility(accessBlocked()&&!blur&&!showNeutralBasemap?VISIBLE:GONE);
 		mapHost.setVisibility(VISIBLE);
 	}
 	public void showLoadingGate(){ access=MapModels.Access.LOADING; renderAccessGate(null); }
@@ -550,21 +550,20 @@ choice(titles[i],allowed?hints[i]:R.string.map_presence_visibility_sponsor_only,
 				if(!busy && pendingVisibility!=null && MapModels.canConfirmVisibility(settings,pendingVisibility)) actions.confirmVisibility(pendingVisibility);
 			});
 			confirm.setEnabled(!busy && pendingVisibility!=null && MapModels.canConfirmVisibility(settings,pendingVisibility));
-			// Retention is distinct from choosing a restricted option. No stored value is preselected.
-			if(!"public".equals(settings.visibility) && MapModels.canConfirmVisibility(settings,settings.visibility)){
-				Button retain=SponsorUi.secondary(body,getContext().getString(R.string.map_presence_visibility_keep,visibilityLabel(settings.visibility)),()->{
-					if(!busy) actions.confirmVisibility(settings.visibility);
-				});
-				retain.setEnabled(!busy);
+		}
+	}
+		private void precisionOptions(){
+			if(settings==null){ messageBlock(); return; }
+			String[] values={"city","5km","1km","200m"}; int[] labels={R.string.map_ui_city_precision,R.string.map_ui_five_km,R.string.map_ui_one_km,R.string.map_ui_two_hundred_m};
+			for(int i=0;i<values.length;i++){
+				String value=values[i]; boolean allowed=MapModels.canChoosePrecision(settings,value);
+				choice(labels[i],allowed?R.string.map_ui_precision_summary:R.string.map_presence_city_sponsor_only,
+						value.equals(settings.precisionLevel),!allowed,()->{
+							if(!allowed){ actions.cityPrecisionSponsor(); return; }
+							actions.precision(value);
+						});
 			}
 		}
-		if(!"hidden".equals(settings.visibility)) action(getString(R.string.map_ui_stop_appearance),actions::stopAppearance,false);
-	}
-	private void precisionOptions(){
-		if(settings==null){ messageBlock(); return; }
-		String[] values={"city","5km","1km","200m"}; int[] labels={R.string.map_ui_city_precision,R.string.map_ui_five_km,R.string.map_ui_one_km,R.string.map_ui_two_hundred_m};
-		for(int i=0;i<values.length;i++){ String value=values[i]; choice(labels[i],R.string.map_ui_precision_summary,value.equals(settings.precisionLevel),()->actions.precision(value)); }
-	}
 	private String providerLabel(String id){ return getString("baidu".equals(id)?R.string.map_presence_baidu:"amap".equals(id)?R.string.map_presence_amap:R.string.map_ui_provider_auto); }
 	private void providerOptions(){
 		for(String id:new String[]{"auto","baidu","amap"}) choice("auto".equals(id)?R.string.map_ui_provider_auto:"baidu".equals(id)?R.string.map_presence_baidu:R.string.map_presence_amap,R.string.map_ui_provider_summary,id.equals(providerId),()->actions.provider(id));

@@ -22,6 +22,8 @@ public final class AlbumModels{
 		public long uploadedAt, sortAt;
 		public int width, height, likesCount, commentsCount;
 		public boolean originalAvailable, liked, isOwner, ownerSponsor, downloadProtected;
+		/** True when an administrator has blocked this photo; nullable for older servers. */
+		public Boolean adminBlocked;
 		/** Null for legacy servers; never interpret a missing permission as an explicit grant. */
 		public Boolean canDownload;
 	}

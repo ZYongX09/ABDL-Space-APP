@@ -66,8 +66,10 @@ public class FriendMapFragment extends AppKitFragment implements MapProvider.Lis
 		if(mapBackdropListener!=null) mapBackdropListener.onMapBackdropChanged(backdropSource,backdropSnapshot);
 	}
 	private void publishProviderBackdrop(){
-		// SDK snapshots cover this provider map View, not mapHost or its padded container.
-		publishBackdrop(baseMapAllowed() && provider!=null && provider.isReady()?provider.getSampleSource():null,null);
+		// Keep the last completed SDK frame while the camera is moving; replace it only after a fresh capture.
+		View source=baseMapAllowed() && provider!=null && provider.isReady()?provider.getSampleSource():null;
+		if(source==null) publishBackdrop(null,null);
+		else if(backdropSource!=source) publishBackdrop(source,null);
 	}
 	private static final int LOCATION_REQUEST=7041;
 	// The privacy summary shows fully only on the first map open of this app process.
@@ -87,7 +89,7 @@ public class FriendMapFragment extends AppKitFragment implements MapProvider.Lis
 	private FriendMapOverlay overlay;
 	private boolean destroyed=true,resumed,tabVisible,active,picking,snapshotBusy,returningFromGate;
 	private SponsorNoticeSheet sponsorSheet;
-	private boolean publishOnLocation;
+	private boolean publishOnLocation,snapshotPending;
 	private int generation,queryGeneration,snapshotGeneration,snapshotRequest,topInset,bottomInset;
 	private Runnable viewportDebounce,snapshotDebounce,snapshotTimeout;
 	private Bundle providerState;
@@ -335,7 +337,11 @@ public class FriendMapFragment extends AppKitFragment implements MapProvider.Lis
 			else requestDeviceLocation();
 		});
 	}
-	@Override public void precision(String value){ if(personalDataAllowed() && MapModels.validPrecision(value)) saveSettings(Map.of("precision_level",value),this::readSelf); }
+	@Override public void precision(String value){
+		if(!personalDataAllowed() || !MapModels.validPrecision(value)) return;
+		if(!MapModels.canChoosePrecision(settings,value)){ cityPrecisionSponsor(); return; }
+		saveSettings(Map.of("precision_level",value),this::readSelf);
+	}
 	@Override public void anonymous(boolean value){ if(personalDataAllowed()) saveSettings(Map.of("anonymous",value),this::readSelf); }
 	@Override public void useDeviceLocation(){ if(personalDataAllowed()) saveSettings(Map.of("location_mode","device"),this::requestDeviceLocation); }
 	private void saveSettings(Map<String,Object> changes,Runnable done){
@@ -386,6 +392,9 @@ public class FriendMapFragment extends AppKitFragment implements MapProvider.Lis
 	}
 	@Override public void visibilitySponsor(){
 		if(personalDataAllowed() || visibilityGateAllowed()) showSponsorNotice(R.string.map_ui_visibility,R.string.map_presence_visibility_sponsor_body);
+	}
+	@Override public void cityPrecisionSponsor(){
+		if(personalDataAllowed()) showSponsorNotice(R.string.map_ui_precision,R.string.map_presence_city_precision_sponsor_body);
 	}
 	private void showSponsorNotice(int title,int body){
 		if(sponsorSheet!=null) return;
@@ -446,16 +455,20 @@ public class FriendMapFragment extends AppKitFragment implements MapProvider.Lis
 	private void scheduleSnapshot(){
 		if(!baseMapAllowed() || provider==null || !provider.isReady()
 				|| (mapBackdropListener==null && access!=MapModels.Access.VERIFICATION && !GlobalUserPreferences.isIosLiquidNavigationEnabled())) return;
+		snapshotPending=true;
+		if(snapshotBusy) return;
 		if(snapshotDebounce!=null) main.removeCallbacks(snapshotDebounce); snapshotDebounce=this::sampleMap; main.postDelayed(snapshotDebounce,300);
 	}
 	private void sampleMap(){
-		if(!baseMapAllowed() || snapshotBusy || provider==null || !provider.isReady()) return;
+		if(!baseMapAllowed() || provider==null || !provider.isReady()) return;
+		if(snapshotBusy){ snapshotPending=true; return; }
+		snapshotPending=false;
 		MapProvider current=provider; View source=current.getSampleSource();
 		int expected=generation,sample=snapshotGeneration,request=++snapshotRequest; snapshotBusy=true;
 		snapshotTimeout=()->{
 			if(live(expected) && current==provider && request==snapshotRequest){
-				snapshotRequest++; snapshotBusy=false; overlay.setSnapshot(null); publishProviderBackdrop();
-				if(sample!=snapshotGeneration) scheduleSnapshot();
+				snapshotRequest++; snapshotBusy=false; publishProviderBackdrop();
+				if(snapshotPending || sample!=snapshotGeneration) scheduleSnapshot();
 			}
 		}; main.postDelayed(snapshotTimeout,2500);
 		current.requestSnapshot(bitmap->main.post(()->{
@@ -463,12 +476,13 @@ public class FriendMapFragment extends AppKitFragment implements MapProvider.Lis
 			snapshotRequest++; snapshotBusy=false; if(snapshotTimeout!=null) main.removeCallbacks(snapshotTimeout);
 			if(sample!=snapshotGeneration){ scheduleSnapshot(); return; }
 			Bitmap safe=bitmap!=null && !bitmap.isRecycled()?bitmap:null;
-			overlay.setSnapshot(safe); publishBackdrop(source,safe);
+			if(safe!=null){ overlay.setSnapshot(safe); publishBackdrop(source,safe); }
+			if(snapshotPending || sample!=snapshotGeneration) scheduleSnapshot();
 		}));
 	}
 	private void clearSnapshotWork(){
-		snapshotGeneration++; snapshotRequest++; snapshotBusy=false;
-		if(snapshotDebounce!=null) main.removeCallbacks(snapshotDebounce); if(snapshotTimeout!=null) main.removeCallbacks(snapshotTimeout);
+			snapshotGeneration++; snapshotRequest++; snapshotBusy=false; snapshotPending=false;
+			if(snapshotDebounce!=null) main.removeCallbacks(snapshotDebounce); if(snapshotTimeout!=null) main.removeCallbacks(snapshotTimeout);
 	}
 	private void cancelAll(){
 		if(viewportDebounce!=null) main.removeCallbacks(viewportDebounce);
