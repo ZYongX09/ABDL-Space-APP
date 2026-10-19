@@ -60,17 +60,17 @@ abstract class FriendCardBaseFragment : ToolbarFragment() {
             contentView = view
             view.setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
             view.setContent {
-                @Suppress("UNUSED_VARIABLE") val redraw = revision
+                val redraw = revision
                 MiuixAppTheme {
                     Box(Modifier.fillMaxSize().background(MiuixTheme.colorScheme.background).imePadding()) {
                         if (!accountValid()) FriendCardNotice("当前账号不可用，请返回并切换到原账号", null, null)
-                        else Screen()
+                        else Screen(redraw)
                     }
                 }
             }
         }
     }
-    @Composable protected abstract fun Screen()
+    @Composable protected abstract fun Screen(revision: Int)
     override fun onShown() {
         super.onShown(); shown = true
         if (accountValid()) refresh() else changed()
