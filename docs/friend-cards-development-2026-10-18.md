@@ -6,6 +6,28 @@
 
 新版仅替换旧交友创建/浏览入口，旧friend_requests接口、历史交友阅读保留；五栏导航与独立地图不变。两个网页无需新页面即可阅读文字fallback，不宣称已支持网页结构化卡片UI。
 
+## 2026-10-19 后端生产发布与客户端验收边界
+
+用户后续授权“除了不发布app外，其他全部完成”。后端生产0080/0082于10:14:38 UTC执行，main快进到878ade0；Worker `b4ff2f2f-f196-4407-ac2a-c5493b8fd5fd` 于10:18:05 UTC接100%流量。线上公共/鉴权边界19/19通过，发布前关键91/91；后端生产记录为独立仓 `docs/friend-cards-production-2026-10-19.md`。原review阶段“后端未部署”描述保留为历史，不再代表当前生产状态。
+
+本次未合Android main、未正式发布APK、未改下载/版本JSON。2026-10-19后续preflight已为**0设备/0AVD**（与早先短暂USB可见时不同）；Linux模拟器不可用，没有强行安装系统组件或接受许可。仓库未有能确认授权归属的实网A/B测试账号清单，无现成授权登录会话；真实创建需有效宝宝证书及当前credential，不能猜测试邮箱登录、提取真实用户token或写DB伪造认证。真实COS/双账号/旧端往返/覆盖安装及小屏大字暗色验收仍阻塞，不能用92项本地回归冒称实网全闭环。正式签名修复测试包继续保留，版本与哈希见下。
+
+## 2026-10-19 review 修复（开发线，专项已通过；后端后续上线）
+
+独立 `fix/friend-cards-review` 基于最新 develop `030e2ffb`；修复提交 `eb120882` 已快进合入并推送develop，未接触并行地图／相册修复工作区。后端review修复 `40008ad`、集成 `fb3d761` 与交付记录 `878ade0` 也已推develop；0080/0082扩列依赖仍未执行生产迁移，本轮不改main/生产SQL/Worker/正式下载。
+
+- Base 将 revision 传入真实主题内容及各 Screen；各页对业务字段、页列表和商品选集生成本轮只读快照，LazyColumn／VerticalPager 不再隐藏捕获同一个普通可变容器。
+- 不通过 `key(revision)` 重建整屏；推荐请求不驱动跳页，只有显式刷新信号才复位；商品搜索只在查询变化时归顶，不在勾选或分页时归顶。
+- 删除卡片发送空 JSON `{}`，让真实请求携带 `application/json`；不放宽后端写入请求守卫。
+- 新增独立真实 Compose 页面回归与 Controller→MockWebServer HTTP 回归。前者保留真实 Fragment／Base ComposeView／Miuix 主题／生产 Screen，仅替换远程执行与导航，不使用 LocalViews。
+- 使用 JDK21 顺序重新编译 release Kotlin、Java 及全部测试源码，通过。最新单次扩列／兼容专项 **92/92，通过14个测试类，零失败／错误／跳过**，包含新增11项真实 Compose 与2项真实HTTP；由最终JUnit XML逐项统计，不累加历史运行。覆盖首帧资格加载退出、错误重试、连续输入、未提交标签及焦点／选区／滚动保持、公开/旧文字预览、商品返回、详情／历史回包、分页追加和选集计数。
+- 日志 `/tmp/friend-cards-review-android-targeted-final.log`，逐类计数 `/tmp/friend-cards-review-android-targeted-summary.json`。先前新测试曾有5处API链式Unit编译错误及1处hint消失后定位失败，均只修测试调用／定位，最终11项真实页面完整通过；没有替换主题或屏蔽业务断言。
+- 另一任务的Gradle运行期间本轮停止自己的并发尝试并等待，未停止对方进程。根分区剩余空间不足1GiB且不支持reflink，最终通过仓库外临时Gradle init脚本将本轮buildDirectory指向 `/tmp/friend-cards-review-android-build`；未改项目Gradle配置、系统SDK或删除用户缓存/旧APK。临时构建从本轮源码重新编译，不复用其它工作区APK。
+- 正式签名release修复测试包由干净提交 `eb120882` 构建：`/home/ZYongX/projects/ABDL-Space-APP-3.1.0-code33-friend-cards-review-fix-test.apk`，**236,164,140 bytes**，SHA-256 `295ad979f7efa1c32f6f89952cb2282e91977d7cf5d61ff863b3a519315a1b0c`。保持包名 `top.abdl_space.app`、3.1.0/code33、min26/target35/compile37及原四ABI；不提升正式版本号。
+- 最终 `assembleRelease` 与 `verifyMapKeys`成功，`apksigner verify` V2通过，签名证书SHA-256仍为 `fd2098a3d3493222c247a7ba2787ec48fd8f62d38e9432ed4d6290a057dea475`，ZIP全部条目校验无损。日志 `/tmp/friend-cards-review-android-package-verified.log`，产物元数据 `/tmp/friend-cards-review-apk.json`。
+- 打包先遇离线desugaring缓存缺失，恢复既有依赖后再遇磁盘配额；只迁移本轮APK输出，压缩本轮D8警告日志并移除本轮已完成测试的可重建中间文件后，最后顺序重跑构建成功。未删除旧APK、用户缓存或其它任务产物；旧friend-cards-test包仍保留，不与修复包混淆。
+- 本轮未重新运行Android全量；原全量OOM/旧QQ资源断言限制仍保留，不宣称全项目全绿。USB设备现已可见，但本轮未在其上安装新包或完成真实后端／COS／双账号闭环。
+
 ## 功能
 
 - 创建/编辑三阶段与发布预览；互动习惯自由文本且示例不保存。
@@ -29,14 +51,11 @@
 - release Kotlin与Java源码编译通过；因恢复被清理的依赖缓存及设备内存/磁盘有限，首次完整构建耗时较长。隔离构建使用临时 `/tmp` SDK平台视图和现有本地配置的临时链接；未修改仓库Gradle配置、未升级依赖、未触及Cloudflare。
 - 发布用测试包副本：`/home/ZYongX/projects/ABDL-Space-APP-3.1.0-code33-friend-cards-test.apk`，**236,145,560 bytes**，SHA-256 `408274cd0b967ccc17941f5f849d5d0235af595fe9c4a76233f7683d3e64c34b`。包名`top.abdl_space.app`，versionCode 33 / versionName 3.1.0，minSDK 26 / targetSDK 35。
 - `apksigner verify --verbose`通过，V2 signer SHA-256 `fd2098a3d3493222c247a7ba2787ec48fd8f62d38e9432ed4d6290a057dea475` 与原正式证书相同；Gradle `verifyMapKeys`通过。原图形工作树APK SHA为`f65af923...`的独立地图包保持原样。
-- 扩列专项 release 单测 **79/79通过**：11个测试类；包含本地状态/草稿/DTO、真实Fragment回调、焦点矩阵、帖子wire/drawable、navigation/Compose及兼容分支。
-- 后端最终完整测试 **578总 / 569pass / 9既有fail**，比基线新增38pass，失败名称集合不变；专项145/145，类型329诊断无新增。独立复核发现的1P1/4P2均修并有回归；这不是完整安全审计。
+- 初次交付的扩列专项 release 单测 **79/79通过**：12个测试类；包含本地状态/草稿/DTO、真实Fragment回调、焦点矩阵、帖子wire/drawable、navigation/Compose及兼容分支。Fragment回调测试替换了Compose视图，**未覆盖本次review确认的真实重组问题**；不能把这79项作为页面刷新验收。
+- 后端初次交付完整测试 **578总 / 569pass / 9既有fail**，比当时基线新增38pass，失败名称集合不变；专项145/145，类型329诊断无新增。当时独立复核修复的是尾注撤回、墓碑封面引用、source、正文长度和投影边界，不等于本次review的五项已经关闭；这不是完整安全审计。
 - 后端Worker `wrangler deploy --dry-run`本地打包成功；**只dry-run，没有执行部署或生产迁移**。
-- 扩列专项实际 **75/75通过**，11个测试类，包含纯状态/草稿/DTO、真实Fragment回调、焦点矩阵、Status wire、display holder、Compose与Home导航。
-- 独立页面复核的两项P2（Float裁切反区间、空推荐批次停载）已修，并纳入专项。
+- 独立页面复核的两项P2（Float裁切反区间、空推荐批次停载）已修，并纳入初次交付专项。
 - 主代理复核纠正了最初holder与已确认中等设计不符的问题，叠字、局部渐变、摘要字段排除、加载失败收缩均有真实View绑定测试。
-- 后端最终完整测试 **578总 / 569pass / 9既有fail**，比基线新增38pass、失败名称集合不变；专项145/145，类型329诊断无新增。独立复核原1P1/4P2均修复并关闭；这不是完整安全审计。
-- 后端本地 Worker `wrangler deploy --dry-run`打包通过；只打包未部署。
 - `git diff --check`已检查。
 
 ### 未通过/未完成

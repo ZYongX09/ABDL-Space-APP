@@ -14,6 +14,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.joinmastodon.android.api.requests.friendcards.FriendCardRequest
 import org.joinmastodon.android.friendcards.FriendCardPages
+import org.joinmastodon.android.model.FriendCard
 import org.joinmastodon.android.ui.compose.friendcards.*
 import top.yukonga.miuix.kmp.basic.Text
 
@@ -22,6 +23,7 @@ class FriendCardFeedFragment : FriendCardBaseFragment() {
     private var position = 0
     private var visibleId: String? = null
     private var needsRevalidate = false
+    private var pagerReset = 0
     override fun onCreate(state: Bundle?) { super.onCreate(state); setTitle("扩列"); position = state?.getInt("page") ?: 0; visibleId = state?.getString("visible_id") }
     override fun onSaveInstanceState(state: Bundle) { super.onSaveInstanceState(state); state.putInt("page", position); state.putString("visible_id", pages.cards.getOrNull(position)?.id ?: visibleId) }
     override fun refresh() {
@@ -55,23 +57,33 @@ class FriendCardFeedFragment : FriendCardBaseFragment() {
         pages.cards.getOrNull(position)?.let { visibleId = it.id }
         needsRevalidate = true; pages.reset(); super.onHidden()
     }
-    @Composable override fun Screen() {
+    private data class ScreenState(
+        val cards: List<FriendCard>, val loading: Boolean, val loaded: Boolean,
+        val error: String?, val position: Int, val restoring: Boolean, val pagerReset: Int,
+    )
+    @Composable override fun Screen(revision: Int) {
+        val state = remember(revision) {
+            ScreenState(pages.cards.toList(), pages.loading, pages.loaded, pages.error, position, visibleId != null, pagerReset)
+        }
         Column(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            FriendCardActions("我的扩列卡" to { go(MyFriendCardsFragment::class.java) }, "刷新" to { position = 0; visibleId = null; pages.reset(); load() })
-            if (pages.cards.isEmpty() || visibleId != null) {
-                if (pages.error != null) FriendCardNotice(pages.error!!, "重试", { load() })
-                else if (pages.loading) FriendCardNotice("正在读取扩列推荐…", null, null)
-                else if (pages.loaded) FriendCardNotice("暂时没有可推荐的卡，可以稍后刷新。", "刷新", { pages.reset(); load() })
+            FriendCardActions("我的扩列卡" to { go(MyFriendCardsFragment::class.java) }, "刷新" to { pagerReset++; position = 0; visibleId = null; pages.reset(); load() })
+            if (state.cards.isEmpty() || state.restoring) {
+                if (state.error != null) FriendCardNotice(state.error, "重试", { load() })
+                else if (state.loading) FriendCardNotice("正在读取扩列推荐…", null, null)
+                else if (state.loaded) FriendCardNotice("暂时没有可推荐的卡，可以稍后刷新。", "刷新", { pages.reset(); load() })
                 return@Column
             }
-            val pager = rememberPagerState(initialPage = position.coerceIn(0, pages.cards.lastIndex), pageCount = { pages.cards.size })
-            LaunchedEffect(pager.currentPage) {
+            val pager = rememberPagerState(initialPage = state.position.coerceIn(0, state.cards.lastIndex), pageCount = { state.cards.size })
+            LaunchedEffect(pager.currentPage, state.cards.size) {
                 position = pager.currentPage
-                if (position >= pages.cards.size - 3 && pages.error == null) load()
+                if (position >= state.cards.size - 3 && state.error == null) load()
             }
-            LaunchedEffect(pages.generation, position) { if (position in pages.cards.indices && pager.currentPage != position) pager.scrollToPage(position) }
-            VerticalPager(state = pager, modifier = Modifier.weight(1f), beyondViewportPageCount = 1, key = { pages.cards[it].id }) { index ->
-                val value = pages.cards[index]
+            var displayedReset by remember { mutableIntStateOf(state.pagerReset) }
+            LaunchedEffect(state.pagerReset) {
+                if (displayedReset != state.pagerReset) { pager.scrollToPage(0); displayedReset = state.pagerReset }
+            }
+            VerticalPager(state = pager, modifier = Modifier.weight(1f), beyondViewportPageCount = 1, key = { state.cards[it].id }) { index ->
+                val value = state.cards[index]
                 BoxWithConstraints(Modifier.fillMaxSize()) {
                     val room = maxHeight.value / LocalDensity.current.fontScale
                     FriendCardPanel(modifier = Modifier.fillMaxSize().clickable { detail(value) }) {
@@ -81,12 +93,12 @@ class FriendCardFeedFragment : FriendCardBaseFragment() {
                         Spacer(Modifier.weight(1f))
                         if (room >= 400) Text(value.owner?.displayName?.takeIf { it.isNotBlank() } ?: value.owner?.username ?: "扩列用户", maxLines = 1, overflow = TextOverflow.Ellipsis)
                         FriendCardActions("完整资料" to { detail(value) }, "私信" to { chat(value) })
-                        if (room >= 360) Text("${index + 1} / ${pages.cards.size} · 上下滑动")
+                        if (room >= 360) Text("${index + 1} / ${state.cards.size} · 上下滑动")
                     }
                 }
             }
-            pages.error?.let { FriendCardNotice(it, "重试下一页", { load() }) }
-            if (pages.loading) Text("正在加载更多…")
+            state.error?.let { FriendCardNotice(it, "重试下一页", { load() }) }
+            if (state.loading) Text("正在加载更多…")
         }
     }
 }

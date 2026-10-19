@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import me.grishka.appkit.Nav
 import org.joinmastodon.android.R
 import org.joinmastodon.android.api.MastodonAPIController
@@ -238,15 +239,31 @@ class FriendCardCreateFragment : FriendCardBaseFragment() {
         persist(); removeBackCallback(back); busy = false; coverGeneration++; uploader?.cancel(); uploader = null; coverBusy = false; super.onHidden()
     }
     override fun onDestroyView() { removeBackCallback(back); coverGeneration++; uploader?.cancel(); uploader = null; coverBusy = false; super.onDestroyView() }
-    @Composable override fun Screen() {
-        val d = draft
-        if (d == null || loadError != null) {
-            FriendCardNotice(loadError ?: "草稿不可用", "重试读取", { loadError = null; restore(); refresh() }); return
+    private data class ScreenState(
+        val draft: FriendCardDraft?,
+        val loadError: String?,
+        val options: FriendCardResponses.Options?,
+        val checking: Boolean,
+        val eligibilityError: String?,
+        val error: String?,
+        val preview: Boolean,
+        val busy: Boolean,
+        val coverBusy: Boolean,
+    )
+    @Composable override fun Screen(revision: Int) {
+        val state = remember(revision) {
+            ScreenState(draft, loadError, options, checking, eligibilityError,
+                listOfNotNull(storageError, currentError, globalError).joinToString("\n").takeIf { it.isNotBlank() },
+                preview, busy, coverBusy)
+        }
+        val d = state.draft
+        if (d == null || state.loadError != null) {
+            FriendCardNotice(state.loadError ?: "草稿不可用", "重试读取", { loadError = null; restore(); refresh() }); return
         }
         FriendCardEditorScreen(
-            draft = d, options = options, checking = checking, eligibilityError = eligibilityError,
-            error = listOfNotNull(storageError, currentError, globalError).joinToString("\n").takeIf { it.isNotBlank() },
-            preview = preview, busy = busy, coverBusy = coverBusy,
+            draft = d, options = state.options, checking = state.checking, eligibilityError = state.eligibilityError,
+            error = state.error,
+            preview = state.preview, busy = state.busy, coverBusy = state.coverBusy,
             onRetry = { if (storageError != null) persist(); refresh() }, onVerification = { openVerification() },
             onStage = { stage(it) }, onEdit = { edit(it) }, onPreview = { showPreview() }, onBackToEdit = { preview = false; changed() },
             onPublish = { publish() }, onUnlock = { unlock() }, onSave = { if (persist()) toast("草稿已保存，尚未发布") }, onCover = { pickCover() },

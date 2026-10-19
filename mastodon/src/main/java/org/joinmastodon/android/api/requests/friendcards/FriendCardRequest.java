@@ -45,7 +45,7 @@ public final class FriendCardRequest<T> extends MastodonAPIRequest<T>{
 		JsonObject body=new JsonObject(); body.addProperty("expected_version", expectedVersion); body.addProperty("state", state);
 		return post("/"+id(cardId)+"/state", FriendCardResponses.Card.class, body);
 	}
-	public static FriendCardRequest<FriendCardResponses.Deleted> delete(String cardId, int expectedVersion){ return new FriendCardRequest<FriendCardResponses.Deleted>(HttpMethod.DELETE, "/"+id(cardId), FriendCardResponses.Deleted.class, null).query("expected_version", expectedVersion); }
+	public static FriendCardRequest<FriendCardResponses.Deleted> delete(String cardId, int expectedVersion){ return new FriendCardRequest<FriendCardResponses.Deleted>(HttpMethod.DELETE, "/"+id(cardId), FriendCardResponses.Deleted.class, new JsonObject()).query("expected_version", expectedVersion); }
 	public static FriendCardRequest<FriendCardResponses.Reported> report(String cardId, String reason, String detail){
 		JsonObject body=new JsonObject(); body.addProperty("reason", reason); if(detail!=null && !detail.isBlank()) body.addProperty("detail", detail);
 		return post("/"+id(cardId)+"/report", FriendCardResponses.Reported.class, body);

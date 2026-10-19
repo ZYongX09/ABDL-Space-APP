@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import org.joinmastodon.android.api.requests.friendcards.FriendCardRequest
@@ -58,25 +59,34 @@ class MyFriendCardsFragment : FriendCardBaseFragment() {
             execute(FriendCardRequest.delete(value.id, value.version), { result -> busy = false; if (result.deleted) refresh() else { globalError = "服务端未确认删除，请刷新核实"; changed() } }, { busy = false; globalError = message(it); changed() })
         }
     }
-    @Composable override fun Screen() {
+    private data class ScreenState(
+        val card: FriendCard?, val loaded: Boolean, val loading: Boolean, val busy: Boolean, val error: String?,
+        val history: List<FriendCard>, val historyLoaded: Boolean, val historyLoading: Boolean,
+        val historyError: String?, val historyCursor: String?,
+    )
+    @Composable override fun Screen(revision: Int) {
+        val state = remember(revision) {
+            ScreenState(card, loaded, loading, busy, globalError, history.cards.toList(),
+                history.loaded, history.loading, history.error, history.nextCursor)
+        }
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            item { FriendCardActions("创建新卡" to { go(FriendCardCreateFragment::class.java) }, "浏览扩列" to { go(FriendCardFeedFragment::class.java) }, "刷新" to { refresh() }, enabled = !busy) }
-            globalError?.let { text -> item { FriendCardNotice(text, "重试", { refresh() }) } }
-            if (loading) item { FriendCardNotice("正在读取我的扩列卡…", null, null) }
-            if (loaded && card == null) item { FriendCardPanel("还没有当前卡") { Text("可以先浏览。创建新卡需要当前有效宝宝认证，浏览与管理不设此门槛。") } }
-            card?.let { value -> item {
+            item { FriendCardActions("创建新卡" to { go(FriendCardCreateFragment::class.java) }, "浏览扩列" to { go(FriendCardFeedFragment::class.java) }, "刷新" to { refresh() }, enabled = !state.busy) }
+            state.error?.let { text -> item { FriendCardNotice(text, "重试", { refresh() }) } }
+            if (state.loading) item { FriendCardNotice("正在读取我的扩列卡…", null, null) }
+            if (state.loaded && state.card == null) item { FriendCardPanel("还没有当前卡") { Text("可以先浏览。创建新卡需要当前有效宝宝认证，浏览与管理不设此门槛。") } }
+            state.card?.let { value -> item {
                 FriendCardPanel("当前卡 · ${stateName(value.state)}") {
                     FriendCardCover(value.coverUrl, value.title, value.coverFocusX, value.coverFocusY)
                     value.reason?.takeIf { it.isNotBlank() }?.let { Text(it) }
-                    FriendCardActions("详情" to { detail(value) }, "编辑" to { go(FriendCardCreateFragment::class.java, args(value.id)) }, (if (value.state == "paused") "恢复展示" else "暂停展示") to { changeState(value) }, "发布帖" to { post(value) }, "删除" to { delete(value) }, enabled = !busy)
+                    FriendCardActions("详情" to { detail(value) }, "编辑" to { go(FriendCardCreateFragment::class.java, args(value.id)) }, (if (value.state == "paused") "恢复展示" else "暂停展示") to { changeState(value) }, "发布帖" to { post(value) }, "删除" to { delete(value) }, enabled = !state.busy)
                 }
             } }
-            if (loaded) item { Text("历史卡 · 仅自己可查看") }
-            items(history.cards, key = { it.id }) { value -> FriendCardPanel(value.title) { Text(stateName(value.state)); FriendCardActions("查看" to { detail(value) }, "编辑" to { go(FriendCardCreateFragment::class.java, args(value.id)) }, "发布帖" to { post(value) }, "删除" to { delete(value) }, enabled = !busy) } }
-            if (history.loaded && history.cards.isEmpty()) item { FriendCardNotice("暂无历史卡", null, null) }
-            history.error?.let { text -> item { FriendCardNotice(text, "重试加载历史", { loadHistory() }) } }
-            if (history.loading) item { FriendCardNotice("正在加载历史…", null, null) }
-            if (history.loaded && history.nextCursor != null && !history.loading && history.error == null) item { FriendCardActions("加载更多历史" to { loadHistory() }) }
+            if (state.loaded) item { Text("历史卡 · 仅自己可查看") }
+            items(state.history, key = { it.id }) { value -> FriendCardPanel(value.title) { Text(stateName(value.state)); FriendCardActions("查看" to { detail(value) }, "编辑" to { go(FriendCardCreateFragment::class.java, args(value.id)) }, "发布帖" to { post(value) }, "删除" to { delete(value) }, enabled = !state.busy) } }
+            if (state.historyLoaded && state.history.isEmpty()) item { FriendCardNotice("暂无历史卡", null, null) }
+            state.historyError?.let { text -> item { FriendCardNotice(text, "重试加载历史", { loadHistory() }) } }
+            if (state.historyLoading) item { FriendCardNotice("正在加载历史…", null, null) }
+            if (state.historyLoaded && state.historyCursor != null && !state.historyLoading && state.historyError == null) item { FriendCardActions("加载更多历史" to { loadHistory() }) }
         }
     }
     private fun stateName(state: String?) = when (state) { "active" -> "展示中"; "paused" -> "已暂停"; "archived" -> "已归档"; else -> "${state ?: "状态未知"} · 以服务端审核状态为准" }
