@@ -21,6 +21,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -51,8 +52,8 @@ fun FriendCardNotice(text: String, action: String?, retry: (() -> Unit)?, modifi
 
 @Composable
 fun FriendCardPanel(title: String? = null, modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
-    Column(modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(MiuixTheme.colorScheme.surface).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        title?.let { Text(it, fontWeight = FontWeight.SemiBold, fontSize = 18.sp) }
+    Column(modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(lerp(MiuixTheme.colorScheme.background, MiuixTheme.colorScheme.onSurface, .055f)).padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        title?.let { Text(it, color = MiuixTheme.colorScheme.onSurfaceVariantSummary, fontWeight = FontWeight.Medium, fontSize = 14.sp) }
         content()
     }
 }
@@ -66,18 +67,21 @@ fun FriendCardActions(vararg actions: Pair<String, () -> Unit>, enabled: Boolean
 
 @Composable
 fun FriendCardField(label: String, value: String, limit: Int, enabled: Boolean = true, hint: String = "", multiline: Boolean = false, onChange: (String) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text("$label  ${FriendCardRules.length(value)}/$limit", fontSize = 14.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text(label, modifier = Modifier.weight(1f), fontSize = 14.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
+            Text("${FriendCardRules.length(value)}/$limit", fontSize = 12.sp, color = if (FriendCardRules.length(value) > limit) MiuixTheme.colorScheme.error else MiuixTheme.colorScheme.onSurfaceVariantSummary)
+        }
         BasicTextField(value = value, onValueChange = onChange, enabled = enabled, singleLine = !multiline,
-            textStyle = TextStyle(color = MiuixTheme.colorScheme.onSurface, fontSize = 16.sp), cursorBrush = SolidColor(MiuixTheme.colorScheme.primary),
-            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(MiuixTheme.colorScheme.surfaceVariant).padding(12.dp).heightIn(min = if (multiline) 72.dp else 28.dp),
-            decorationBox = { inner -> Box { if (value.isEmpty()) Text(hint, fontSize = 16.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary); inner() } })
+            textStyle = TextStyle(color = MiuixTheme.colorScheme.onSurface, fontSize = 17.sp, lineHeight = 26.sp), cursorBrush = SolidColor(MiuixTheme.colorScheme.primary),
+            modifier = Modifier.fillMaxWidth().heightIn(min = if (multiline) 72.dp else 28.dp),
+            decorationBox = { inner -> Box { if (value.isEmpty()) Text(hint, fontSize = 17.sp, lineHeight = 26.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary); inner() } })
     }
 }
 
 @Composable
 fun FriendCardPrivacy(field: String, visible: Boolean, enabled: Boolean, onChange: () -> Unit) {
-    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable(enabled = enabled, role = Role.Checkbox, onClick = onChange).padding(vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+    Row(Modifier.fillMaxWidth().heightIn(min = 44.dp).clip(RoundedCornerShape(10.dp)).clickable(enabled = enabled, role = Role.Checkbox, onClick = onChange).padding(vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
         Text("${FriendCardRules.fields[field]}可见范围", fontSize = 13.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
         Text(if (visible) "公开 · 点击设为仅自己" else "仅自己 · 点击设为公开", fontSize = 13.sp, color = MiuixTheme.colorScheme.primary)
     }
@@ -85,9 +89,10 @@ fun FriendCardPrivacy(field: String, visible: Boolean, enabled: Boolean, onChang
 
 @Composable
 fun FriendCardChip(text: String, selected: Boolean = false, enabled: Boolean = true, onClick: (() -> Unit)? = null) {
-    Text(text, fontSize = 13.sp, color = if (selected) MiuixTheme.colorScheme.onPrimaryContainer else MiuixTheme.colorScheme.onSurfaceVariantSummary,
-        modifier = Modifier.clip(RoundedCornerShape(24.dp)).background(if (selected) MiuixTheme.colorScheme.primaryContainer else MiuixTheme.colorScheme.surfaceVariant)
-            .then(if (onClick != null) Modifier.clickable(enabled = enabled, role = Role.Button, onClick = onClick) else Modifier).padding(horizontal = 12.dp, vertical = 9.dp))
+    Text(text, fontSize = 14.sp, color = if (selected) MiuixTheme.colorScheme.onPrimaryContainer else MiuixTheme.colorScheme.onSurface,
+        modifier = Modifier.clip(RoundedCornerShape(24.dp)).background(if (selected) MiuixTheme.colorScheme.primaryContainer else MiuixTheme.colorScheme.surfaceVariant.copy(alpha = .65f))
+            .then(if (onClick != null) Modifier.clickable(enabled = enabled, role = Role.Button, onClick = onClick).heightIn(min = 44.dp) else Modifier)
+            .padding(horizontal = 15.dp, vertical = 11.dp))
 }
 
 @Composable

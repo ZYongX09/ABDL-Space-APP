@@ -13,6 +13,8 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.platform.ComposeView
+import org.robolectric.annotation.GraphicsMode
+import java.io.File
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
@@ -309,6 +311,8 @@ class FriendCardCompositionBehaviorTest {
         compose.onNodeWithContentDescription("添加其他游戏").performClick()
         inList(hasText("自填游戏 ×")).assertIsDisplayed()
         clickInList("自填游戏 ×")
+        compose.runOnIdle { assertTrue("Removing a game must update the durable draft", FriendCardDraftStore(compose.activity).load(account, null)?.input?.games.orEmpty().isEmpty()) }
+        list().performScrollToIndex(2)
         inList(hasText("我在玩 · 0/8")).assertIsDisplayed()
     }
 
@@ -316,6 +320,7 @@ class FriendCardCompositionBehaviorTest {
     fun savingTheScrolledEditorDoesNotRecreateItsLazyColumnOrJumpToTheTop() {
         mount(FriendCardCreateFragment())
         ready()
+        list().performScrollToIndex(3)
         val save = inList(hasText("保存本机草稿"))
         val listId = list().fetchSemanticsNode().id
         val scrollBefore = listScroll()
@@ -525,6 +530,61 @@ class FriendCardCompositionBehaviorTest {
         }
     }
 
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun redesignedRealFragmentHierarchyRendersAndKeepsOwnerAndVisitorActionsPinned() {
+        val fixture = card("render_card", "周末散步，认识有趣的朋友").apply {
+            owner = FriendCard.Owner().apply { id = "42"; username = "render_fixture"; displayName = "小岚 · 虚构用户" }
+            gender = "男"; age = "28岁"; region = "杭州"; mbti = "INFP"; zodiac = "天秤座"
+            interests = listOf("摄影", "散步", "音乐", "电影", "旅行")
+            games = listOf("stardew-valley", "minecraft")
+            lookingFor = "想认识愿意分享日常的朋友，一起散步、玩游戏，慢慢熟悉彼此。"
+            boundaries = "尊重彼此的节奏，不催回复。"
+            publicFields = listOf("gender", "age", "region", "mbti", "zodiac", "interests", "games", "looking_for", "boundaries")
+        }
+        val fragment = mount(FriendCardDetailFragment(), Bundle().apply { putString("card_id", "render_card") })
+        success(request("/render_card"), FriendCardResponses.Card().apply { card = fixture })
+        compose.onNodeWithText("编辑卡片").assertIsDisplayed().performClick()
+        assertEquals(FriendCardCreateFragment::class.java, LocalNavigation.target)
+        captureRealFragment("detail-owner-native-light")
+
+        compose.runOnIdle {
+            fixture.ownerId = "43"
+            fixture.owner.id = "43"
+        }
+        returnTo(fragment)
+        success(request("/render_card"), FriendCardResponses.Card().apply { card = fixture })
+        compose.onNodeWithText("编辑卡片").assertDoesNotExist()
+        compose.onNodeWithContentDescription("发私信").assertIsDisplayed().performClick()
+        assertEquals(org.joinmastodon.android.chat.ui.ChatFragment::class.java, LocalNavigation.target)
+        assertEquals(43L, LocalNavigation.args?.getLong("peer_id"))
+        captureRealFragment("detail-visitor-native-light")
+
+        compose.activityRule.scenario.onActivity { activity ->
+            activity.fragmentManager.beginTransaction().remove(fragment).commit()
+            activity.fragmentManager.executePendingTransactions()
+        }
+        mount(FriendCardFeedFragment())
+        success(request("/feed"), page(null, fixture))
+        compose.onNodeWithText("扩列精选").assertIsDisplayed()
+        compose.onNodeWithContentDescription("发私信").assertIsDisplayed()
+        captureRealFragment("feed-native-light")
+    }
+
+    private fun captureRealFragment(name: String) {
+        compose.waitForIdle()
+        lateinit var bitmap: android.graphics.Bitmap
+        compose.runOnIdle {
+            val view = compose.activity.window.decorView
+            bitmap = android.graphics.Bitmap.createBitmap(view.width, view.height, android.graphics.Bitmap.Config.ARGB_8888)
+            view.draw(android.graphics.Canvas(bitmap))
+        }
+        val directory = File("/tmp/abdl-friend-card-ui-renders/real-fragments").apply { mkdirs() }
+        File(directory, "$name.png").outputStream().use {
+            assertTrue(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it))
+        }
+    }
+
     private fun <T : FriendCardBaseFragment> mount(fragment: T, args: Bundle = Bundle()): T {
         args.putString("account", account)
         fragment.arguments = args
@@ -564,6 +624,9 @@ class FriendCardCompositionBehaviorTest {
     private fun listScroll(): Float = list().fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value()
 
     private fun inList(matcher: SemanticsMatcher): SemanticsNodeInteraction {
+        val target = compose.onNode(matcher)
+        if (runCatching { target.assertIsDisplayed() }.isSuccess) return target
+        list().performScrollToIndex(0)
         list().performScrollToNode(matcher)
         return compose.onNode(matcher).performScrollTo()
     }

@@ -1,22 +1,37 @@
-@file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@file:OptIn(
+    androidx.compose.foundation.ExperimentalFoundationApi::class,
+    androidx.compose.foundation.layout.ExperimentalLayoutApi::class,
+)
 
 package org.joinmastodon.android.fragments.friendcards
 
 import android.os.Bundle
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import org.joinmastodon.android.R
 import org.joinmastodon.android.api.requests.friendcards.FriendCardRequest
 import org.joinmastodon.android.friendcards.FriendCardPages
 import org.joinmastodon.android.model.FriendCard
 import org.joinmastodon.android.ui.compose.friendcards.*
+import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 class FriendCardFeedFragment : FriendCardBaseFragment() {
     private val pages = FriendCardPages()
@@ -65,12 +80,14 @@ class FriendCardFeedFragment : FriendCardBaseFragment() {
         val state = remember(revision) {
             ScreenState(pages.cards.toList(), pages.loading, pages.loaded, pages.error, position, visibleId != null, pagerReset)
         }
-        Column(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            FriendCardActions("我的扩列卡" to { go(MyFriendCardsFragment::class.java) }, "刷新" to { pagerReset++; position = 0; visibleId = null; pages.reset(); load() })
+        Column(Modifier.fillMaxSize().padding(horizontal = 12.dp).padding(top = 8.dp, bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            FeedHeader(state.cards.size) { pagerReset++; position = 0; visibleId = null; pages.reset(); load() }
             if (state.cards.isEmpty() || state.restoring) {
-                if (state.error != null) FriendCardNotice(state.error, "重试", { load() })
-                else if (state.loading) FriendCardNotice("正在读取扩列推荐…", null, null)
-                else if (state.loaded) FriendCardNotice("暂时没有可推荐的卡，可以稍后刷新。", "刷新", { pages.reset(); load() })
+                Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    if (state.error != null) FriendCardNotice(state.error, "重试", { load() })
+                    else if (state.loading) FriendCardNotice("正在读取扩列推荐…", null, null)
+                    else if (state.loaded) FriendCardNotice("暂时没有可推荐的卡，可以稍后刷新。", "刷新", { pages.reset(); load() })
+                }
                 return@Column
             }
             val pager = rememberPagerState(initialPage = state.position.coerceIn(0, state.cards.lastIndex), pageCount = { state.cards.size })
@@ -82,23 +99,66 @@ class FriendCardFeedFragment : FriendCardBaseFragment() {
             LaunchedEffect(state.pagerReset) {
                 if (displayedReset != state.pagerReset) { pager.scrollToPage(0); displayedReset = state.pagerReset }
             }
-            VerticalPager(state = pager, modifier = Modifier.weight(1f), beyondViewportPageCount = 1, key = { state.cards[it].id }) { index ->
+            VerticalPager(state = pager, modifier = Modifier.weight(1f).fillMaxWidth(), pageSpacing = 12.dp, beyondViewportPageCount = 1, key = { state.cards[it].id }) { index ->
                 val value = state.cards[index]
-                BoxWithConstraints(Modifier.fillMaxSize()) {
-                    val room = maxHeight.value / LocalDensity.current.fontScale
-                    FriendCardPanel(modifier = Modifier.fillMaxSize().clickable { detail(value) }) {
-                        FriendCardCover(if (room >= 420) value.coverUrl else null, value.title, value.coverFocusX, value.coverFocusY, ratio = if (room >= 620) 2.2f else 3.2f)
-                        if (room >= 620) FriendCardContents(value, compact = true)
-                        else if (value.isPublic("looking_for") && !value.lookingFor.isNullOrBlank()) Text("我想找 · ${value.lookingFor}", maxLines = if (room >= 400) 2 else 1, overflow = TextOverflow.Ellipsis)
-                        Spacer(Modifier.weight(1f))
-                        if (room >= 400) Text(value.owner?.displayName?.takeIf { it.isNotBlank() } ?: value.owner?.username ?: "扩列用户", maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        FriendCardActions("完整资料" to { detail(value) }, "私信" to { chat(value) })
-                        if (room >= 360) Text("${index + 1} / ${state.cards.size} · 上下滑动")
+                val palette = friendCardPalette(value)
+                Box(Modifier.fillMaxSize().clip(RoundedCornerShape(24.dp)).background(palette.background)) {
+                    Column(Modifier.fillMaxSize()) {
+                        // Only the portrait yields space on short screens; identity and Hi stay reachable.
+                        FriendCardPortrait(value, compact = true, modifier = Modifier.weight(1f).fillMaxWidth()
+                            .clickable(role = Role.Button, onClickLabel = "查看完整资料") { detail(value) })
+                        Column(Modifier.fillMaxWidth().background(palette.background).padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                FriendCardIdentity(value, modifier = Modifier.weight(1f), onClick = { profile(value) })
+                                FriendCardHello { chat(value) }
+                            }
+                            Text("${index + 1} / ${state.cards.size} · 上下滑动", color = palette.accent, fontSize = 12.sp)
+                        }
                     }
                 }
             }
             state.error?.let { FriendCardNotice(it, "重试下一页", { load() }) }
-            if (state.loading) Text("正在加载更多…")
+            if (state.loading) Text("正在加载更多…", color = MiuixTheme.colorScheme.onSurfaceVariantSummary, fontSize = 13.sp)
+        }
+    }
+
+    @Composable private fun FeedHeader(count: Int, onRefresh: () -> Unit) {
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            // Move controls onto their own row rather than squeezing or shrinking accessibility text.
+            val stacked = maxWidth.value / LocalDensity.current.fontScale < 340f
+            if (stacked) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    FeedHeading(count)
+                    FeedControls(onRefresh)
+                }
+            } else {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    FeedHeading(count, Modifier.weight(1f))
+                    FeedControls(onRefresh)
+                }
+            }
+        }
+    }
+
+    @Composable private fun FeedHeading(count: Int, modifier: Modifier = Modifier) {
+        FlowRow(modifier, horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text("扩列精选", fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.semantics { heading() })
+            Text("$count 张", fontSize = 13.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary, modifier = Modifier.padding(top = 6.dp))
+        }
+    }
+
+    @Composable private fun FeedControls(onRefresh: () -> Unit) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Box(Modifier.heightIn(min = 48.dp).clip(RoundedCornerShape(24.dp)).background(MiuixTheme.colorScheme.surfaceVariant)
+                .clickable(role = Role.Button) { go(MyFriendCardsFragment::class.java) }.padding(horizontal = 14.dp, vertical = 12.dp), contentAlignment = Alignment.Center) {
+                Text("我的扩列卡", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = MiuixTheme.colorScheme.onSurface)
+            }
+            Row(Modifier.heightIn(min = 48.dp).clip(RoundedCornerShape(24.dp)).clickable(role = Role.Button, onClick = onRefresh)
+                .padding(horizontal = 10.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                Icon(painter = painterResource(R.drawable.ic_fluent_arrow_clockwise_24_regular), contentDescription = null,
+                    tint = MiuixTheme.colorScheme.onSurfaceVariantSummary, modifier = Modifier.size(20.dp))
+                Text("刷新", fontSize = 13.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
+            }
         }
     }
 }

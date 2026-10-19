@@ -135,6 +135,7 @@ public class FriendCardStatusDisplayItem extends StatusDisplayItem{
 		private final TextView title, overlayTitle, about, interests, lookingFor, action;
 		private final FlowLayout aboutChips, interestChips;
 		private boolean acceptsCover;
+		private boolean coloredPublication;
 
 		public Holder(Activity activity, ViewGroup parent){
 			super(new FrameLayout(activity));
@@ -143,7 +144,7 @@ public class FriendCardStatusDisplayItem extends StatusDisplayItem{
 			card=new LinearLayout(activity);
 			card.setOrientation(LinearLayout.VERTICAL);
 			card.setBackgroundResource(R.drawable.bg_card_with_border);
-			card.setOutlineProvider(OutlineProviders.roundedRect(12));
+			card.setOutlineProvider(OutlineProviders.roundedRect(20));
 			card.setClipToOutline(true);
 			wrapper.addView(card, new FrameLayout.LayoutParams(-1, -2, Gravity.START));
 
@@ -217,14 +218,25 @@ public class FriendCardStatusDisplayItem extends StatusDisplayItem{
 			title.setText(heading);
 			overlayTitle.setText(heading);
 			title.setMaxLines(publication ? 2 : 1);
-			title.setTextColor(UiUtils.getThemeColor(wrapper.getContext(), publication ? R.attr.colorM3OnSurface : R.attr.colorM3Primary));
+			coloredPublication=publication;
+			title.setTextColor(publication ? Color.WHITE : UiUtils.getThemeColor(wrapper.getContext(), R.attr.colorM3Primary));
+			about.setTextColor(publication ? 0xCCFFFFFF : UiUtils.getThemeColor(wrapper.getContext(), R.attr.colorM3OnSurfaceVariant));
+			interests.setTextColor(about.getCurrentTextColor());
+			lookingFor.setTextColor(publication ? Color.WHITE : UiUtils.getThemeColor(wrapper.getContext(), R.attr.colorM3OnSurface));
+			action.setTextColor(publication ? 0xE6FFFFFF : UiUtils.getThemeColor(wrapper.getContext(), R.attr.colorM3Primary));
 			bindTags(about, aboutChips, publication ? aboutTags(data) : List.of());
 			bindTags(interests, interestChips, publication ? interestTags(data) : List.of());
 			bindRow(lookingFor, publication && isPublic(data, "looking_for") ? data.lookingFor : "", R.string.friend_card_post_looking_for);
 			details.setPadding(V.dp(14), V.dp(publication ? 12 : 8), V.dp(14), V.dp(publication ? 6 : 2));
 			action.setVisibility(publication ? View.VISIBLE : View.GONE);
 			action.setText(R.string.friend_card_post_details);
-			card.setBackgroundResource(publication ? R.drawable.bg_card_with_border : R.drawable.bg_rect_4dp_ripple);
+			if(publication){
+				int[] palette={0xFF70434F, 0xFF263F43, 0xFF48634C, 0xFF455775};
+				GradientDrawable background=new GradientDrawable();
+				background.setColor(palette[(data.title.hashCode() & Integer.MAX_VALUE)%palette.length]);
+				background.setCornerRadius(V.dp(20));
+				card.setBackground(background);
+			}else card.setBackgroundResource(R.drawable.bg_rect_4dp_ripple);
 			card.setClickable(available);
 			card.setFocusable(available);
 			card.setContentDescription(heading);
@@ -247,11 +259,12 @@ public class FriendCardStatusDisplayItem extends StatusDisplayItem{
 		private void addTag(FlowLayout chips, String value){
 			TextView tag=text(wrapper.getContext(), 12, R.attr.colorM3OnSecondaryContainer, 1);
 			tag.setText(value);
+			if(coloredPublication) tag.setTextColor(Color.WHITE);
 			tag.setMaxWidth(V.dp(160));
 			tag.setPadding(V.dp(8), V.dp(3), V.dp(8), V.dp(3));
 			GradientDrawable background=new GradientDrawable();
-			background.setColor(UiUtils.getThemeColor(wrapper.getContext(), R.attr.colorM3SecondaryContainer));
-			background.setCornerRadius(V.dp(8));
+			background.setColor(coloredPublication ? 0x30FFFFFF : UiUtils.getThemeColor(wrapper.getContext(), R.attr.colorM3SecondaryContainer));
+			background.setCornerRadius(V.dp(24));
 			tag.setBackground(background);
 			FrameLayout space=new FrameLayout(wrapper.getContext());
 			space.setPadding(0, 0, V.dp(6), V.dp(6));
