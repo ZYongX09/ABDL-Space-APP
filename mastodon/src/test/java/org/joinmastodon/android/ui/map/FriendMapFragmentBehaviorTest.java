@@ -171,6 +171,14 @@ public class FriendMapFragmentBehaviorTest{
         assertEquals("hidden",body(last()).get("visibility")); assertFalse(body(last()).containsKey("settings_version"));
         assertFalse(body(last()).containsKey("visibility_confirmed")); assertEquals(0,presenceWrites());
     }
+    @Test public void providerFailureStillAllowsWithdrawalWithoutConsentOrSponsorUpgrade() throws Exception{
+        accepted(); settings.babyVerified=true; settings.visibilityConfirmed=true; settings.visibility="public"; reply(last(),settings);
+        ReflectionHelpers.setField(fragment,"access",MapModels.Access.ERROR);
+        FriendMapOverlay overlay=ReflectionHelpers.getField(fragment,"overlay"); overlay.showErrorGate("SDK failure");
+        fragment.stopAppearance();
+        assertEquals("hidden",body(last()).get("visibility")); assertFalse(body(last()).containsKey("visibility_confirmed"));
+        assertFalse(body(last()).containsKey("settings_version")); assertEquals(0,presenceWrites());
+    }
     @Test public void existingPrivacyCanBeExplicitlyRetainedWithoutCapabilityAndRestrictedClicksOnlyShowSheet() throws Exception{
         accepted(); settings.babyVerified=true; settings.visibility="friends"; reply(last(),settings);
         int count=ApiExecution.requests.size(); fragment.confirmVisibility("hidden");
@@ -210,8 +218,12 @@ public class FriendMapFragmentBehaviorTest{
         List<Bitmap> replay=new ArrayList<>(); fragment.setMapBackdropListener((source,snapshot)->{ assertSame(provider.map,source); replay.add(snapshot); });
         assertEquals(1,replay.size()); assertSame(bitmap,replay.get(0));
         fragment.setMapBackdropListener((source,snapshot)->{ sources.add(source); snapshots.add(snapshot); });
+        FriendMapOverlay overlay=ReflectionHelpers.getField(fragment,"overlay");
+        assertTrue((Boolean)ReflectionHelpers.getField(overlay,"hasSnapshot"));
         fragment.onCameraMove(); assertSame(provider.map,sources.get(sources.size()-1)); assertSame(bitmap,snapshots.get(snapshots.size()-1));
+        assertTrue("Moving the camera must preserve panel glass as well as navigation glass",(Boolean)ReflectionHelpers.getField(overlay,"hasSnapshot"));
         fragment.setTabVisible(false); assertNull(sources.get(sources.size()-1)); assertNull(snapshots.get(snapshots.size()-1));
+        assertFalse((Boolean)ReflectionHelpers.getField(overlay,"hasSnapshot"));
         int events=sources.size(); provider.snapshot.accept(bitmap); ShadowLooper.idleMainLooper(); assertEquals(events,sources.size());
         fragment.onDestroyView(); assertNull(sources.get(sources.size()-1)); assertNull(snapshots.get(snapshots.size()-1));
     }

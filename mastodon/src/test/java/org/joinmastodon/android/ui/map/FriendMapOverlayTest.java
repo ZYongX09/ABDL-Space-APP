@@ -250,7 +250,21 @@ public class FriendMapOverlayTest{
 			int notices=actions.cityPrecisionNotices; card.performClick(); assertEquals(notices+1,actions.cityPrecisionNotices); assertNull(actions.precision);
 			overlay.dispose();
 		}
-		@Test public void stopIsNotRestrictedAndEnablingAppearanceDoesNotSilentlyChoosePublic(){
+		@Test public void failureAndVerificationGatesPermitWithdrawalButChoiceGateDoesNot(){
+		FriendMapOverlay overlay=overlay(true); MapModels.Settings ready=settings(true); ready.visibility="public";
+		overlay.updateSettings(ready); overlay.showErrorGate("地图不可用");
+		View withdrawal=findText(field(overlay,"gateColumn"),context.getString(R.string.map_ui_withdraw_location));
+		assertNotNull(withdrawal); assertTrue(withdrawal.performClick()); assertEquals(1,actions.stops);
+		ready.babyVerified=false; overlay.updateSettings(ready); overlay.showVerificationGate();
+		withdrawal=findText(field(overlay,"gateColumn"),context.getString(R.string.map_ui_withdraw_location));
+		assertNotNull(withdrawal); withdrawal.performClick(); assertEquals(2,actions.stops);
+		ready.babyVerified=true; ready.visibilityConfirmed=false; overlay.updateSettings(ready); overlay.showVisibilityGate();
+		assertNull(findText(field(overlay,"body"),context.getString(R.string.map_ui_withdraw_location)));
+		ready.visibility="hidden"; overlay.updateSettings(ready); overlay.showErrorGate("地图不可用");
+		assertNull(findText(field(overlay,"gateColumn"),context.getString(R.string.map_ui_withdraw_location)));
+		overlay.dispose();
+	}
+	@Test public void stopIsNotRestrictedAndEnablingAppearanceDoesNotSilentlyChoosePublic(){
 		FriendMapOverlay overlay=overlay(true); MapModels.Settings ready=settings(true); ready.visibility="friends";
 		overlay.updateSettings(ready); overlay.hideAccessGate(); overlay.showSettings();
 		findText(overlay,context.getString(R.string.map_ui_stop_appearance)).performClick(); assertEquals(1,actions.stops); assertNull(actions.changed);

@@ -189,15 +189,15 @@ public final class AlbumPhotoViewer implements PhotoViewer.AlbumDelegate, Applic
 	}
 
 	static boolean mayAutoLoadHd(AlbumModels.Photo photo){
-		return photo!=null && photo.isOwner && photo.ownerSponsor && !TextUtils.isEmpty(photo.hdUrl);
+		return photo!=null && !Boolean.TRUE.equals(photo.adminBlocked) && photo.isOwner && photo.ownerSponsor && !TextUtils.isEmpty(photo.hdUrl);
 	}
 
-	static boolean mayUseLossless(AlbumModels.Photo photo){ return photo!=null && photo.isOwner && photo.originalAvailable; }
+	static boolean mayUseLossless(AlbumModels.Photo photo){ return photo!=null && !Boolean.TRUE.equals(photo.adminBlocked) && photo.isOwner && photo.originalAvailable; }
 
 	static boolean protectedNonowner(AlbumModels.Photo photo){ return photo!=null && photo.downloadProtected && !photo.isOwner; }
 
 	static boolean mayDownload(AlbumModels.Photo photo){
-		return photo!=null && (photo.isOwner || !photo.downloadProtected && !Boolean.FALSE.equals(photo.canDownload));
+		return photo!=null && !Boolean.TRUE.equals(photo.adminBlocked) && (photo.isOwner || !photo.downloadProtected && !Boolean.FALSE.equals(photo.canDownload));
 	}
 
 	static Map<String,Object> authorizationBody(String variant, String operation, Integer noticeVersion){
@@ -239,6 +239,7 @@ public final class AlbumPhotoViewer implements PhotoViewer.AlbumDelegate, Applic
 					if(policyGeneration!=generation) main.post(()->{ if(live(generation)) viewer.reloadAlbumPreview(); });
 				}
 				@Override public void onFailed(){}
+				@Override public void onBlocked(){ viewer.showAlbumPhotoBlocked(currentIndex); }
 				@Override public void onAccessDenied(){ close(); }
 			});
 		}
@@ -354,7 +355,7 @@ public final class AlbumPhotoViewer implements PhotoViewer.AlbumDelegate, Applic
 	}
 
 	@Override public void onView(int position, String variant){
-		if(!live(generation) || position!=currentIndex || protectedNonowner(photos.get(position))
+		if(!live(generation) || position!=currentIndex || Boolean.TRUE.equals(photos.get(position).adminBlocked) || protectedNonowner(photos.get(position))
 				|| mediaAction!=null || permissionWaiting || previewRefreshing) return;
 		if("original".equals(variant) && !mayUseLossless(photos.get(position))) return;
 		beginMedia(position, variant, false);
@@ -401,7 +402,7 @@ public final class AlbumPhotoViewer implements PhotoViewer.AlbumDelegate, Applic
 
 	private void beginMedia(int position, String variant, boolean download){
 		if(!live(generation) || position!=currentIndex || mediaAction!=null || previewRefreshing
-				|| protectedNonowner(photos.get(position)) || download && !mayDownload(photos.get(position))) return;
+				|| Boolean.TRUE.equals(photos.get(position).adminBlocked) || protectedNonowner(photos.get(position)) || download && !mayDownload(photos.get(position))) return;
 		if("original".equals(variant) && !mayUseLossless(photos.get(position))) return;
 		MediaAction action=new MediaAction(position, variant, download, generation);
 		mediaAction=action;
@@ -514,7 +515,7 @@ public final class AlbumPhotoViewer implements PhotoViewer.AlbumDelegate, Applic
 	}
 
 	@Override public void onLike(int position){
-		if(!live(generation) || likeBusy || position!=currentIndex) return;
+		if(!live(generation) || likeBusy || position!=currentIndex || Boolean.TRUE.equals(photos.get(position).adminBlocked)) return;
 		AlbumModels.Photo photo=photos.get(position);
 		likeBusy=true;
 		viewer.refreshAlbumControls();

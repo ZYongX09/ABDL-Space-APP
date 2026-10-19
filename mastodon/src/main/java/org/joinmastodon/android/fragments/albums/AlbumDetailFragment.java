@@ -390,7 +390,7 @@ public class AlbumDetailFragment extends LoaderFragment{
 				holder.itemView.setContentDescription(getString(R.string.album_photo_accessibility, groupLabel(photo.sortAt, true, ZoneId.systemDefault()), row.photoIndex+1)
 						+(adminBlocked ? " · "+getString(R.string.album_photo_admin_blocked) : protectedTile ? " · "+getString(R.string.album_protection_thumbnail) : ""));
 				holder.itemView.setOnClickListener(v->{ if(!adminBlocked && fresh && sessionValid()) AlbumPhotoViewer.open(getActivity(), accountId, new ArrayList<>(photos), row.photoIndex); });
-				holder.itemView.setOnLongClickListener(v->{ if(adminBlocked || !owner() || !photo.isOwner) return false; confirmDeletePhoto(photo); return true; });
+				holder.itemView.setOnLongClickListener(v->{ if(!owner() || !photo.isOwner) return false; confirmDeletePhoto(photo); return true; });
 		}
 		@Override public int getItemCount(){ return rows.size(); }
 	}

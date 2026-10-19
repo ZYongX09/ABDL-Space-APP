@@ -531,6 +531,48 @@ public class AlbumPhotoViewerTest{
 		});
 	}
 
+	@Test @Config(shadows=RecordingApiExecution.class) public void policyPollingReplacesDisplayedPhotoWithBlockedStateAndCancelsMedia() throws Exception{
+		RecordingApiExecution.routes.clear();
+		withSession((accountID, session)->{
+			try(ActivityController<Activity> lifecycle=Robolectric.buildActivity(Activity.class).setup().visible()){
+				Activity host=lifecycle.get(); host.setTheme(R.style.Theme_Mastodon_Dark);
+				AlbumModels.Photo previous=photo(); previous.isOwner=true;
+				Constructor<AlbumPhotoViewer> constructor=AlbumPhotoViewer.class.getDeclaredConstructor(Activity.class, String.class, List.class, int.class); constructor.setAccessible(true);
+				AlbumPhotoViewer adapter=constructor.newInstance(host, accountID, List.of(previous), 0);
+				Attachment attachment=AlbumPhotoViewer.attachment(previous);
+				PhotoViewer viewer=new PhotoViewer(host, null, List.of(attachment), 0, null, accountID, new NoTransition(), adapter);
+				field(AlbumPhotoViewer.class,"viewer").set(adapter,viewer);
+				try{
+					attachOverlay(viewer);
+					adapter.cancelPending();
+					@SuppressWarnings("unchecked") Set<Object> holders=(Set<Object>)field(PhotoViewer.class,"albumPhotoHolders").get(viewer);
+					assertFalse(holders.isEmpty());
+					android.graphics.drawable.Drawable oldImage=new android.graphics.drawable.ColorDrawable(0xff112233);
+					for(Object holder:holders) ((ImageView)field(holder.getClass(),"imageView").get(holder)).setImageDrawable(oldImage);
+					field(PhotoViewer.class,"albumSourceDrawable").set(viewer,oldImage); field(PhotoViewer.class,"albumSourcePosition").setInt(viewer,0);
+					okhttp3.Call bytes=new okhttp3.OkHttpClient().newCall(new okhttp3.Request.Builder().url(previous.hdUrl).build());
+					field(PhotoViewer.class,"albumMediaCall").set(viewer,bytes);
+					method(AlbumPhotoViewer.class,"watchPolicy").invoke(adapter);
+					AlbumModels.Photo blocked=photo(); blocked.isOwner=true; blocked.adminBlocked=true; blocked.canDownload=false; blocked.previewUrl=null; blocked.hdUrl=null; blocked.originalAvailable=false;
+					deliverPreviewRenewal(blocked);
+					assertTrue(bytes.isCanceled()); assertNull(field(PhotoViewer.class,"albumSourceDrawable").get(viewer));
+					assertTrue(attachment.adminBlocked); assertNull(attachment.url); assertNull(attachment.previewUrl);
+					assertFalse(field(PhotoViewer.class,"albumPreviewRefreshing").getBoolean(viewer));
+					for(Object holder:holders){
+						ImageView image=(ImageView)field(holder.getClass(),"imageView").get(holder);
+						assertNotNull(image.getDrawable()); assertNotSame(oldImage,image.getDrawable());
+						assertEquals(host.getString(R.string.album_photo_admin_blocked),image.getContentDescription());
+					}
+					assertEquals(View.GONE,((View)field(PhotoViewer.class,"albumPreviewRetryButton").get(viewer)).getVisibility());
+					int requests=RecordingApiExecution.routes.size();
+					adapter.onDownload(0); adapter.onView(0,"hd"); adapter.onView(0,"original"); adapter.onLike(0);
+					assertEquals(requests,RecordingApiExecution.routes.size());
+					assertFalse(AlbumPhotoViewer.mayDownload(blocked)); assertFalse(AlbumPhotoViewer.mayUseLossless(blocked));
+				}finally{ viewer.onDismissed(); }
+			}
+		});
+	}
+
 	private interface SessionTest{ void run(String accountID, AccountSession session) throws Exception; }
 	private void withSession(SessionTest test) throws Exception{
 		Constructor<AccountSession> constructor=AccountSession.class.getDeclaredConstructor(); constructor.setAccessible(true);

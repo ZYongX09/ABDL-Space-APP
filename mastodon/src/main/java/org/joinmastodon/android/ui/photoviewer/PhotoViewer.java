@@ -810,18 +810,25 @@ public class PhotoViewer implements ZoomPanView.Listener{
 					onDismissed(); // Clears every drawable/request before returning to the album screen.
 				}
 				@Override public void onBlocked(){
-					if(!live()) return;
-					if(albumCommentsVisible){ setAlbumCommentsVisible(false); albumDelegate.onCommentsClosed(); }
-					Attachment attachment=attachments.get(position);
-					attachment.adminBlocked=true; attachment.url=null; attachment.previewUrl=null;
-					for(PhotoViewHolder holder:albumPhotoHolders) if(holder.getAbsoluteAdapterPosition()==position){
-						Call call=albumPreviewCalls.remove(holder); if(call!=null) call.cancel();
-						holder.setImageDrawable(AlbumUi.adminBlockedPlaceholder(activity));
-					}
-					albumPreviewRetryButton.setVisibility(View.GONE);
-					refreshAlbumControls();
+					if(live()) showAlbumPhotoBlocked(position);
 				}
 		});
+	}
+
+	public void showAlbumPhotoBlocked(int position){
+		if(!isAlbumHostValid() || position!=currentIndex || !albumDelegate.getInfo(position).adminBlocked) return;
+		revokeAlbumQuality();
+		albumPreviewRevision++; albumPreviewRefreshing=false;
+		albumPreviewGeneration=-1; albumPreviewPosition=-1;
+		if(albumCommentsVisible){ setAlbumCommentsVisible(false); albumDelegate.onCommentsClosed(); }
+		Attachment attachment=attachments.get(position);
+		attachment.adminBlocked=true; attachment.url=null; attachment.previewUrl=null;
+		for(PhotoViewHolder holder:albumPhotoHolders) if(holder.getAbsoluteAdapterPosition()==position){
+			holder.setImageDrawable(AlbumUi.adminBlockedPlaceholder(activity));
+			holder.imageView.setContentDescription(activity.getString(R.string.album_photo_admin_blocked));
+		}
+		albumPreviewRetryButton.setVisibility(View.GONE);
+		refreshAlbumControls();
 	}
 
 	static void setAlbumPreviewMetadata(Attachment attachment, String previewUrl, String description, int width, int height){

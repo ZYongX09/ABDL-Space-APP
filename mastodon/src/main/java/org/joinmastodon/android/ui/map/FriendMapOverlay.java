@@ -212,6 +212,8 @@ public final class FriendMapOverlay extends FrameLayout{
 		gateColumn.addView(title,new LinearLayout.LayoutParams(-1,-2));
 		if(verification) SponsorUi.button(gateColumn,getString(R.string.map_ui_go_verification),actions::verification);
 		else if(access==MapModels.Access.ERROR) SponsorUi.button(gateColumn,getString(R.string.map_ui_retry),actions::refresh);
+		if(!busy && (verification || access==MapModels.Access.ERROR) && settings!=null && !"hidden".equals(settings.visibility))
+			SponsorUi.secondary(gateColumn,getString(R.string.map_ui_withdraw_location),actions::stopAppearance);
 		updateAccessPresentation();
 	}
 	private void updateAccessPresentation(){

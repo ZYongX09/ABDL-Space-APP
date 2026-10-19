@@ -50,6 +50,7 @@
 	<string name="map_ui_update_service">更新与地图服务</string>
 	<string name="map_ui_update_location">重新获取一次定位</string>
 	<string name="map_ui_stop_appearance">停止在地图上出现</string>
+	<string name="map_ui_withdraw_location">撤回已发布的位置</string>
 	<string name="map_ui_everyone_summary">已登录用户可浏览各地区地图并看到你按所选精度展示的位置。</string>
 	<string name="map_ui_mutual_summary">只有与你互相关注的用户能看到你。</string>
 	<string name="map_ui_invisible_summary">不公开你的头像和位置，仍可浏览各地区地图。</string>

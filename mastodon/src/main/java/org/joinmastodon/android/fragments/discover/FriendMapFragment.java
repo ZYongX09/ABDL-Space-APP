@@ -408,7 +408,7 @@ public class FriendMapFragment extends AppKitFragment implements MapProvider.Lis
 	@Override public void onCameraMove(){
 		if(!baseMapAllowed()) return;
 		snapshotGeneration++;
-		if(overlay!=null){ overlay.setSnapshot(null); if(personalDataAllowed()) overlay.onCameraMoved(); }
+		if(overlay!=null && personalDataAllowed()) overlay.onCameraMoved();
 		publishProviderBackdrop();
 	}
 	public View getMapSampleView(){ return baseMapAllowed() && provider!=null?provider.getSampleSource():null; }
