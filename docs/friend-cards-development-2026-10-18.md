@@ -1,6 +1,16 @@
 # 扩列卡 v1 开发与验证记录（2026-10-18）
 
-## 范围与发布边界
+## 2026-10-19 本轮整合测试包（当前状态）
+
+- 已将地图/相册四项修复 `37cd71fb` 与最新 develop `497030ce` 的扩列卡 review 修复合流，得到 `6e27794941a448f067f870f4211d30c1835217fd`。**最终测试与APK均来自该干净提交**，后续仅补交付文档，不改变包内源码。
+- 单次最终 release 定向回归 **34类 / 292项通过，0失败、0错误、0跳过**，同时覆盖扩列卡92项、地图/相册112项及地图其余合同/状态/玻璃、五栏导航与感谢榜；不是将历史不同源码的92与112累加。全部逐类计数及完整过程见 `docs/map-album-review-fixes-2026-10-19.md`。
+- 首次增量复用实际30类266项、2个旧合同字节码失败，另4类26项没有class；已保留失败证据。随后临时禁用Kotlin incremental/build cache并强制生产及全部测试Kotlin/Java重编译，`javap`验证2个新合同常量、4个补齐类、生产revision和JSON DELETE后完整重跑292项通过；不修改断言、不改项目持久配置。
+- 最新正式签名 release 测试包：`/home/ZYongX/projects/ABDL-Space-3.1.0-code33-integrated-review-test.apk`，**236,164,820 bytes**，SHA-256 `5c0f321b3eb1b4c28d9276cdd6cfc77e59f7fadbc4252fc8c290e6de07f9746a`。`assembleRelease`及`verifyMapKeys`通过；V2证书SHA-256 `fd2098a3d3493222c247a7ba2787ec48fd8f62d38e9432ed4d6290a057dea475` 与既有正式签名一致；ZIP全部28,504条目通过。保持 `top.abdl_space.app`、3.1.0/code33、min26/target35/compile37、四ABI及非debuggable；所有旧包保留。
+- 最终统计 `/home/ZYongX/projects/abdl-integrated-review-targeted-final-summary.json`，测试日志 `/home/ZYongX/projects/abdl-integrated-review-targeted-final-2026-10-19.log`，JUnit归档 `/home/ZYongX/projects/abdl-integrated-review-targeted-final-junit.tar.gz`；包核验 `/home/ZYongX/projects/abdl-integrated-review-apk-verification.json`，构建日志 `/home/ZYongX/projects/abdl-integrated-review-assemble-release-2026-10-19.log`。
+- 当前再查为**0设备/0AVD**，历史“USB可见”仅是当时阶段记录。未完成真机/GPU地图、真实COS/双账号/旧端往返/覆盖安装或小屏大字暗色验收；没有授权实网测试账号/有效宝宝凭证，未获取真实用户token或伪造认证。本轮未跑全量，保留原OOM及QQ资源断言限制，不宣称全项目全绿。
+- **Android不合main、不正式发布、不改线上版本JSON或下载入口、不dispatch发布工作流**；main保持 `ed555e85`。下文“未部署后端/未生产迁移/USB可见”等均按各阶段历史理解，当前后端发布事实见后端生产发布小节。
+
+## 初次实现阶段：范围与发布边界（历史）
 
 本轮按已批准方案在 `feat/friend-cards` 实现，基于graphics-worktree的develop `4b54e601`；不使用陈旧friend-map主工作树。后端已在独立仓开发并合入develop `8944ae9`，新迁移为 `0080_friend_cards.sql`。本轮未将扩列推进main、未执行生产0080、未部署Worker、未更新正式APK下载或版本号。测试包构建不等于正式发布。
 
@@ -12,7 +22,9 @@
 
 本次未合Android main、未正式发布APK、未改下载/版本JSON。2026-10-19后续preflight已为**0设备/0AVD**（与早先短暂USB可见时不同）；Linux模拟器不可用，没有强行安装系统组件或接受许可。仓库未有能确认授权归属的实网A/B测试账号清单，无现成授权登录会话；真实创建需有效宝宝证书及当前credential，不能猜测试邮箱登录、提取真实用户token或写DB伪造认证。真实COS/双账号/旧端往返/覆盖安装及小屏大字暗色验收仍阻塞，不能用92项本地回归冒称实网全闭环。正式签名修复测试包继续保留，版本与哈希见下。
 
-## 2026-10-19 review 修复（开发线，专项已通过；后端后续上线）
+## 2026-10-19 review 修复（历史阶段，后端上线及本轮整合前）
+
+以下为该阶段结束时的记录；其中未执行生产迁移、当时USB状态及旧包信息不代表本轮当前状态。
 
 独立 `fix/friend-cards-review` 基于最新 develop `030e2ffb`；修复提交 `eb120882` 已快进合入并推送develop，未接触并行地图／相册修复工作区。后端review修复 `40008ad`、集成 `fb3d761` 与交付记录 `878ade0` 也已推develop；0080/0082扩列依赖仍未执行生产迁移，本轮不改main/生产SQL/Worker/正式下载。
 
@@ -43,9 +55,9 @@
 - Status可选扩展字段容错，未知或损坏schema回退文字；保留原帖头尾/CW/过滤/媒体。普通帖只显示标题链接，精确剥离服务端HTML尾注，不吞用户正文。
 - Compose插卡、预览/移除与编辑回显、friend_card_id三态；不向不支持此扩展的NBW误同步。自动卡编辑进入卡编辑页。
 
-## 验证
+## 初次实现阶段验证（历史，非本轮整合结果）
 
-### 已完成
+### 当时已完成
 
 - 隔离于含未提交相册实验修改的graphics工作树，以仅含扩列提交的工作树完成 `:mastodon:assembleRelease --offline`。构建为3.1.0/code33（保持已发布版本号/包名），输出先写在隔离树构建目录，不覆盖原APK。
 - release Kotlin与Java源码编译通过；因恢复被清理的依赖缓存及设备内存/磁盘有限，首次完整构建耗时较长。隔离构建使用临时 `/tmp` SDK平台视图和现有本地配置的临时链接；未修改仓库Gradle配置、未升级依赖、未触及Cloudflare。
@@ -58,7 +70,7 @@
 - 主代理复核纠正了最初holder与已确认中等设计不符的问题，叠字、局部渐变、摘要字段排除、加载失败收缩均有真实View绑定测试。
 - `git diff --check`已检查。
 
-### 未通过/未完成
+### 当时未通过/未完成（全量及设备限制仍需区分）
 
 - Android完整release回归曾实跑 **1243测试 / 14失败**：旧FriendUniverse源码合同断言和AlbumReport异步Toast时序两处之后做了修正；但完整run还包含11项Robolectric SDK资源加载 `OutOfMemoryError` 及1项旧QQ xxxhdpi WebP VP8L格式断言（资源实际为VP8X）。完整suite修正后的最终结果**尚未取得**。之后尝试1GB Robolectric堆的full rerun，仍有Android 15 SDK资源加载OOM，完整报告未能完成；两项兼容测试被同时运行的full任务抢占过一次，也没有得到最终定向重跑报告。因此不能宣称full绿或回归0失败。
 - Android扩列 release专项重跑 **79/79通过**，涵盖对应模块/合入的旧导航及Compose行为测试。
