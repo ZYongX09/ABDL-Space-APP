@@ -8,7 +8,7 @@
 
 ## 2026-10-19 review 修复（开发线，专项已通过）
 
-独立 `fix/friend-cards-review` 基于最新 develop `030e2ffb`，未接触并行地图／相册修复工作区。
+独立 `fix/friend-cards-review` 基于最新 develop `030e2ffb`；修复提交 `eb120882` 已快进合入并推送develop，未接触并行地图／相册修复工作区。后端review修复 `40008ad`、集成 `fb3d761` 与交付记录 `878ade0` 也已推develop；0080/0082扩列依赖仍未执行生产迁移，本轮不改main/生产SQL/Worker/正式下载。
 
 - Base 将 revision 传入真实主题内容及各 Screen；各页对业务字段、页列表和商品选集生成本轮只读快照，LazyColumn／VerticalPager 不再隐藏捕获同一个普通可变容器。
 - 不通过 `key(revision)` 重建整屏；推荐请求不驱动跳页，只有显式刷新信号才复位；商品搜索只在查询变化时归顶，不在勾选或分页时归顶。
@@ -17,7 +17,10 @@
 - 使用 JDK21 顺序重新编译 release Kotlin、Java 及全部测试源码，通过。最新单次扩列／兼容专项 **92/92，通过14个测试类，零失败／错误／跳过**，包含新增11项真实 Compose 与2项真实HTTP；由最终JUnit XML逐项统计，不累加历史运行。覆盖首帧资格加载退出、错误重试、连续输入、未提交标签及焦点／选区／滚动保持、公开/旧文字预览、商品返回、详情／历史回包、分页追加和选集计数。
 - 日志 `/tmp/friend-cards-review-android-targeted-final.log`，逐类计数 `/tmp/friend-cards-review-android-targeted-summary.json`。先前新测试曾有5处API链式Unit编译错误及1处hint消失后定位失败，均只修测试调用／定位，最终11项真实页面完整通过；没有替换主题或屏蔽业务断言。
 - 另一任务的Gradle运行期间本轮停止自己的并发尝试并等待，未停止对方进程。根分区剩余空间不足1GiB且不支持reflink，最终通过仓库外临时Gradle init脚本将本轮buildDirectory指向 `/tmp/friend-cards-review-android-build`；未改项目Gradle配置、系统SDK或删除用户缓存/旧APK。临时构建从本轮源码重新编译，不复用其它工作区APK。
-- 本轮未重新运行Android全量；原全量OOM/旧QQ资源断言限制仍保留，不宣称全项目全绿。USB设备现已可见，但本轮尚未在其上安装新包或完成真实后端／COS／双账号闭环。
+- 正式签名release修复测试包由干净提交 `eb120882` 构建：`/home/ZYongX/projects/ABDL-Space-APP-3.1.0-code33-friend-cards-review-fix-test.apk`，**236,164,140 bytes**，SHA-256 `295ad979f7efa1c32f6f89952cb2282e91977d7cf5d61ff863b3a519315a1b0c`。保持包名 `top.abdl_space.app`、3.1.0/code33、min26/target35/compile37及原四ABI；不提升正式版本号。
+- 最终 `assembleRelease` 与 `verifyMapKeys`成功，`apksigner verify` V2通过，签名证书SHA-256仍为 `fd2098a3d3493222c247a7ba2787ec48fd8f62d38e9432ed4d6290a057dea475`，ZIP全部条目校验无损。日志 `/tmp/friend-cards-review-android-package-verified.log`，产物元数据 `/tmp/friend-cards-review-apk.json`。
+- 打包先遇离线desugaring缓存缺失，恢复既有依赖后再遇磁盘配额；只迁移本轮APK输出，压缩本轮D8警告日志并移除本轮已完成测试的可重建中间文件后，最后顺序重跑构建成功。未删除旧APK、用户缓存或其它任务产物；旧friend-cards-test包仍保留，不与修复包混淆。
+- 本轮未重新运行Android全量；原全量OOM/旧QQ资源断言限制仍保留，不宣称全项目全绿。USB设备现已可见，但本轮未在其上安装新包或完成真实后端／COS／双账号闭环。
 
 ## 功能
 
