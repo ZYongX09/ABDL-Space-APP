@@ -2,11 +2,13 @@ package org.joinmastodon.android.ui.displayitems;
 
 import android.app.Activity;
 import android.content.Context;
+import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Matrix;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.RippleDrawable;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.Gravity;
@@ -23,6 +25,7 @@ import org.joinmastodon.android.friendcards.FriendCardGames;
 import org.joinmastodon.android.model.FriendCard;
 import org.joinmastodon.android.model.FriendCardAttachment;
 import org.joinmastodon.android.model.Status;
+import org.joinmastodon.android.model.StatusPrivacy;
 import org.joinmastodon.android.ui.OutlineProviders;
 import org.joinmastodon.android.ui.utils.UiUtils;
 import org.joinmastodon.android.ui.views.FlowLayout;
@@ -53,11 +56,13 @@ public class FriendCardStatusDisplayItem extends StatusDisplayItem{
 		this.presentation=presentation(attachment);
 		this.accountID=accountID;
 		FriendCard card=attachment==null ? null : attachment.card;
-		// Only the API's owned-cover projection is used, never the attachment's user-facing URL.
-		// Do not request an unavailable/private/sensitive cover, including recycled late images.
-		String cover=presentation==Presentation.PUBLICATION && !hideCover && !status.sensitive && card!=null ? card.coverUrl : null;
+		// Only the API's live owned-cover projection is used, never attachment.url or a LINK's card snapshot.
+		// Protected or unavailable rows must not request a cover or accept a recycled late image.
+		boolean allowCover=!hideCover && !status.sensitive && status.visibility!=StatusPrivacy.PRIVATE && status.visibility!=StatusPrivacy.DIRECT;
+		String cover=allowCover ? (presentation==Presentation.PUBLICATION && card!=null ? card.coverUrl
+				: presentation==Presentation.LINK && attachment.linkPreview!=null ? attachment.linkPreview.coverUrl : null) : null;
 		coverRequest=hasText(cover) && (cover.startsWith("https://") || cover.startsWith("http://"))
-				? new UrlImageLoaderRequest(cover, V.dp(440), V.dp(200)) : null;
+				? new UrlImageLoaderRequest(cover, V.dp(presentation==Presentation.LINK ? 108 : 440), V.dp(presentation==Presentation.LINK ? 150 : 200)) : null;
 	}
 
 	public static Presentation presentation(FriendCardAttachment extension){
@@ -133,6 +138,10 @@ public class FriendCardStatusDisplayItem extends StatusDisplayItem{
 		private final CoverFrame coverPanel;
 		private final FocusCoverView cover;
 		private final TextView title, overlayTitle, about, interests, lookingFor, action;
+		private final LinearLayout linkContainer;
+		private final FocusCoverView linkCover;
+		private final ImageView linkIcon, linkChevron;
+		private final TextView linkLabel, linkTitle;
 		private final FlowLayout aboutChips, interestChips;
 		private boolean acceptsCover;
 		private boolean coloredPublication;
@@ -191,6 +200,70 @@ public class FriendCardStatusDisplayItem extends StatusDisplayItem{
 			action.setGravity(Gravity.CENTER_VERTICAL);
 			card.addView(action, new LinearLayout.LayoutParams(-1, -2));
 			card.setOnClickListener(v->onClick());
+
+			// Keep the publication subtree unchanged. Ordinary inserted links have their own compact row.
+			linkContainer=new LinearLayout(activity);
+			linkContainer.setOrientation(LinearLayout.HORIZONTAL);
+			linkContainer.setGravity(Gravity.CENTER_VERTICAL);
+			linkContainer.setPaddingRelative(V.dp(14), V.dp(10), V.dp(12), V.dp(10));
+			linkContainer.setMinimumHeight(V.dp(96));
+			GradientDrawable linkBackground=rounded(UiUtils.getThemeColor(activity, R.attr.colorM3SurfaceVariant), 16);
+			linkBackground.setStroke(V.dp(1), UiUtils.getThemeColor(activity, R.attr.colorM3OutlineVariant));
+			linkContainer.setBackground(new RippleDrawable(ColorStateList.valueOf(UiUtils.getThemeColor(activity, R.attr.colorM3OutlineVariant)), linkBackground, rounded(Color.WHITE, 16)));
+			linkContainer.setVisibility(View.GONE);
+			linkContainer.setOnClickListener(v->onClick());
+			wrapper.addView(linkContainer, new FrameLayout.LayoutParams(-1, -2));
+
+			FrameLayout thumbnail=new FrameLayout(activity);
+			thumbnail.setRotation(-4);
+			thumbnail.setBackground(rounded(Color.WHITE, 8));
+			thumbnail.setOutlineProvider(OutlineProviders.roundedRect(8));
+			thumbnail.setClipToOutline(true);
+			thumbnail.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
+			linkContainer.addView(thumbnail, new LinearLayout.LayoutParams(V.dp(54), V.dp(75)));
+			FrameLayout face=new FrameLayout(activity);
+			face.setBackground(rounded(UiUtils.getThemeColor(activity, R.attr.colorM3SecondaryContainer), 6));
+			face.setOutlineProvider(OutlineProviders.roundedRect(6));
+			face.setClipToOutline(true);
+			FrameLayout.LayoutParams faceParams=new FrameLayout.LayoutParams(-1, -1);
+			faceParams.setMargins(V.dp(2), V.dp(2), V.dp(2), V.dp(2));
+			thumbnail.addView(face, faceParams);
+			linkCover=new FocusCoverView(activity, .72f);
+			face.addView(linkCover, new FrameLayout.LayoutParams(-1, -1));
+			linkIcon=new ImageView(activity);
+			linkIcon.setImageResource(R.drawable.ic_friend_card);
+			linkIcon.setImageTintList(ColorStateList.valueOf(UiUtils.getThemeColor(activity, R.attr.colorM3OnSecondaryContainer)));
+			face.addView(linkIcon, new FrameLayout.LayoutParams(V.dp(32), V.dp(32), Gravity.CENTER));
+
+			LinearLayout linkText=new LinearLayout(activity);
+			linkText.setOrientation(LinearLayout.VERTICAL);
+			linkText.setGravity(Gravity.CENTER_VERTICAL);
+			linkText.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
+			LinearLayout.LayoutParams copyParams=new LinearLayout.LayoutParams(0, -2, 1);
+			copyParams.setMarginStart(V.dp(16));
+			linkContainer.addView(linkText, copyParams);
+			linkLabel=text(activity, 11, R.attr.colorM3OnSurfaceVariant, 1);
+			linkLabel.setPadding(V.dp(7), V.dp(2), V.dp(7), V.dp(2));
+			linkLabel.setBackground(rounded(UiUtils.getThemeColor(activity, R.attr.colorM3Surface), 6));
+			linkText.addView(linkLabel, new LinearLayout.LayoutParams(-2, -2));
+			linkTitle=text(activity, 15, R.attr.colorM3OnSurface, 2);
+			linkTitle.setTypeface(linkTitle.getTypeface(), Typeface.BOLD);
+			linkTitle.setPadding(0, V.dp(5), 0, 0);
+			linkText.addView(linkTitle, new LinearLayout.LayoutParams(-1, -2));
+			linkChevron=new ImageView(activity);
+			linkChevron.setImageResource(R.drawable.ic_fluent_chevron_right_20_regular);
+			linkChevron.setImageTintList(ColorStateList.valueOf(UiUtils.getThemeColor(activity, R.attr.colorM3OnSurfaceVariant)));
+			linkChevron.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+			LinearLayout.LayoutParams chevronParams=new LinearLayout.LayoutParams(V.dp(20), V.dp(20));
+			chevronParams.setMarginStart(V.dp(10));
+			linkContainer.addView(linkChevron, chevronParams);
+		}
+
+		private static GradientDrawable rounded(int color, int radius){
+			GradientDrawable background=new GradientDrawable();
+			background.setColor(color);
+			background.setCornerRadius(V.dp(radius));
+			return background;
 		}
 
 		private static TextView text(Context context, int size, int color, int lines){
@@ -206,10 +279,16 @@ public class FriendCardStatusDisplayItem extends StatusDisplayItem{
 		@Override public void onBind(FriendCardStatusDisplayItem item){
 			wrapper.setPaddingRelative(V.dp(item.fullWidth ? 16 : 64), 0, V.dp(16), V.dp(8));
 			boolean publication=item.presentation==Presentation.PUBLICATION;
+			boolean link=item.presentation==Presentation.LINK || item.presentation==Presentation.UNAVAILABLE_LINK;
 			boolean available=publication || item.presentation==Presentation.LINK;
 			FriendCard data=publication ? item.attachment.card : null;
-			acceptsCover=publication && item.coverRequest!=null;
+			acceptsCover=available && item.coverRequest!=null;
 			cover.setImageDrawable(null);
+			linkCover.setImageDrawable(null);
+			linkCover.setVisibility(View.GONE);
+			linkIcon.setVisibility(View.VISIBLE);
+			card.setVisibility(link ? View.GONE : View.VISIBLE);
+			linkContainer.setVisibility(link ? View.VISIBLE : View.GONE);
 			// Stay compact until an image actually arrives. A failed load leaves no empty banner.
 			setCoverVisible(false);
 			cover.setFocus(data==null ? .5f : data.coverFocusX, data==null ? .4f : data.coverFocusY);
@@ -240,6 +319,18 @@ public class FriendCardStatusDisplayItem extends StatusDisplayItem{
 			card.setClickable(available);
 			card.setFocusable(available);
 			card.setContentDescription(heading);
+			// A LINK uses only the bounded public preview, never fields from attachment.card.
+			FriendCardAttachment.LinkPreview preview=item.presentation==Presentation.LINK ? item.attachment.linkPreview : null;
+			String ownership=preview!=null && hasText(preview.ownerName) ? preview.ownerName+"的扩列卡" : "Ta 的扩列卡";
+			if(!available) ownership=wrapper.getContext().getString(R.string.friend_cards_detail_title);
+			linkLabel.setText(ownership);
+			linkTitle.setText(link ? heading : "");
+			linkCover.setFocus(preview==null ? .5f : preview.coverFocusX, preview==null ? .4f : preview.coverFocusY);
+			linkChevron.setVisibility(available ? View.VISIBLE : View.INVISIBLE);
+			linkContainer.setClickable(link && available);
+			linkContainer.setFocusable(link && available);
+			linkContainer.setEnabled(available);
+			linkContainer.setContentDescription(link ? ownership+"，"+heading : null);
 		}
 
 		private void setCoverVisible(boolean visible){
@@ -279,12 +370,21 @@ public class FriendCardStatusDisplayItem extends StatusDisplayItem{
 
 		@Override public void setImage(int index, Drawable image){
 			if(index!=0 || !acceptsCover) return;
-			cover.setImageDrawable(image);
-			setCoverVisible(image!=null);
+			if(item.presentation==Presentation.LINK){
+				linkCover.setImageDrawable(image);
+				linkCover.setVisibility(image!=null ? View.VISIBLE : View.GONE);
+				linkIcon.setVisibility(image!=null ? View.GONE : View.VISIBLE);
+			}else{
+				cover.setImageDrawable(image);
+				setCoverVisible(image!=null);
+			}
 		}
 		@Override public void clearImage(int index){
 			if(index!=0) return;
 			cover.setImageDrawable(null);
+			linkCover.setImageDrawable(null);
+			linkCover.setVisibility(View.GONE);
+			linkIcon.setVisibility(View.VISIBLE);
 			setCoverVisible(false);
 		}
 		@Override public void onImageLoadingFailed(int index, Throwable error){ clearImage(index); }
@@ -309,10 +409,12 @@ public class FriendCardStatusDisplayItem extends StatusDisplayItem{
 		}
 	}
 
-	/** Measures 2.2:1 at the actual row width, then crops using the server's normalized focus. */
+	/** Crops at the server's normalized focus; publications stay 2.2:1, tiny LINK covers are portrait. */
 	public static class FocusCoverView extends ImageView{
 		private float focusX=.5f, focusY=.4f;
-		public FocusCoverView(Context context){ super(context); setScaleType(ScaleType.MATRIX); }
+		private final float aspectRatio;
+		public FocusCoverView(Context context){ this(context, 2.2f); }
+		private FocusCoverView(Context context, float aspectRatio){ super(context); this.aspectRatio=aspectRatio; setScaleType(ScaleType.MATRIX); }
 		public void setFocus(float x, float y){
 			focusX=Float.isFinite(x) ? Math.max(0, Math.min(1, x)) : .5f;
 			focusY=Float.isFinite(y) ? Math.max(0, Math.min(1, y)) : .4f;
@@ -320,7 +422,8 @@ public class FriendCardStatusDisplayItem extends StatusDisplayItem{
 		}
 		@Override protected void onMeasure(int widthSpec, int heightSpec){
 			int width=MeasureSpec.getSize(widthSpec);
-			super.onMeasure(widthSpec, MeasureSpec.makeMeasureSpec(Math.round(width/2.2f), MeasureSpec.EXACTLY));
+			int height=MeasureSpec.getMode(heightSpec)==MeasureSpec.EXACTLY ? MeasureSpec.getSize(heightSpec) : Math.round(width/aspectRatio);
+			super.onMeasure(widthSpec, MeasureSpec.makeMeasureSpec(height, MeasureSpec.EXACTLY));
 		}
 		@Override protected void onSizeChanged(int w, int h, int oldW, int oldH){ super.onSizeChanged(w,h,oldW,oldH); updateMatrix(); }
 		@Override public void setImageDrawable(Drawable drawable){ super.setImageDrawable(drawable); updateMatrix(); }

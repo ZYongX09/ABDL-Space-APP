@@ -10,12 +10,17 @@ public final class FriendCardResponses{
 		@SerializedName("id") public String id;
 		@SerializedName("name") public String name;
 	}
+	public static class Capabilities{
+		@SerializedName("social_accounts") public boolean socialAccounts;
+		@SerializedName("link_preview") public boolean linkPreview;
+	}
 	public static class Options{
 		@SerializedName("schema_version") public int schemaVersion;
 		@SerializedName("games") public List<Game> games;
 		@SerializedName("interest_presets") public List<String> interestPresets;
 		@SerializedName("can_create") public boolean canCreate;
 		@SerializedName("verification_state") public String verificationState;
+		@SerializedName("capabilities") public Capabilities capabilities;
 	}
 	public static class Me{
 		@SerializedName("card") public FriendCard card;

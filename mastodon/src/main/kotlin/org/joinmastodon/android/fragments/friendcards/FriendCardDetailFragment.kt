@@ -9,14 +9,15 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.platform.LocalView
 import org.joinmastodon.android.GlobalUserPreferences
 import top.yukonga.miuix.kmp.blur.isRuntimeShaderSupported
-import top.yukonga.miuix.kmp.blur.layerBackdrop
-import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -86,11 +87,18 @@ class FriendCardDetailFragment : FriendCardBaseFragment() {
         val state = remember(revision) { ScreenState(card, loading, busy, globalError) }
         val value = state.card
         val palette = value?.let { friendCardPalette(it) }
+        val contrast = rememberFriendCardContrastSampler()
         val liquid = GlobalUserPreferences.isIosLiquidNavigationEnabled() && LocalView.current.isHardwareAccelerated && isRuntimeShaderSupported()
-        val backdrop = if (liquid) rememberLayerBackdrop() else null
-        Box(Modifier.fillMaxSize().background(palette?.background ?: Color(0xFF263F43))) {
-            Column(Modifier.fillMaxSize().then(if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier)) {
-            LazyColumn(Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        val backdrop = if (liquid) contrast.backdrop else null
+        val scroll = rememberLazyListState()
+        LaunchedEffect(contrast, scroll) {
+            snapshotFlow { scroll.firstVisibleItemIndex to scroll.firstVisibleItemScrollOffset }
+                .collect { contrast.invalidateContent() }
+        }
+        val background = palette?.background ?: Color(0xFF263F43)
+        Box(Modifier.fillMaxSize().background(background)) {
+            Column(Modifier.fillMaxSize().friendCardContrastContent(contrast).background(background)) {
+            LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = scroll, contentPadding = PaddingValues(bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (state.loading) item {
                     Box(Modifier.padding(top = 56.dp, start = 12.dp, end = 12.dp).clip(RoundedCornerShape(18.dp)).background(MiuixTheme.colorScheme.surface)) {
                         FriendCardNotice("正在读取卡片…", null, null)
@@ -102,7 +110,11 @@ class FriendCardDetailFragment : FriendCardBaseFragment() {
                     }
                 } }
                 if (value != null) {
-                    item { FriendCardPortrait(value, topClearance = 64.dp, onDiaper = { diaper(it) }) }
+                    item {
+                        androidx.compose.runtime.CompositionLocalProvider(LocalFriendCardContentInvalidated provides contrast::invalidateContent) {
+                            FriendCardPortrait(value, topClearance = 64.dp, onDiaper = { diaper(it) })
+                        }
+                    }
                     item {
                         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -121,7 +133,7 @@ class FriendCardDetailFragment : FriendCardBaseFragment() {
             }
             if (value != null) DetailFooter(value, state.busy)
             }
-            FriendCardDetailControls(backdrop, !state.busy, { finish() }, { go(MyFriendCardsFragment::class.java) })
+            FriendCardDetailControls(backdrop, !state.busy, { finish() }, { go(MyFriendCardsFragment::class.java) }, contrast = contrast)
         }
     }
 

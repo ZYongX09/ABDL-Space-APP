@@ -29,6 +29,7 @@ public class FriendCard extends BaseModel{
 	@SerializedName("diapers") public List<Diaper> diapers=new ArrayList<>();
 	@SerializedName("looking_for") public String lookingFor;
 	@SerializedName("boundaries") public String boundaries;
+	@SerializedName("social_accounts") public List<SocialAccount> socialAccounts=new ArrayList<>();
 	@SerializedName("public_fields") public List<String> publicFields=new ArrayList<>();
 	@SerializedName("cover_upload_id") public String coverUploadId;
 	@SerializedName("cover_url") public String coverUrl;
@@ -43,6 +44,13 @@ public class FriendCard extends BaseModel{
 	}
 	public boolean isPublic(String field){ return publicFields!=null && publicFields.contains(field); }
 
+	@Parcel public static class SocialAccount{
+		@SerializedName("id") public String id;
+		@SerializedName("platform") public String platform;
+		@SerializedName("account") public String account;
+		@SerializedName("name") public String name="";
+		@SerializedName("is_public") public boolean isPublic;
+	}
 	@Parcel public static class Owner{
 		@SerializedName("id") public String id;
 		@SerializedName("username") public String username;

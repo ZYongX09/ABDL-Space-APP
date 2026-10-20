@@ -26,7 +26,7 @@ class FriendCardDraftStore(private val storage: FriendCardDraftStorage) {
     fun save(draft: FriendCardDraft): FriendCardDraft = synchronized(lock) {
         val previous = load(draft.account, draft.cardId)
         if (previous != null && previous.draftId != draft.draftId) throw IOException("草稿已在另一页面更新，请重新进入")
-        if (previous?.pending != null && (FriendCardRules.gson.toJson(previous.pending) != FriendCardRules.gson.toJson(draft.pending) || previous.pending.inputJson != FriendCardRules.gson.toJson(draft.input))) throw IOException("请先处理尚未确认结果的发布操作，不能修改其输入")
+        if (previous?.pending != null && (FriendCardRules.gson.toJson(previous.pending) != FriendCardRules.gson.toJson(draft.pending) || !samePendingInput(previous.pending.inputJson, draft.input))) throw IOException("请先处理尚未确认结果的发布操作，不能修改其输入")
         persist(draft); draft
     }
     fun prepare(draft: FriendCardDraft): FriendCardDraft = synchronized(lock) {
@@ -66,6 +66,16 @@ class FriendCardDraftStore(private val storage: FriendCardDraftStorage) {
         if (previous?.pending != null) throw IOException("发布结果尚未确认，不能丢弃操作快照")
         if (previous != null && previous.draftId != draft.draftId) throw IOException("草稿已更换")
         if (!storage.commit(key(draft.account, draft.cardId), null)) throw IOException("草稿删除失败，请重试")
+    }
+    private fun samePendingInput(snapshot: String, input: org.joinmastodon.android.api.requests.friendcards.FriendCardInput): Boolean {
+        fun normalized(value: com.google.gson.JsonElement): com.google.gson.JsonObject {
+            val objectValue = value.asJsonObject
+            if (objectValue.get("social_accounts")?.isJsonNull == true) objectValue.remove("social_accounts")
+            return objectValue
+        }
+        return try {
+            normalized(com.google.gson.JsonParser.parseString(snapshot)) == normalized(com.google.gson.JsonParser.parseString(FriendCardRules.gson.toJson(input)))
+        } catch (_: RuntimeException) { false }
     }
     private fun persist(draft: FriendCardDraft) {
         if (!storage.commit(key(draft.account, draft.cardId), FriendCardRules.gson.toJson(draft))) throw IOException("草稿未能保存，请释放存储空间后重试；未发送发布请求")

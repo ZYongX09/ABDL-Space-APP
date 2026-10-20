@@ -126,9 +126,12 @@ internal class FocusImage(context: Context) : ImageView(context) {
     var focusX = .5f
     var focusY = .4f
     var onDrawable: ((Boolean) -> Unit)? = null
+    var onContentInvalidated: (() -> Unit)? = null
     init { scaleType = ScaleType.MATRIX }
-    override fun setImageDrawable(drawable: Drawable?) { super.setImageDrawable(drawable); position(); onDrawable?.invoke(drawable != null) }
-    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) { super.onSizeChanged(w, h, oldw, oldh); position() }
+    override fun setImageDrawable(drawable: Drawable?) { super.setImageDrawable(drawable); position(); onDrawable?.invoke(drawable != null); onContentInvalidated?.invoke() }
+    override fun invalidateDrawable(drawable: Drawable) { super.invalidateDrawable(drawable); onContentInvalidated?.invoke() }
+    override fun setAlpha(alpha: Float) { val previous = this.alpha; super.setAlpha(alpha); if (previous != alpha) onContentInvalidated?.invoke() }
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) { super.onSizeChanged(w, h, oldw, oldh); position(); onContentInvalidated?.invoke() }
     fun position() {
         val d = drawable ?: return
         if (d.intrinsicWidth <= 0 || d.intrinsicHeight <= 0 || width <= 0 || height <= 0) return

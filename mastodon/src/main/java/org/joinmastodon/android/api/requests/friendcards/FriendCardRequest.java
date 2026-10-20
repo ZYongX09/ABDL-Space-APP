@@ -24,6 +24,11 @@ public final class FriendCardRequest<T> extends MastodonAPIRequest<T>{
 		if(id==null || !id.matches("[A-Za-z0-9_-]{1,128}")) throw new IllegalArgumentException("Invalid identifier");
 		return id;
 	}
+	private static JsonObject cardBody(FriendCardInput card){
+		JsonObject body=WIRE.toJsonTree(Objects.requireNonNull(card)).getAsJsonObject();
+		if(card.socialAccounts==null) body.remove("social_accounts");
+		return body;
+	}
 	public static <T> FriendCardRequest<T> get(String path, Class<T> type){ return new FriendCardRequest<>(HttpMethod.GET, path, type, null); }
 	public static <T> FriendCardRequest<T> post(String path, Class<T> type, Object body){ return new FriendCardRequest<>(HttpMethod.POST, path, type, body); }
 	public FriendCardRequest<T> query(String key, Object value){ if(value!=null) addQueryParameter(key, String.valueOf(value)); return this; }
@@ -33,11 +38,11 @@ public final class FriendCardRequest<T> extends MastodonAPIRequest<T>{
 	public static FriendCardRequest<FriendCardResponses.Page> history(String cursor){ return get("/history", FriendCardResponses.Page.class).query("cursor", cursor); }
 	public static FriendCardRequest<FriendCardResponses.Card> detail(String cardId){ return get("/"+id(cardId), FriendCardResponses.Card.class); }
 	public static FriendCardRequest<FriendCardResponses.Card> create(String operationId, String expectedCurrentId, FriendCardInput card){
-		JsonObject body=new JsonObject(); body.addProperty("operation_id", Objects.requireNonNull(operationId)); body.addProperty("expected_current_id", expectedCurrentId); body.add("card", WIRE.toJsonTree(Objects.requireNonNull(card)));
+		JsonObject body=new JsonObject(); body.addProperty("operation_id", Objects.requireNonNull(operationId)); body.addProperty("expected_current_id", expectedCurrentId); body.add("card", cardBody(card));
 		return post("", FriendCardResponses.Card.class, body);
 	}
 	public static FriendCardRequest<FriendCardResponses.Card> edit(String cardId, int expectedVersion, FriendCardInput card){
-		JsonObject body=new JsonObject(); body.addProperty("expected_version", expectedVersion); body.add("card", WIRE.toJsonTree(Objects.requireNonNull(card)));
+		JsonObject body=new JsonObject(); body.addProperty("expected_version", expectedVersion); body.add("card", cardBody(card));
 		return new FriendCardRequest<>(HttpMethod.PATCH, "/"+id(cardId), FriendCardResponses.Card.class, body);
 	}
 	public static FriendCardRequest<FriendCardResponses.Card> state(String cardId, int expectedVersion, String state){

@@ -20,6 +20,7 @@ public class FriendCardInput{
 	@SerializedName("diaper_ids") public List<Integer> diaperIds=new ArrayList<>();
 	@SerializedName("looking_for") public String lookingFor="";
 	@SerializedName("boundaries") public String boundaries="";
+	@SerializedName("social_accounts") public List<FriendCard.SocialAccount> socialAccounts;
 	@SerializedName("public_fields") public List<String> publicFields=new ArrayList<>(List.of("gender", "age", "zodiac", "region", "mbti", "interaction_habits", "interests", "games", "diapers", "looking_for", "boundaries"));
 	@SerializedName("cover_upload_id") public String coverUploadId;
 	@SerializedName("cover_focus_x") public float coverFocusX=.5f;
@@ -33,6 +34,7 @@ public class FriendCardInput{
 		value.games=new ArrayList<>(card.games==null ? List.of() : card.games);
 		if(card.diapers!=null) for(FriendCard.Diaper diaper:card.diapers) if(diaper!=null && !value.diaperIds.contains(diaper.id)) value.diaperIds.add(diaper.id);
 		value.lookingFor=text(card.lookingFor); value.boundaries=text(card.boundaries);
+		if(card.socialAccounts!=null && !card.socialAccounts.isEmpty()) value.socialAccounts=new ArrayList<>(card.socialAccounts);
 		value.publicFields=new ArrayList<>(card.publicFields==null ? List.of() : card.publicFields);
 		value.coverUploadId=card.coverUploadId; value.coverFocusX=card.coverFocusX; value.coverFocusY=card.coverFocusY;
 		return value;

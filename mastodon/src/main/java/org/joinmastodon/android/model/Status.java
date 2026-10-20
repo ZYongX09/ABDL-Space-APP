@@ -290,9 +290,12 @@ public class Status extends BaseModel implements DisplayItemsParent, Searchable 
 				// Unavailable cards must never retain stale private/title/cover metadata on the client.
 				if(!object.get("available").getAsBoolean()){
 					object=object.deepCopy();
-					object.remove("title"); object.remove("url"); object.remove("card");
+					object.remove("title"); object.remove("url"); object.remove("card"); object.remove("link_preview");
 				}else if(object.has("card") && !object.get("card").isJsonNull() && !validCard(object.get("card"))){
 					return null;
+				}
+				if(object.has("link_preview") && (!"link".equals(mode) || !validLinkPreview(object.get("link_preview")))){
+					object=object.deepCopy(); object.remove("link_preview");
 				}
 				return context.deserialize(object, FriendCardAttachment.class);
 			}catch(RuntimeException malformedExtension){
@@ -300,7 +303,18 @@ public class Status extends BaseModel implements DisplayItemsParent, Searchable 
 			}
 		}
 
-		private static boolean requiredString(JsonObject object, String key){
+			private static boolean validLinkPreview(JsonElement value){
+				if(value==null || !value.isJsonObject()) return false;
+				JsonObject preview=value.getAsJsonObject();
+				if(!strings(preview, "cover_url", "owner_id", "owner_name")) return false;
+				for(String key:List.of("cover_focus_x", "cover_focus_y")){
+					JsonElement focus=preview.get(key);
+					if(focus!=null && !focus.isJsonNull() && (!focus.isJsonPrimitive() || !focus.getAsJsonPrimitive().isNumber()
+							|| !Double.isFinite(focus.getAsDouble()) || focus.getAsDouble()<0 || focus.getAsDouble()>1)) return false;
+				}
+				return true;
+			}
+			private static boolean requiredString(JsonObject object, String key){
 			return object.has(key) && !object.get(key).isJsonNull() && strings(object, key)
 					&& !object.get(key).getAsString().isBlank();
 		}
@@ -329,8 +343,19 @@ public class Status extends BaseModel implements DisplayItemsParent, Searchable 
 			if(!requiredString(card, "id") || !requiredString(card, "title") || !strings(card, "owner_id", "post_id", "state", "url",
 					"gender", "age", "zodiac", "region", "school", "mbti", "interaction_habits", "looking_for", "boundaries", "cover_url")
 					|| !stringLists(card, "interests", "games", "public_fields")) return false;
-			for(String key:List.of("cover_focus_x", "cover_focus_y")){
-				JsonElement focus=card.get(key);
+				JsonElement accounts=card.get("social_accounts");
+				if(accounts!=null && !accounts.isJsonNull()){
+					if(!accounts.isJsonArray() || accounts.getAsJsonArray().size()>5) return false;
+					for(JsonElement entry:accounts.getAsJsonArray()){
+						if(!entry.isJsonObject()) return false;
+						JsonObject account=entry.getAsJsonObject();
+						if(!requiredString(account,"id") || !requiredString(account,"platform") || !requiredString(account,"account") || !strings(account,"name")) return false;
+						JsonElement visible=account.get("is_public");
+						if(visible!=null && (!visible.isJsonPrimitive() || !visible.getAsJsonPrimitive().isBoolean())) return false;
+					}
+				}
+				for(String key:List.of("cover_focus_x", "cover_focus_y")){
+					JsonElement focus=card.get(key);
 				if(focus!=null && !focus.isJsonNull() && (!focus.isJsonPrimitive() || !focus.getAsJsonPrimitive().isNumber()
 						|| !Double.isFinite(focus.getAsDouble()))) return false;
 			}

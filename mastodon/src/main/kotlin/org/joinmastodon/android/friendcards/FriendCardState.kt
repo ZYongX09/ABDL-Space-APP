@@ -20,6 +20,7 @@ object FriendCardRules {
         if (input.interests.size > 12 || input.interests.any { it.isBlank() || length(it) > 16 }) return "兴趣最多12项，每项1–16字"
         if (input.games.size > 8 || input.games.any { it.isBlank() || length(it) > 30 }) return "游戏最多8项，每项1–30字"
         if (input.diaperIds.size > 8 || input.diaperIds.any { it <= 0 } || input.diaperIds.distinct().size != input.diaperIds.size) return "请选择最多8款库内商品"
+        FriendCardSocialRules.validate(input.socialAccounts)?.let { return it }
         if (input.publicFields.any { it !in fields }) return "公开字段无效"
         if (!input.coverFocusX.isFinite() || !input.coverFocusY.isFinite() || input.coverFocusX !in 0f..1f || input.coverFocusY !in 0f..1f) return "封面焦点无效"
         return null
@@ -52,6 +53,7 @@ object FriendCardRules {
         this.games = if ("games" in input.publicFields) input.games.toList() else emptyList()
         this.diapers = if ("diapers" in input.publicFields) diapers.filter { it.id in input.diaperIds } else emptyList()
         lookingFor = visible("looking_for", input.lookingFor); boundaries = visible("boundaries", input.boundaries)
+        socialAccounts = input.socialAccounts.orEmpty().filter { it.isPublic }.map(FriendCardSocialRules::copy)
         this.coverUrl = coverUrl; coverFocusX = input.coverFocusX; coverFocusY = input.coverFocusY
     }
     fun legacyText(card: FriendCard, games: List<FriendCardResponses.Game>): String = buildList {
@@ -60,6 +62,7 @@ object FriendCardRules {
         line("gender", card.gender); line("age", card.age); line("zodiac", card.zodiac); line("region", card.region); line("school", card.school); line("mbti", card.mbti); line("interaction_habits", card.interactionHabits)
         line("interests", card.interests.orEmpty().joinToString("、")); line("games", card.games.orEmpty().joinToString("、") { gameName(it, games) }); line("diapers", card.diapers.orEmpty().joinToString("、") { it.name.orEmpty() })
         line("looking_for", card.lookingFor); line("boundaries", card.boundaries)
+        card.socialAccounts.orEmpty().filter { it.isPublic }.forEach { add("${FriendCardSocialRules.platformName(it)}：${it.account.orEmpty()}") }
     }.joinToString("\n")
 }
 

@@ -130,15 +130,19 @@ fun FriendCardPortrait(card: FriendCard, modifier: Modifier = Modifier, games: M
 @Composable
 private fun PortraitHeading(card: FriendCard, palette: FriendCardPalette, compact: Boolean, showCover: Boolean = true, room: Float = Float.POSITIVE_INFINITY, topClearance: Dp = 0.dp) {
     var loaded by remember(card.coverUrl) { mutableStateOf(false) }
+    val contentInvalidated = LocalFriendCardContentInvalidated.current
     val hasCover = showCover && !card.coverUrl.isNullOrBlank()
     Box(Modifier.fillMaxWidth()) {
         if (hasCover) Box(Modifier.fillMaxWidth().then(if (loaded) Modifier.aspectRatio(if (compact) 2.2f else 1.5f) else Modifier.height(1.dp)).clipToBounds()) {
             key(card.coverUrl) {
                 AndroidView(factory = { context -> FocusImage(context).apply {
                     onDrawable = { loaded = it }
+                    onContentInvalidated = contentInvalidated
+                    animate().setUpdateListener { onContentInvalidated?.invoke() }
                     importantForAccessibility = android.view.View.IMPORTANT_FOR_ACCESSIBILITY_NO
                     ViewImageLoader.load(this, null, UrlImageLoaderRequest(card.coverUrl, 1440, 1200))
-                } }, update = { image -> image.focusX = card.coverFocusX; image.focusY = card.coverFocusY; image.position() }, modifier = Modifier.fillMaxSize())
+                } }, update = { image -> image.onContentInvalidated = contentInvalidated; image.focusX = card.coverFocusX; image.focusY = card.coverFocusY; image.position() },
+                    onRelease = { image -> image.onContentInvalidated = null; image.animate().setUpdateListener(null) }, modifier = Modifier.fillMaxSize())
             }
             if (loaded) Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0f to Color.Transparent, .30f to Color.Transparent, 1f to palette.background)))
         }
@@ -214,6 +218,7 @@ private fun PortraitContents(card: FriendCard, games: Map<String, String>, compa
             card.diapers.forEach { item -> FriendCardProduct(item, { onDiaper(item) }) }
         }
     }
+    if (!compact && card.socialAccounts.orEmpty().any { it.isPublic }) FriendCardSocialDetails(card.socialAccounts.orEmpty())
 }
 
 @Composable

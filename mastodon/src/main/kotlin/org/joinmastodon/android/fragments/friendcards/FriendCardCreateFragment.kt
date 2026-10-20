@@ -193,6 +193,7 @@ class FriendCardCreateFragment : FriendCardBaseFragment() {
             if (d.coverUrl != null && d.input.coverUploadId.isNullOrBlank()) { globalError = "封面资源ID不可用，请重新选择或明确移除封面"; changed(); return }
             if (d.cardId == null && (options?.canCreate != true || options?.verificationState != "active" || !d.currentLoaded || currentError != null)) { globalError = "请重试读取创建资格与当前卡"; changed(); return }
             FriendCardRules.validate(d.input)?.let { globalError = it; changed(); return }
+            if (d.input.socialAccounts != null && options?.capabilities?.socialAccounts != true) { globalError = "当前服务暂未支持社交账号，草稿已保留，请在服务更新后重试"; changed(); return }
         }
         if (!persist()) return
         val ready = try { store.prepare(d) } catch (error: Exception) { storageError = error.message; changed(); return }

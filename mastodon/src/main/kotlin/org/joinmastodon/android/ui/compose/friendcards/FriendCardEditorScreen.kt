@@ -217,6 +217,18 @@ fun FriendCardEditorScreen(
                             EditorField("mbti", input.mbti, 16, input, enabled, onEdit) { target, text -> target.mbti = text }
                             EditorDivider()
                             EditorField("interaction_habits", input.interactionHabits, 120, input, enabled, onEdit, multiline = true, hint = "例如：慢回复但认真回；熟悉后可语音；周末一起玩游戏。示例不会保存。") { target, text -> target.interactionHabits = text }
+                            val socialSupported = options?.capabilities?.socialAccounts == true
+                            if (socialSupported || !input.socialAccounts.isNullOrEmpty()) {
+                                EditorDivider()
+                                Spacer(Modifier.height(20.dp))
+                                if (!socialSupported) Text("当前未确认服务端支持社交账号，已有内容已保留，暂不可编辑。", fontSize = 12.sp,
+                                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary, modifier = Modifier.padding(bottom = 12.dp))
+                                FriendCardSocialEditor(
+                                    accounts = input.socialAccounts.orEmpty(),
+                                    enabled = enabled && socialSupported,
+                                    onChange = { accounts -> if (enabled && socialSupported) onEdit { target -> target.socialAccounts = accounts.toList() } },
+                                )
+                            }
                         }
                     }
                 }

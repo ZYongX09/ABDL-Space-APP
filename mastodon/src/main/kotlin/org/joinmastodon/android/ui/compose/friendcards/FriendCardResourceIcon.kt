@@ -18,7 +18,8 @@ internal fun FriendCardResourceIcon(@DrawableRes resource: Int, tint: Color, mod
         isFocusable = false
         importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
     } }, update = { image ->
-        image.setImageResource(resource)
-        image.imageTintList = ColorStateList.valueOf(tint.toArgb())
+        if (image.tag != resource) { image.setImageResource(resource); image.tag = resource }
+        val color = tint.toArgb()
+        if (image.imageTintList?.defaultColor != color) image.imageTintList = ColorStateList.valueOf(color)
     }, modifier = modifier)
 }
