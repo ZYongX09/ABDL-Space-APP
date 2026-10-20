@@ -17,6 +17,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import org.joinmastodon.android.R
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
@@ -25,6 +27,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import me.grishka.appkit.imageloader.ViewImageLoader
@@ -95,16 +98,12 @@ fun FriendCardIdentity(card: FriendCard, modifier: Modifier = Modifier, onClick:
 fun FriendCardHello(enabled: Boolean = true, onClick: () -> Unit) {
     Box(Modifier.size(54.dp).clip(CircleShape).background(Color.White.copy(alpha = if (enabled) 1f else .5f))
         .clickable(enabled = enabled, role = Role.Button, onClick = onClick).semantics { contentDescription = "发私信" }, contentAlignment = Alignment.Center) {
-        Canvas(Modifier.size(34.dp)) {
-            val ink = Color(0xFF233036)
-            drawCircle(ink, radius = size.minDimension * .44f, style = androidx.compose.ui.graphics.drawscope.Stroke(2.1.dp.toPx()))
-        }
-        Text("Hi", color = Color(0xFF233036), fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
+        FriendCardResourceIcon(R.drawable.ic_friend_card_chat, tint = Color(0xFF233036), modifier = Modifier.size(29.dp))
     }
 }
 
 @Composable
-fun FriendCardPortrait(card: FriendCard, modifier: Modifier = Modifier, games: Map<String, String> = emptyMap(), compact: Boolean = false, onDiaper: (FriendCard.Diaper) -> Unit = {}) {
+fun FriendCardPortrait(card: FriendCard, modifier: Modifier = Modifier, games: Map<String, String> = emptyMap(), compact: Boolean = false, topClearance: Dp = 0.dp, onDiaper: (FriendCard.Diaper) -> Unit = {}) {
     val palette = friendCardPalette(card)
     if (compact) {
         BoxWithConstraints(modifier.fillMaxSize().background(palette.background)) {
@@ -119,7 +118,7 @@ fun FriendCardPortrait(card: FriendCard, modifier: Modifier = Modifier, games: M
         }
     } else {
         Column(modifier.fillMaxWidth().background(palette.background)) {
-            PortraitHeading(card, palette, compact = false)
+            PortraitHeading(card, palette, compact = false, topClearance = topClearance)
             Column(Modifier.padding(horizontal = 16.dp).padding(bottom = 22.dp).fillMaxWidth().clip(RoundedCornerShape(24.dp))
                 .background(palette.panel).padding(20.dp), verticalArrangement = Arrangement.spacedBy(30.dp)) {
                 PortraitContents(card, games, compact = false, roomy = true, palette = palette, onDiaper = onDiaper)
@@ -129,7 +128,7 @@ fun FriendCardPortrait(card: FriendCard, modifier: Modifier = Modifier, games: M
 }
 
 @Composable
-private fun PortraitHeading(card: FriendCard, palette: FriendCardPalette, compact: Boolean, showCover: Boolean = true, room: Float = Float.POSITIVE_INFINITY) {
+private fun PortraitHeading(card: FriendCard, palette: FriendCardPalette, compact: Boolean, showCover: Boolean = true, room: Float = Float.POSITIVE_INFINITY, topClearance: Dp = 0.dp) {
     var loaded by remember(card.coverUrl) { mutableStateOf(false) }
     val hasCover = showCover && !card.coverUrl.isNullOrBlank()
     Box(Modifier.fillMaxWidth()) {
@@ -144,10 +143,31 @@ private fun PortraitHeading(card: FriendCard, palette: FriendCardPalette, compac
             if (loaded) Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0f to Color.Transparent, .30f to Color.Transparent, 1f to palette.background)))
         }
         Column(Modifier.fillMaxWidth().then(if (hasCover && loaded) Modifier.align(Alignment.BottomStart) else Modifier)
-            .padding(start = if (compact) 24.dp else 28.dp, end = 24.dp, top = if (compact && room < 200) 12.dp else if (compact) 26.dp else 40.dp, bottom = if (compact && room < 200) 12.dp else 24.dp)) {
-            if (!compact || room >= 200) Text("“", color = Color.White.copy(alpha = .14f), fontSize = 60.sp, fontWeight = FontWeight.Black, modifier = Modifier.height(22.dp))
+            .padding(start = if (compact) 24.dp else 28.dp, end = 24.dp, top = if (compact && room < 200) 12.dp else if (compact) 26.dp else maxOf(40.dp, topClearance), bottom = if (compact && room < 200) 12.dp else 24.dp)) {
+            if (!compact || room >= 200) FriendCardQuotation()
             Text(card.title.orEmpty(), color = Color.White, fontSize = if (compact) 25.sp else 29.sp, lineHeight = if (compact) 33.sp else 39.sp,
                 fontWeight = FontWeight.Bold, maxLines = if (compact && room < 100) 1 else if (compact) 2 else Int.MAX_VALUE, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+@Composable
+internal fun FriendCardQuotation(modifier: Modifier = Modifier) {
+    Canvas(modifier.size(width = 36.dp, height = 26.dp)) {
+        val unit = minOf(size.width / 36f, size.height / 26f)
+        for (offset in listOf(2f, 19f)) {
+            val shape = Path().apply {
+                moveTo((offset + 13f) * unit, 2f * unit)
+                lineTo((offset + 10f) * unit, 2f * unit)
+                cubicTo((offset + 3f) * unit, 2f * unit, offset * unit, 9f * unit, offset * unit, 17f * unit)
+                lineTo(offset * unit, 24f * unit)
+                lineTo((offset + 12f) * unit, 24f * unit)
+                lineTo((offset + 12f) * unit, 13f * unit)
+                lineTo((offset + 6f) * unit, 13f * unit)
+                cubicTo((offset + 6f) * unit, 9f * unit, (offset + 9f) * unit, 6f * unit, (offset + 13f) * unit, 6f * unit)
+                close()
+            }
+            drawPath(shape, Color.White.copy(alpha = .18f))
         }
     }
 }

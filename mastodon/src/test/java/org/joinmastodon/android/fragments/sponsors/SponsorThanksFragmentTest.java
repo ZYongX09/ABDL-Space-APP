@@ -255,7 +255,8 @@ public class SponsorThanksFragmentTest{
                 ImageCache.ProgressCallback progress, ImageLoaderCallback callback, boolean decode){
             requests.add((UrlImageLoaderRequest)request);
             try{
-                Constructor<?> constructor=ImageCache.PendingImageRequest.class.getDeclaredConstructors()[0];
+                Constructor<?> constructor=ImageCache.PendingImageRequest.class.getDeclaredConstructor(
+                        ImageCache.class, Class.forName(ImageCache.class.getName()+"$ImageDownloadInfo"), ImageLoaderCallback.class);
                 constructor.setAccessible(true);
                 ImageCache.PendingImageRequest result=(ImageCache.PendingImageRequest)constructor.newInstance(cache, null, callback);
                 pending.add(result); return result;

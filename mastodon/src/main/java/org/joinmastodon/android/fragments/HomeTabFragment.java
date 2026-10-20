@@ -745,7 +745,7 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		liquidToolbarController.setShowNewPosts(newPostsBtnShown);
 		liquidToolbarController.setReminderState(announcementsBadged, settingsBadged);
 		ArrayList<HomeToolbarMenuItem> root=new ArrayList<>();
-		root.add(new HomeToolbarMenuItem(R.id.friend_card_feed, getString(R.string.friend_card_feed_entry), R.drawable.ic_fluent_people_24_regular));
+		root.add(new HomeToolbarMenuItem(R.id.friend_card_feed, getString(R.string.friend_card_feed_entry), R.drawable.ic_friend_card));
 		root.add(new HomeToolbarMenuItem(R.id.settings, getString(R.string.settings), R.drawable.ic_fluent_settings_24_regular));
 		root.add(new HomeToolbarMenuItem(R.id.announcements, getString(R.string.sk_announcements), R.drawable.ic_fluent_megaphone_24_regular));
 		root.add(new HomeToolbarMenuItem(R.id.edit_timelines, getString(R.string.sk_edit_timelines), R.drawable.ic_fluent_edit_24_regular));

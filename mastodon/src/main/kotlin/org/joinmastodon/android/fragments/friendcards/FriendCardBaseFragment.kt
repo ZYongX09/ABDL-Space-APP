@@ -9,7 +9,6 @@ import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -62,7 +61,7 @@ abstract class FriendCardBaseFragment : ToolbarFragment() {
             view.setContent {
                 val redraw = revision
                 MiuixAppTheme {
-                    Box(Modifier.fillMaxSize().background(MiuixTheme.colorScheme.background).imePadding()) {
+                    Box(Modifier.fillMaxSize().background(MiuixTheme.colorScheme.background)) {
                         if (!accountValid()) FriendCardNotice("当前账号不可用，请返回并切换到原账号", null, null)
                         else Screen(redraw)
                     }

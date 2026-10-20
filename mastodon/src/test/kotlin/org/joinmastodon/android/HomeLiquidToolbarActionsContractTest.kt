@@ -35,7 +35,7 @@ class HomeLiquidToolbarActionsContractTest {
 
 		assertTrue(home.contains("homeTabFragment::openSearch"))
 		assertTrue(home.contains("new HomeToolbarComposeMenuItem(R.id.compose_post, getString(R.string.compose_menu_post), getNotes(MiuixIcons.INSTANCE))"))
-		assertTrue(home.contains("new HomeToolbarComposeMenuItem(R.id.compose_friend_request, getString(R.string.compose_menu_friend_request), getContactsBook(MiuixIcons.INSTANCE))"))
+		assertTrue(home.contains("new HomeToolbarComposeMenuItem(R.id.compose_friend_request, getString(R.string.compose_menu_friend_request), getContactsBook(MiuixIcons.INSTANCE), R.drawable.ic_friend_card)"))
 		assertTrue(home.contains("new HomeToolbarComposeMenuItem(R.id.compose_album, getString(R.string.baby_albums_compose_upload), getImage(MiuixIcons.INSTANCE))"))
 		assertTrue(home.contains("import static top.yukonga.miuix.kmp.icon.extended.ImageKt.getImage;"))
 		assertTrue(home.contains("liquidToolbarController.setComposeMenu(composeItems)"))

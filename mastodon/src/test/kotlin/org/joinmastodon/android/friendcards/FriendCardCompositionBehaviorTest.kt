@@ -5,12 +5,15 @@ package org.joinmastodon.android.friendcards
 import android.app.Activity
 import android.app.Fragment
 import android.content.Context
+import android.os.Build
 import android.os.Bundle
 import android.os.Looper
 import android.util.Pair
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowInsets
 import android.widget.FrameLayout
+import android.widget.Toolbar
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.platform.ComposeView
 import org.robolectric.annotation.GraphicsMode
@@ -21,6 +24,7 @@ import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.hasSetTextAction
@@ -41,6 +45,7 @@ import me.grishka.appkit.Nav
 import me.grishka.appkit.api.APIRequest
 import me.grishka.appkit.api.Callback
 import me.grishka.appkit.fragments.AppKitFragment
+import me.grishka.appkit.views.FragmentRootLinearLayout
 import org.joinmastodon.android.CompatibilityTestApplication
 import org.joinmastodon.android.MastodonApp
 import org.joinmastodon.android.R
@@ -317,20 +322,37 @@ class FriendCardCompositionBehaviorTest {
     }
 
     @Test
-    fun savingTheScrolledEditorDoesNotRecreateItsLazyColumnOrJumpToTheTop() {
+    fun ordinaryEditsAutoSaveAndMeCallbackDoesNotRecreateTheScrolledEditor() {
+        val original = FriendCardDraft(account, input = FriendCardInput().apply {
+            title = "自动保存回归"
+            interactionHabits = "滚动草稿"
+        })
+        FriendCardDraftStore(compose.activity).save(original)
         mount(FriendCardCreateFragment())
-        ready()
-        list().performScrollToIndex(3)
-        val save = inList(hasText("保存本机草稿"))
+        val me = request("/me")
+        success(request("/options"), options())
+        val input = inList(editable("滚动草稿"))
+        input.performClick().performTextInputSelection(TextRange(1, 3))
+        val inputId = input.fetchSemanticsNode().id
         val listId = list().fetchSemanticsNode().id
         val scrollBefore = listScroll()
         assertTrue("The regression must exercise a genuinely scrolled list", scrollBefore > 0f)
 
-        save.performClick()
-        compose.waitForIdle()
+        node(inputId).performTextInput("更新")
+        node(inputId).assertEditable("滚更新稿").assertIsFocused()
         assertEquals(listId, list().fetchSemanticsNode().id)
         assertEquals(scrollBefore, listScroll(), 0.00001f)
-        compose.onNodeWithText("保存本机草稿").assertIsDisplayed()
+        node(inputId).performTextInputSelection(TextRange(1, 3))
+        success(me, FriendCardResponses.Me())
+        node(inputId).assertEditable("滚更新稿").assertIsFocused().assertSelection(TextRange(1, 3))
+        assertEquals(listId, list().fetchSemanticsNode().id)
+        assertEquals(scrollBefore, listScroll(), 0.00001f)
+        val saved = requireNotNull(FriendCardDraftStore(compose.activity).load(account, null))
+        assertEquals(original.draftId, saved.draftId)
+        assertEquals("滚更新稿", saved.input.interactionHabits)
+        assertTrue(saved.dirty)
+        assertTrue(saved.currentLoaded)
+        assertEditingFooter()
     }
 
     @Test
@@ -347,12 +369,15 @@ class FriendCardCompositionBehaviorTest {
         inList(hasText("学校可见范围")).assert(hasText("仅自己 · 点击设为公开"))
         clickInList("地区可见范围")
         compose.onNodeWithText("地区可见范围").assert(hasText("仅自己 · 点击设为公开"))
-        clickInList("喜欢与经历")
+        nextStage()
         inList(hasText("2 / 3 · 喜欢与经历")).assertIsDisplayed()
-        clickInList("我想找")
+        assertEquals(1, FriendCardDraftStore(compose.activity).load(account, null)?.stage)
+        nextStage()
         inList(hasText("3 / 3 · 我想找")).assertIsDisplayed()
         inList(editable("一起认真玩游戏")).assertEditable("一起认真玩游戏")
-        clickInList("发布前预览")
+        assertEquals(2, FriendCardDraftStore(compose.activity).load(account, null)?.stage)
+        nextStage()
+        compose.onNodeWithText("下一阶段").assertDoesNotExist()
 
         inList(hasText("公开卡片预览")).assertIsDisplayed()
         compose.onNodeWithText("默认私密学校").assertDoesNotExist()
@@ -364,10 +389,61 @@ class FriendCardCompositionBehaviorTest {
         inList(editable("默认私密学校")).assertEditable("默认私密学校")
         clickInList("学校可见范围")
         compose.onNodeWithText("学校可见范围").assert(hasText("公开 · 点击设为仅自己"))
-        clickInList("发布前预览")
+        clickInList("我想找")
+        nextStage()
         inList(hasText("默认私密学校")).assertIsDisplayed()
         inList(hasText("扩列 · 预览回归宣言\n学校：默认私密学校\n我想找：一起认真玩游戏")).assertIsDisplayed()
-        assertEquals(original.draftId, FriendCardDraftStore(compose.activity).load(account, null)?.draftId)
+        val saved = requireNotNull(FriendCardDraftStore(compose.activity).load(account, null))
+        assertEquals(original.draftId, saved.draftId)
+        assertEquals("默认私密学校", saved.input.school)
+        assertEquals("后来隐藏的地区", saved.input.region)
+        assertTrue("school" in saved.input.publicFields)
+        assertTrue("region" !in saved.input.publicFields)
+        assertTrue("Preview must not publish or freeze an operation", saved.pending == null)
+        assertEquals(2, LocalRequests.requests.size)
+    }
+
+    @Test
+    fun lastNextStageStillValidatesBeforeOpeningThePublicPreview() {
+        FriendCardDraftStore(compose.activity).save(FriendCardDraft(account, input = FriendCardInput().apply {
+            title = "保留发布前校验"
+        }))
+        mount(FriendCardCreateFragment())
+        ready()
+        nextStage()
+        nextStage()
+        nextStage()
+        inList(hasText("请填写我想找")).assertIsDisplayed()
+        compose.onNodeWithText("公开卡片预览").assertDoesNotExist()
+        assertEditingFooter()
+        inputWithHint("你想认识怎样的朋友？（必填）").performTextInput("寻找尊重边界的朋友")
+        nextStage()
+        inList(hasText("公开卡片预览")).assertIsDisplayed()
+        inList(hasText("扩列 · 保留发布前校验\n我想找：寻找尊重边界的朋友")).assertIsDisplayed()
+        assertTrue(FriendCardDraftStore(compose.activity).load(account, null)?.pending == null)
+        assertEquals("Only options/me may execute before an explicit publish", 2, LocalRequests.requests.size)
+    }
+
+    @Test
+    @Config(sdk = [28, 30])
+    fun nativeRootConsumesKeyboardInsetsOnceAndKeepsTheSingleFooterPinned() {
+        val fragment = mount(FriendCardCreateFragment())
+        ready()
+        assertEditingFooter()
+        val before = dispatchInsetsAndMeasureFooter(fragment, bottom = 24)
+        val keyboard = dispatchInsetsAndMeasureFooter(fragment, bottom = 280)
+        assertEquals("AppKit must subtract the keyboard only once from Compose height", 256,
+            before.composeHeight - keyboard.composeHeight)
+        assertEquals("The fixed footer must move by exactly the native root's subtraction", 256f,
+            before.footerBottom - keyboard.footerBottom, 1f)
+        assertEquals("No extra Compose IME/navigation reservation may open below the footer",
+            before.footerGap, keyboard.footerGap, 1f)
+        assertEquals(before.footerHeight, keyboard.footerHeight, 1f)
+        assertEquals("Footer content padding is 12dp, not an extra system-bar reservation", 12f, keyboard.footerGap, 1f)
+        assertTrue("The unclipped footer must remain inside the resized Compose viewport", keyboard.footerTop >= 0f)
+        assertEquals(keyboard, dispatchInsetsAndMeasureFooter(fragment, bottom = 280))
+        assertEquals(before, dispatchInsetsAndMeasureFooter(fragment, bottom = 24))
+        assertEditingFooter()
     }
 
     @Test
@@ -543,10 +619,14 @@ class FriendCardCompositionBehaviorTest {
             publicFields = listOf("gender", "age", "region", "mbti", "zodiac", "interests", "games", "looking_for", "boundaries")
         }
         val fragment = mount(FriendCardDetailFragment(), Bundle().apply { putString("card_id", "render_card") })
+        assertNativeToolbarGone(fragment)
         success(request("/render_card"), FriendCardResponses.Card().apply { card = fixture })
         compose.onNodeWithText("编辑卡片").assertIsDisplayed().performClick()
         assertEquals(FriendCardCreateFragment::class.java, LocalNavigation.target)
-        captureRealFragment("detail-owner-native-light")
+        assertEquals("render_card", LocalNavigation.args?.getString("card_id"))
+        assertDetailOverlayRouting(fragment)
+        compose.onNodeWithText("Hi").assertDoesNotExist()
+        captureRealFragment("detail-owner-overlay-native-light-api28-fallback")
 
         compose.runOnIdle {
             fixture.ownerId = "43"
@@ -558,7 +638,10 @@ class FriendCardCompositionBehaviorTest {
         compose.onNodeWithContentDescription("发私信").assertIsDisplayed().performClick()
         assertEquals(org.joinmastodon.android.chat.ui.ChatFragment::class.java, LocalNavigation.target)
         assertEquals(43L, LocalNavigation.args?.getLong("peer_id"))
-        captureRealFragment("detail-visitor-native-light")
+        assertDetailOverlayRouting(fragment)
+        compose.onNodeWithText("Hi").assertDoesNotExist()
+        compose.onNodeWithText("发私信").assertDoesNotExist()
+        captureRealFragment("detail-visitor-overlay-chat-icon-native-light-api28-fallback")
 
         compose.activityRule.scenario.onActivity { activity ->
             activity.fragmentManager.beginTransaction().remove(fragment).commit()
@@ -569,6 +652,90 @@ class FriendCardCompositionBehaviorTest {
         compose.onNodeWithText("扩列精选").assertIsDisplayed()
         compose.onNodeWithContentDescription("发私信").assertIsDisplayed()
         captureRealFragment("feed-native-light")
+    }
+
+    private fun assertNativeToolbarGone(fragment: FriendCardDetailFragment) {
+        compose.runOnIdle {
+            val toolbar = requireNotNull(fragment.view).findViewById<Toolbar>(R.id.toolbar)
+            assertEquals("Detail must remove, not merely make transparent, the native toolbar", View.GONE, toolbar.visibility)
+        }
+    }
+
+    private fun assertDetailOverlayRouting(fragment: FriendCardDetailFragment) {
+        assertNativeToolbarGone(fragment)
+        val close = compose.onNodeWithContentDescription("关闭").assertIsDisplayed()
+        val manage = compose.onNodeWithContentDescription("管理我的扩列卡").assertIsDisplayed()
+        val closeBounds = close.getUnclippedBoundsInRoot()
+        val manageBounds = manage.getUnclippedBoundsInRoot()
+        assertEquals(44f, closeBounds.right.value - closeBounds.left.value, 1f)
+        assertEquals(44f, closeBounds.bottom.value - closeBounds.top.value, 1f)
+        assertTrue("Manage belongs to the opposite end of the overlay", closeBounds.right < manageBounds.left)
+        assertEquals(closeBounds.top.value, manageBounds.top.value, 1f)
+        compose.runOnIdle { LocalNavigation.reset() }
+        manage.performClick()
+        assertEquals("Owner and visitor management always opens the current account's cards",
+            MyFriendCardsFragment::class.java, LocalNavigation.target)
+        assertEquals(account, LocalNavigation.args?.getString("account"))
+        assertTrue("Manage must not carry the viewed card into an edit route", LocalNavigation.args?.containsKey("card_id") != true)
+        close.performClick()
+        assertSame(fragment, LocalNavigation.finished)
+    }
+
+    private data class FooterGeometry(
+        val composeHeight: Int,
+        val footerTop: Float,
+        val footerBottom: Float,
+        val footerHeight: Float,
+        val footerGap: Float,
+    )
+
+    private fun dispatchInsetsAndMeasureFooter(fragment: FriendCardCreateFragment, bottom: Int): FooterGeometry {
+        compose.runOnIdle {
+            val root = requireNotNull(fragment.view)
+            assertTrue("Exercise the production AppKit inset owner", root is FragmentRootLinearLayout)
+            val insets = if (Build.VERSION.SDK_INT >= 30) {
+                WindowInsets.Builder()
+                    // AppKit uses the legacy combined bottom; also deliver the actual typed IME.
+                    .setSystemWindowInsets(android.graphics.Insets.of(0, 24, 0, bottom))
+                    .setStableInsets(android.graphics.Insets.of(0, 24, 0, 24))
+                    .setInsets(WindowInsets.Type.ime(), android.graphics.Insets.of(0, 0, 0, if (bottom > 24) bottom else 0))
+                    .setVisible(WindowInsets.Type.ime(), bottom > 24)
+                    .build()
+            } else {
+                WindowInsets::class.java.getDeclaredConstructor(android.graphics.Rect::class.java)
+                    .apply { isAccessible = true }.newInstance(android.graphics.Rect(0, 24, 0, bottom))
+            }
+            assertEquals("Fixture must deliver the requested system/keyboard bottom", bottom, insets.systemWindowInsetBottom)
+            // The real AppKit callback dispatches onto its real root; no test padding/inset consumer.
+            fragment.onApplyWindowInsets(insets)
+            repeat(3) {
+                root.forceLayout()
+                root.measure(View.MeasureSpec.makeMeasureSpec(393, View.MeasureSpec.EXACTLY),
+                    View.MeasureSpec.makeMeasureSpec(852, View.MeasureSpec.EXACTLY))
+                root.layout(0, 0, 393, 852)
+                root.viewTreeObserver.dispatchOnPreDraw()
+            }
+            assertEquals("Native root, not a Compose spacer, owns the inset", bottom, root.paddingBottom)
+        }
+        compose.waitForIdle()
+        val bounds = compose.onNodeWithText("下一阶段").assertIsDisplayed().getUnclippedBoundsInRoot()
+        val height = realComposeView(fragment).height
+        return FooterGeometry(height, bounds.top.value, bounds.bottom.value, bounds.bottom.value - bounds.top.value,
+            height.toFloat() - bounds.bottom.value)
+    }
+
+    private fun assertEditingFooter() {
+        assertEquals("Each edit stage has exactly one fixed next action", 1,
+            compose.onAllNodes(hasText("下一阶段")).fetchSemanticsNodes().size)
+        compose.onNodeWithText("下一阶段").assertIsDisplayed()
+        compose.onNodeWithText("保存本机草稿").assertDoesNotExist()
+        compose.onNodeWithText("发布前预览").assertDoesNotExist()
+    }
+
+    private fun nextStage() {
+        assertEditingFooter()
+        compose.onNodeWithText("下一阶段").performClick()
+        compose.waitForIdle()
     }
 
     private fun captureRealFragment(name: String) {

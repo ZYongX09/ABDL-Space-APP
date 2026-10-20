@@ -12,13 +12,16 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalView
+import org.joinmastodon.android.GlobalUserPreferences
+import top.yukonga.miuix.kmp.blur.isRuntimeShaderSupported
+import top.yukonga.miuix.kmp.blur.layerBackdrop
+import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
-import org.joinmastodon.android.R
-import org.joinmastodon.android.ui.utils.UiUtils
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
@@ -39,18 +42,15 @@ class FriendCardDetailFragment : FriendCardBaseFragment() {
     override fun onViewCreated(view: View, state: Bundle?) { super.onViewCreated(view, state); styleToolbar() }
     override fun onUpdateToolbar() { super.onUpdateToolbar(); styleToolbar() }
     private fun styleToolbar() {
-        val host = activity ?: return
+        if (activity == null) return
         val bar = toolbar ?: return
         val value = card
-        val background = value?.let { friendCardPalette(it).background.toArgb() } ?: UiUtils.getThemeColor(host, R.attr.colorM3Background)
-        val foreground = if (value != null) android.graphics.Color.WHITE else UiUtils.getThemeColor(host, R.attr.colorM3OnSurface)
-        bar.setBackgroundColor(background)
-        bar.setTitleTextColor(foreground)
-        bar.navigationIcon?.mutate()?.let { it.setTint(foreground); bar.navigationIcon = it }
+        val background = value?.let { friendCardPalette(it).background.toArgb() } ?: 0xFF263F43.toInt()
+        bar.visibility = View.GONE
         setStatusBarColor(background)
         setNavigationBarColor(background)
     }
-    override fun wantsLightStatusBar() = card == null && !UiUtils.isDarkTheme()
+    override fun wantsLightStatusBar() = false
     override fun refresh() {
         if (busy) return
         cancelRequests()
@@ -86,18 +86,23 @@ class FriendCardDetailFragment : FriendCardBaseFragment() {
         val state = remember(revision) { ScreenState(card, loading, busy, globalError) }
         val value = state.card
         val palette = value?.let { friendCardPalette(it) }
-        Column(Modifier.fillMaxSize().background(palette?.background ?: MiuixTheme.colorScheme.background)) {
-            // The native toolbar is supplied by Base. Only the public portrait scrolls;
-            // the footer takes its own measured space instead of covering the last section.
+        val liquid = GlobalUserPreferences.isIosLiquidNavigationEnabled() && LocalView.current.isHardwareAccelerated && isRuntimeShaderSupported()
+        val backdrop = if (liquid) rememberLayerBackdrop() else null
+        Box(Modifier.fillMaxSize().background(palette?.background ?: Color(0xFF263F43))) {
+            Column(Modifier.fillMaxSize().then(if (backdrop != null) Modifier.layerBackdrop(backdrop) else Modifier)) {
             LazyColumn(Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (state.loading) item { FriendCardNotice("正在读取卡片…", null, null) }
+                if (state.loading) item {
+                    Box(Modifier.padding(top = 56.dp, start = 12.dp, end = 12.dp).clip(RoundedCornerShape(18.dp)).background(MiuixTheme.colorScheme.surface)) {
+                        FriendCardNotice("正在读取卡片…", null, null)
+                    }
+                }
                 state.error?.let { text -> item {
-                    Box(Modifier.padding(12.dp).clip(RoundedCornerShape(18.dp)).background(MiuixTheme.colorScheme.surface)) {
+                    Box(Modifier.padding(top = 56.dp, start = 12.dp, end = 12.dp, bottom = 12.dp).clip(RoundedCornerShape(18.dp)).background(MiuixTheme.colorScheme.surface)) {
                         FriendCardNotice(text, "重新读取", { refresh() })
                     }
                 } }
                 if (value != null) {
-                    item { FriendCardPortrait(value, onDiaper = { diaper(it) }) }
+                    item { FriendCardPortrait(value, topClearance = 64.dp, onDiaper = { diaper(it) }) }
                     item {
                         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -115,6 +120,8 @@ class FriendCardDetailFragment : FriendCardBaseFragment() {
                 }
             }
             if (value != null) DetailFooter(value, state.busy)
+            }
+            FriendCardDetailControls(backdrop, !state.busy, { finish() }, { go(MyFriendCardsFragment::class.java) })
         }
     }
 

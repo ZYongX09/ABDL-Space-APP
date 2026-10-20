@@ -3,6 +3,7 @@ package org.joinmastodon.android.ui.compose.navigation
 import android.content.Context
 import android.view.View
 import android.widget.FrameLayout
+import androidx.annotation.DrawableRes
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -40,6 +41,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -64,10 +66,11 @@ import java.util.function.Consumer
 import java.util.function.IntConsumer
 
 /** One destination of the home compose fan. [id] matches the ids used by the liquid compose menu. */
-data class ComposeFanMenuItem(
+data class ComposeFanMenuItem @JvmOverloads constructor(
 	val id: Int,
 	val title: String,
 	val icon: ImageVector,
+	@DrawableRes val iconRes: Int? = null,
 )
 
 /** FAB geometry shared with [R.layout.compose_fab]: 56dp square, 16dp end/bottom margin. */
@@ -103,7 +106,7 @@ class ComposeFanMenuController(
 	private var bottomInsetPxState by mutableIntStateOf(0)
 	private val items: List<ComposeFanMenuItem> = listOf(
 		ComposeFanMenuItem(R.id.compose_post, context.getString(R.string.compose_menu_post), MiuixIcons.Notes),
-		ComposeFanMenuItem(R.id.compose_friend_request, context.getString(R.string.compose_menu_friend_request), MiuixIcons.ContactsBook),
+		ComposeFanMenuItem(R.id.compose_friend_request, context.getString(R.string.compose_menu_friend_request), MiuixIcons.ContactsBook, iconRes = R.drawable.ic_friend_card),
 		ComposeFanMenuItem(R.id.compose_album, context.getString(R.string.baby_albums_compose_upload), MiuixIcons.Image),
 	)
 
@@ -306,7 +309,11 @@ private fun FanRow(
 				.semantics { contentDescription = item.title },
 			contentAlignment = Alignment.Center,
 		) {
-			Icon(item.icon, contentDescription = null, modifier = Modifier.size(24.dp), tint = contentColor)
+			if (item.iconRes != null) {
+				Icon(painterResource(item.iconRes), contentDescription = null, modifier = Modifier.size(24.dp), tint = contentColor)
+			} else {
+				Icon(item.icon, contentDescription = null, modifier = Modifier.size(24.dp), tint = contentColor)
+			}
 		}
 	}
 }

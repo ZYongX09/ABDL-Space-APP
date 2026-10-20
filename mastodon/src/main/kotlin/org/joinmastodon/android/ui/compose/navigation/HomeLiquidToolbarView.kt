@@ -111,10 +111,11 @@ data class HomeToolbarMenuItem(
 private const val COMPOSE_MENU_WIDTH_DP = 200
 private const val COMPOSE_MENU_END_PADDING_DP = 40
 
-data class HomeToolbarComposeMenuItem(
+data class HomeToolbarComposeMenuItem @JvmOverloads constructor(
 	val id: Int,
 	val title: String,
 	val icon: androidx.compose.ui.graphics.vector.ImageVector,
+	@DrawableRes val iconRes: Int? = null,
 )
 
 class HomeLiquidToolbarController(
@@ -569,7 +570,11 @@ val trailingExpanded = menuPageState==HomeToolbarMenuPage.ROOT || menuPageState=
 		) {
 				if(animatedPage==HomeToolbarMenuPage.COMPOSE) {
 					composeMenuState.forEachIndexed { index, item ->
-						MenuRow(item.icon, item.title, false, highlightedIndex==index+offset) { activateComposeItem(index) }
+						if(item.iconRes!=null) {
+							MenuRow(item.iconRes, item.title, false, highlightedIndex==index+offset) { activateComposeItem(index) }
+						} else {
+							MenuRow(item.icon, item.title, false, highlightedIndex==index+offset) { activateComposeItem(index) }
+						}
 					}
 					return@Column
 				}

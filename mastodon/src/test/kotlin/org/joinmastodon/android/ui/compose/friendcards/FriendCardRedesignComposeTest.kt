@@ -2,6 +2,7 @@
 
 package org.joinmastodon.android.ui.compose.friendcards
 
+import android.content.res.ColorStateList
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.ColorFilter
@@ -22,6 +23,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -36,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
@@ -51,6 +54,7 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -60,10 +64,12 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import me.grishka.appkit.imageloader.ViewImageLoader
 import me.grishka.appkit.imageloader.requests.ImageLoaderRequest
 import me.grishka.appkit.imageloader.requests.UrlImageLoaderRequest
 import org.joinmastodon.android.CompatibilityTestApplication
+import org.joinmastodon.android.R
 import org.joinmastodon.android.api.requests.friendcards.FriendCardInput
 import org.joinmastodon.android.api.requests.friendcards.FriendCardResponses
 import org.joinmastodon.android.friendcards.FriendCardDraft
@@ -90,6 +96,7 @@ import top.yukonga.miuix.kmp.theme.ThemeController
 import top.yukonga.miuix.kmp.theme.darkColorScheme
 import top.yukonga.miuix.kmp.theme.lightColorScheme
 import java.io.File
+import kotlin.math.roundToInt
 
 /**
  * Real production composables on a real ComponentActivity with native Skia and Canvas capture.
@@ -214,6 +221,11 @@ class FriendCardRedesignComposeTest {
         compose.onNodeWithText(ownerName).assert(buttonRole).assertHasClickAction().performClick()
         compose.onNodeWithText("编辑卡片").assert(buttonRole).assertIsEnabled().performClick()
         compose.onNodeWithContentDescription("发私信").assert(buttonRole).assertIsEnabled().performClick()
+        assertAbsent("Hi", "发私信")
+        val hello = compose.onNodeWithContentDescription("发私信").getUnclippedBoundsInRoot()
+        assertEquals("Private-message control remains circular", hello.right.value - hello.left.value,
+            hello.bottom.value - hello.top.value, .01f)
+        assertEquals(54f, hello.right.value - hello.left.value, .01f)
         compose.runOnIdle {
             assertEquals(1, primaryClicks)
             assertEquals(1, helloClicks)
@@ -225,6 +237,89 @@ class FriendCardRedesignComposeTest {
         compose.runOnIdle {
             assertEquals("Disabled primary callback must not fire", 1, primaryClicks)
             assertEquals("Disabled private-message callback must not fire", 1, helloClicks)
+        }
+    }
+
+    @Test
+    fun chatAndCloseRenderVisibleSvgStrokesMatchingNativeDrawablesInLightAndDark() {
+        var dark by mutableStateOf(false)
+        val panel = androidx.compose.ui.graphics.Color(0xFF263F43)
+        compose.setContent {
+            FixtureTheme(dark = dark) {
+                Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                    FixtureCaption("SVG像素回归 · 原生资源参考与实际控件")
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                        Text("Android ImageView", modifier = Modifier.weight(1f))
+                        NativeIconReference(R.drawable.ic_friend_card_chat, 29, 0xFF233036.toInt(), "native-chat", androidx.compose.ui.graphics.Color.White)
+                        NativeIconReference(R.drawable.ic_fluent_dismiss_24_regular, 20, android.graphics.Color.WHITE, "native-close", panel)
+                    }
+                    Box(Modifier.fillMaxWidth().background(panel)) {
+                        FriendCardDetailControls(backdrop = null, enabled = true, onClose = {}, onManage = {})
+                    }
+                    FriendCardHello {}
+                }
+            }
+        }
+        for (isDark in listOf(false, true)) {
+            compose.runOnIdle { dark = isDark }
+            val chat = compose.onNodeWithContentDescription("发私信").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+            val close = compose.onNodeWithContentDescription("关闭").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+            val nativeChat = compose.onNodeWithTag("native-chat").fetchSemanticsNode().boundsInRoot
+            val nativeClose = compose.onNodeWithTag("native-close").fetchSemanticsNode().boundsInRoot
+            capture("chat-close-svg-pixels-${mode(isDark)}-393x852", 393, 852) { bitmap ->
+                fun ink(bounds: Rect, darkInk: Boolean): Set<Pair<Int, Int>> = buildSet {
+                    for (y in 0 until bounds.height.roundToInt()) for (x in 0 until bounds.width.roundToInt()) {
+                        val pixel = bitmap.getPixel(bounds.left.roundToInt() + x, bounds.top.roundToInt() + y)
+                        val channels = listOf(android.graphics.Color.red(pixel), android.graphics.Color.green(pixel), android.graphics.Color.blue(pixel))
+                        if (if (darkInk) channels.max() < 130 else channels.min() > 220) add(x to y)
+                    }
+                }
+                fun center(bounds: Rect, size: Float) = Rect(bounds.center.x - size / 2, bounds.center.y - size / 2,
+                    bounds.center.x + size / 2, bounds.center.y + size / 2)
+                fun coverage(expected: Set<Pair<Int, Int>>, actual: Set<Pair<Int, Int>>) = expected.count { (x, y) ->
+                    (-1..1).any { dx -> (-1..1).any { dy -> (x + dx to y + dy) in actual } }
+                }.toFloat() / expected.size.coerceAtLeast(1)
+                fun verify(label: String, reference: Rect, actual: Rect, size: Float, darkInk: Boolean) {
+                    val nativeInk = ink(reference, darkInk)
+                    val actualInk = ink(center(actual, size), darkInk)
+                    val counts = "$label ${mode(isDark)}: native=${nativeInk.size}, production=${actualInk.size}"
+                    assertTrue("Native ImageView must draw the supplied SVG resource, $counts", nativeInk.size >= 20)
+                    assertTrue("The actual control must contain strokes, not a blank or filled circle, $counts",
+                        actualInk.size >= nativeInk.size * .6f && actualInk.size <= nativeInk.size * 1.8f)
+                    assertTrue("Production must preserve the supplied SVG paths (1px raster tolerance), $counts",
+                        coverage(nativeInk, actualInk) >= .8f && coverage(actualInk, nativeInk) >= .8f)
+                }
+                verify("dark chat", nativeChat, chat, 29f, darkInk = true)
+                verify("white close", nativeClose, close, 20f, darkInk = false)
+            }
+        }
+    }
+
+    @Test
+    fun quotationCanvasRendersTwoCompleteMarksWithRoomInsideItsBounds() {
+        compose.setContent {
+            FixtureTheme(fontScale = 1.6f) {
+                Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black), contentAlignment = Alignment.Center) {
+                    FriendCardQuotation(Modifier.testTag("quotation"))
+                }
+            }
+        }
+        val quotation = compose.onNodeWithTag("quotation").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        assertEquals(36f, quotation.width, .01f)
+        assertEquals(26f, quotation.height, .01f)
+        assertAbsent("“")
+        capture("quotation-canvas-393x852-font160", 393, 852) { bitmap ->
+            val left = quotation.left.toInt()
+            val top = quotation.top.toInt()
+            fun lit(x: Int, y: Int) = android.graphics.Color.red(bitmap.getPixel(left + x, top + y)) > 10
+            for (x in listOf(8, 25)) {
+                assertTrue("Each quotation shoulder must render above the body", lit(x, 5))
+                assertTrue("Each quotation body must reach its designed bottom", lit(x, 22))
+            }
+            assertFalse("Keep the gap between both marks", lit(17, 18))
+            assertFalse("Top of the Canvas must leave breathing room", lit(8, 0))
+            assertFalse("Bottom of the Canvas must not clip the quotation body", lit(8, 25))
         }
     }
 
@@ -278,6 +373,10 @@ class FriendCardRedesignComposeTest {
                 }
                 compose.onNode(hasScrollToIndexAction()).performScrollToNode(expected)
                 compose.onNode(expected).assertIsDisplayed()
+                assertEquals("All stages have just one pinned next footer", 1,
+                    compose.onAllNodes(hasText("下一阶段")).fetchSemanticsNodes().size)
+                compose.onNodeWithText("下一阶段").assertIsDisplayed().assertHasClickAction()
+                assertAbsent("保存本机草稿", "发布前预览")
                 // Capture a stable initial viewport, not whichever field the assertion scrolled to.
                 compose.onNode(hasScrollToIndexAction()).performScrollToIndex(0)
                 capture("editor-stage$index-no-cover-${mode(isDark)}-393x852", 393, 852)
@@ -313,9 +412,16 @@ class FriendCardRedesignComposeTest {
             // These contents must be really composed, even when the tall detail needs scrolling.
             compose.onNodeWithText(school).performScrollTo().assertIsDisplayed()
             compose.onNodeWithText(habits).performScrollTo().assertIsDisplayed()
-            val primary = if (isOwner) "编辑卡片" else "发私信"
-            compose.onNodeWithText(primary).assertIsDisplayed().assertHasClickAction()
-            compose.onNodeWithText(if (isOwner) "发私信" else "编辑卡片").assertDoesNotExist()
+            if (isOwner) {
+                compose.onNodeWithText("编辑卡片").assertIsDisplayed().assertHasClickAction()
+                compose.onNodeWithContentDescription("发私信").assertDoesNotExist()
+            } else {
+                compose.onNodeWithContentDescription("发私信").assertIsDisplayed().assertHasClickAction()
+                compose.onNodeWithText("编辑卡片").assertDoesNotExist()
+            }
+            compose.onNodeWithContentDescription("关闭").assertIsDisplayed().assertHasClickAction()
+            compose.onNodeWithContentDescription("管理我的扩列卡").assertIsDisplayed().assertHasClickAction()
+            assertAbsent("Hi", "发私信")
             compose.onNodeWithText(title).performScrollTo()
             if (hasCover) compose.runOnIdle {
                 assertTrue("Only the loader is replaced; the real FocusImage must receive the synthetic drawable",
@@ -329,7 +435,7 @@ class FriendCardRedesignComposeTest {
         values.forEach { compose.onNodeWithText(it, substring = true, useUnmergedTree = true).assertDoesNotExist() }
     }
 
-    private fun capture(name: String, width: Int, height: Int) {
+    private fun capture(name: String, width: Int, height: Int, verifyPixels: ((Bitmap) -> Unit)? = null) {
         compose.waitForIdle()
         lateinit var bitmap: Bitmap
         compose.runOnIdle {
@@ -342,13 +448,29 @@ class FriendCardRedesignComposeTest {
         // Fail loudly rather than publishing a blank/transparent placeholder as a screenshot.
         val samples = (1..12).flatMap { x -> (1..12).map { y -> bitmap.getPixel(x * (width - 1) / 13, y * (height - 1) / 13) } }
         assertTrue("Native render must contain nontransparent pixels", samples.any { android.graphics.Color.alpha(it) > 0 })
-        assertTrue("Native render must contain actual UI, not one flat color", samples.distinct().size > 2)
+        if (verifyPixels == null) assertTrue("Native render must contain actual UI, not one flat color", samples.distinct().size > 2)
         val directory = File(System.getProperty("friendCard.renderDir").orEmpty().trim().ifBlank { "/tmp/abdl-friend-card-ui-renders" })
         assertTrue("Cannot create screenshot directory $directory", directory.isDirectory || directory.mkdirs())
         val output = File(directory, "$name.png")
         output.outputStream().use { assertTrue("PNG compression failed", bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
         assertTrue("Screenshot is empty: $output", output.length() > 1024)
-        bitmap.recycle()
+        try {
+            verifyPixels?.invoke(bitmap)
+        } finally {
+            bitmap.recycle()
+        }
+    }
+
+    @Composable
+    private fun NativeIconReference(resource: Int, size: Int, tint: Int, tag: String, background: androidx.compose.ui.graphics.Color) {
+        // Independent native reference: supplied XML paths, real ImageView.draw, no substituted bitmap.
+        AndroidView(factory = { context ->
+            ImageView(context).apply {
+                scaleType = ImageView.ScaleType.FIT_CENTER
+                imageTintList = ColorStateList.valueOf(tint)
+                setImageResource(resource)
+            }
+        }, modifier = Modifier.size(size.dp).background(background).testTag(tag))
     }
 
     @Composable
@@ -383,19 +505,30 @@ class FriendCardRedesignComposeTest {
     @Composable
     private fun DetailFixture(value: FriendCard, owner: Boolean) {
         Column(Modifier.fillMaxSize()) {
-            FixtureCaption("详情组件 · ${if (owner) "主人" else "访客"}页脚样例 · 虚构成人 · ${if (value.coverUrl == null) "无封面" else "合成几何封面"}")
-            Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-                FriendCardPortrait(value, games = gameLabels)
-            }
-            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                FriendCardIdentity(value, light = false)
-                if (owner) {
-                    FriendCardPrimaryButton("编辑卡片", {})
-                    FriendCardActions("管理我的卡" to {})
-                } else {
-                    FriendCardPrimaryButton("发私信", {})
-                    FriendCardActions("用户主页" to {}, "举报" to {}, "屏蔽用户" to {})
+            FixtureCaption("详情组件 · ${if (owner) "主人" else "访客"}样例 · API28非玻璃回退 · 虚构成人 · ${if (value.coverUrl == null) "无封面" else "合成几何封面"}")
+            Box(Modifier.weight(1f).fillMaxWidth()) {
+                Column(Modifier.fillMaxSize()) {
+                    Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+                        FriendCardPortrait(value, games = gameLabels, topClearance = 64.dp)
+                    }
+                    Column(Modifier.fillMaxWidth().background(friendCardPalette(value).background).padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        if (owner) {
+                            FriendCardIdentity(value)
+                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                FriendCardPrimaryButton("编辑卡片", {}, modifier = Modifier.weight(1f), outlined = true, light = true)
+                                FriendCardPrimaryButton("管理我的卡", {}, modifier = Modifier.weight(1f), outlined = true, light = true)
+                            }
+                        } else {
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                                FriendCardIdentity(value, Modifier.weight(1f))
+                                FriendCardHello {}
+                            }
+                        }
+                    }
                 }
+                FriendCardDetailControls(backdrop = null, enabled = true, onClose = {}, onManage = {})
             }
         }
     }

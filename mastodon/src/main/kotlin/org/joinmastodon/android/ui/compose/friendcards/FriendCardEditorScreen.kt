@@ -285,7 +285,7 @@ fun FriendCardEditorScreen(
                 EditorHint("草稿按当前账号持久保存，不会发布。输入内容与账号个人资料相互独立。")
             }
         }
-        if (editing) EditorBottomBar(stage, enabled, coverBusy, onStage, onPreview, onSave)
+        if (editing) EditorBottomBar(stage, enabled, coverBusy, onStage, onPreview)
     }
 }
 
@@ -329,31 +329,15 @@ private fun EditorHeader(stage: Int, completion: Int, enabled: Boolean, onStage:
 }
 
 @Composable
-private fun EditorBottomBar(stage: Int, enabled: Boolean, coverBusy: Boolean, onStage: (Int) -> Unit, onPreview: () -> Unit, onSave: () -> Unit) {
+private fun EditorBottomBar(stage: Int, enabled: Boolean, coverBusy: Boolean, onStage: (Int) -> Unit, onPreview: () -> Unit) {
     Column(Modifier.fillMaxWidth().background(MiuixTheme.colorScheme.background)) {
         EditorDivider()
-        Column(
-            Modifier.fillMaxWidth().navigationBarsPadding().padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 4.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
-        ) {
-            FriendCardPrimaryButton(
-                text = if (stage < 2) "下一阶段" else "发布前预览",
-                onClick = { if (stage < 2) onStage(stage + 1) else onPreview() },
-                modifier = Modifier.heightIn(min = 54.dp),
-                enabled = enabled && (stage < 2 || !coverBusy),
-            )
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                EditorFooterAction("保存本机草稿", enabled && !coverBusy, Modifier.weight(1f), onSave)
-                if (stage < 2) EditorFooterAction("发布前预览", enabled && !coverBusy, Modifier.weight(1f), onPreview)
-            }
-        }
-    }
-}
-
-@Composable
-private fun EditorFooterAction(label: String, enabled: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    Box(modifier.heightIn(min = 44.dp).clip(RoundedCornerShape(12.dp)).clickable(enabled = enabled, role = Role.Button, onClick = onClick).padding(8.dp), contentAlignment = Alignment.Center) {
-        Text(label, fontSize = 13.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = if (enabled) 1f else .45f), textAlign = TextAlign.Center)
+        FriendCardPrimaryButton(
+            text = "下一阶段",
+            onClick = { if (stage < 2) onStage(stage + 1) else onPreview() },
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp).heightIn(min = 54.dp),
+            enabled = enabled && (stage < 2 || !coverBusy),
+        )
     }
 }
 
