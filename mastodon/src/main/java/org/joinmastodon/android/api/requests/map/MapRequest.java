@@ -18,6 +18,7 @@ public final class MapRequest<T> extends MastodonAPIRequest<T>{
     }
     public static MapRequest<MapModels.Settings> settings(){ return new MapRequest<>(HttpMethod.GET, "/settings", MapModels.Settings.class, null); }
     public static MapRequest<MapModels.Settings> updateSettings(Map<String,Object> body){ return new MapRequest<>(HttpMethod.PUT, "/settings", MapModels.Settings.class, body); }
+    public static MapRequest<MapModels.Settings> stopService(){ return new MapRequest<>(HttpMethod.POST, "/service/stop", MapModels.Settings.class, Map.of()); }
     public static MapRequest<MapModels.Presence> mine(){ return new MapRequest<>(HttpMethod.GET, "/presence/me", MapModels.Presence.class, null); }
     public static MapRequest<MapModels.Presence> updatePresence(Map<String,Object> body){ return new MapRequest<>(HttpMethod.PUT, "/presence", MapModels.Presence.class, body); }
     public static MapRequest<MapModels.PresenceList> list(double minLat, double minLng, double maxLat, double maxLng, double centerLat, double centerLng, String regionId, int zoom, int limit){

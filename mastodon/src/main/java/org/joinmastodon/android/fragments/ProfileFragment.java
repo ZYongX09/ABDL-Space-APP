@@ -78,6 +78,8 @@ import org.joinmastodon.android.chat.model.Conversation;
 import org.joinmastodon.android.fragments.account_list.FamiliarFollowerListFragment;
 import org.joinmastodon.android.fragments.account_list.FollowerListFragment;
 import org.joinmastodon.android.fragments.account_list.FollowingListFragment;
+import org.joinmastodon.android.fragments.friendcards.FriendCardDetailFragment;
+import org.joinmastodon.android.friendcards.PublicFriendCardUi;
 import org.joinmastodon.android.fragments.report.ReportReasonChoiceFragment;
 import org.joinmastodon.android.model.Account;
 import org.joinmastodon.android.model.AccountField;
@@ -164,6 +166,9 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 	private View tabsDivider;
 	private View actionButtonWrap;
 	private View nbwSourceNotice;
+	private View publicFriendCardMini;
+	private boolean refreshPublicFriendCardOnShown, publicFriendCardRefreshing;
+	private int accountLoadGeneration;
 	private LinearLayout badgeContainer;
 	private OkHttpClient badgeHttpClient;
 	private CustomDrawingOrderLinearLayout scrollableContent;
@@ -274,6 +279,8 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 		tabsDivider=content.findViewById(R.id.tabs_divider);
 		actionButtonWrap=content.findViewById(R.id.profile_action_btn_wrap);
 		nbwSourceNotice=content.findViewById(R.id.nbw_source_notice);
+		publicFriendCardMini=content.findViewById(R.id.profile_friend_card_mini);
+		PublicFriendCardUi.clearMini(publicFriendCardMini);
 		badgeContainer=content.findViewById(R.id.badge_container);
 		badgeHttpClient=new OkHttpClient();
 		scrollableContent=content.findViewById(R.id.scrollable_content);
@@ -443,10 +450,14 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 
 	@Override
 	protected void doLoadData(){
+		int generation=++accountLoadGeneration;
+		boolean recheckingPublicFriendCard=publicFriendCardRefreshing;
 		currentRequest=new GetAccountByID(profileAccountID)
 				.setCallback(new SimpleCallback<>(this){
 					@Override
 					public void onSuccess(Account result){
+						if(generation!=accountLoadGeneration) return;
+						publicFriendCardRefreshing=false;
 						account=result;
 						isOwnProfile=AccountSessionManager.getInstance().isSelf(accountID, account);
 						bindHeaderView();
@@ -467,6 +478,21 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 								savedFragment.onRefresh();
 						}
 						V.setVisibilityAnimated(fab, View.VISIBLE);
+					}
+
+					@Override
+					public void onError(ErrorResponse error){
+						if(generation!=accountLoadGeneration) return;
+						if(recheckingPublicFriendCard){
+							publicFriendCardRefreshing=false;
+							refreshing=false;
+							if(refreshLayout!=null) refreshLayout.setRefreshing(false);
+							if(account!=null) account.publicFriendCard=null;
+							bindPublicFriendCardMini();
+							if(getActivity()!=null) error.showToast(getActivity());
+							return;
+						}
+						super.onError(error);
 					}
 				})
 				.exec(accountID);
@@ -547,16 +573,18 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 		}
 		if(!refreshing){
 			pager.getAdapter().notifyDataSetChanged();
-			pager.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener(){
-				@Override
-				public boolean onPreDraw(){
-					pager.getViewTreeObserver().removeOnPreDrawListener(this);
-					pager.setCurrentItem(1, false);
-					updateAlbumPageVisibility();
-					tabbar.selectTab(tabbar.getTabAt(1));
-					return true;
-				}
-			});
+			if(!loaded){
+				pager.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener(){
+					@Override
+					public boolean onPreDraw(){
+						pager.getViewTreeObserver().removeOnPreDrawListener(this);
+						pager.setCurrentItem(1, false);
+						updateAlbumPageVisibility();
+						tabbar.selectTab(tabbar.getTabAt(1));
+						return true;
+					}
+				});
+			}
 		}
 		super.dataLoaded();
 	}
@@ -622,6 +650,13 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 	protected void onShown(){
 		super.onShown();
 		updateAlbumPageVisibility();
+		if(refreshPublicFriendCardOnShown && !isInEditMode && getActivity()!=null){
+			refreshPublicFriendCardOnShown=false;
+			publicFriendCardRefreshing=true;
+			bindPublicFriendCardMini();
+			if(currentRequest!=null) currentRequest.cancel();
+			doLoadData();
+		}
 	}
 
 	@Override
@@ -716,6 +751,7 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 	}
 
 	private void bindHeaderViewForPreviewMaybe(){
+		if(publicFriendCardMini!=null) PublicFriendCardUi.clearMini(publicFriendCardMini);
 		if(loaded)
 			return;
 		String username=getArguments().getString("accountUsername");
@@ -739,7 +775,34 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 		tabsDivider.setVisibility(View.GONE);
 	}
 
+	private void bindPublicFriendCardMini(){
+		if(publicFriendCardMini!=null)
+			PublicFriendCardUi.bindMini(publicFriendCardMini, account,
+					isInEditMode || publicFriendCardRefreshing || refreshPublicFriendCardOnShown, this::onPublicFriendCardClick);
+	}
+
+	private void onPublicFriendCardClick(View view){
+		if(isInEditMode || publicFriendCardRefreshing || refreshPublicFriendCardOnShown || getActivity()==null
+				|| !PublicFriendCardUi.hasReference(account)) return;
+		var manager=AccountSessionManager.getInstance();
+		if(accountID==null || !accountID.equals(manager.getLastActiveAccountID()) || manager.tryGetAccount(accountID)==null) return;
+		Bundle args=new Bundle();
+		args.putString("account", accountID);
+		args.putString("card_id", account.publicFriendCard.id);
+		refreshPublicFriendCardOnShown=true;
+		bindPublicFriendCardMini();
+		Nav.go(getActivity(), FriendCardDetailFragment.class, args);
+	}
+
+	@Override
+	public void onDestroyView(){
+		if(publicFriendCardMini!=null) PublicFriendCardUi.clearMini(publicFriendCardMini);
+		publicFriendCardMini=null;
+		super.onDestroyView();
+	}
+
 	private void bindHeaderView(){
+		bindPublicFriendCardMini();
 		if(innerProgress.getVisibility()==View.VISIBLE){
 			TransitionManager.beginDelayedTransition(contentView, new TransitionSet()
 					.addTransition(new Fade(Fade.IN | Fade.OUT))
@@ -1403,6 +1466,7 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 		if(isInEditMode)
 			throw new IllegalStateException();
 		isInEditMode=true;
+		bindPublicFriendCardMini();
 		invalidateOptionsMenu();
 		pager.setUserInputEnabled(false);
 		actionButton.setText(R.string.save_changes);

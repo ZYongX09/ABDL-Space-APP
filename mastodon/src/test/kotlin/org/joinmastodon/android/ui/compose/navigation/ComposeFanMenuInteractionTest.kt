@@ -55,6 +55,7 @@ class ComposeFanMenuInteractionTest {
 		val expected = listOf(
 			R.string.compose_menu_post to R.id.compose_post,
 			R.string.compose_menu_friend_request to R.id.compose_friend_request,
+			R.string.compose_menu_friend_card to R.id.compose_friend_card,
 			R.string.baby_albums_compose_upload to R.id.compose_album,
 		)
 		for ((titleRes, id) in expected) {
@@ -64,7 +65,7 @@ class ComposeFanMenuInteractionTest {
 			compose.waitForIdle()
 			compose.runOnIdle { assertEquals(id, actions.lastOrNull()) }
 		}
-		assertEquals(3, actions.size)
+		assertEquals(4, actions.size)
 		// Selecting an option folds the fan away.
 		compose.runOnIdle { assertFalse(menu.isExpanded) }
 	}

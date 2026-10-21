@@ -37,6 +37,10 @@ public final class MapModels{
 		return settings!=null && validPrecision(value) && (!"city".equals(value) || "city".equals(settings.precisionLevel)
 				|| settings.capabilities!=null && settings.capabilities.canChooseCityPrecision);
 	}
+	/** A full service reset is distinct from legacy location withdrawal. */
+	public static boolean canStopService(Settings settings){
+		return settings!=null && settings.capabilities!=null && settings.capabilities.canStopService;
+	}
 	public static boolean canPublishDeviceLocation(Settings settings){
 		return settings!=null && consentAccepted(settings.consent) && settings.babyVerified && settings.visibilityConfirmed
 				&& ("public".equals(settings.visibility) || "friends".equals(settings.visibility)) && "device".equals(settings.locationMode);
@@ -65,7 +69,7 @@ public final class MapModels{
 	}
 
 	public static class Capabilities{
-		public boolean canChooseVisibility, canChooseCityPrecision;
+		public boolean canChooseVisibility, canChooseCityPrecision, canStopService;
 	}
 
 	public static class Settings extends BaseModel{
@@ -78,6 +82,8 @@ public final class MapModels{
 		public boolean anonymous, autoRefresh, active, canViewNationwide, canChooseLocation, babyVerified;
 		public String mapScope;
 		public Region currentRegion;
+		/** Stop responses explicitly return no remaining map point. */
+		public Point point;
 		@Override public void postprocess() throws ObjectValidationException{
 			if(consent==null || !validVisibility(visibility) || !validPrecision(precisionLevel)
 					|| !validLocationMode(locationMode) || fuzzRadiusM<200 || fuzzRadiusM>20_000)

@@ -97,7 +97,7 @@ class FriendCardIconContractTest {
 		assertTrue(toolbar.contains("MenuRow(item.iconRes, item.title"))
 		val fan = File(projectDir, "$composeRoot/ComposeFanMenu.kt").readText()
 		assertTrue(fan.contains("data class ComposeFanMenuItem @JvmOverloads constructor("))
-		assertTrue(fan.contains("painterResource(item.iconRes)"))
+		assertTrue(fan.contains("FriendCardResourceIcon(item.iconRes"))
 	}
 
 	@Test

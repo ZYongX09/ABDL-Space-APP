@@ -50,6 +50,10 @@
 	<string name="map_ui_update_service">更新与地图服务</string>
 	<string name="map_ui_update_location">重新获取一次定位</string>
 	<string name="map_ui_stop_appearance">停止在地图上出现</string>
+	<string name="map_ui_stop_service">停止使用本服务</string>
+	<string name="map_ui_stop_service_confirm">停止后会撤下你已发布的地图位置，并恢复首次使用引导。再次使用时，需要重新阅读并同意地图协议、通过认证及确认可见性。这不会删除你的账号、帖子或其他用户数据。确定停止使用本服务吗？</string>
+	<string name="map_ui_stop_service_unsupported">当前服务器尚不支持停止使用本服务，无法恢复首次使用引导。尚未执行停止；如需立即撤回位置，可使用“撤回已发布的位置”。请更新服务器后重试。</string>
+	<string name="map_ui_stop_service_failed">未能确认服务已停止，尚未完成重置。请重新加载服务器设置后重试；不会以仅隐藏位置代替停止服务。</string>
 	<string name="map_ui_withdraw_location">撤回已发布的位置</string>
 	<string name="map_ui_everyone_summary">已登录用户可浏览各地区地图并看到你按所选精度展示的位置。</string>
 	<string name="map_ui_mutual_summary">只有与你互相关注的用户能看到你。</string>

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+	xmlns:app="http://schemas.android.com/apk/res-auto"
 	xmlns:tools="http://schemas.android.com/tools"
 	android:layout_width="match_parent"
 	android:layout_height="wrap_content"
@@ -29,27 +30,58 @@
 		android:layout_marginBottom="4dp"
 		android:importantForAccessibility="no" />
 
-	<TextView
-		android:id="@+id/name"
+	<org.joinmastodon.android.ui.views.HeaderSubtitleLinearLayout
+		android:id="@+id/name_wrap"
 		android:layout_width="match_parent"
 		android:layout_height="20dp"
 		android:layout_toEndOf="@id/avatar"
 		android:layout_alignTop="@id/avatar"
 		android:layout_marginVertical="-3dp"
 		android:layout_marginEnd="16dp"
-		android:ellipsize="end"
-		android:gravity="start|center_vertical"
-		android:singleLine="true"
-		android:textAlignment="viewStart"
-		android:textAppearance="@style/m3_label_large"
-		android:textColor="?colorM3OnSurface"
-		tools:text="Eugen" />
+		android:gravity="center_vertical"
+		app:firstFraction="0%">
+
+		<TextView
+			android:id="@+id/name"
+			android:layout_width="wrap_content"
+			android:layout_height="20dp"
+			android:ellipsize="end"
+			android:gravity="start|center_vertical"
+			android:singleLine="true"
+			android:textAlignment="viewStart"
+			android:textAppearance="@style/m3_label_large"
+			android:textColor="?colorM3OnSurface"
+			tools:text="Eugen" />
+
+		<ImageView
+			android:id="@+id/header_friend_card_marker"
+			android:layout_width="16dp"
+			android:layout_height="16dp"
+			android:layout_marginStart="4dp"
+			android:src="@drawable/ic_friend_card"
+			android:contentDescription="@string/friend_card_public_marker_description"
+			android:visibility="gone" />
+
+		<TextView
+			android:id="@+id/header_name_badge"
+			android:layout_width="wrap_content"
+			android:layout_height="20dp"
+			android:layout_marginStart="4dp"
+			android:maxWidth="96dp"
+			android:singleLine="true"
+			android:ellipsize="end"
+			android:gravity="center_vertical"
+			android:textAppearance="@style/m3_label_large"
+			android:textColor="?colorM3OnSurface"
+			android:visibility="gone" />
+
+	</org.joinmastodon.android.ui.views.HeaderSubtitleLinearLayout>
 
 	<TextView
 		android:id="@+id/time_and_username"
 		android:layout_width="match_parent"
 		android:layout_height="18dp"
-		android:layout_below="@id/name"
+		android:layout_below="@id/name_wrap"
 		android:layout_toEndOf="@id/avatar"
 		android:layout_marginEnd="16dp"
 		android:ellipsize="end"

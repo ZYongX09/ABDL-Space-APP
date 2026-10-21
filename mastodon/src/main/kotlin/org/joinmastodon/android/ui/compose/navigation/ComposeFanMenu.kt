@@ -41,7 +41,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.ViewCompositionStrategy
-import androidx.compose.ui.res.painterResource
+import org.joinmastodon.android.ui.compose.friendcards.FriendCardResourceIcon
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -313,7 +313,7 @@ private fun FanRow(
 			contentAlignment = Alignment.Center,
 		) {
 			if (item.iconRes != null) {
-				Icon(painterResource(item.iconRes), contentDescription = null, modifier = Modifier.size(24.dp), tint = contentColor)
+				FriendCardResourceIcon(item.iconRes, tint = contentColor, modifier = Modifier.size(24.dp))
 			} else {
 				Icon(item.icon, contentDescription = null, modifier = Modifier.size(24.dp), tint = contentColor)
 			}

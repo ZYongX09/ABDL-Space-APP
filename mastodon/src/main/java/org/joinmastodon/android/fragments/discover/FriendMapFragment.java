@@ -1,6 +1,7 @@
 package org.joinmastodon.android.fragments.discover;
 
 import android.Manifest;
+import android.app.AlertDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
@@ -39,6 +40,7 @@ import org.joinmastodon.android.fragments.ProfileFragment;
 import org.joinmastodon.android.fragments.settings.BabyVerificationFragment;
 import org.joinmastodon.android.fragments.sponsors.SponsorCenterFragment;
 import org.joinmastodon.android.model.map.MapModels;
+import org.joinmastodon.android.ui.M3AlertDialogBuilder;
 import org.joinmastodon.android.ui.map.FriendMapOverlay;
 import org.joinmastodon.android.ui.map.MapDeviceLocation;
 import org.joinmastodon.android.ui.map.MapProvider;
@@ -89,6 +91,7 @@ public class FriendMapFragment extends AppKitFragment implements MapProvider.Lis
 	private FriendMapOverlay overlay;
 	private boolean destroyed=true,resumed,tabVisible,active,picking,snapshotBusy,returningFromGate;
 	private SponsorNoticeSheet sponsorSheet;
+	private AlertDialog stopServiceDialog;
 	private boolean publishOnLocation,snapshotPending;
 	private int generation,queryGeneration,snapshotGeneration,snapshotRequest,topInset,bottomInset;
 	private Runnable viewportDebounce,snapshotDebounce,snapshotTimeout;
@@ -137,6 +140,7 @@ public class FriendMapFragment extends AppKitFragment implements MapProvider.Lis
 	/** Local cancellation must never delete/hide server presence: offline and logout retain it. */
 	private void blockAccess(MapModels.Access next){
 		access=next; generation++; queryGeneration++; cancelAll(); clearSnapshotWork(); publishBackdrop(null,null);
+		if(stopServiceDialog!=null){ stopServiceDialog.dismiss(); stopServiceDialog=null; }
 		self=null; lastCamera=null; visiblePoints.clear();
 		if(provider!=null){ provider.renderSafe(visiblePoints); provider.showFuzzArea(null); }
 		if(overlay!=null){ if(picking) cancelPin(); overlay.setPoints(visiblePoints); overlay.setSnapshot(null); overlay.setSampleSource(null); }
@@ -320,6 +324,47 @@ public class FriendMapFragment extends AppKitFragment implements MapProvider.Lis
 		// Safety withdrawal bypasses consent/verification/sponsorship gates, like the server.
 		writeVisibility("hidden",false);
 	}
+	@Override public void stopService(){
+		if(!personalDataAllowed() || stopServiceDialog!=null) return;
+		if(!MapModels.canStopService(settings)){ overlay.setMessage(getString(R.string.map_ui_stop_service_unsupported),false); return; }
+		int expected=generation;
+		stopServiceDialog=new M3AlertDialogBuilder(getActivity())
+				.setTitle(R.string.map_ui_stop_service)
+				.setMessage(R.string.map_ui_stop_service_confirm)
+				.setPositiveButton(R.string.map_ui_stop_service,(dialog,which)->{ if(live(expected)) performStopService(); })
+				.setNegativeButton(R.string.cancel,null)
+				.create();
+		stopServiceDialog.setOnDismissListener(dialog->stopServiceDialog=null);
+		stopServiceDialog.show();
+	}
+	private void performStopService(){
+		if(!personalDataAllowed() || !MapModels.canStopService(settings)) return;
+		long previousVersion=settings.settingsVersion;
+		blockAccess(MapModels.Access.LOADING); overlay.showLoadingGate(); overlay.setBusy(true);
+		if(provider!=null) provider.onPause();
+		int expected=generation;
+		settingsRequest=MapRequest.stopService().setCallback(new Callback<>(){
+			@Override public void onSuccess(MapModels.Settings result){
+				if(!live(expected)) return;
+				settingsRequest=null;
+				// Never treat an old hide-only or malformed response as a completed service reset.
+				if(result==null || result.consent==null || result.consent.accepted
+						|| !MapModels.CONSENT_VERSION.equals(result.consent.version) || !"hidden".equals(result.visibility)
+						|| result.visibilityConfirmed || result.active || result.point!=null
+						|| !MapModels.canStopService(result) || result.settingsVersion<=previousVersion){
+					failAccess(getString(R.string.map_ui_stop_service_failed)); return;
+				}
+				blockAccess(MapModels.Access.LOADING);
+				applySettings(result); // Fresh server consent=false destroys this account's SDK and reopens the introduction.
+			}
+			@Override public void onError(ErrorResponse error){
+				if(!live(expected)) return;
+				settingsRequest=null;
+				int status=error instanceof MastodonErrorResponse response?response.httpStatus:-1;
+				failAccess(getString(status==404 || status==405 || status==501?R.string.map_ui_stop_service_unsupported:R.string.map_ui_stop_service_failed));
+			}
+		}).exec(accountID);
+	}
 	private boolean visibilityGateAllowed(){
 		return active && !destroyed && sessionValid() && consentAccepted() && settings.babyVerified && access==MapModels.Access.VISIBILITY;
 	}
@@ -493,7 +538,12 @@ public class FriendMapFragment extends AppKitFragment implements MapProvider.Lis
 	public boolean onBackPressed(){ return overlay!=null && overlay.onBackPressed(); }
 	@Override public void onStart(){ super.onStart(); if(provider!=null && active) provider.onStart(); }
 	@Override public void onResume(){ super.onResume(); resumed=true; updateActivityState(); refreshAfterGate(); }
-	@Override protected void onShown(){ super.onShown(); refreshAfterGate(); }
+	@Override protected void onShown(){
+		super.onShown();
+		// An already-hidden user's sponsorship may have expired while another page covered the map.
+		// Only the fresh server revision decides whether visibility must be confirmed again.
+		if(active && overlay!=null){ returningFromGate=false; loadSettings(); }
+	}
 	private void refreshAfterGate(){
 		if(returningFromGate && active && overlay!=null){ returningFromGate=false; loadSettings(); }
 	}

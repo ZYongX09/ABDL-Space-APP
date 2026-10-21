@@ -212,6 +212,67 @@ public class MapClientAccessContractTest{
 		String read=method(text,"void readSelf(");
 		assertTrue(read.contains("requestDeviceLocation(!existing && MapModels.canPublishDeviceLocation(settings))"));
 	}
+	@Test public void fullStopCapabilityAndResetStateUseServerWireFieldsWithoutChangingAnonymous(){
+		MapModels.Settings old=GSON.fromJson("{\"visibility\":\"hidden\",\"anonymous\":true,\"capabilities\":{}}",MapModels.Settings.class);
+		assertFalse(MapModels.canStopService(old)); old.capabilities=null; assertFalse(MapModels.canStopService(old)); assertFalse(MapModels.canStopService(null));
+		MapModels.Settings stopped=GSON.fromJson("{\"consent\":{\"version\":\"map-presence-v2\",\"accepted\":false,\"accepted_version\":null},\"visibility\":\"hidden\",\"visibility_confirmed\":false,\"settings_version\":43,\"point\":null,\"anonymous\":true,\"capabilities\":{\"can_stop_service\":true}}",MapModels.Settings.class);
+		assertTrue(MapModels.canStopService(stopped)); assertEquals(43,stopped.settingsVersion); assertNull(stopped.point); assertTrue(stopped.anonymous);
+		assertFalse(stopped.visibilityConfirmed); assertEquals(MapModels.Access.CONSENT,MapModels.accessFor(stopped));
+		assertFalse(MapModels.canPublishDeviceLocation(stopped)); assertFalse(MapModels.allowsBaseMap(MapModels.accessFor(stopped)));
+	}
+	@Test public void expiryIsOnlyTheServerUnconfirmedVisibilityGateEvenForPreviouslyHidden(){
+		for(String visibility:new String[]{"hidden","friends","public"}){
+			MapModels.Settings value=settings(MapModels.CONSENT_VERSION,MapModels.CONSENT_VERSION,true); value.visibility=visibility;
+			value.capabilities=new MapModels.Capabilities(); assertEquals(MapModels.Access.READY,MapModels.accessFor(value));
+			value.visibilityConfirmed=false; value.settingsVersion=44;
+			assertEquals(MapModels.Access.VISIBILITY,MapModels.accessFor(value)); assertTrue(value.consent.accepted); assertEquals(44,value.settingsVersion);
+		}
+	}
+	@Test public void stopAndWithdrawalAreSeparateActionsWithNoHideFallbackOrOptimisticConsentReset() throws Exception{
+		String text=fragment(),stop=method(text,"void performStopService(");
+		assertTrue(stop.contains("MapRequest.stopService()")); assertFalse(stop.contains("writeVisibility(")); assertFalse(stop.contains("MapRequest.delete("));
+		assertFalse(stop.contains("consent.accepted=false")); assertFalse(stop.contains("settings.visibility="));
+		assertTrue(stop.contains("result.consent.accepted")); assertTrue(stop.contains("result.visibilityConfirmed"));
+		assertTrue(stop.contains("result.point!=null")); assertTrue(stop.contains("result.settingsVersion<=previousVersion"));
+		assertTrue(stop.indexOf("blockAccess(MapModels.Access.LOADING)")<stop.indexOf("MapRequest.stopService()"));
+		assertTrue(stop.contains("applySettings(result)")); assertTrue(stop.contains("map_ui_stop_service_failed"));
+		assertTrue(method(text,"void stopAppearance(").contains("writeVisibility(\"hidden\",false)"));
+		String dialog=method(text,"void stopService("); assertTrue(dialog.contains("new M3AlertDialogBuilder"));
+		assertTrue(dialog.contains("setTitle(R.string.map_ui_stop_service)")); assertTrue(dialog.contains("setMessage(R.string.map_ui_stop_service_confirm)"));
+		assertTrue(dialog.contains("setNegativeButton(R.string.cancel,null)")); assertTrue(dialog.contains("if(live(expected)) performStopService()"));
+		assertTrue(method(text,"void blockAccess(").contains("stopServiceDialog.dismiss()"));
+		String request=method(source(JAVA+"api/requests/map/MapRequest.java"),"stopService()");
+		assertTrue(request.contains("HttpMethod.POST")); assertTrue(request.contains("\"/service/stop\"")); assertTrue(request.contains("MapModels.Settings.class, Map.of()"));
+	}
+	@Test public void settingsAndPickerUseSameStopActionOnlySavedPublicOutsideFirstUse() throws Exception{
+		String overlay=source(JAVA+"ui/map/FriendMapOverlay.java"),preferences=method(overlay,"void preferences(");
+		assertFalse(preferences.contains("switchRow")); assertFalse(preferences.contains("map_ui_appear_on_map")); assertFalse(preferences.contains("map_ui_anonymous"));
+		assertTrue(preferences.contains("stopServiceAction()")); assertFalse(preferences.contains("map_ui_stop_appearance"));
+		String picker=method(overlay,"void visibilityOptions(");
+		assertTrue(picker.contains("if(!first && \"public\".equals(settings.visibility)) stopServiceAction()"));
+		assertFalse(picker.contains("\"public\".equals(pendingVisibility)"));
+		String action=method(overlay,"void stopServiceAction("); assertTrue(action.contains("SponsorUi.secondary"));
+		assertTrue(action.contains("stop.setEnabled(!busy && supported)")); assertTrue(action.contains("map_ui_stop_service_unsupported"));
+		assertTrue(action.contains("actions.stopService()")); assertFalse(action.contains("colorM3Error"));
+	}
+	@Test public void accountSettingsMapEntryAndNavigationAreRemovedButMainTabRemains() throws Exception{
+		String account=source(JAVA+"fragments/settings/SettingsAccountFragment.java");
+		assertFalse(account.contains("FriendMapFragment")); assertFalse(account.contains("onFriendMapClick"));
+		assertFalse(account.contains("map_presence_title")); assertFalse(account.contains("map_presence_settings_summary"));
+		String main=source(JAVA+"fragments/settings/SettingsMainFragment.java"); assertTrue(main.contains("SettingsAccountFragment.class"));
+		String navigation=source("src/main/kotlin/org/joinmastodon/android/ui/compose/navigation/HomeLiquidNavigationView.kt");
+		assertTrue(navigation.contains("R.string.map_presence_title"));
+	}
+	@Test public void everyShownReloadsAuthoritativeSettingsWithoutLocalSponsorOrVisibilityInference() throws Exception{
+		String shown=method(fragment(),"void onShown("); assertTrue(shown.contains("loadSettings()"));
+		assertFalse(shown.contains("returningFromGate &&")); assertFalse(shown.contains("settings.visibility")); assertFalse(shown.contains("capabilities"));
+		assertFalse(shown.contains("sponsorBadge")); assertFalse(shown.contains("consent.accepted="));
+	}
+	@Test public void stopCopyNamesResetAndExplicitlyExcludesUserDataDeletionAndSystemPermissionReset() throws Exception{
+		String ui=source("src/main/res/values/map_ui.xml"),presence=source("src/main/res/values/map_presence.xml");
+		for(String required:new String[]{"停止使用本服务","撤下你已发布的地图位置","恢复首次使用引导","不会删除你的账号、帖子或其他用户数据","当前服务器尚不支持停止使用本服务","不会以仅隐藏位置代替停止服务"}) assertTrue(required,ui.contains(required));
+		assertTrue(presence.contains("不会重置系统定位权限")); assertTrue(presence.contains("以服务器最新设置为准"));
+	}
 	@Test public void standaloneTitleIsRemovedWithoutChangingTabLabels() throws Exception{
 		assertTrue(method(fragment(),"void onCreate(").contains("setTitle(\"\")"));
 		assertFalse(fragment().contains("setTitle(R.string.map_presence_title)"));

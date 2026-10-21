@@ -68,6 +68,7 @@ public class MastodonAPIController{
 			.setFieldNamingPolicy(FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES)
 			.registerTypeAdapter(Instant.class, new IsoInstantTypeAdapter())
 			.registerTypeAdapter(LocalDate.class, new IsoLocalDateTypeAdapter())
+			.registerTypeAdapter(org.joinmastodon.android.model.Account.PublicFriendCard.class, new org.joinmastodon.android.model.Account.PublicFriendCardDeserializer())
 			.create();
 	public static final Gson gson = gsonWithoutDeserializer.newBuilder()
 			.registerTypeAdapter(Status.class, new Status.StatusDeserializer())

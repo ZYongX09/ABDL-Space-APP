@@ -91,6 +91,28 @@ public class Account extends BaseModel implements Searchable{
 	 */
 	public Badge badge;
 	public PublicSponsor sponsor;
+	@com.google.gson.annotations.SerializedName("public_friend_card") public PublicFriendCard publicFriendCard;
+
+	@Parcel
+	public static class PublicFriendCard{
+		@com.google.gson.annotations.SerializedName("schema_version") public int schemaVersion;
+		@com.google.gson.annotations.SerializedName("id") public String id;
+		public boolean isSupported(){ return schemaVersion==1 && id!=null && id.matches("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}"); }
+	}
+
+	public static class PublicFriendCardDeserializer implements com.google.gson.JsonDeserializer<PublicFriendCard>{
+		@Override public PublicFriendCard deserialize(com.google.gson.JsonElement value, java.lang.reflect.Type type, com.google.gson.JsonDeserializationContext context){
+			try{
+				if(!value.isJsonObject()) return null;
+				com.google.gson.JsonObject object=value.getAsJsonObject();
+				if(!object.has("schema_version") || !object.get("schema_version").isJsonPrimitive()
+						|| !object.getAsJsonPrimitive("schema_version").isNumber() || object.get("schema_version").getAsDouble()!=1
+						|| !object.has("id") || !object.get("id").isJsonPrimitive() || !object.getAsJsonPrimitive("id").isString()) return null;
+				PublicFriendCard reference=new PublicFriendCard(); reference.schemaVersion=1; reference.id=object.get("id").getAsString();
+				return reference.isSupported() ? reference : null;
+			}catch(RuntimeException malformed){ return null; }
+		}
+	}
 
 	@Parcel
 	public static class PublicSponsor{

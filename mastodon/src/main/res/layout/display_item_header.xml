@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+	xmlns:app="http://schemas.android.com/apk/res-auto"
 	xmlns:tools="http://schemas.android.com/tools"
 	android:layout_width="match_parent"
 	android:layout_height="wrap_content"
@@ -50,7 +51,9 @@
 		android:layout_height="24dp"
 		android:layout_toEndOf="@id/avatar"
 		android:layout_toStartOf="@id/more"
-		android:layout_marginEnd="8dp">
+		android:layout_marginEnd="8dp"
+		android:gravity="center_vertical"
+		app:firstFraction="0%">
 
 		<TextView
 			android:id="@+id/name"
@@ -62,6 +65,28 @@
 			android:textColor="?colorM3OnSurface"
 			android:gravity="start|center_vertical"
 			tools:text="Eugen" />
+
+		<ImageView
+			android:id="@+id/header_friend_card_marker"
+			android:layout_width="16dp"
+			android:layout_height="16dp"
+			android:layout_marginStart="4dp"
+			android:src="@drawable/ic_friend_card"
+			android:contentDescription="@string/friend_card_public_marker_description"
+			android:visibility="gone" />
+
+		<TextView
+			android:id="@+id/header_name_badge"
+			android:layout_width="wrap_content"
+			android:layout_height="24dp"
+			android:layout_marginStart="4dp"
+			android:maxWidth="96dp"
+			android:singleLine="true"
+			android:ellipsize="end"
+			android:gravity="center_vertical"
+			android:textAppearance="@style/m3_title_medium"
+			android:textColor="?colorM3OnSurface"
+			android:visibility="gone" />
 
 		<TextView
 			android:id="@+id/extra_text"

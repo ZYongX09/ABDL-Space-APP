@@ -24,7 +24,6 @@ import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
-import android.widget.Switch;
 import android.widget.TextView;
 
 import java.util.ArrayList;
@@ -47,7 +46,9 @@ public final class FriendMapOverlay extends FrameLayout{
 		void locate();
 		void visibility(String value);
 		void confirmVisibility(String value);
+		/** Emergency withdrawal keeps the existing agreement; full stop resets server consent. */
 		void stopAppearance();
+		void stopService();
 		void visibilitySponsor();
 		default void cityPrecisionSponsor(){ sponsor(); }
 		void precision(String value);
@@ -513,10 +514,9 @@ public final class FriendMapOverlay extends FrameLayout{
 	}
 	private void preferences(){
 		if(settings==null){ messageBlock(); action(getString(R.string.map_ui_retry),actions::refresh,false); return; }
+		messageBlock();
 		heading(R.string.map_ui_my_appearance);
-		switchRow(R.string.map_ui_appear_on_map,!"hidden".equals(settings.visibility),value->{ if(value) open(MapSheetState.Page.VISIBILITY); else actions.stopAppearance(); });
 		settingRow(R.string.map_ui_visibility,visibilityLabel(settings.visibility),()->open(MapSheetState.Page.VISIBILITY));
-		switchRow(R.string.map_ui_anonymous,settings.anonymous,actions::anonymous);
 		settingRow(R.string.map_ui_precision,precisionLabel(settings.precisionLevel),()->open(MapSheetState.Page.PRECISION));
 		heading(R.string.map_ui_position_source);
 		settingRow(R.string.map_ui_device_location,"device".equals(settings.locationMode)?getString(R.string.map_ui_selected):"",actions::useDeviceLocation);
@@ -525,12 +525,23 @@ public final class FriendMapOverlay extends FrameLayout{
 		settingRow(R.string.map_ui_update_location,"",actions::locate);
 		settingRow(R.string.map_presence_provider,providerLabel(providerId),()->open(MapSheetState.Page.PROVIDER));
 		settingRow(R.string.map_presence_privacy_link,"",actions::privacy);
-		if(!"hidden".equals(settings.visibility)) action(getString(R.string.map_ui_stop_appearance),actions::stopAppearance,false);
+		stopServiceAction();
+	}
+	private void stopServiceAction(){
+		boolean supported=MapModels.canStopService(settings);
+		Button stop=SponsorUi.secondary(body,getString(R.string.map_ui_stop_service),()->{ if(!busy && MapModels.canStopService(settings)) actions.stopService(); });
+		stop.setEnabled(!busy && supported);
+		if(!supported){
+			TextView notice=text(getString(R.string.map_ui_stop_service_unsupported),R.style.m3_body_medium,secondary);
+			notice.setPadding(0,V.dp(8),0,V.dp(8)); body.addView(notice,new LinearLayout.LayoutParams(-1,-2));
+			if(settings!=null && !"hidden".equals(settings.visibility)) action(getString(R.string.map_ui_withdraw_location),actions::stopAppearance,false);
+		}
 	}
 	private void visibilityOptions(){
 		if(settings==null){ messageBlock(); return; }
 		boolean first=sheetState.visibilityRequired();
 		messageBlock();
+		if(!first && "public".equals(settings.visibility)) stopServiceAction();
 		if(first){
 			TextView note=text(getString(R.string.map_presence_visibility_required),R.style.m3_body_medium,onSurface);
 			note.setPadding(0,0,0,V.dp(12)); body.addView(note);
@@ -584,12 +595,6 @@ choice(titles[i],allowed?hints[i]:R.string.map_presence_visibility_sponsor_only,
 	}
 	private void heading(int id){ TextView text=text(getString(id),R.style.m3_title_medium,onSurface); text.setTypeface(Typeface.DEFAULT,Typeface.BOLD); text.setPadding(0,V.dp(18),0,V.dp(8)); body.addView(text); }
 	private void settingRow(int title,String value,Runnable action){ summaryRow(body,title,value,action); divider(body); }
-	private void switchRow(int title,boolean checked,java.util.function.Consumer<Boolean> action){
-		LinearLayout row=new LinearLayout(getContext()); row.setGravity(Gravity.CENTER_VERTICAL); row.setMinimumHeight(V.dp(56));
-		row.addView(text(getString(title),R.style.m3_body_large,onSurface),new LinearLayout.LayoutParams(0,-2,1));
-		Switch control=new Switch(getContext()); control.setChecked(checked); control.setContentDescription(getString(title)); control.setButtonTintList(ColorStateList.valueOf(primary)); control.setOnCheckedChangeListener((button,value)->action.accept(value)); row.addView(control);
-		body.addView(row,new LinearLayout.LayoutParams(-1,-2)); divider(body);
-	}
 	private void choice(int title,int hint,boolean selected,Runnable action){ choice(title,hint,selected,false,action); }
 	private void choice(int title,int hint,boolean selected,boolean restricted,Runnable action){
 		LinearLayout card=new LinearLayout(getContext()); card.setOrientation(LinearLayout.VERTICAL); card.setPadding(V.dp(16),V.dp(14),V.dp(16),V.dp(14));

@@ -77,13 +77,15 @@ public class CompactHeaderStatusDisplayItem extends StatusDisplayItem{
 	}
 
 	public static class Holder extends StatusDisplayItem.Holder<CompactHeaderStatusDisplayItem> implements ImageLoaderViewHolder{
-		private final TextView name, timeAndUsername;
-		private final ImageView avatar;
+		private final TextView name, nameBadge, timeAndUsername;
+		private final ImageView avatar, publicFriendCardMarker;
 		private final View clickableThing;
 
 		public Holder(Activity activity, ViewGroup parent){
 			super(activity, R.layout.display_item_header_compact, parent);
 			name=findViewById(R.id.name);
+			nameBadge=findViewById(R.id.header_name_badge);
+			publicFriendCardMarker=findViewById(R.id.header_friend_card_marker);
 			timeAndUsername=findViewById(R.id.time_and_username);
 			avatar=findViewById(R.id.avatar);
 			clickableThing=findViewById(R.id.clickable_thing);
@@ -100,10 +102,16 @@ public class CompactHeaderStatusDisplayItem extends StatusDisplayItem{
 			if(!item.hasAvatarUrl)
 				avatar.setImageResource(R.drawable.default_avatar);
 			name.setText(item.parsedName);
+			org.joinmastodon.android.friendcards.PublicFriendCardUi.bindMarker(publicFriendCardMarker, item.user, item.status);
+			nameBadge.setText(null);
+			nameBadge.setContentDescription(null);
+			nameBadge.setVisibility(View.GONE);
 			if(item.user.badge!=null && !TextUtils.isEmpty(item.user.badge.name)){
-				android.text.SpannableString ssb=new android.text.SpannableString(name.getText()+" ⦁ ");
-				ssb.setSpan(new org.joinmastodon.android.ui.text.BadgeSpan(item.user.badge), ssb.length()-2, ssb.length(), android.text.SpannableString.SPAN_EXCLUSIVE_EXCLUSIVE);
-				name.setText(ssb);
+				SpannableStringBuilder badge=new SpannableStringBuilder("\uFFFC");
+				badge.setSpan(new org.joinmastodon.android.ui.text.BadgeSpan(item.user.badge), 0, badge.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+				nameBadge.setText(badge);
+				nameBadge.setContentDescription(item.user.badge.name);
+				nameBadge.setVisibility(View.VISIBLE);
 			}
 			String time;
 			if(item.status==null || item.status.editedAt==null)

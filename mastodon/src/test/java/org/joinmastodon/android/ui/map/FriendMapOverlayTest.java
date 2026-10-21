@@ -1,8 +1,11 @@
 package org.joinmastodon.android.ui.map;
 
+import android.app.Activity;
 import android.content.Context;
 import android.content.res.Configuration;
+import android.graphics.Rect;
 import android.graphics.drawable.ColorDrawable;
+import android.os.SystemClock;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
@@ -18,20 +21,23 @@ import org.joinmastodon.android.model.map.MapModels;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.robolectric.Robolectric;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.RuntimeEnvironment;
 import org.robolectric.annotation.Config;
+import org.robolectric.shadows.ShadowLooper;
 import org.robolectric.util.ReflectionHelpers;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import me.grishka.appkit.utils.V;
 
 import static org.junit.Assert.*;
 
 @RunWith(RobolectricTestRunner.class)
-@Config(sdk={26,31,35}, application=CompatibilityTestApplication.class)
+@Config(sdk={26,31,35}, qualifiers="mdpi", application=CompatibilityTestApplication.class)
 public class FriendMapOverlayTest{
 	private Context context;
 	private RecordingActions actions;
@@ -190,6 +196,7 @@ public class FriendMapOverlayTest{
 		FriendMapOverlay overlay=overlay(true); MapModels.Settings first=settings(true); first.visibility="public"; first.visibilityConfirmed=false;
 		overlay.updateSettings(first); overlay.hideAccessGate(); layout(overlay,360,800);
 		assertEquals(MapSheetState.Page.VISIBILITY,overlay.state().page());
+		assertNull(findText(field(overlay,"body"),context.getString(R.string.map_ui_stop_service)));
 		Button confirm=(Button)findText(overlay,context.getString(R.string.map_presence_visibility_continue));
 		assertFalse(confirm.isEnabled()); confirm.performClick(); assertNull(actions.confirmed);
 		assertFalse(hasSelectedLabel(field(overlay,"body")));
@@ -201,6 +208,7 @@ public class FriendMapOverlayTest{
 		((View)findText(field(overlay,"body"),context.getString(R.string.map_ui_everyone)).getParent()).performClick();
 		assertNull(actions.confirmed); assertNull(actions.changed);
 		confirm=(Button)findText(overlay,context.getString(R.string.map_presence_visibility_continue)); assertTrue(confirm.isEnabled());
+		assertNull("Selecting pending public must not create a stop shortcut",findText(field(overlay,"body"),context.getString(R.string.map_ui_stop_service)));
 		confirm.performClick(); assertEquals("public",actions.confirmed); overlay.dispose();
 	}
 	@Test public void restrictedChoicesOnlyShowNoticeAndExistingPrivacyHasExplicitRetention(){
@@ -238,8 +246,9 @@ public class FriendMapOverlayTest{
 			assertEquals(View.VISIBLE,overlay.findViewById(R.id.friend_map_canvas).getVisibility());
 			assertEquals(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS,overlay.findViewById(R.id.friend_map_canvas).getImportantForAccessibility());
 			ViewGroup body=field(overlay,"body");
-			assertNull(findText(body,context.getString(R.string.map_ui_stop_appearance)));
-			assertNull(findText(body,context.getString(R.string.map_presence_visibility_keep,context.getString(R.string.map_ui_everyone))));
+				assertNull(findText(body,context.getString(R.string.map_ui_stop_appearance)));
+				assertNull(findText(body,context.getString(R.string.map_ui_stop_service)));
+				assertNull(findText(body,context.getString(R.string.map_presence_visibility_keep,context.getString(R.string.map_ui_everyone))));
 			overlay.dispose();
 		}
 	@Test public void cityPrecisionIsLockedVisuallyButClickOnlyShowsSponsorNotice(){
@@ -264,13 +273,72 @@ public class FriendMapOverlayTest{
 		assertNull(findText(field(overlay,"gateColumn"),context.getString(R.string.map_ui_withdraw_location)));
 		overlay.dispose();
 	}
-	@Test public void stopIsNotRestrictedAndEnablingAppearanceDoesNotSilentlyChoosePublic(){
-		FriendMapOverlay overlay=overlay(true); MapModels.Settings ready=settings(true); ready.visibility="friends";
-		overlay.updateSettings(ready); overlay.hideAccessGate(); overlay.showSettings();
-		findText(overlay,context.getString(R.string.map_ui_stop_appearance)).performClick(); assertEquals(1,actions.stops); assertNull(actions.changed);
-		ready.visibility="hidden"; overlay.updateSettings(ready); overlay.showSettings();
-		android.widget.Switch control=findSwitch(field(overlay,"body")); assertNotNull(control); control.performClick();
-		assertEquals(MapSheetState.Page.VISIBILITY,overlay.state().page()); assertNull(actions.changed); overlay.dispose();
+	@Test public void appearanceHasNoTogglesPreservesAnonymousAndStopsEvenWhenAlreadyHidden(){
+		for(String visibility:new String[]{"public","friends","hidden"}){
+			FriendMapOverlay overlay=overlay(true); MapModels.Settings ready=settings(true); ready.visibility=visibility; ready.anonymous=true;
+			ready.capabilities=new MapModels.Capabilities(); ready.capabilities.canStopService=true;
+			overlay.updateSettings(ready); overlay.hideAccessGate(); overlay.showSettings(); layout(overlay,360,800);
+			View body=field(overlay,"body"); assertNull(findSwitch(body));
+			assertNull(findText(body,context.getString(R.string.map_ui_appear_on_map)));
+			assertNull(findText(body,context.getString(R.string.map_ui_anonymous)));
+			assertNull(findText(body,context.getString(R.string.map_ui_stop_appearance)));
+			Button stop=(Button)findText(body,context.getString(R.string.map_ui_stop_service)); assertNotNull(stop); assertTrue(stop.isEnabled());
+			int previous=actions.serviceStops; stop.performClick(); assertEquals(previous+1,actions.serviceStops); assertEquals(0,actions.stops);
+			assertTrue("Removing the toggle must not change stored server anonymity",ready.anonymous);
+			overlay.setBusy(true); stop=(Button)findText(field(overlay,"body"),context.getString(R.string.map_ui_stop_service)); assertFalse(stop.isEnabled());
+			stop.performClick(); assertEquals(previous+1,actions.serviceStops); overlay.dispose();
+		}
+	}
+	@Test @Config(qualifiers="w360dp-h800dp-mdpi") public void savedPublicPickerHasOrdinaryReachableStopButtonButOtherSavedChoicesDoNot(){
+		var lifecycle=Robolectric.buildActivity(Activity.class); Activity activity=lifecycle.get(); activity.setTheme(R.style.Theme_Mastodon_Dark);
+		lifecycle.setup(); FriendMapOverlay overlay=new FriendMapOverlay(activity,actions); activity.setContentView(overlay); lifecycle.visible();
+		try{
+			MapModels.Settings ready=settings(true); ready.visibility="public";
+			ready.capabilities=new MapModels.Capabilities(); ready.capabilities.canStopService=true;
+			overlay.updateSettings(ready); overlay.hideAccessGate(); overlay.showSettings();
+			((View)findText(field(overlay,"body"),context.getString(R.string.map_ui_visibility)).getParent()).performClick();
+			// A scrolling child's touch-UP posts its click; a detached View cannot run that posted action.
+			ShadowLooper.idleMainLooper(300,TimeUnit.MILLISECONDS);
+			Button stop=(Button)findText(field(overlay,"body"),context.getString(R.string.map_ui_stop_service)); assertNotNull(stop);
+			assertTrue("Pointer input must exercise an attached window",overlay.isAttachedToWindow()); assertTrue(stop.isShown());
+			assertEquals(MapSheetState.Page.VISIBILITY,overlay.state().page()); assertEquals(View.VISIBLE,stop.getVisibility()); assertTrue(stop.isEnabled());
+			assertEquals(View.VISIBLE,overlay.findViewById(R.id.friend_map_panel).getVisibility());
+			assertTrue(stop.getWidth()>0); assertTrue(stop.getHeight()>=V.dp(48));
+			assertNotEquals(org.joinmastodon.android.ui.utils.UiUtils.getThemeColor(context,R.attr.colorM3Error),stop.getCurrentTextColor());
+			Rect visible=new Rect(); assertTrue("The saved-public action must be in the real scroll viewport",stop.getLocalVisibleRect(visible));
+			assertEquals(stop.getWidth(),visible.width()); assertEquals(stop.getHeight(),visible.height());
+			Rect hit=new Rect(0,0,stop.getWidth(),stop.getHeight()); overlay.offsetDescendantRectToMyCoords(stop,hit);
+			int[] delivered=new int[2]; stop.setOnTouchListener((view,event)->{
+				if(event.getActionMasked()==MotionEvent.ACTION_DOWN) delivered[0]++;
+				if(event.getActionMasked()==MotionEvent.ACTION_UP) delivered[1]++;
+				return false; // Observe only: retain normal button/ScrollView touch handling.
+			});
+			long downTime=SystemClock.uptimeMillis();
+			MotionEvent down=MotionEvent.obtain(downTime,downTime,MotionEvent.ACTION_DOWN,hit.exactCenterX(),hit.exactCenterY(),0);
+			MotionEvent up=MotionEvent.obtain(downTime,downTime+16,MotionEvent.ACTION_UP,hit.exactCenterX(),hit.exactCenterY(),0);
+			try{
+				assertTrue("The full overlay must accept pointer DOWN",overlay.dispatchTouchEvent(down));
+				assertTrue("The full overlay must accept pointer UP",overlay.dispatchTouchEvent(up));
+			}finally{ down.recycle(); up.recycle(); }
+			ShadowLooper.idleMainLooper();
+			assertArrayEquals("Both events must reach the real stop button",new int[]{1,1},delivered);
+			assertEquals("A pointer tap must invoke full stop exactly once",1,actions.serviceStops); assertEquals(0,actions.stops);
+			for(String value:new String[]{"friends","hidden"}){
+				ready.visibility=value; overlay.updateSettings(ready);
+				assertNull(findText(field(overlay,"body"),context.getString(R.string.map_ui_stop_service)));
+			}
+		}finally{ overlay.dispose(); lifecycle.pause().stop().destroy(); }
+	}
+	@Test public void oldServerShowsDisabledStopAndDistinctSafeWithdrawalInsteadOfFakeReset(){
+		FriendMapOverlay overlay=overlay(true); MapModels.Settings ready=settings(true); ready.visibility="public";
+		overlay.updateSettings(ready); overlay.hideAccessGate(); overlay.showSettings(); layout(overlay,360,800);
+		Button stop=(Button)findText(field(overlay,"body"),context.getString(R.string.map_ui_stop_service)); assertNotNull(stop); assertFalse(stop.isEnabled());
+		assertNotNull(findText(field(overlay,"body"),context.getString(R.string.map_ui_stop_service_unsupported)));
+		stop.performClick(); assertEquals(0,actions.serviceStops); assertEquals(0,actions.stops);
+		findText(field(overlay,"body"),context.getString(R.string.map_ui_withdraw_location)).performClick(); assertEquals(1,actions.stops);
+		((View)findText(field(overlay,"body"),context.getString(R.string.map_ui_visibility)).getParent()).performClick(); layout(overlay,360,800);
+		stop=(Button)findText(field(overlay,"body"),context.getString(R.string.map_ui_stop_service)); assertNotNull(stop); assertFalse(stop.isEnabled());
+		assertEquals(0,actions.serviceStops); assertTrue(ready.consent.accepted); overlay.dispose();
 	}
 	private android.widget.Switch findSwitch(View view){
 		if(view instanceof android.widget.Switch control) return control;
@@ -295,7 +363,7 @@ public class FriendMapOverlayTest{
 		MotionEvent event=MotionEvent.obtain(1,2,action,x,y,0); try{ view.dispatchTouchEvent(event); }finally{ event.recycle(); }
 	}
 	private static final class RecordingActions implements FriendMapOverlay.Actions{
-		int consents,refreshes,verifications,visibilityNotices,cityPrecisionNotices,stops;
+		int consents,refreshes,verifications,visibilityNotices,cityPrecisionNotices,stops,serviceStops;
 		String confirmed,changed;
 		public void confirmVisibility(String value){ confirmed=value; }
 		public void visibilitySponsor(){ visibilityNotices++; }
@@ -303,6 +371,7 @@ public class FriendMapOverlayTest{
 		String precision;
 		public void precision(String value){ precision=value; }
 		public void stopAppearance(){ stops++; }
+		public void stopService(){ serviceStops++; }
 		public void refresh(){ refreshes++; } public void locate(){} public void visibility(String value){ changed=value; }
 		public void anonymous(boolean value){} public void provider(String value){} public void useDeviceLocation(){} public void beginPin(){}
 		public void confirmPin(){} public void cancelPin(){} public void consent(){ consents++; } public void privacy(){}
