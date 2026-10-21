@@ -8,8 +8,10 @@ import android.os.Bundle;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.Matrix;
+import android.graphics.RectF;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.RippleDrawable;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -330,6 +332,53 @@ public class FriendCardStatusDisplayItemTest{
 			assertFalse(allText(holder.itemView).contains("PRIVATE SCHOOL"));
 			assertFalse(allText(holder.itemView).contains("PRIVATE HABITS"));
 			assertTrue(holder.itemView.getHeight()<V.dp(130));
+		}
+	}
+
+	@Test @GraphicsMode(GraphicsMode.Mode.NATIVE)
+	@Config(qualifiers="w393dp-h852dp-mdpi")
+	public void rotatedLinkReservesAllCornersAndAntialiasGutterWithoutGrowingThePortrait(){
+		assertEquals(1f,MastodonApp.context.getResources().getDisplayMetrics().density,.001f);
+		for(boolean dark:new boolean[]{false,true}){
+			try(ActivityController<Activity> lifecycle=Robolectric.buildActivity(Activity.class)){
+				Activity activity=lifecycle.get(); activity.setTheme(dark ? R.style.Theme_Mastodon_Dark : R.style.Theme_Mastodon_Light); lifecycle.setup();
+				FriendCardStatusDisplayItem.Holder holder=new FriendCardStatusDisplayItem.Holder(activity,new FrameLayout(activity));
+				int compactHeight=-1;
+				for(boolean hasCover:new boolean[]{false,true}){
+					Status status=post(); status.friendCard.mode="link"; status.friendCard.card=null;
+					if(hasCover) preview(status);
+					holder.bind(item(activity,status,false));
+					if(hasCover) holder.setImage(0,bitmap(activity,400,100));
+					measure(holder.itemView);
+					LinearLayout row=linkRow(holder);
+					FrameLayout thumbnail=(FrameLayout)row.getChildAt(0), face=linkFace(holder);
+					assertEquals(V.dp(54),thumbnail.getWidth()); assertEquals(V.dp(75),thumbnail.getHeight());
+					assertEquals(-4f,thumbnail.getRotation(),.01f);
+					assertEquals(V.dp(8),row.getPaddingTop()); assertEquals(V.dp(8),row.getPaddingBottom());
+					assertEquals(row.getHeight()/2f,thumbnail.getTop()+thumbnail.getHeight()/2f,.5f);
+					assertTrue("The compact row may grow by at most 2dp",row.getHeight()>=V.dp(96) && row.getHeight()<=V.dp(98));
+					if(compactHeight<0) compactHeight=row.getHeight();
+					assertEquals("Cover arrival must not change the row height",compactHeight,row.getHeight());
+					assertFalse(row.getClipChildren()); assertFalse(row.getClipToPadding()); assertFalse(row.getClipToOutline());
+					assertTrue(row.getBackground() instanceof RippleDrawable);
+					assertNotNull("Keep the rounded ripple mask",((RippleDrawable)row.getBackground()).findDrawableByLayerId(android.R.id.mask));
+					RectF bounds=new RectF(0,0,thumbnail.getWidth(),thumbnail.getHeight());
+					thumbnail.getMatrix().mapRect(bounds); bounds.offset(thumbnail.getLeft(),thumbnail.getTop());
+					assertEquals(59.1002f,bounds.width(),.01f); assertEquals(78.5842f,bounds.height(),.01f);
+					bounds.inset(-1,-1); // One physical pixel of AA must also fit, not just the four vertices.
+					assertTrue("Every rotated corner plus AA must fit inside the padded row",new RectF(row.getPaddingLeft(),row.getPaddingTop(),row.getWidth()-row.getPaddingRight(),row.getHeight()-row.getPaddingBottom()).contains(bounds));
+					FrameLayout wrapper=(FrameLayout)holder.itemView;
+					bounds.offset(row.getLeft(),row.getTop());
+					assertTrue("The wrapper's legitimate padding clip must be harmless",new RectF(wrapper.getPaddingLeft(),wrapper.getPaddingTop(),wrapper.getWidth()-wrapper.getPaddingRight(),wrapper.getHeight()-wrapper.getPaddingBottom()).contains(bounds));
+					assertTrue(wrapper.getClipChildren()); assertTrue(wrapper.getClipToPadding());
+					assertTrue("Retain the white portrait's rounded outline",thumbnail.getClipToOutline());
+					assertTrue("Cover cropping belongs inside the rounded face",face.getClipToOutline()); assertTrue(face.getClipChildren());
+					assertEquals(V.dp(2),face.getLeft()); assertEquals(V.dp(2),face.getTop());
+					assertEquals(thumbnail.getWidth()-V.dp(2),face.getRight()); assertEquals(thumbnail.getHeight()-V.dp(2),face.getBottom());
+					assertEquals(hasCover ? View.VISIBLE : View.GONE,linkCover(holder).getVisibility());
+					assertEquals(hasCover ? View.GONE : View.VISIBLE,linkIcon(holder).getVisibility());
+				}
+			}
 		}
 	}
 

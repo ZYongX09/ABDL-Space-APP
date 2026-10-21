@@ -9,12 +9,14 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Looper
 import android.util.Pair
+import android.view.DisplayCutout
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowInsets
 import android.widget.FrameLayout
 import android.widget.Toolbar
 import androidx.activity.ComponentActivity
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.ComposeView
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
@@ -31,6 +33,7 @@ import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performImeAction
@@ -359,7 +362,8 @@ class FriendCardCompositionBehaviorTest {
     fun stageAndPrivacyEditsRefreshBothPublicAndLegacyPreviewsWithoutLosingTheDraft() {
         val original = FriendCardDraft(account, input = FriendCardInput().apply {
             title = "预览回归宣言"
-            school = "默认私密学校"
+            school = "主动隐藏的学校"
+            publicFields = publicFields - "school"
             region = "后来隐藏的地区"
             lookingFor = "一起认真玩游戏"
         })
@@ -380,22 +384,22 @@ class FriendCardCompositionBehaviorTest {
         compose.onNodeWithText("下一阶段").assertDoesNotExist()
 
         inList(hasText("公开卡片预览")).assertIsDisplayed()
-        compose.onNodeWithText("默认私密学校").assertDoesNotExist()
+        compose.onNodeWithText("主动隐藏的学校").assertDoesNotExist()
         compose.onNodeWithText("后来隐藏的地区").assertDoesNotExist()
         inList(hasText("扩列 · 预览回归宣言\n我想找：一起认真玩游戏")).assertIsDisplayed()
         clickInList("返回修改")
         inList(editable("一起认真玩游戏")).assertEditable("一起认真玩游戏")
         clickInList("关于我")
-        inList(editable("默认私密学校")).assertEditable("默认私密学校")
+        inList(editable("主动隐藏的学校")).assertEditable("主动隐藏的学校")
         clickInList("学校可见范围")
         compose.onNodeWithText("学校可见范围").assert(hasText("公开 · 点击设为仅自己"))
         clickInList("我想找")
         nextStage()
-        inList(hasText("默认私密学校")).assertIsDisplayed()
-        inList(hasText("扩列 · 预览回归宣言\n学校：默认私密学校\n我想找：一起认真玩游戏")).assertIsDisplayed()
+        inList(hasText("主动隐藏的学校")).assertIsDisplayed()
+        inList(hasText("扩列 · 预览回归宣言\n学校：主动隐藏的学校\n我想找：一起认真玩游戏")).assertIsDisplayed()
         val saved = requireNotNull(FriendCardDraftStore(compose.activity).load(account, null))
         assertEquals(original.draftId, saved.draftId)
-        assertEquals("默认私密学校", saved.input.school)
+        assertEquals("主动隐藏的学校", saved.input.school)
         assertEquals("后来隐藏的地区", saved.input.region)
         assertTrue("school" in saved.input.publicFields)
         assertTrue("region" !in saved.input.publicFields)
@@ -499,11 +503,95 @@ class FriendCardCompositionBehaviorTest {
     }
 
     @Test
+    @Config(sdk = [28, 30], qualifiers = "w393dp-h852dp-hdpi")
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun detailBackgroundStartsAtNativeZeroWhileCutoutsProtectControlsAndAllContentStates() {
+        val fragment = mount(FriendCardDetailFragment(), Bundle().apply { putString("card_id", "edge_card") })
+        val insets = detailEdgeInsets(statusTop = 24, cutoutTop = 52, left = 18, right = 12, bottom = 24)
+        assertEquals(24, insets.systemWindowInsetTop)
+        assertEquals(52, requireNotNull(insets.displayCutout).safeInsetTop)
+        dispatchDetailEdgeInsets(fragment, insets)
+        assertDetailControlsBelow(fragment, safeTopPx = 52)
+        assertDetailTopPixels(fragment, 0xFF263F43.toInt(), safeTopPx = 52)
+        assertDetailContentBelowControls("正在读取卡片…")
+
+        failure(request("/edge_card"), "安全区内的详情错误")
+        dispatchDetailEdgeInsets(fragment, insets)
+        assertDetailControlsBelow(fragment, safeTopPx = 52)
+        assertDetailContentBelowControls("安全区内的详情错误")
+        assertDetailTopPixels(fragment, 0xFF263F43.toInt(), safeTopPx = 52)
+        clickInList("重新读取")
+        val fixture = card("edge_card", "全屏详情安全区回归")
+        success(request("/edge_card"), FriendCardResponses.Card().apply { card = fixture })
+        dispatchDetailEdgeInsets(fragment, insets)
+        assertDetailContentBelowControls(fixture.title)
+        val background = org.joinmastodon.android.ui.compose.friendcards.friendCardPalette(fixture).background.toArgb()
+        assertDetailTopPixels(fragment, background, safeTopPx = 52)
+        assertDetailFooterAboveNativeBottom(fragment, bottomPx = 24)
+        repeat(2) {
+            dispatchDetailEdgeInsets(fragment, insets)
+            assertDetailControlsBelow(fragment, safeTopPx = 52)
+            assertDetailFooterAboveNativeBottom(fragment, bottomPx = 24)
+        }
+
+        // A new orientation/cutout delivery replaces the old safe top rather than accumulating it.
+        val sideCutout = detailEdgeInsets(statusTop = 24, cutoutTop = 0, left = 32, right = 12, bottom = 24)
+        repeat(2) {
+            dispatchDetailEdgeInsets(fragment, sideCutout)
+            assertDetailControlsBelow(fragment, safeTopPx = 24)
+            assertDetailTopPixels(fragment, background, safeTopPx = 24)
+        }
+        assertDetailOverlayRouting(fragment)
+    }
+
+    @Test
+    @Config(sdk = [28, 30])
+    fun leavingFullBleedDetailRestoresTheEditorsOriginalTopAndKeyboardInsetOwnership() {
+        val detail = mount(FriendCardDetailFragment(), Bundle().apply { putString("card_id", "edge_to_editor") })
+        val insets = detailEdgeInsets(statusTop = 24, cutoutTop = 44, left = 0, right = 0, bottom = 24)
+        dispatchDetailEdgeInsets(detail, insets)
+        val fixture = card("edge_to_editor", "从全屏详情打开编辑")
+        success(request("/edge_to_editor"), FriendCardResponses.Card().apply { card = fixture })
+        compose.onNodeWithText("编辑卡片").assertIsDisplayed().performClick()
+        assertEquals(FriendCardCreateFragment::class.java, LocalNavigation.target)
+        assertEquals(fixture.id, LocalNavigation.args?.getString("card_id"))
+        val editorArgs = requireNotNull(LocalNavigation.args).let { Bundle(it) }
+        compose.activityRule.scenario.onActivity { activity ->
+            activity.fragmentManager.beginTransaction().hide(detail).commit()
+            activity.fragmentManager.executePendingTransactions()
+        }
+        val editor = mount(FriendCardCreateFragment(), editorArgs)
+        success(request("/options"), options())
+        success(request("/edge_to_editor"), FriendCardResponses.Card().apply { card = fixture })
+        assertEditingFooter()
+        val before = dispatchInsetsAndMeasureFooter(editor, bottom = 24)
+        compose.runOnIdle {
+            assertEquals("Only detail may remove the AppKit status reservation", 24, requireNotNull(editor.view).paddingTop)
+            assertEquals(View.VISIBLE, requireNotNull(editor.view).findViewById<Toolbar>(R.id.toolbar).visibility)
+        }
+        val keyboard = dispatchInsetsAndMeasureFooter(editor, bottom = 280)
+        assertEquals(256, before.composeHeight - keyboard.composeHeight)
+        assertEquals(256f, before.footerBottom - keyboard.footerBottom, 1f)
+        assertEquals(12f, keyboard.footerGap, 1f)
+        assertEquals(keyboard, dispatchInsetsAndMeasureFooter(editor, bottom = 280))
+        assertEquals(before, dispatchInsetsAndMeasureFooter(editor, bottom = 24))
+        compose.activityRule.scenario.onActivity { activity ->
+            activity.fragmentManager.beginTransaction().remove(editor).show(detail).commit()
+            activity.fragmentManager.executePendingTransactions()
+        }
+        compose.waitForIdle()
+        dispatchDetailEdgeInsets(detail, insets)
+        assertDetailControlsBelow(detail, safeTopPx = 44)
+    }
+
+    @Test
     fun meAndHistoryCallbacksRefreshCurrentCardHistoryErrorsAndAppendedCards() {
         mount(MyFriendCardsFragment())
         compose.onNodeWithText("正在读取我的扩列卡…").assertIsDisplayed()
         success(request("/me"), FriendCardResponses.Me().apply { card = card("current_card", "当前回包标题") })
-        inList(hasText("当前卡 · 展示中")).assertIsDisplayed()
+        compose.onNodeWithContentDescription("当前卡 · 展示中").assertIsDisplayed()
+        inList(hasText("当前卡片")).assertIsDisplayed()
+        inList(hasText("展示中")).assertIsDisplayed()
         inList(hasText("当前回包标题")).assertIsDisplayed()
         inList(hasText("正在加载历史…")).assertIsDisplayed()
         success(request("/history"), page("history_next", card("history_1", "历史回包一")))
@@ -521,34 +609,65 @@ class FriendCardCompositionBehaviorTest {
     }
 
     @Test
-    fun feedAppendAndRetryKeepTheCurrentPagerPageAndExposeTheAppendedCards() {
-        mount(FriendCardFeedFragment())
+    fun feedAppendAndRetryKeepTheCurrentListAndVisibleAnchorAndExposeTheAppendedCards() {
+        val fragment = mount(FriendCardFeedFragment())
+        val content = realComposeView(fragment)
+        val feedList = compose.onNodeWithTag("friend-card-hub-plaza-list")
         compose.onNodeWithText("正在读取扩列推荐…").assertIsDisplayed()
         val first = (1..6).map { card("feed_$it", "推荐回包 $it") }
         success(request("/feed"), page("feed_next", *first.toTypedArray()))
+        val pages = field(MyFriendCardsFragment::class.java, "pages").get(fragment) as FriendCardPages
+        assertEquals(first.map { it.id }, pages.cards.map { it.id })
         compose.onNodeWithText("正在读取扩列推荐…").assertDoesNotExist()
         compose.onNodeWithText("推荐回包 1").assertIsDisplayed()
-        val pagerId = list().fetchSemanticsNode().id
-        list().performScrollToIndex(3)
-        compose.waitForIdle()
-        compose.onNodeWithText("推荐回包 4").assertIsDisplayed()
-        compose.onNodeWithText("4 / 6 · 上下滑动").assertIsDisplayed()
-        assertEquals("feed_next", query(request("/feed"), "cursor"))
+        val listId = feedList.fetchSemanticsNode().id
+        inList(hasText("推荐回包 4")).assertIsDisplayed()
+        assertEquals("Scrolling alone must not request another batch", 1, LocalRequests.requests.size)
 
-        failure(request("/feed"), "推荐下一批失败")
-        compose.onNodeWithText("推荐下一批失败").assertIsDisplayed()
-        compose.onNodeWithText("推荐回包 4").assertIsDisplayed()
-        compose.onNodeWithText("重试下一页").performClick()
-        compose.waitForIdle()
-        success(request("/feed"), page(null, first[3], card("appended_1", "追加回包一"), card("appended_2", "追加回包二")))
-        assertEquals(pagerId, list().fetchSemanticsNode().id)
-        compose.onNodeWithText("推荐回包 4").assertIsDisplayed()
-        compose.onNodeWithText("4 / 8 · 上下滑动").assertIsDisplayed()
+        clickInList("换一批，遇见新朋友")
+        val next = request("/feed")
+        assertEquals("feed_next", query(next, "cursor"))
+        assertEquals(2, LocalRequests.requests.size)
+        inList(hasText("正在加载更多…")).assertIsDisplayed()
+        val anchor = inList(hasText("推荐回包 4")).assertIsDisplayed()
+        val anchorId = anchor.fetchSemanticsNode().id
+        val scrollBeforeFailure = listScroll()
+        val topBeforeFailure = anchor.getUnclippedBoundsInRoot().top.value
+        assertTrue("The callback must exercise a genuinely scrolled list", scrollBeforeFailure > 0f)
+
+        failure(next, "推荐下一批失败")
+        assertEquals(listId, feedList.fetchSemanticsNode().id)
+        assertEquals(scrollBeforeFailure, listScroll(), 0.00001f)
+        node(anchorId).assert(hasText("推荐回包 4")).assertIsDisplayed()
+        assertEquals(topBeforeFailure, node(anchorId).getUnclippedBoundsInRoot().top.value, 0.5f)
+        assertEquals(first.map { it.id }, pages.cards.map { it.id })
+        assertEquals("推荐下一批失败", pages.error)
+        inList(hasText("推荐下一批失败")).assertIsDisplayed()
+        clickInList("重试下一页")
+        val retry = request("/feed")
+        assertTrue("Retry must execute a new request", retry !== next)
+        assertEquals("feed_next", query(retry, "cursor"))
+        assertEquals(3, LocalRequests.requests.size)
+        inList(hasText("正在加载更多…")).assertIsDisplayed()
+        val appendAnchor = inList(hasText("推荐回包 4")).assertIsDisplayed()
+        val appendAnchorId = appendAnchor.fetchSemanticsNode().id
+        val scrollBeforeAppend = listScroll()
+        val topBeforeAppend = appendAnchor.getUnclippedBoundsInRoot().top.value
+
+        success(retry, page(null, first[3], card("appended_1", "追加回包一"), card("appended_2", "追加回包二")))
+        assertSame(content, realComposeView(fragment))
+        assertEquals(listId, feedList.fetchSemanticsNode().id)
+        assertEquals(scrollBeforeAppend, listScroll(), 0.00001f)
+        node(appendAnchorId).assert(hasText("推荐回包 4")).assertIsDisplayed()
+        assertEquals(topBeforeAppend, node(appendAnchorId).getUnclippedBoundsInRoot().top.value, 0.5f)
+        assertEquals(first.map { it.id } + listOf("appended_1", "appended_2"), pages.cards.map { it.id })
+        assertTrue(pages.error == null && pages.nextCursor == null && !pages.loading)
         compose.onNodeWithText("推荐下一批失败").assertDoesNotExist()
-        list().performScrollToIndex(6)
-        compose.waitForIdle()
-        compose.onNodeWithText("追加回包一").assertIsDisplayed()
-        compose.onNodeWithText("7 / 8 · 上下滑动").assertIsDisplayed()
+        inList(hasText("追加回包一")).assertIsDisplayed()
+        inList(hasText("追加回包二")).assertIsDisplayed()
+        inList(hasText("已看完本次推荐，稍后再来看看")).assertIsDisplayed()
+        compose.onNodeWithText("重试下一页").assertDoesNotExist()
+        assertEquals(3, LocalRequests.requests.size)
     }
 
     @Test
@@ -647,11 +766,180 @@ class FriendCardCompositionBehaviorTest {
             activity.fragmentManager.beginTransaction().remove(fragment).commit()
             activity.fragmentManager.executePendingTransactions()
         }
-        mount(FriendCardFeedFragment())
+        val plaza = mount(FriendCardFeedFragment())
         success(request("/feed"), page(null, fixture))
-        compose.onNodeWithText("扩列精选").assertIsDisplayed()
-        compose.onNodeWithContentDescription("发私信").assertIsDisplayed()
-        captureRealFragment("feed-native-light")
+        compose.onNode(hasText("扩列广场") and SemanticsMatcher("hub heading") {
+            it.config.contains(SemanticsProperties.Heading)
+        }).assertIsDisplayed()
+        compose.onNodeWithTag("friend-card-hub-tab-plaza").assert(hasText("扩列广场"))
+        compose.onNodeWithText("扩列精选").assertDoesNotExist()
+        inList(hasText("认识一下")).assertIsDisplayed()
+        compose.onNodeWithTag("friend-card-hub-plaza-list").performScrollToIndex(0)
+        captureRealFragment("plaza-native-light")
+
+        compose.activityRule.scenario.onActivity { activity ->
+            activity.fragmentManager.beginTransaction().remove(plaza).commit()
+            activity.fragmentManager.executePendingTransactions()
+        }
+        val ownFixture = card("my_render_card", fixture.title).apply {
+            owner = fixture.owner.let { value -> FriendCard.Owner().apply {
+                id = "42"; username = value.username; displayName = value.displayName
+            } }
+            interests = fixture.interests
+            games = fixture.games
+            lookingFor = fixture.lookingFor
+            publicFields = fixture.publicFields
+        }
+        mount(MyFriendCardsFragment())
+        success(request("/me"), FriendCardResponses.Me().apply { card = ownFixture })
+        success(request("/history"), page(null))
+        compose.onNodeWithContentDescription("当前卡 · 展示中").assertIsDisplayed()
+        compose.onNodeWithText("当前卡片").assertIsDisplayed()
+        captureRealFragment("my-cards-native-light")
+        inList(hasText("还没有历史卡片")).assertIsDisplayed()
+        inList(hasText("替换后的卡片会收纳在这里")).assertIsDisplayed()
+        captureRealFragment("my-cards-empty-history-native-light")
+    }
+
+    private fun detailEdgeInsets(statusTop: Int, cutoutTop: Int, left: Int, right: Int, bottom: Int): WindowInsets {
+        val rect = android.graphics.Rect::class.java
+        val bounds = buildList {
+            if (cutoutTop > 0) add(android.graphics.Rect(120, 0, 200, cutoutTop))
+            if (left > 0) add(android.graphics.Rect(0, 100, left, 180))
+            if (right > 0) add(android.graphics.Rect(393 - right, 100, 393, 180))
+        }
+        val cutout = DisplayCutout(android.graphics.Rect(left, cutoutTop, right, 0), bounds)
+        return if (Build.VERSION.SDK_INT >= 30) {
+            val status = android.graphics.Insets.of(0, statusTop, 0, 0)
+            val navigation = android.graphics.Insets.of(left, 0, right, bottom)
+            WindowInsets.Builder()
+                .setInsets(WindowInsets.Type.statusBars(), status)
+                .setInsetsIgnoringVisibility(WindowInsets.Type.statusBars(), status)
+                .setVisible(WindowInsets.Type.statusBars(), true)
+                .setInsets(WindowInsets.Type.navigationBars(), navigation)
+                .setInsetsIgnoringVisibility(WindowInsets.Type.navigationBars(), navigation)
+                .setVisible(WindowInsets.Type.navigationBars(), true)
+                .setDisplayCutout(cutout)
+                .setInsets(WindowInsets.Type.systemGestures(), android.graphics.Insets.of(left, 0, right, bottom))
+                .setInsets(WindowInsets.Type.ime(), android.graphics.Insets.NONE)
+                .setVisible(WindowInsets.Type.ime(), false)
+                .build()
+        } else {
+            WindowInsets::class.java.getDeclaredConstructor(rect, rect, rect,
+                Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType, DisplayCutout::class.java)
+                .apply { isAccessible = true }
+                .newInstance(android.graphics.Rect(left, statusTop, right, bottom), null,
+                    android.graphics.Rect(left, statusTop, right, bottom), false, false, cutout)
+        }
+    }
+
+    private fun dispatchDetailEdgeInsets(fragment: FriendCardDetailFragment, insets: WindowInsets) {
+        compose.runOnIdle {
+            val root = requireNotNull(fragment.view) as FragmentRootLinearLayout
+            var delivered: WindowInsets? = null
+            // Observe the actual input before AppKit consumes it; do not replace its consumer.
+            root.setOnApplyWindowInsetsListener { view, value ->
+                delivered = value
+                view.onApplyWindowInsets(value)
+            }
+            try {
+                fragment.onApplyWindowInsets(insets)
+            } finally {
+                root.setOnApplyWindowInsetsListener(null)
+            }
+            val nativeInsets = requireNotNull(delivered)
+            assertEquals(0, nativeInsets.systemWindowInsetTop)
+            if (Build.VERSION.SDK_INT >= 30) {
+                val topTypes = WindowInsets.Type.statusBars() or WindowInsets.Type.displayCutout()
+                assertEquals("Typed visible top cannot leak into Compose", 0, nativeInsets.getInsets(topTypes).top)
+                assertEquals("Typed stable top cannot leak into Compose", 0, nativeInsets.getInsetsIgnoringVisibility(topTypes).top)
+                for (type in listOf(WindowInsets.Type.navigationBars(), WindowInsets.Type.systemGestures(), WindowInsets.Type.ime())) {
+                    assertEquals("Removing top must preserve each bottom/side inset type", insets.getInsets(type), nativeInsets.getInsets(type))
+                }
+            }
+            val density = root.resources.displayMetrics.density
+            val width = (393 * density).toInt()
+            val height = (852 * density).toInt()
+            repeat(3) {
+                root.forceLayout()
+                root.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+                    View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY))
+                root.layout(0, 0, width, height)
+                root.viewTreeObserver.dispatchOnPreDraw()
+            }
+            assertEquals("No native status strip or reserved top remains", 0, root.paddingTop)
+            assertEquals(insets.systemWindowInsetLeft, root.paddingLeft)
+            assertEquals(insets.systemWindowInsetRight, root.paddingRight)
+            assertEquals(insets.systemWindowInsetBottom, root.paddingBottom)
+            assertEquals(android.graphics.Color.TRANSPARENT, root.statusBarColor)
+            val content = realComposeView(fragment)
+            val area = android.graphics.Rect(0, 0, content.width, content.height)
+            root.offsetDescendantRectToMyCoords(content, area)
+            assertEquals("Production Compose background starts at native y=0", 0, area.top)
+            assertEquals(root.paddingLeft, area.left)
+            assertEquals(root.width - root.paddingRight, area.right)
+            assertEquals("Native root alone reserves navigation/gesture bottom", root.height - root.paddingBottom, area.bottom)
+        }
+        compose.waitForIdle()
+        assertNativeToolbarGone(fragment)
+    }
+
+    private fun assertDetailControlsBelow(fragment: FriendCardDetailFragment, safeTopPx: Int) {
+        val density = realComposeView(fragment).resources.displayMetrics.density
+        val close = compose.onNodeWithContentDescription("关闭").assertIsDisplayed().getUnclippedBoundsInRoot()
+        val manage = compose.onNodeWithContentDescription("管理我的扩列卡").assertIsDisplayed().getUnclippedBoundsInRoot()
+        // The Row is CenterVertically: a wrapped manage label may be taller than the
+        // 44dp close button (52dp with legacy software text metrics). Check the exact
+        // row envelope and center alignment, not the shorter child's top or shadow.
+        val rowTop = safeTopPx / density + 6f
+        val rowHeight = maxOf(close.bottom.value - close.top.value, manage.bottom.value - manage.top.value)
+        assertEquals("Status/cutout top is converted from px once, plus existing 6dp", rowTop,
+            minOf(close.top.value, manage.top.value), 1f)
+        for (bounds in listOf(close, manage)) {
+            val height = bounds.bottom.value - bounds.top.value
+            assertEquals("Each control is centered inside the measured safe overlay row",
+                rowTop + (rowHeight - height) / 2f, bounds.top.value, 1f)
+            assertEquals("Both controls share the safe row's vertical center",
+                rowTop + rowHeight / 2f, (bounds.top.value + bounds.bottom.value) / 2f, 1f)
+            assertTrue("Both complete controls remain below the actual status/cutout safe top",
+                bounds.top.value >= safeTopPx / density)
+        }
+        assertTrue(close.right < manage.left)
+        assertTrue("Close retains native side-cutout protection plus 16dp", close.left.value >= 15f)
+        val viewportWidth = realComposeView(fragment).width / density
+        assertTrue("Manage remains inside native right safe edge", manage.right.value <= viewportWidth - 15f)
+    }
+
+    private fun assertDetailContentBelowControls(text: String) {
+        val close = compose.onNodeWithContentDescription("关闭").assertIsDisplayed().getUnclippedBoundsInRoot()
+        val manage = compose.onNodeWithContentDescription("管理我的扩列卡").assertIsDisplayed().getUnclippedBoundsInRoot()
+        val content = compose.onNodeWithText(text).assertIsDisplayed().getUnclippedBoundsInRoot()
+        assertTrue("Loading, error and hero text must clear the complete overlay row",
+            content.top > maxOf(close.bottom, manage.bottom))
+    }
+
+    private fun assertDetailFooterAboveNativeBottom(fragment: FriendCardDetailFragment, bottomPx: Int) {
+        val content = realComposeView(fragment)
+        val density = content.resources.displayMetrics.density
+        val footer = compose.onNodeWithText("编辑卡片").assertIsDisplayed().getUnclippedBoundsInRoot()
+        assertEquals("Only the detail footer's existing 16dp padding remains", 16f, content.height / density - footer.bottom.value, 1f)
+        compose.runOnIdle { assertEquals(bottomPx, requireNotNull(fragment.view).paddingBottom) }
+    }
+
+    private fun assertDetailTopPixels(fragment: FriendCardDetailFragment, background: Int, safeTopPx: Int) {
+        compose.runOnIdle {
+            val root = requireNotNull(fragment.view)
+            val bitmap = android.graphics.Bitmap.createBitmap(root.width, root.height, android.graphics.Bitmap.Config.ARGB_8888)
+            try {
+                // Native software Canvas checks real content coverage, not fabricated GPU sampling.
+                root.draw(android.graphics.Canvas(bitmap))
+                val x = root.width / 2
+                assertEquals("Real card content, not a painted system strip, covers y=0", background, bitmap.getPixel(x, 0))
+                assertEquals(background, bitmap.getPixel(x, (safeTopPx - 1).coerceAtLeast(0)))
+            } finally {
+                bitmap.recycle()
+            }
+        }
     }
 
     private fun assertNativeToolbarGone(fragment: FriendCardDetailFragment) {

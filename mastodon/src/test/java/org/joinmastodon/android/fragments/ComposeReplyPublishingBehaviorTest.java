@@ -8,6 +8,9 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.EditText;
+import android.widget.HorizontalScrollView;
+import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.PopupWindow;
 import android.widget.Toolbar;
 
@@ -54,6 +57,7 @@ import org.robolectric.RobolectricTestRunner;
 import org.robolectric.RuntimeEnvironment;
 import org.robolectric.android.controller.ActivityController;
 import org.robolectric.annotation.Config;
+import org.robolectric.annotation.GraphicsMode;
 import org.robolectric.annotation.Implementation;
 import org.robolectric.annotation.Implements;
 import org.robolectric.annotation.LooperMode;
@@ -371,23 +375,68 @@ public class ComposeReplyPublishingBehaviorTest{
 		assertEquals("  "+BODY+"  ", sentStatus().status);
 	}
 
+	@Test
+	@GraphicsMode(GraphicsMode.Mode.NATIVE) // Geometry depends on real glyph advances for the pinned "500" counter.
+	public void sixToolbarButtonsKeepEqual24DpGlyphsAndScrollWithPinnedCounterAt320Dp() throws Exception{
+		launch(null);
+		ImageButton cardButton=insertFriendCardButton();
+		android.view.ViewGroup buttons=(android.view.ViewGroup)cardButton.getParent();
+		assertEquals(6, buttons.getChildCount());
+		assertTrue(buttons.getParent() instanceof HorizontalScrollView);
+		HorizontalScrollView scroller=(HorizontalScrollView)buttons.getParent();
+		View row=(View)scroller.getParent();
+		View counter=fragment.getView().findViewById(R.id.char_counter);
+		assertSame(row, counter.getParent());
+		row.measure(View.MeasureSpec.makeMeasureSpec(V.dp(320), View.MeasureSpec.EXACTLY),
+				View.MeasureSpec.makeMeasureSpec(V.dp(48), View.MeasureSpec.EXACTLY));
+		row.layout(0, 0, V.dp(320), V.dp(48));
+		String geometry="density="+row.getResources().getDisplayMetrics().density+", 320dp="+V.dp(320)
+				+", row="+row.getWidth()+", buttons="+buttons.getWidth()+", viewport="+scroller.getWidth()
+				+", counter="+counter.getWidth();
+		assertEquals(geometry, V.dp(320), row.getWidth());
+		for(int i=0; i<buttons.getChildCount(); i++){
+			assertTrue(buttons.getChildAt(i) instanceof ImageButton);
+			ImageButton button=(ImageButton)buttons.getChildAt(i);
+			assertEquals(V.dp(36), button.getMeasuredWidth());
+			assertEquals(V.dp(36), button.getMeasuredHeight());
+			assertEquals(V.dp(6), button.getPaddingLeft());
+			assertEquals(V.dp(6), button.getPaddingRight());
+			assertEquals(geometry+", button="+i, V.dp(24), button.getMeasuredWidth()-button.getPaddingLeft()-button.getPaddingRight());
+			assertEquals(ImageView.ScaleType.CENTER_INSIDE, button.getScaleType());
+			assertNotNull(button.getContentDescription());
+			assertNotNull(button.getTooltipText());
+		}
+		assertTrue("320dp retains a scrollable button group instead of shrinking icons: "+geometry, buttons.getWidth()>scroller.getWidth());
+		assertTrue(geometry, counter.getWidth()>0);
+		assertTrue(geometry, counter.getRight()<=V.dp(320));
+		int counterLeft=counter.getLeft();
+		scroller.scrollTo(buttons.getWidth(), 0);
+		assertTrue(geometry+", scrollX="+scroller.getScrollX(), scroller.getScrollX()>0);
+		assertTrue("The sixth button must be fully reachable: "+geometry+", scrollX="+scroller.getScrollX(), cardButton.getRight()-scroller.getScrollX()<=scroller.getWidth());
+		assertEquals(geometry, counterLeft, counter.getLeft());
+		assertEquals(View.VISIBLE, body.getVisibility());
+	}
+
 	@Test public void insertPreviewRemoveAndCardOnlyPublishUseCurrentAccountAndNeverSyncNbw() throws Exception{
 		launch(null);
 		int checks=count(GetOwnAccount.class);
-		assertTrue(menu.performIdentifierAction(R.id.compose_insert_friend_card, 0));
+		assertFriendCardAction(R.string.friend_card_compose_insert);
+		clickInsertFriendCard();
 		MastodonAPIRequest<?> me=last(FriendCardRequest.class);
 		assertEquals(session.getID(), LocalRequests.accounts.get(LocalRequests.accounts.size()-1));
 		FriendCardResponses.Me response=new FriendCardResponses.Me(); response.card=friendCard();
 		succeed(me, response);
 		assertEquals(View.VISIBLE, fragment.getView().findViewById(R.id.compose_friend_card).getVisibility());
 		assertEquals("Current card", ((android.widget.TextView)fragment.getView().findViewById(R.id.compose_friend_card_title)).getText().toString());
+		assertFriendCardAction(R.string.friend_card_compose_replace);
 		assertEquals(View.GONE, fragment.getView().findViewById(R.id.btn_visibility).getVisibility());
 		assertEquals(View.GONE, fragment.getView().findViewById(R.id.newbabyworld_card).getVisibility());
 		assertTrue("A card-only post can publish without NBW binding", publishItem().isEnabled());
 		assertTrue(fragment.getView().findViewById(R.id.compose_friend_card_remove).performClick());
 		assertEquals(View.GONE, fragment.getView().findViewById(R.id.compose_friend_card).getVisibility());
+		assertFriendCardAction(R.string.friend_card_compose_insert);
 		assertFalse(publishItem().isEnabled());
-		assertTrue(menu.performIdentifierAction(R.id.compose_insert_friend_card, 0));
+		clickInsertFriendCard();
 		succeed(last(FriendCardRequest.class), response);
 		// Deliberately corrupt stale forum state: every publish guard still prevents NBW sync.
 		field(ComposeFragment.class, "selectedNBWForumId").setInt(fragment, 27);
@@ -422,7 +471,7 @@ public class ComposeReplyPublishingBehaviorTest{
 
 	@Test public void failedInsertDoesNotAttachInventedEmptyCardOrEnableCardOnlyPublishing() throws Exception{
 		launch(null);
-		assertTrue(menu.performIdentifierAction(R.id.compose_insert_friend_card, 0));
+		clickInsertFriendCard();
 		callback(last(FriendCardRequest.class)).onError(new MastodonErrorResponse("Unavailable", 503, null));
 		idle();
 		assertEquals(View.GONE, fragment.getView().findViewById(R.id.compose_friend_card).getVisibility());
@@ -467,11 +516,15 @@ public class ComposeReplyPublishingBehaviorTest{
 		assertNotNull(fragment.getView());
 		body=fragment.getView().findViewById(R.id.toot_text);
 		assertNotNull(body);
+		assertEquals(View.VISIBLE, body.getVisibility());
 		assertTrue(body.isEnabled());
 		assertNotNull(body.getKeyListener());
 		Toolbar toolbar=fragment.getView().findViewById(R.id.toolbar);
 		assertNotNull(toolbar);
 		menu=toolbar.getMenu(); // Inflated by the real AppKit lifecycle with its real click listener.
+		assertNull("Friend-card insertion belongs only to the bottom toolbar", menu.findItem(R.id.compose_insert_friend_card));
+		assertNotNull(insertFriendCardButton());
+		assertTrue(insertFriendCardButton().hasOnClickListeners());
 		assertNotNull(publishItem());
 		assertSame(publishItem(), field(ComposeFragment.class, "publishButton").get(fragment));
 	}
@@ -488,6 +541,16 @@ public class ComposeReplyPublishingBehaviorTest{
 		idle();
 	}
 
+	private ImageButton insertFriendCardButton(){ return fragment.getView().findViewById(R.id.compose_insert_friend_card); }
+	private void clickInsertFriendCard(){
+		assertTrue("Bottom toolbar button must dispatch the production insertion listener", insertFriendCardButton().performClick());
+		idle();
+	}
+	private void assertFriendCardAction(int title){
+		String expected=activity.getString(title);
+		assertEquals(expected, insertFriendCardButton().getContentDescription().toString());
+		assertEquals(expected, insertFriendCardButton().getTooltipText().toString());
+	}
 	private MenuItem publishItem(){ return menu.findItem(R.id.publish); }
 	private int bindingState() throws Exception{ return field(ComposeFragment.class, "newBabyWorldBindingState").getInt(fragment); }
 	private void setBindingState(int state) throws Exception{

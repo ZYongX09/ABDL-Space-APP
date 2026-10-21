@@ -29,6 +29,37 @@ import org.robolectric.annotation.Config
 class FriendCardSocialContractTest {
     @Before fun initializeApiContext() { MastodonApp.context = RuntimeEnvironment.getApplication() }
 
+    @Test fun publicDefaultsNeverBackfillExplicitPrivacyInSavedDraftsOrPendingSnapshots() {
+        assertEquals(FriendCardRules.fields.keys.toList(), FriendCardInput().publicFields)
+        for (visibleFields in listOf(listOf("looking_for"), emptyList())) {
+            val memory = Memory()
+            val store = FriendCardDraftStore(memory)
+            val source = input(listOf(row("explicit-private", public = false))).apply {
+                school = "不能公开的学校"; publicFields = visibleFields
+            }
+            val draft = FriendCardDraft("existing-owner", input = source, currentLoaded = true)
+            store.save(draft)
+            val serialized = memory.entries.values.single()
+            val savedInput = JsonParser.parseString(serialized).asJsonObject.getAsJsonObject("input")
+            assertEquals(visibleFields, savedInput.getAsJsonArray("public_fields").map { it.asString })
+            val restarted = FriendCardDraftStore(memory)
+            val restored = restarted.load(draft.account, null)!!
+            restarted.save(restored)
+            assertEquals(serialized, memory.entries.values.single())
+            val operation = restarted.prepare(restored).pending!!
+            for (input in listOf(restored.input, FriendCardRules.copy(restored.input), operation.input())) {
+                assertEquals(visibleFields, input.publicFields)
+                assertEquals(source.school, input.school)
+                assertFalse(input.socialAccounts.single().isPublic)
+                val preview = FriendCardRules.publicPreview(input, emptyList(), null)
+                assertEquals("", preview.school); assertTrue(preview.socialAccounts.isEmpty())
+            }
+            val wire = body(FriendCardRequest.create(operation.operationId, null, operation.input())).getAsJsonObject("card")
+            assertEquals(visibleFields, wire.getAsJsonArray("public_fields").map { it.asString })
+            assertFalse(wire.getAsJsonArray("social_accounts").single().asJsonObject["is_public"].asBoolean)
+        }
+    }
+
     @Test fun ordinaryPlatformsAndExactUnicodeLimitsAreValidAndNewRowsArePrivate() {
         val qq = row("qq-main", "qq", "123456789")
         val wechat = row("wechat-main", "wechat", "friend_2026", public = true)

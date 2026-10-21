@@ -125,7 +125,7 @@ class FriendCardSocialUiTest {
     }
 
     @Test
-    fun searchableSelectorAddsOnlyRealPresetsOrCustomWithPrivateUuidRowsAndFiveItemLimit() {
+    fun searchableSelectorAddsPublicUuidRowsAndPreservesExplicitPrivacyWithFiveItemLimit() {
         var entries by mutableStateOf<List<FriendCard.SocialAccount>>(emptyList())
         compose.setContent { FixtureTheme { EditorPanel { FriendCardSocialEditor(entries, true) { entries = it } } } }
         compose.onNodeWithText("+  添加社交账号").performClick()
@@ -137,12 +137,12 @@ class FriendCardSocialUiTest {
         compose.onNodeWithText("微信").performClick()
         compose.runOnIdle {
             assertEquals("wechat", entries.single().platform)
-            assertFalse(entries.single().isPublic)
+            assertTrue(entries.single().isPublic)
             assertEquals(entries.single().id, UUID.fromString(entries.single().id).toString())
         }
         val firstId = entries.single().id
         compose.onNodeWithContentDescription("第1项微信账号").performTextInput("synthetic_wechat")
-        compose.onNodeWithContentDescription("第1项微信账号可见范围").performClick().assertIsOn()
+        compose.onNodeWithContentDescription("第1项微信账号可见范围").assertIsOn().performClick().assertIsOff()
         compose.onNodeWithContentDescription("选择第1项社交平台，当前微信").performClick()
         compose.onNodeWithText("其他 / 自定义").performClick()
         compose.onNodeWithContentDescription("第1项平台名称").performTextInput("虚构社区")
@@ -150,7 +150,7 @@ class FriendCardSocialUiTest {
             assertEquals(firstId, entries.single().id)
             assertEquals("synthetic_wechat", entries.single().account)
             assertEquals("虚构社区", entries.single().name)
-            assertTrue(entries.single().isPublic)
+            assertFalse(entries.single().isPublic)
         }
         repeat(4) {
             compose.onNodeWithText("+  添加社交账号").performScrollTo().performClick()
@@ -161,7 +161,7 @@ class FriendCardSocialUiTest {
         compose.runOnIdle {
             assertEquals(5, entries.size)
             assertEquals(5, entries.map { it.id }.distinct().size)
-            assertTrue(entries.drop(1).all { !it.isPublic })
+            assertTrue(entries.drop(1).all { it.isPublic })
         }
         compose.onNodeWithContentDescription("移除第1项虚构社区账号").performScrollTo().performClick()
         compose.runOnIdle { assertEquals(4, entries.size); assertTrue(entries.none { it.id == firstId }) }

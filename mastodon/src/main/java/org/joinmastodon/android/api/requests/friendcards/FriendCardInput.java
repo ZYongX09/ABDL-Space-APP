@@ -21,7 +21,7 @@ public class FriendCardInput{
 	@SerializedName("looking_for") public String lookingFor="";
 	@SerializedName("boundaries") public String boundaries="";
 	@SerializedName("social_accounts") public List<FriendCard.SocialAccount> socialAccounts;
-	@SerializedName("public_fields") public List<String> publicFields=new ArrayList<>(List.of("gender", "age", "zodiac", "region", "mbti", "interaction_habits", "interests", "games", "diapers", "looking_for", "boundaries"));
+	@SerializedName("public_fields") public List<String> publicFields=new ArrayList<>(List.of("gender", "age", "zodiac", "region", "school", "mbti", "interaction_habits", "interests", "games", "diapers", "looking_for", "boundaries"));
 	@SerializedName("cover_upload_id") public String coverUploadId;
 	@SerializedName("cover_focus_x") public float coverFocusX=.5f;
 	@SerializedName("cover_focus_y") public float coverFocusY=.4f;

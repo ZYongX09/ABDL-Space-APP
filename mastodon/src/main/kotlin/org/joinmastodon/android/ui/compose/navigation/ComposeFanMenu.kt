@@ -92,7 +92,7 @@ private const val LABEL_SLIDE_DP = 24
 private const val SCRIM_ALPHA = 0.45f
 
 /**
- * Fan-out compose menu for the non-liquid home FAB. Tapping the FAB unfolds three circular
+ * Fan-out compose menu for the non-liquid home FAB. Tapping the FAB unfolds its circular
  * options upwards from the FAB position (60ms apart, springy), with their labels fading in from
  * the right a moment later over a dimmed page; tapping the cross or the dimmed area folds them
  * back in reverse order.
@@ -106,7 +106,8 @@ class ComposeFanMenuController(
 	private var bottomInsetPxState by mutableIntStateOf(0)
 	private val items: List<ComposeFanMenuItem> = listOf(
 		ComposeFanMenuItem(R.id.compose_post, context.getString(R.string.compose_menu_post), MiuixIcons.Notes),
-		ComposeFanMenuItem(R.id.compose_friend_request, context.getString(R.string.compose_menu_friend_request), MiuixIcons.ContactsBook, iconRes = R.drawable.ic_friend_card),
+		ComposeFanMenuItem(R.id.compose_friend_request, context.getString(R.string.compose_menu_friend_request), MiuixIcons.ContactsBook),
+		ComposeFanMenuItem(R.id.compose_friend_card, context.getString(R.string.compose_menu_friend_card), MiuixIcons.ContactsBook, iconRes = R.drawable.ic_friend_card),
 		ComposeFanMenuItem(R.id.compose_album, context.getString(R.string.baby_albums_compose_upload), MiuixIcons.Image),
 	)
 
@@ -183,7 +184,9 @@ private fun FanMenuContent(
 		if (expanded) {
 			scrim.animateTo(1f, tween(if (reduceMotion) 0 else 200))
 		} else {
-			scrim.animateTo(0f, tween(if (reduceMotion) 0 else 240))
+			// Keep the overlay alive until the last staggered option has finished folding.
+			val collapseDurationMs = if (reduceMotion) 0 else (items.lastIndex.coerceAtLeast(0) * STAGGER_MS + 160L).toInt()
+			scrim.animateTo(0f, tween(collapseDurationMs))
 			onCollapsed()
 		}
 	}

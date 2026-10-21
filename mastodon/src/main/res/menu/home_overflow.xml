@@ -2,10 +2,6 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
 	<group android:id="@+id/top">
 		<item
-			android:id="@+id/friend_card_feed"
-			android:icon="@drawable/ic_friend_card"
-			android:title="@string/friend_card_feed_entry" />
-		<item
 			android:id="@+id/settings"
 			android:icon="@drawable/ic_fluent_settings_24_regular"
 			android:title="@string/settings" />

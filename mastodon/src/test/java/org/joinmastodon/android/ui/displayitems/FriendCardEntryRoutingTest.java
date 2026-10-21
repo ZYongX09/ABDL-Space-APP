@@ -19,7 +19,6 @@ import org.joinmastodon.android.api.requests.statuses.GetStatusSourceText;
 import org.joinmastodon.android.fragments.ComposeFragment;
 import org.joinmastodon.android.fragments.ProfileFragment;
 import org.joinmastodon.android.fragments.friendcards.FriendCardCreateFragment;
-import org.joinmastodon.android.fragments.friendcards.MyFriendCardsFragment;
 import org.joinmastodon.android.model.Account;
 import org.joinmastodon.android.model.FriendCardAttachment;
 import org.joinmastodon.android.model.Status;
@@ -111,18 +110,14 @@ public class FriendCardEntryRoutingTest{
 		assertEquals(source.spoilerText,args.getString("sourceSpoiler")); assertEquals("card-1",args.getString("sourceFriendCardId"));
 	}
 
-	@Test public void ownProfileMenuRoutesMyCardsButOtherProfileCannotUseThatAction() throws Exception{
+	@Test public void ownProfileMenuNoLongerContainsMyCardsEntryOrHandler() throws Exception{
 		Fragment probe=new Fragment(); activity.getFragmentManager().beginTransaction().add(probe,"probe").commit(); activity.getFragmentManager().executePendingTransactions();
 		ProfileFragment profile=new ProfileFragment(); field(Fragment.class,"mHost").set(profile,field(Fragment.class,"mHost").get(probe));
 		field(ProfileFragment.class,"accountID").set(profile,"selected-account"); field(ProfileFragment.class,"isOwnProfile").setBoolean(profile,true);
 		PopupMenu menu=new PopupMenu(activity,new View(activity)); menu.inflate(R.menu.profile_own);
-		assertNotNull(menu.getMenu().findItem(R.id.my_friend_cards));
-		profile.onOptionsItemSelected(menu.getMenu().findItem(R.id.my_friend_cards));
-		assertEquals(List.of(MyFriendCardsFragment.class),LocalNavigation.destinations);
-		assertEquals("selected-account",LocalNavigation.arguments.get(0).getString("account"));
-		field(ProfileFragment.class,"isOwnProfile").setBoolean(profile,false);
-		profile.onOptionsItemSelected(menu.getMenu().findItem(R.id.my_friend_cards));
-		assertEquals(1,LocalNavigation.destinations.size());
+		assertNull(menu.getMenu().findItem(R.id.my_friend_cards));
+		profile.onOptionsItemSelected(menu.getMenu().add(0, R.id.my_friend_cards, 0, "Removed cards"));
+		assertTrue(LocalNavigation.destinations.isEmpty());
 	}
 
 	@Test public void firstPartyForumAndCanonicalLinksResolveSameTypedPostOnly(){

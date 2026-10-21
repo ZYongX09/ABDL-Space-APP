@@ -19,6 +19,8 @@ class FriendCardWireTest {
         assertEquals("generic-id", value.coverUploadId); assertEquals("用户", value.owner.displayName)
         assertEquals("https://example.com/x.jpg", value.diapers[0].imageUrl); assertEquals("123", value.postId)
         assertTrue(value.isPublic("interaction_habits")); assertFalse(value.isPublic("school"))
+        val editable = FriendCardInput.fromCard(value)
+        assertEquals(listOf("interaction_habits"), editable.publicFields); assertFalse(editable.publicFields.contains("school"))
         for (type in listOf(FriendCard::class.java, FriendCard.Owner::class.java, FriendCard.Diaper::class.java, FriendCardAttachment::class.java, FriendCardInput::class.java, FriendCardResponses.Options::class.java)) {
             type.declaredFields.filterNot { Modifier.isStatic(it.modifiers) || it.isSynthetic }.forEach { field -> assertTrue("${type.simpleName}.${field.name} public", Modifier.isPublic(field.modifiers)); assertFalse("${field.name} camelCase", field.name.contains('_')) }
         }
@@ -28,7 +30,8 @@ class FriendCardWireTest {
         val json = FriendCardRules.gson.toJsonTree(input).asJsonObject
         assertEquals("原文", json["interaction_habits"].asString); assertTrue(json["cover_upload_id"].isJsonNull)
         assertFalse(json.has("interactionHabits")); assertFalse(json.has("verified")); assertFalse(json.has("owner_id"))
-        assertEquals(2, json["diaper_ids"].asJsonArray.size()); assertFalse(input.publicFields.contains("school"))
+        assertEquals(2, json["diaper_ids"].asJsonArray.size()); assertTrue(input.publicFields.contains("school"))
+        assertEquals(FriendCardRules.fields.keys.toList(), json["public_fields"].asJsonArray.map { it.asString })
     }
     @Test fun unknownOrMismatchedAttachmentFallsBackToPostContent() {
         val extension = Gson().fromJson("""{"schema_version":1,"mode":"publication","id":"a","available":true,"card":{"schema_version":1,"id":"b","title":"标题"}}""", FriendCardAttachment::class.java)

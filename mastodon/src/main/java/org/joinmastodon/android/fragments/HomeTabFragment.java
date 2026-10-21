@@ -60,8 +60,7 @@ import org.joinmastodon.android.events.ListDeletedEvent;
 import org.joinmastodon.android.events.ListUpdatedEvent;
 import org.joinmastodon.android.events.SelfUpdateStateChangedEvent;
 import org.joinmastodon.android.fragments.discover.SearchQueryFragment;
-import org.joinmastodon.android.fragments.friendcards.FriendCardCreateFragment;
-import org.joinmastodon.android.fragments.friendcards.FriendCardFeedFragment;
+import org.joinmastodon.android.fragments.friendcards.MyFriendCardsFragment;
 import org.joinmastodon.android.fragments.settings.SettingsMainFragment;
 import org.joinmastodon.android.googleservices.barcodescanner.Barcode;
 import org.joinmastodon.android.googleservices.barcodescanner.BarcodeScanner;
@@ -745,7 +744,6 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		liquidToolbarController.setShowNewPosts(newPostsBtnShown);
 		liquidToolbarController.setReminderState(announcementsBadged, settingsBadged);
 		ArrayList<HomeToolbarMenuItem> root=new ArrayList<>();
-		root.add(new HomeToolbarMenuItem(R.id.friend_card_feed, getString(R.string.friend_card_feed_entry), R.drawable.ic_friend_card));
 		root.add(new HomeToolbarMenuItem(R.id.settings, getString(R.string.settings), R.drawable.ic_fluent_settings_24_regular));
 		root.add(new HomeToolbarMenuItem(R.id.announcements, getString(R.string.sk_announcements), R.drawable.ic_fluent_megaphone_24_regular));
 		root.add(new HomeToolbarMenuItem(R.id.edit_timelines, getString(R.string.sk_edit_timelines), R.drawable.ic_fluent_edit_24_regular));
@@ -778,7 +776,9 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		if(id==R.id.compose_post)
 			destination=ComposeFragment.class;
 		else if(id==R.id.compose_friend_request)
-			destination=FriendCardCreateFragment.class;
+			destination=FriendRequestCreateFragment.class;
+		else if(id==R.id.compose_friend_card)
+			destination=MyFriendCardsFragment.class;
 		else if(id==R.id.compose_album)
 			destination=org.joinmastodon.android.fragments.albums.AlbumUploadFragment.class;
 		else
@@ -790,21 +790,11 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		Nav.go(getActivity(), destination, args);
 	}
 
-	private void openFriendCardFeed(){
-		if(getActivity()==null) return;
-		Bundle args=new Bundle(); args.putString("account", accountID);
-		Nav.go(getActivity(), FriendCardFeedFragment.class, args);
-	}
-
 	public void onLiquidCompose(){
 		openComposeAction(R.id.compose_post);
 	}
 
 	public void onLiquidMenuItem(int id){
-		if(id==R.id.friend_card_feed){
-			openFriendCardFeed();
-			return;
-		}
 		if(id==R.id.novel){
 			startActivity(new Intent(getActivity(), NovelEditorActivity.class).putExtra(NovelEditorActivity.EXTRA_ACCOUNT_ID, accountID));
 			return;
@@ -813,7 +803,7 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 			openQrScanner();
 			return;
 		}
-		if(id==R.id.compose_post || id==R.id.compose_friend_request || id==R.id.compose_album){
+		if(id==R.id.compose_post || id==R.id.compose_friend_request || id==R.id.compose_friend_card || id==R.id.compose_album){
 			openComposeAction(id);
 			return;
 		}
@@ -936,8 +926,6 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		if (item.getItemId() == R.id.menu_back) {
 			getToolbar().post(() -> overflowPopup.show());
 			return true;
-		} else if (id == R.id.friend_card_feed) {
-			openFriendCardFeed();
 		} else if (id == R.id.search_action) {
 			openSearch();
 		} else if (id == R.id.scan_qr) {

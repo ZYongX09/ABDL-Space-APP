@@ -159,7 +159,7 @@ fun FriendCardEditorScreen(
                 return@LazyColumn
             }
             item(key = "privacy-note") {
-                EditorHint("选填资料可留空，学校默认仅自己可见。")
+                EditorHint("选填资料可留空，默认公开，可逐项设为仅自己。")
             }
             if (stage == 0) {
                 item(key = "cover") {

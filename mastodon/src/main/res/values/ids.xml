@@ -62,7 +62,13 @@
 	<!-- 液态玻璃发帖菜单 -->
 	<item name="compose_post" type="id" />
 	<item name="compose_friend_request" type="id" />
+	<item name="compose_friend_card" type="id" />
 	<item name="compose_album" type="id" />
+
+	<!-- Removed menu actions: keep symbols for legacy saved state and regression tests only. -->
+	<item name="friend_card_feed" type="id" />
+	<item name="my_friend_cards" type="id" />
+	<item name="compose_insert_friend_card" type="id" />
 
 	<!-- 小说 v2 -->
 	<item name="novel_square_pad" type="id" />

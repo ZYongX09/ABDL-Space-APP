@@ -174,11 +174,26 @@ public class FriendCardFragmentBehaviorTest {
         activity.getFragmentManager().beginTransaction().add(feed,"friend-card-feed").commit(); activity.getFragmentManager().executePendingTransactions();
         field(FriendCardBaseFragment.class,"shown").set(feed,true);
         LocalRequests.requests.clear();
-        FriendCardPages pages=(FriendCardPages)field(FriendCardFeedFragment.class,"pages").get(feed); pages.reset();
-        Method refresh=FriendCardFeedFragment.class.getDeclaredMethod("refresh"); refresh.setAccessible(true); refresh.invoke(feed);
+        pages(feed).reset();
+        feedMethod(feed,"refresh").invoke(feed);
         return feed;
     }
-    private FriendCardPages pages(FriendCardFeedFragment feed) throws Exception { return (FriendCardPages)field(FriendCardFeedFragment.class,"pages").get(feed); }
+    // Only feed reflection follows the compatibility subclass's private hub owner.
+    // Create-fragment field()/invoke() keep their exact declaring-class contracts.
+    private Field feedField(FriendCardFeedFragment feed,String name) throws Exception {
+        for(Class<?> type=feed.getClass();type!=null;type=type.getSuperclass()) {
+            try { return field(type,name); } catch(NoSuchFieldException ignored) {}
+        }
+        throw new NoSuchFieldException(feed.getClass().getName()+"."+name);
+    }
+    private Method feedMethod(FriendCardFeedFragment feed,String name) throws Exception {
+        for(Class<?> type=feed.getClass();type!=null;type=type.getSuperclass()) {
+            try { Method method=type.getDeclaredMethod(name); method.setAccessible(true); return method; }
+            catch(NoSuchMethodException ignored) {}
+        }
+        throw new NoSuchMethodException(feed.getClass().getName()+"."+name+"()");
+    }
+    private FriendCardPages pages(FriendCardFeedFragment feed) throws Exception { return (FriendCardPages)feedField(feed,"pages").get(feed); }
     private FriendCardResponses.Page page(String cursor,String... ids) {
         FriendCardResponses.Page page=new FriendCardResponses.Page(); page.cards=new ArrayList<>(); page.nextCursor=cursor;
         for(String id:ids){ FriendCard value=new FriendCard(); value.id=id; value.schemaVersion=1; value.title="宣言"; page.cards.add(value); }
@@ -198,7 +213,7 @@ public class FriendCardFragmentBehaviorTest {
     }
     @Test public void emptyAndDuplicateMiddleBatchesAdvanceWithoutPagerMovement() throws Exception {
         FriendCardFeedFragment feed=feed(); success(request("/feed"),page("middle","a"));
-        Method load=FriendCardFeedFragment.class.getDeclaredMethod("load"); load.setAccessible(true); load.invoke(feed);
+        feedMethod(feed,"load").invoke(feed);
         success(request("/feed"),page("duplicates"));
         assertEquals("duplicates",cursor(request("/feed"))); assertTrue(pages(feed).getLoading());
         success(request("/feed"),page("last","a"));
@@ -211,7 +226,7 @@ public class FriendCardFragmentBehaviorTest {
         FriendCardFeedFragment feed=feed(); success(request("/feed"),page("repeat")); success(request("/feed"),page("repeat"));
         assertEquals(2,LocalRequests.requests.size()); assertNull(pages(feed).getNextCursor()); assertFalse(pages(feed).getLoading()); assertTrue(pages(feed).getCards().isEmpty());
         pages(feed).reset();
-        Method load=FriendCardFeedFragment.class.getDeclaredMethod("load"); load.setAccessible(true); load.invoke(feed);
+        feedMethod(feed,"load").invoke(feed);
         success(request("/feed"),page("a")); success(request("/feed"),page("b")); success(request("/feed"),page("a"));
         assertEquals(5,LocalRequests.requests.size()); assertNull(pages(feed).getNextCursor()); assertFalse(pages(feed).getLoading());
     }

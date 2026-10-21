@@ -2,8 +2,10 @@
 
 package org.joinmastodon.android.fragments.friendcards
 
+import android.os.Build
 import android.os.Bundle
 import android.view.View
+import android.view.WindowInsets
 import android.widget.EditText
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -13,7 +15,10 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.platform.LocalView
 import org.joinmastodon.android.GlobalUserPreferences
@@ -38,8 +43,29 @@ class FriendCardDetailFragment : FriendCardBaseFragment() {
     private var card: FriendCard? = null
     private var loading = false
     private var busy = false
+    private var safeTopPx by mutableIntStateOf(0)
     private lateinit var cardId: String
     override fun onCreate(state: Bundle?) { super.onCreate(state); setTitle("扩列卡"); cardId = arguments?.getString("card_id").orEmpty() }
+    @Suppress("DEPRECATION")
+    override fun onApplyWindowInsets(insets: WindowInsets) {
+        // AppKit already lays out behind the bars. Move only its top reservation into the
+        // overlay/hero content; the background must still start at the native root's y=0.
+        safeTopPx = maxOf(insets.systemWindowInsetTop,
+            if (Build.VERSION.SDK_INT >= 28) insets.displayCutout?.safeInsetTop ?: 0 else 0,
+            if (Build.VERSION.SDK_INT >= 30) {
+                insets.getInsetsIgnoringVisibility(WindowInsets.Type.statusBars() or WindowInsets.Type.displayCutout()).top
+            } else 0)
+        val contentInsets = if (Build.VERSION.SDK_INT >= 29) {
+            // Unlike replaceSystemWindowInsets, inset also clears typed status/cutout and
+            // stable tops on API 30+, without converting an IME bottom into navigation bars.
+            insets.inset(0, safeTopPx, 0, 0)
+        } else {
+            insets.replaceSystemWindowInsets(insets.systemWindowInsetLeft, 0,
+                insets.systemWindowInsetRight, insets.systemWindowInsetBottom)
+        }
+        // Sides, navigation/gesture bottom and keyboard resizing remain owned by AppKit.
+        super.onApplyWindowInsets(contentInsets)
+    }
     override fun onViewCreated(view: View, state: Bundle?) { super.onViewCreated(view, state); styleToolbar() }
     override fun onUpdateToolbar() { super.onUpdateToolbar(); styleToolbar() }
     private fun styleToolbar() {
@@ -48,7 +74,7 @@ class FriendCardDetailFragment : FriendCardBaseFragment() {
         val value = card
         val background = value?.let { friendCardPalette(it).background.toArgb() } ?: 0xFF263F43.toInt()
         bar.visibility = View.GONE
-        setStatusBarColor(background)
+        setStatusBarColor(android.graphics.Color.TRANSPARENT)
         setNavigationBarColor(background)
     }
     override fun wantsLightStatusBar() = false
@@ -96,23 +122,25 @@ class FriendCardDetailFragment : FriendCardBaseFragment() {
                 .collect { contrast.invalidateContent() }
         }
         val background = palette?.background ?: Color(0xFF263F43)
+        val safeTop = with(LocalDensity.current) { safeTopPx.toDp() }
+        val topClearance = safeTop + 64.dp
         Box(Modifier.fillMaxSize().background(background)) {
             Column(Modifier.fillMaxSize().friendCardContrastContent(contrast).background(background)) {
             LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = scroll, contentPadding = PaddingValues(bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (state.loading) item {
-                    Box(Modifier.padding(top = 56.dp, start = 12.dp, end = 12.dp).clip(RoundedCornerShape(18.dp)).background(MiuixTheme.colorScheme.surface)) {
+                    Box(Modifier.padding(top = topClearance, start = 12.dp, end = 12.dp).clip(RoundedCornerShape(18.dp)).background(MiuixTheme.colorScheme.surface)) {
                         FriendCardNotice("正在读取卡片…", null, null)
                     }
                 }
                 state.error?.let { text -> item {
-                    Box(Modifier.padding(top = 56.dp, start = 12.dp, end = 12.dp, bottom = 12.dp).clip(RoundedCornerShape(18.dp)).background(MiuixTheme.colorScheme.surface)) {
+                    Box(Modifier.padding(top = topClearance, start = 12.dp, end = 12.dp, bottom = 12.dp).clip(RoundedCornerShape(18.dp)).background(MiuixTheme.colorScheme.surface)) {
                         FriendCardNotice(text, "重新读取", { refresh() })
                     }
                 } }
                 if (value != null) {
                     item {
                         androidx.compose.runtime.CompositionLocalProvider(LocalFriendCardContentInvalidated provides contrast::invalidateContent) {
-                            FriendCardPortrait(value, topClearance = 64.dp, onDiaper = { diaper(it) })
+                            FriendCardPortrait(value, topClearance = topClearance, onDiaper = { diaper(it) })
                         }
                     }
                     item {
@@ -133,7 +161,8 @@ class FriendCardDetailFragment : FriendCardBaseFragment() {
             }
             if (value != null) DetailFooter(value, state.busy)
             }
-            FriendCardDetailControls(backdrop, !state.busy, { finish() }, { go(MyFriendCardsFragment::class.java) }, contrast = contrast)
+            FriendCardDetailControls(backdrop, !state.busy, { finish() }, { go(MyFriendCardsFragment::class.java) },
+                modifier = Modifier.padding(top = safeTop), contrast = contrast)
         }
     }
 

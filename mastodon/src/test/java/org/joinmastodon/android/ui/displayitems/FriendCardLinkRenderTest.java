@@ -7,7 +7,10 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.LinearGradient;
+import android.graphics.Matrix;
 import android.graphics.Paint;
+import android.graphics.Rect;
+import android.graphics.RectF;
 import android.graphics.Shader;
 import android.graphics.drawable.BitmapDrawable;
 import android.view.View;
@@ -49,6 +52,7 @@ public class FriendCardLinkRenderTest{
 	@Before public void setup(){
 		MastodonApp.context=RuntimeEnvironment.getApplication();
 		V.setApplicationContext(MastodonApp.context);
+		assertEquals("Corner raster assertions require physical MDPI pixels",1f,MastodonApp.context.getResources().getDisplayMetrics().density,.001f);
 	}
 
 	@Test public void renderLightAndDarkCoverFallbackUnavailableAndLongDeclarationWithUserBody() throws Exception{
@@ -87,9 +91,12 @@ public class FriendCardLinkRenderTest{
 					ImageView cover=(ImageView)face.getChildAt(0), icon=(ImageView)face.getChildAt(1);
 					TextView declaration=(TextView)((LinearLayout)row.getChildAt(1)).getChildAt(1);
 					assertEquals(View.VISIBLE,row.getVisibility());
-					assertTrue(holder.itemView.getHeight()<V.dp(130));
+					assertEquals(54,thumbnail.getWidth()); assertEquals(75,thumbnail.getHeight());
+					assertTrue("Keep the compact row within the 2dp height allowance",row.getHeight()>=96 && row.getHeight()<=98);
 					assertEquals(-4f,thumbnail.getRotation(),.01f);
-					assertEquals(.72f,thumbnail.getWidth()/(float)thumbnail.getHeight(),.02f);
+					assertEquals(row.getHeight()/2f,thumbnail.getTop()+thumbnail.getHeight()/2f,.5f);
+					assertFalse(row.getClipChildren()); assertFalse(row.getClipToPadding());
+					assertTrue(thumbnail.getClipToOutline()); assertTrue(face.getClipToOutline());
 					assertEquals(hasCover ? View.VISIBLE : View.GONE,cover.getVisibility());
 					assertEquals(hasCover ? View.GONE : View.VISIBLE,icon.getVisibility());
 					assertNotNull(icon.getDrawable());
@@ -112,10 +119,77 @@ public class FriendCardLinkRenderTest{
 					try(FileOutputStream output=new FileOutputStream(new File(directory,(dark ? "dark-" : "light-")+state+".png"))){
 						assertTrue(rendered.compress(Bitmap.CompressFormat.PNG,100,output));
 					}
+					// Preserve the actual failing capture too, rather than inspecting a stale PNG.
+					assertPortraitCorners(rendered,root,row,thumbnail,(dark ? "dark-" : "light-")+state);
 					rendered.recycle();
 				}
 			}
 		}
+	}
+
+	/** Compare every rounded corner with an unclipped, rotated portrait on the same surface.
+	 * Full renders used to pass assertHasInk even with the entire left/top white edge missing. */
+	private static void assertPortraitCorners(Bitmap rendered,LinearLayout root,LinearLayout row,FrameLayout thumbnail,String state){
+		Matrix toRoot=new Matrix(thumbnail.getMatrix());
+		float x=0,y=0;
+		for(View view=thumbnail; view!=root; view=(View)view.getParent()){
+			x+=view.getLeft(); y+=view.getTop();
+		}
+		toRoot.postTranslate(x,y);
+		RectF bounds=new RectF(0,0,thumbnail.getWidth(),thumbnail.getHeight());
+		toRoot.mapRect(bounds); bounds.inset(-1,-1);
+		Rect rowRect=new Rect(0,0,row.getWidth(),row.getHeight());
+		root.offsetDescendantRectToMyCoords(row,rowRect);
+		assertTrue(state+" rotated bounds and AA gutter must stay inside the padded row",new RectF(rowRect.left+row.getPaddingLeft(),rowRect.top+row.getPaddingTop(),rowRect.right-row.getPaddingRight(),rowRect.bottom-row.getPaddingBottom()).contains(bounds));
+
+		Bitmap expected=Bitmap.createBitmap(rendered.getWidth(),rendered.getHeight(),Bitmap.Config.ARGB_8888);
+		Canvas referenceCanvas=new Canvas(expected);
+		referenceCanvas.drawColor(UiUtils.getThemeColor(root.getContext(),R.attr.colorM3SurfaceVariant));
+		// Draw only the portrait's background to make an independent rounded white outline
+		// oracle. No parent or face clip, icon silhouette, or cover color can define it.
+		referenceCanvas.save(); referenceCanvas.concat(toRoot); thumbnail.getBackground().draw(referenceCanvas); referenceCanvas.restore();
+		Matrix fromRoot=new Matrix(); assertTrue(toRoot.invert(fromRoot));
+		int[] borderPixels=new int[4], antialiasPixels=new int[4], overflowPixels=new int[4];
+		int matchedBorder=0,matchedAntialias=0;
+		for(int py=(int)Math.floor(bounds.top); py<(int)Math.ceil(bounds.bottom); py++){
+			for(int px=(int)Math.floor(bounds.left); px<(int)Math.ceil(bounds.right); px++){
+				float[] local={px+.5f,py+.5f}; fromRoot.mapPoints(local);
+				float localX=local[0],localY=local[1];
+				// The white ring is 2px wide, not 1px. At -4deg the outermost pixel
+				// strip alone has too few fully covered samples on a dark surface.
+				// Exclude the actual inner face rect; its legitimate crop is unchanged.
+				if(!((localX<10 || localX>thumbnail.getWidth()-10) && (localY<10 || localY>thumbnail.getHeight()-10))) continue;
+				if(localX>2 && localX<thumbnail.getWidth()-2 && localY>2 && localY<thumbnail.getHeight()-2) continue;
+				float centerX=localX<thumbnail.getWidth()/2f ? 8 : thumbnail.getWidth()-8;
+				float centerY=localY<thumbnail.getHeight()/2f ? 8 : thumbnail.getHeight()-8;
+				float radius=(float)Math.hypot(localX-centerX,localY-centerY);
+				if(radius<=7 || radius>9) continue;
+				int corner=(localX<thumbnail.getWidth()/2f ? 0 : 1)+(localY<thumbnail.getHeight()/2f ? 0 : 2);
+				int reference=expected.getPixel(px,py),actual=rendered.getPixel(px,py);
+				boolean solid=isWhite(reference), antialiased=false;
+				if(!solid && radius>=7.8f){
+					int surface=UiUtils.getThemeColor(root.getContext(),R.attr.colorM3SurfaceVariant);
+					antialiased=colorDistance(reference,surface)>=3 && colorDistance(reference,Color.WHITE)>=3;
+				}
+				if(!solid && !antialiased) continue;
+				assertTrue(state+" corner "+corner+" clipped at native pixel "+px+","+py+" expected "+Integer.toHexString(reference)+" actual "+Integer.toHexString(actual),colorDistance(reference,actual)<=4);
+				if(solid){ borderPixels[corner]++; matchedBorder++; }
+				else{ antialiasPixels[corner]++; matchedAntialias++; }
+				if(px+.5f<x || px+.5f>x+thumbnail.getWidth() || py+.5f<y || py+.5f>y+thumbnail.getHeight()) overflowPixels[corner]++;
+			}
+		}
+		for(int corner=0;corner<4;corner++){
+			assertTrue(state+" corner "+corner+" must retain its white border",borderPixels[corner]>=3);
+			assertTrue(state+" corner "+corner+" must retain antialiased outer pixels",antialiasPixels[corner]>=2);
+		}
+		assertTrue(state+" must inspect actual rotated overflow, including the formerly clipped upper-left corner",overflowPixels[0]>0);
+		assertTrue(state+" cannot pass with an empty corner oracle",matchedBorder>=12 && matchedAntialias>=8);
+		expected.recycle();
+	}
+
+	private static boolean isWhite(int color){ return Color.alpha(color)==255 && Color.red(color)>=250 && Color.green(color)>=250 && Color.blue(color)>=250; }
+	private static int colorDistance(int a,int b){
+		return Math.max(Math.max(Math.abs(Color.red(a)-Color.red(b)),Math.abs(Color.green(a)-Color.green(b))),Math.max(Math.abs(Color.blue(a)-Color.blue(b)),Math.abs(Color.alpha(a)-Color.alpha(b))));
 	}
 
 	private static Status post(String state){

@@ -884,7 +884,8 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 
 		List<HomeToolbarComposeMenuItem> composeItems=new ArrayList<>();
 		composeItems.add(new HomeToolbarComposeMenuItem(R.id.compose_post, getString(R.string.compose_menu_post), getNotes(MiuixIcons.INSTANCE)));
-		composeItems.add(new HomeToolbarComposeMenuItem(R.id.compose_friend_request, getString(R.string.compose_menu_friend_request), getContactsBook(MiuixIcons.INSTANCE), R.drawable.ic_friend_card));
+		composeItems.add(new HomeToolbarComposeMenuItem(R.id.compose_friend_request, getString(R.string.compose_menu_friend_request), getContactsBook(MiuixIcons.INSTANCE)));
+		composeItems.add(new HomeToolbarComposeMenuItem(R.id.compose_friend_card, getString(R.string.compose_menu_friend_card), getContactsBook(MiuixIcons.INSTANCE), R.drawable.ic_friend_card));
 		composeItems.add(new HomeToolbarComposeMenuItem(R.id.compose_album, getString(R.string.baby_albums_compose_upload), getImage(MiuixIcons.INSTANCE)));
 		liquidToolbarController.setComposeMenu(composeItems);
 

@@ -9,8 +9,7 @@ import org.joinmastodon.android.CompatibilityTestApplication;
 import org.joinmastodon.android.MastodonApp;
 import org.joinmastodon.android.R;
 import org.joinmastodon.android.fragments.albums.AlbumUploadFragment;
-import org.joinmastodon.android.fragments.friendcards.FriendCardCreateFragment;
-import org.joinmastodon.android.fragments.friendcards.FriendCardFeedFragment;
+import org.joinmastodon.android.fragments.friendcards.MyFriendCardsFragment;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -83,8 +82,8 @@ public class HomeComposeActionRoutingTest{
 	}
 
 	@Test public void productionFanAndLiquidActionsRouteIdenticallyForEachCurrentAccount() throws Exception{
-		int[] ids={R.id.compose_post, R.id.compose_friend_request, R.id.compose_album};
-		Class<?>[] targets={ComposeFragment.class, FriendCardCreateFragment.class, AlbumUploadFragment.class};
+		int[] ids={R.id.compose_post, R.id.compose_friend_request, R.id.compose_friend_card, R.id.compose_album};
+		Class<?>[] targets={ComposeFragment.class, FriendRequestCreateFragment.class, MyFriendCardsFragment.class, AlbumUploadFragment.class};
 		for(String account:new String[]{"account-one@example.test", "account-two@example.test"}){
 			setAccount(account);
 			for(int i=0; i<ids.length; i++){
@@ -110,14 +109,19 @@ public class HomeComposeActionRoutingTest{
 		assertEquals(List.of("current-fragment-account"), LocalNavigation.accounts);
 	}
 
-	@Test public void classicAndLiquidMoreOpenFeedWithoutChangingComposeOrLegacyReading() throws Exception{
+	@Test public void classicAndLiquidMoreHaveNoFeedEntryOrLegacyHandler() throws Exception{
 		setAccount("selected-account");
-		home.onLiquidMenuItem(R.id.friend_card_feed);
 		android.widget.PopupMenu popup=new android.widget.PopupMenu(activity, new View(activity));
 		popup.inflate(R.menu.home_overflow);
-		home.onOptionsItemSelected(popup.getMenu().findItem(R.id.friend_card_feed));
-		assertEquals(List.of(FriendCardFeedFragment.class, FriendCardFeedFragment.class), LocalNavigation.destinations);
-		assertEquals(List.of("selected-account", "selected-account"), LocalNavigation.accounts);
+		assertNull(popup.getMenu().findItem(R.id.friend_card_feed));
+		Field overflow=HomeTabFragment.class.getDeclaredField("overflowPopup");
+		overflow.setAccessible(true);
+		overflow.set(home, popup);
+		home.onLiquidMenuItem(R.id.friend_card_feed);
+		// A stale legacy id must not provide a hidden shortcut after removing its visible entry.
+		home.onOptionsItemSelected(popup.getMenu().add(0, R.id.friend_card_feed, 0, "Removed feed"));
+		assertTrue(LocalNavigation.destinations.isEmpty());
+		assertTrue(LocalNavigation.accounts.isEmpty());
 		assertNotNull(FriendRequestListFragment.class);
 	}
 

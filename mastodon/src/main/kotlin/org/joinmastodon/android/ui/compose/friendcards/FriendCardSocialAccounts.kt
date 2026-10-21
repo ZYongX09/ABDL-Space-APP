@@ -111,7 +111,7 @@ fun FriendCardSocialEditor(
             Text("社交账号", modifier = Modifier.weight(1f), fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = colors.onSurface)
             Text("选填 · ${accounts.size}/$SocialAccountLimit", fontSize = 12.sp, color = if (accounts.size > SocialAccountLimit) colors.error else colors.onSurfaceVariantSummary)
         }
-        Text("选择平台，再填写账号或主页链接。新账号默认仅自己可见。", fontSize = 12.sp, lineHeight = 18.sp, color = colors.onSurfaceVariantSummary)
+        Text("选择平台，再填写账号或主页链接。默认公开，可逐项设为仅自己。", fontSize = 12.sp, lineHeight = 18.sp, color = colors.onSurfaceVariantSummary)
         accounts.forEachIndexed { index, entry ->
             // Never key on account text, privacy, platform, list revision, or DTO object identity.
             key(entry.id?.takeIf { it.isNotBlank() } ?: "legacy-social-$index") {
@@ -186,7 +186,7 @@ fun FriendCardSocialEditor(
                         this.platform = platform
                         account = ""
                         name = ""
-                        isPublic = false
+                        isPublic = true
                     })
                 } else update(target) { this.platform = platform }
             }

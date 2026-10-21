@@ -5,6 +5,7 @@ import android.content.Context;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Matrix;
+import android.graphics.RectF;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
@@ -205,8 +206,12 @@ public class FriendCardStatusDisplayItem extends StatusDisplayItem{
 			linkContainer=new LinearLayout(activity);
 			linkContainer.setOrientation(LinearLayout.HORIZONTAL);
 			linkContainer.setGravity(Gravity.CENTER_VERTICAL);
-			linkContainer.setPaddingRelative(V.dp(14), V.dp(10), V.dp(12), V.dp(10));
+			linkContainer.setPaddingRelative(V.dp(14), V.dp(8), V.dp(12), V.dp(8));
 			linkContainer.setMinimumHeight(V.dp(96));
+			// The ripple mask clips the ripple, not the portrait. Do not clip its rotated AA edge
+			// to the row's unrotated child bounds or padded content rect; reserve that edge below.
+			linkContainer.setClipChildren(false);
+			linkContainer.setClipToPadding(false);
 			GradientDrawable linkBackground=rounded(UiUtils.getThemeColor(activity, R.attr.colorM3SurfaceVariant), 16);
 			linkBackground.setStroke(V.dp(1), UiUtils.getThemeColor(activity, R.attr.colorM3OutlineVariant));
 			linkContainer.setBackground(new RippleDrawable(ColorStateList.valueOf(UiUtils.getThemeColor(activity, R.attr.colorM3OutlineVariant)), linkBackground, rounded(Color.WHITE, 16)));
@@ -220,7 +225,16 @@ public class FriendCardStatusDisplayItem extends StatusDisplayItem{
 			thumbnail.setOutlineProvider(OutlineProviders.roundedRect(8));
 			thumbnail.setClipToOutline(true);
 			thumbnail.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
-			linkContainer.addView(thumbnail, new LinearLayout.LayoutParams(V.dp(54), V.dp(75)));
+			int portraitWidth=V.dp(54), portraitHeight=V.dp(75);
+			RectF rotatedBounds=new RectF(0, 0, portraitWidth, portraitHeight);
+			Matrix rotation=new Matrix(); rotation.setRotate(thumbnail.getRotation()); rotation.mapRect(rotatedBounds);
+			// LinearLayout measures unrotated sizes. Reserve the transformed bounds, plus one
+			// physical pixel on each side for antialiasing, without enlarging the 54 x 75 face.
+			int horizontalInset=(int)Math.ceil((rotatedBounds.width()-portraitWidth)/2f)+1;
+			int verticalInset=(int)Math.ceil((rotatedBounds.height()-portraitHeight)/2f)+1;
+			LinearLayout.LayoutParams thumbnailParams=new LinearLayout.LayoutParams(portraitWidth, portraitHeight);
+			thumbnailParams.setMargins(horizontalInset, verticalInset, horizontalInset, verticalInset);
+			linkContainer.addView(thumbnail, thumbnailParams);
 			FrameLayout face=new FrameLayout(activity);
 			face.setBackground(rounded(UiUtils.getThemeColor(activity, R.attr.colorM3SecondaryContainer), 6));
 			face.setOutlineProvider(OutlineProviders.roundedRect(6));

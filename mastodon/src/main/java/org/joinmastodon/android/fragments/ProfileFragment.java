@@ -1024,10 +1024,7 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 	@Override
 	public boolean onOptionsItemSelected(MenuItem item){
 		int id=item.getItemId();
-		if(id==R.id.my_friend_cards && isOwnProfile){
-			Bundle args=new Bundle(); args.putString("account", accountID);
-			Nav.go(getActivity(), org.joinmastodon.android.fragments.friendcards.MyFriendCardsFragment.class, args);
-		}else if(id==R.id.share){
+		if(id==R.id.share){
 			UiUtils.openSystemShareSheet(getActivity(), account);
 		}else if(id==R.id.messages_action){
 			openConversations();

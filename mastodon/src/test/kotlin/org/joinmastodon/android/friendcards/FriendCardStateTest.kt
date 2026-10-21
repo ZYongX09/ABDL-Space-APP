@@ -14,6 +14,23 @@ class FriendCardStateTest {
         input.interactionHabits = "慢回复但会认真回；\n周末一起玩游戏"
         assertEquals(input.interactionHabits, FriendCardRules.copy(input).interactionHabits)
     }
+    @Test fun newInputsDefaultAllFieldsPublicButExistingPrivacySurvivesDeepCopy() {
+        val fresh = FriendCardInput().apply { school = "公开的学校" }
+        assertEquals(FriendCardRules.fields.keys.toList(), fresh.publicFields)
+        assertEquals(fresh.school, FriendCardRules.publicPreview(fresh, emptyList(), null).school)
+
+        val existing = card("existing-private").apply { school = "不能公开的学校"; publicFields = listOf("looking_for") }
+        val editable = FriendCardInput.fromCard(existing)
+        val copied = FriendCardRules.copy(editable)
+        assertNotSame(existing.publicFields, editable.publicFields)
+        assertNotSame(editable.publicFields, copied.publicFields)
+        for (input in listOf(editable, copied)) {
+            assertEquals(listOf("looking_for"), input.publicFields)
+            assertEquals(existing.school, input.school)
+            assertFalse(input.publicFields.contains("school"))
+            assertEquals("", FriendCardRules.publicPreview(input, emptyList(), null).school)
+        }
+    }
     @Test fun customTagsTrimClearAndDoNotSplitCommas() {
         assertNotNull(FriendCardRules.addTag(emptyList(), "  \n", 12, 16).error)
         val added = FriendCardRules.addTag(emptyList(), "  A,B  ", 12, 16)
@@ -32,7 +49,7 @@ class FriendCardStateTest {
         assertEquals("三角洲行动", FriendCardGames.gameName("delta-force"))
     }
     @Test fun privateFieldsNeverEnterEitherPreview() {
-        val input = FriendCardInput().apply { title = "宣言"; lookingFor = "朋友"; school = "不能公开的学校"; interactionHabits = "私密习惯"; publicFields = publicFields - "interaction_habits" }
+        val input = FriendCardInput().apply { title = "宣言"; lookingFor = "朋友"; school = "不能公开的学校"; interactionHabits = "私密习惯"; publicFields = publicFields - "interaction_habits" - "school" }
         val preview = FriendCardRules.publicPreview(input, emptyList(), null)
         assertEquals("", preview.school); assertEquals("", preview.interactionHabits)
         assertFalse(FriendCardRules.legacyText(preview, emptyList()).contains("不能公开"))

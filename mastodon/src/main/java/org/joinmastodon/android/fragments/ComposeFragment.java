@@ -172,7 +172,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	private String accountID;
 	private int charCount, charLimit, trimmedCharCount;
 
-	private ImageButton mediaBtn, pollBtn, emojiBtn, spoilerBtn, languageBtn;
+	private ImageButton mediaBtn, pollBtn, emojiBtn, spoilerBtn, languageBtn, insertFriendCardBtn;
 	private FrameLayout replyWrap;
 	private LinearLayout visibilityBtn;
 	private TextView visibilityText1, visibilityText2, visibilityCurrentText;
@@ -234,7 +234,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	public Status editingStatus;
 	private boolean creatingView;
 	private boolean ignoreSelectionChanges=false;
-	private MenuItem publishButton, insertFriendCardItem;
+	private MenuItem publishButton;
 	private String friendCardId, initialFriendCardId, friendCardTitle;
 	private boolean friendCardSpecified;
 	private int friendCardRequestGeneration;
@@ -388,6 +388,8 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		visibilityText2=view.findViewById(R.id.visibility_text2);
 		visibilityCurrentText=visibilityText1;
 		languageBtn=view.findViewById(R.id.btn_language);
+		insertFriendCardBtn=view.findViewById(R.id.compose_insert_friend_card);
+		insertFriendCardBtn.setOnClickListener(v->insertMyFriendCard());
 		replyWrap=view.findViewById(R.id.reply_wrap);
 		quotedPostWrap=view.findViewById(R.id.quoted_post_wrap);
 		friendCardPreview=view.findViewById(R.id.compose_friend_card);
@@ -535,7 +537,11 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		if(friendCardPreview==null) return;
 		friendCardPreview.setVisibility(hasFriendCard() ? View.VISIBLE : View.GONE);
 		friendCardPreviewTitle.setText(TextUtils.isEmpty(friendCardTitle) ? getString(R.string.friend_card_compose_attached) : friendCardTitle);
-		if(insertFriendCardItem!=null) insertFriendCardItem.setTitle(hasFriendCard() ? R.string.friend_card_compose_replace : R.string.friend_card_compose_insert);
+		if(insertFriendCardBtn!=null){
+			String action=getString(hasFriendCard() ? R.string.friend_card_compose_replace : R.string.friend_card_compose_insert);
+			insertFriendCardBtn.setContentDescription(action);
+			insertFriendCardBtn.setTooltipText(action);
+		}
 	}
 
 	private void setAttachedFriendCard(FriendCard card){
@@ -989,17 +995,11 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	public void onCreateOptionsMenu(Menu menu, MenuInflater inflater){
 		inflater.inflate(editingStatus==null ? R.menu.compose : R.menu.compose_edit, menu);
 		publishButton=menu.findItem(R.id.publish);
-		insertFriendCardItem=menu.findItem(R.id.compose_insert_friend_card);
-		updateFriendCardPreview();
 		updatePublishButtonState();
 	}
 
 	@Override
 	public boolean onOptionsItemSelected(MenuItem item){
-		if(item.getItemId()==R.id.compose_insert_friend_card){
-			insertMyFriendCard();
-			return true;
-		}
 		if(item.getItemId()==R.id.publish){
 			if(needsNewBabyWorldBinding() && newBabyWorldBindingState!=BINDING_BOUND){
 				refreshNewBabyWorldBinding();
