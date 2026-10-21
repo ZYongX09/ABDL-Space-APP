@@ -1,10 +1,12 @@
 package org.joinmastodon.android.fragments;
 
 import android.app.Activity;
+import android.graphics.Rect;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewTreeObserver;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.LinearLayout;
@@ -14,7 +16,10 @@ import android.widget.Toast;
 
 import com.google.gson.reflect.TypeToken;
 
+import org.joinmastodon.android.BuildConfig;
 import org.joinmastodon.android.R;
+import org.joinmastodon.android.friendcards.FriendCardPromotion;
+import org.joinmastodon.android.fragments.friendcards.MyFriendCardsFragment;
 import org.joinmastodon.android.api.requests.friendrequests.CreateFriendRequest;
 import org.joinmastodon.android.api.requests.friendrequests.UpdateFriendRequest;
 import org.joinmastodon.android.api.session.AccountSessionManager;
@@ -24,7 +29,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
+import me.grishka.appkit.Nav;
 import me.grishka.appkit.api.Callback;
 import me.grishka.appkit.api.ErrorResponse;
 import me.grishka.appkit.fragments.ToolbarFragment;
@@ -38,6 +45,12 @@ public class FriendRequestCreateFragment extends ToolbarFragment {
 	private String[] editFieldKeys, editFieldValues;
 	private String selectedLookingFor = "";
 	private TextView lookingForLabel;
+	private static final String PROMOTION_PAGE="friend_card_promotion_page";
+	private String promotionPage;
+	private FriendCardPromotion promotion;
+	private View promotionView;
+	private boolean promotionShown;
+	private final ViewTreeObserver.OnPreDrawListener promotionPreDraw=this::recordPromotionVisibility;
 
 	// 交友类型（优先放前面）
 	private static final String[] LOOKING_FOR_OPTIONS = {
@@ -64,6 +77,12 @@ public class FriendRequestCreateFragment extends ToolbarFragment {
 		editDescription = getArguments().getString("editDescription");
 		editFieldKeys = getArguments().getStringArray("editFieldKeys");
 		editFieldValues = getArguments().getStringArray("editFieldValues");
+		promotionPage=savedInstanceState==null ? getArguments().getString(PROMOTION_PAGE) : savedInstanceState.getString(PROMOTION_PAGE,getArguments().getString(PROMOTION_PAGE));
+		if(promotionPage==null){
+			promotionPage=UUID.randomUUID().toString();
+			getArguments().putString(PROMOTION_PAGE,promotionPage);
+		}
+		promotion=new FriendCardPromotion(getContext(),BuildConfig.VERSION_CODE,promotionPage);
 	}
 
 	@Override
@@ -157,7 +176,56 @@ public class FriendRequestCreateFragment extends ToolbarFragment {
 			}
 		}
 
+		promotionView=view.findViewById(R.id.friend_card_promotion);
+		promotionView.setVisibility(editRequestId==null && promotion.canShow() ? View.VISIBLE : View.GONE);
+		view.findViewById(R.id.friend_card_promotion_action).setOnClickListener(v->openFriendCards());
+		view.findViewById(R.id.friend_card_promotion_close).setOnClickListener(v->{
+			promotion.dismiss();
+			promotionView.setVisibility(View.GONE);
+		});
+		promotionView.getViewTreeObserver().addOnPreDrawListener(promotionPreDraw);
 		return view;
+	}
+
+	@Override public void onSaveInstanceState(Bundle state){
+		super.onSaveInstanceState(state);
+		state.putString(PROMOTION_PAGE,promotionPage);
+	}
+
+	@Override protected void onShown(){ super.onShown(); promotionShown=true; updatePromotion(); }
+	@Override protected void onHidden(){ promotionShown=false; super.onHidden(); }
+	@Override public void onResume(){ super.onResume(); updatePromotion(); }
+
+	private void updatePromotion(){
+		if(promotionView!=null){
+			promotionView.setVisibility(editRequestId==null && promotion.canShow() ? View.VISIBLE : View.GONE);
+			promotionView.invalidate();
+		}
+	}
+
+	private boolean recordPromotionVisibility(){
+		if(promotionView==null || !promotionShown || !isResumed() || isHidden() || !promotionView.isAttachedToWindow()
+				|| !promotionView.isShown() || promotionView.getWindowVisibility()!=View.VISIBLE
+				|| promotionView.getAlpha()<=0 || promotionView.getWidth()==0 || promotionView.getHeight()==0) return true;
+		Rect visible=new Rect();
+		if(!promotionView.getGlobalVisibleRect(visible) || visible.isEmpty()) return true;
+		if(!promotion.onVisible()) promotionView.setVisibility(View.GONE);
+		return true;
+	}
+
+	private void openFriendCards(){
+		if(promotionView==null || !promotionView.isShown() || !promotionShown || !isResumed() || getActivity()==null) return;
+		var manager=AccountSessionManager.getInstance();
+		if(accountID==null || !accountID.equals(manager.getLastActiveAccountID()) || manager.tryGetAccount(accountID)==null) return;
+		Bundle args=new Bundle(); args.putString("account",accountID);
+		Nav.go(getActivity(),MyFriendCardsFragment.class,args);
+	}
+
+	@Override public void onDestroyView(){
+		if(promotionView!=null && promotionView.getViewTreeObserver().isAlive())
+			promotionView.getViewTreeObserver().removeOnPreDrawListener(promotionPreDraw);
+		promotionView=null;
+		super.onDestroyView();
 	}
 
 	private void addFieldRow(String key, String value) {

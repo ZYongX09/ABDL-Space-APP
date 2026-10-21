@@ -11,7 +11,7 @@ import org.robolectric.annotation.Config
 import top.yukonga.miuix.kmp.blur.isRuntimeShaderSupported
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [26, 28, 29, 30, 31, 32, 33, 35], application = CompatibilityTestApplication::class)
+@Config(sdk = [26, 27, 28, 29, 30, 31, 32, 33, 35], application = CompatibilityTestApplication::class)
 class GraphicsCompatibilityTest {
 	@Test fun lowerApiCannotEnterRuntimeShaderPath() {
 		assertEquals(Build.VERSION.SDK_INT >= 33, supportsRuntimeGraphicsEffects())

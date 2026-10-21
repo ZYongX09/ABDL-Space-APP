@@ -15,7 +15,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [26, 28, 30, 31, 35], application = CompatibilityTestApplication::class)
+@Config(sdk = [26, 27, 28, 29, 30, 31, 32, 35], application = CompatibilityTestApplication::class)
 class LegacyWindowCompatibilityTest {
 	@Test fun cameraActivityCreatesAndAcceptsInsetsWithoutApi30Calls() {
 		val controller = Robolectric.buildActivity(MediaCameraActivity::class.java).create()

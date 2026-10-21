@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
@@ -8,6 +9,83 @@
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:padding="16dp">
+
+        <RelativeLayout
+            android:id="@+id/friend_card_promotion"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="4dp"
+            android:padding="16dp"
+            android:background="@drawable/bg_settings_banner"
+            android:visibility="gone">
+
+            <androidx.appcompat.widget.AppCompatImageView
+                android:id="@+id/friend_card_promotion_icon"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginEnd="16dp"
+                android:background="@drawable/white_circle"
+                android:backgroundTint="?colorM3PrimaryContainer"
+                android:padding="8dp"
+                android:src="@drawable/ic_friend_card"
+                app:tint="?colorM3OnPrimaryContainer"
+                android:importantForAccessibility="no" />
+
+            <TextView
+                android:id="@+id/friend_card_promotion_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_toEndOf="@id/friend_card_promotion_icon"
+                android:textAppearance="@style/m3_title_medium"
+                android:textColor="?colorM3OnSurface"
+                android:text="@string/friend_card_promotion_title" />
+
+            <TextView
+                android:id="@+id/friend_card_promotion_text"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_below="@id/friend_card_promotion_title"
+                android:layout_toEndOf="@id/friend_card_promotion_icon"
+                android:layout_marginTop="2dp"
+                android:textAppearance="@style/m3_body_medium"
+                android:textColor="?colorM3OnSurface"
+                android:text="@string/friend_card_promotion_message" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_below="@id/friend_card_promotion_text"
+                android:layout_toEndOf="@id/friend_card_promotion_icon"
+                android:layout_marginStart="-8dp"
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/friend_card_promotion_action"
+                    style="@style/Widget.Mastodon.M3.Button.Text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:minHeight="28dp"
+                    android:minWidth="0dp"
+                    android:paddingHorizontal="8dp"
+                    android:paddingVertical="4dp"
+                    android:textAppearance="@style/m3_label_large"
+                    android:text="@string/friend_card_promotion_action" />
+
+                <Button
+                    android:id="@+id/friend_card_promotion_close"
+                    style="@style/Widget.Mastodon.M3.Button.Text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:minHeight="28dp"
+                    android:minWidth="0dp"
+                    android:paddingHorizontal="8dp"
+                    android:paddingVertical="4dp"
+                    android:textAppearance="@style/m3_label_large"
+                    android:text="@string/friend_card_promotion_close" />
+            </LinearLayout>
+        </RelativeLayout>
 
         <!-- 交友类型 -->
         <TextView

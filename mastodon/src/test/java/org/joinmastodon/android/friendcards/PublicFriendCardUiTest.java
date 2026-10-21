@@ -174,27 +174,39 @@ public class PublicFriendCardUiTest{
 		}
 	}
 
-	@Test public void actualProfileLayoutMiniStartsGoneAndClearsPausedEditedUnknownAndReboundState() throws Exception{
+	@Test @Config(sdk={26,28,32})
+	public void actualProfileLayoutMiniStartsGoneAndClearsPausedEditedUnknownAndReboundState() throws Exception{
 		for(boolean dark:new boolean[]{false,true}) try(ActivityController<Activity> lifecycle=host(dark)){
 			Activity activity=lifecycle.get(); View profile=LayoutInflater.from(activity).inflate(R.layout.fragment_profile,null,false);
-			View mini=profile.findViewById(R.id.profile_friend_card_mini);
+			View mini=profile.findViewById(R.id.profile_friend_card_mini), following=profile.findViewById(R.id.following_btn);
 			assertEquals(View.GONE,mini.getVisibility());
-			ViewGroup parent=(ViewGroup)mini.getParent();
-			assertTrue(parent.indexOfChild(profile.findViewById(R.id.bio))<parent.indexOfChild(mini));
-			assertTrue(parent.indexOfChild(mini)<parent.indexOfChild(profile.findViewById(R.id.badge_container)));
+			ViewGroup parent=(ViewGroup)mini.getParent(), counters=profile.findViewById(R.id.profile_counters);
+			assertSame(parent,following.getParent()); assertSame(counters,parent.getParent());
+			assertEquals(parent.indexOfChild(following)+1,parent.indexOfChild(mini));
+			assertNotSame(profile.findViewById(R.id.bio).getParent(),parent);
 			LinearLayout root=root(activity);
-			for(int id:new int[]{R.id.profile_header,R.id.bio,R.id.profile_friend_card_mini}){
+			for(int id:new int[]{R.id.profile_header,R.id.bio,R.id.profile_counters}){
 				View child=profile.findViewById(id); ((ViewGroup)child.getParent()).removeView(child); root.addView(child);
 			}
 			((TextView)root.findViewById(R.id.name)).setText("小鹿 🌙");
 			((TextView)root.findViewById(R.id.username)).setText("little-deer");
 			((TextView)root.findViewById(R.id.bio)).setText("一起分享平凡日常里的小确幸，也欢迎认识温柔有趣的新朋友。");
+			((TextView)root.findViewById(R.id.followers_count)).setText("1.2万");
+			((TextView)root.findViewById(R.id.followers_label)).setText("关注者");
+			((TextView)root.findViewById(R.id.following_count)).setText("123");
+			((TextView)root.findViewById(R.id.following_label)).setText("正在关注");
 			AtomicInteger clicks=new AtomicInteger(); Account user=user();
 			PublicFriendCardUi.bindMini(mini,user,false,v->clicks.incrementAndGet()); measure(root);
 			assertEquals(View.VISIBLE,mini.getVisibility()); assertTrue(mini.performClick()); assertEquals(1,clicks.get());
-			assertTrue(mini.isFocusable()); assertTrue(mini.getHeight()>=V.dp(40));
+			assertTrue(mini.isFocusable()); assertEquals(following.getHeight(),mini.getHeight());
 			ImageView icon=mini.findViewById(R.id.profile_friend_card_icon); assertMarkerInk(icon);
-			assertEquals("查看扩列卡",mini.getContentDescription());
+			TextView label=mini.findViewById(R.id.profile_friend_card_label), followingLabel=root.findViewById(R.id.following_label);
+			assertEquals("扩列卡",mini.getContentDescription()); assertEquals("扩列卡",label.getText().toString());
+			assertEquals(followingLabel.getTextSize(),label.getTextSize(),0);
+			assertEquals(Math.round(followingLabel.getTextSize()),icon.getWidth()); assertEquals(icon.getWidth(),icon.getHeight());
+			int blue=PublicFriendCardUi.markerColor(dark,UiUtils.getThemeColor(activity,R.attr.colorM3Surface));
+			assertEquals(blue,label.getCurrentTextColor()); assertEquals(blue,icon.getImageTintList().getDefaultColor());
+			assertMiniFits(following,mini,label,icon); assertEquals(0,parent.getTop());
 			capture(root,(dark ? "dark-" : "light-")+"profile-mini-active");
 			for(String state:List.of("paused","edited","missing","malformed")){
 				Account current=user(); if(state.equals("paused") || state.equals("missing")) current.publicFriendCard=null;
@@ -204,12 +216,44 @@ public class PublicFriendCardUiTest{
 				assertEquals(state,View.GONE,mini.getVisibility()); assertFalse(mini.isEnabled());
 				assertFalse(mini.isClickable()); assertFalse(mini.isFocusable()); assertFalse(mini.hasOnClickListeners());
 				assertNull(mini.getTag()); assertNull(mini.getContentDescription()); assertNull(icon.getDrawable()); assertNull(icon.getImageTintList());
+				assertEquals("",label.getText().toString()); assertEquals(Color.TRANSPARENT,label.getCurrentTextColor());
+				assertEquals(following.getRight(),parent.getWidth());
 				mini.performClick(); assertEquals(1,clicks.get());
 				capture(root,(dark ? "dark-" : "light-")+"profile-mini-"+state);
 			}
 			PublicFriendCardUi.bindMini(mini,user(),false,v->clicks.addAndGet(10));
 			assertTrue(mini.performClick()); assertEquals(11,clicks.get());
 		}
+	}
+
+	@Test @Config(sdk={26,28,32},qualifiers="w280dp-h640dp-mdpi")
+	public void narrowProfileKeepsFollowingAndCardTogetherWithoutClippingAtLargeFontScale() throws Exception{
+		RuntimeEnvironment.setFontScale(2f);
+		for(boolean dark:new boolean[]{false,true}) try(ActivityController<Activity> lifecycle=host(dark)){
+			Activity activity=lifecycle.get(); View profile=LayoutInflater.from(activity).inflate(R.layout.fragment_profile,null,false);
+			View counters=profile.findViewById(R.id.profile_counters); ((ViewGroup)counters.getParent()).removeView(counters);
+			LinearLayout root=root(activity); root.addView(counters);
+			((TextView)root.findViewById(R.id.followers_count)).setText("99.9万");
+			((TextView)root.findViewById(R.id.followers_label)).setText("关注者");
+			((TextView)root.findViewById(R.id.following_count)).setText("99.9万");
+			((TextView)root.findViewById(R.id.following_label)).setText("正在关注");
+			View mini=root.findViewById(R.id.profile_friend_card_mini), following=root.findViewById(R.id.following_btn);
+			PublicFriendCardUi.bindMini(mini,user(),false,v->{});
+			measure(root,280);
+			assertMiniFits(following,mini,mini.findViewById(R.id.profile_friend_card_label),mini.findViewById(R.id.profile_friend_card_icon));
+			View pair=(View)mini.getParent(); assertTrue(pair.getTop()>=root.findViewById(R.id.followers_btn).getBottom());
+			capture(root,(dark ? "dark-" : "light-")+"profile-mini-narrow-large-font");
+		}
+	}
+
+	private static void assertMiniFits(View following,View mini,TextView label,ImageView icon){
+		assertEquals(following.getTop(),mini.getTop()); assertEquals(following.getBottom(),mini.getBottom());
+		assertTrue(following.getRight()<=mini.getLeft()); assertTrue(icon.getRight()<=label.getLeft());
+		assertTrue(label.getRight()<=mini.getWidth()-mini.getPaddingRight());
+		assertEquals(1,label.getLineCount()); assertEquals(0,label.getLayout().getEllipsisCount(0));
+		View row=(View)mini.getParent(), counters=(View)row.getParent();
+		assertTrue(mini.getRight()<=row.getWidth()); assertTrue(row.getRight()<=counters.getWidth());
+		assertTrue(row.getBottom()<=counters.getHeight());
 	}
 
 	private ActivityController<Activity> host(boolean dark){
@@ -229,8 +273,9 @@ public class PublicFriendCardUiTest{
 		if(type==1) ((CompactHeaderStatusDisplayItem.Holder)holder).bind(new CompactHeaderStatusDisplayItem(status.id,status.account,status.createdAt,callbacks,activity,"offline",status));
 		else ((HeaderStatusDisplayItem.Holder)holder).bind(type==2 ? new CheckableHeaderStatusDisplayItem(status.id,status.account,status.createdAt,callbacks,activity,"offline",status,null) : new HeaderStatusDisplayItem(status.id,status.account,status.createdAt,callbacks,activity,"offline",status,null));
 	}
-	private static void measure(View root){
-		root.measure(View.MeasureSpec.makeMeasureSpec(V.dp(393),View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED));
+	private static void measure(View root){ measure(root,393); }
+	private static void measure(View root,int width){
+		root.measure(View.MeasureSpec.makeMeasureSpec(V.dp(width),View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED));
 		root.layout(0,0,root.getMeasuredWidth(),root.getMeasuredHeight());
 	}
 	private static void assertOrder(TextView name,ImageView marker,TextView badge){
@@ -247,7 +292,7 @@ public class PublicFriendCardUiTest{
 		Bitmap bitmap=Bitmap.createBitmap(root.getWidth(),root.getHeight(),Bitmap.Config.ARGB_8888); root.draw(new Canvas(bitmap));
 		int first=bitmap.getPixel(0,0),ink=0; for(int y=0;y<bitmap.getHeight();y++) for(int x=0;x<bitmap.getWidth();x++) if(bitmap.getPixel(x,y)!=first) ink++;
 		assertTrue("Capture cannot be a blank surface",ink>50);
-		File directory=new File(System.getProperty("publicFriendCardRenderDir","/tmp/abdl-friend-card-ui-renders/public-references"));
+		File directory=new File(System.getProperty("publicFriendCardRenderDir","/tmp/abdl-friend-card-ui-renders/public-references"),"api"+RuntimeEnvironment.getApiLevel());
 		assertTrue(directory.isDirectory() || directory.mkdirs());
 		try(FileOutputStream output=new FileOutputStream(new File(directory,name+".png"))){ assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG,100,output)); }
 		bitmap.recycle();

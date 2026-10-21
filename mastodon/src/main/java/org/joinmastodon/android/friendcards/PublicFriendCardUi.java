@@ -7,6 +7,7 @@ import android.graphics.drawable.Drawable;
 import android.view.View;
 import android.view.ViewParent;
 import android.widget.ImageView;
+import android.widget.TextView;
 
 import org.joinmastodon.android.R;
 import org.joinmastodon.android.model.Account;
@@ -75,14 +76,21 @@ public final class PublicFriendCardUi{
 		row.setContentDescription(null);
 		row.setVisibility(View.GONE);
 		clearIcon(row.findViewById(R.id.profile_friend_card_icon));
+		TextView label=row.findViewById(R.id.profile_friend_card_label);
+		label.setText("");
+		label.setTextColor(Color.TRANSPARENT);
 	}
 
 	public static void bindMini(View row, Account account, boolean unavailable, View.OnClickListener listener){
 		clearMini(row);
 		if(unavailable || !hasReference(account)) return;
+		int color=tint(row);
+		TextView label=row.findViewById(R.id.profile_friend_card_label);
+		label.setText(R.string.friend_card_profile_view);
+		label.setTextColor(color);
 		ImageView icon=row.findViewById(R.id.profile_friend_card_icon);
 		icon.setImageResource(R.drawable.ic_friend_card);
-		icon.setImageTintList(ColorStateList.valueOf(tint(row)));
+		icon.setImageTintList(ColorStateList.valueOf(color));
 		icon.setVisibility(View.VISIBLE);
 		row.setContentDescription(row.getContext().getString(R.string.friend_card_profile_view));
 		row.setEnabled(true);

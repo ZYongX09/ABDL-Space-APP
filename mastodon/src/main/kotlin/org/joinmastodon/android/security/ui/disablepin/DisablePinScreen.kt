@@ -10,8 +10,6 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.foundation.layout.padding
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -21,7 +19,8 @@ import org.joinmastodon.android.R
 import org.joinmastodon.android.security.ui.pin.PinScreen
 import org.joinmastodon.android.security.ui.setuppin.vibrateInvalidPin
 import org.joinmastodon.android.ui.compose.component.BackNavigationIcon
-import top.yukonga.miuix.kmp.basic.Scaffold
+import org.joinmastodon.android.security.ui.pin.PinScaffold
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 
 @Composable
@@ -54,10 +53,12 @@ fun DisablePinScreen(
 			onBack()
 		}
 	}
-	Scaffold(
+	PinScaffold(
 		topBar = {
 			SmallTopAppBar(
 				title = stringResource(R.string.security__disable_pin),
+				color = MiuixTheme.colorScheme.background,
+				titleColor = MiuixTheme.colorScheme.onBackground,
 				navigationIcon = {
 					BackNavigationIcon(
 						onClick = {
@@ -72,7 +73,7 @@ fun DisablePinScreen(
 				},
 			)
 		},
-	) { padding ->
+	) {
 		PinScreen(
 			message = stringResource(R.string.security__enter_current_pin),
 			errorMessage = uiState.errorMessageRes?.let {
@@ -89,7 +90,6 @@ fun DisablePinScreen(
 			showBiometrics = false,
 			onDigit = viewModel::digitEntered,
 			onBackspace = viewModel::backspace,
-			modifier = Modifier.padding(padding),
 		)
 	}
 }

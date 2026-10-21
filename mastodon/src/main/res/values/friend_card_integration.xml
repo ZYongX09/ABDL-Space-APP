@@ -14,4 +14,8 @@
 	<string name="friend_card_compose_attached">已附加扩列卡</string>
 	<string name="friend_card_compose_no_nbw">含扩列卡的帖子仅发布到本站，不同步宝宝新天地。</string>
 	<string name="friend_card_compose_no_current">你还没有可插入的当前扩列卡。可前往我的扩列卡创建或恢复。</string>
+	<string name="friend_card_promotion_title">全新扩列卡上线</string>
+	<string name="friend_card_promotion_message">更完整的资料，更好看的展示。来制作你的专属扩列卡，认识新朋友。</string>
+	<string name="friend_card_promotion_action">去看看</string>
+	<string name="friend_card_promotion_close">关闭</string>
 </resources>

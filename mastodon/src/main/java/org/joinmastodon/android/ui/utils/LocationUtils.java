@@ -6,7 +6,9 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.location.Location;
+import android.location.LocationListener;
 import android.location.LocationManager;
+import android.os.Bundle;
 import android.os.Looper;
 import android.text.TextUtils;
 import android.util.Log;
@@ -102,7 +104,12 @@ public class LocationUtils{
 			return;
 		}
 		android.util.Log.e(TAG, "Requesting single update from "+provider);
-		lm.requestSingleUpdate(provider, location->resolveAndCache(context, location, callback), Looper.getMainLooper());
+		lm.requestSingleUpdate(provider, new LocationListener(){
+			@Override public void onLocationChanged(Location location){ resolveAndCache(context, location, callback); }
+			@Override public void onStatusChanged(String provider, int status, Bundle extras){}
+			@Override public void onProviderEnabled(String provider){}
+			@Override public void onProviderDisabled(String provider){}
+		}, Looper.getMainLooper());
 	}
 
 	private static void resolveAndCache(@NonNull Context context, @NonNull Location location, @Nullable OnLocationResolved callback){

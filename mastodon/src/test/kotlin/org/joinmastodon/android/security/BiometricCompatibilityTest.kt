@@ -15,7 +15,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [26, 28, 29, 30, 31, 33, 35], application = Application::class)
+@Config(sdk = [26, 27, 28, 29, 30, 31, 32, 33, 35], application = Application::class)
 class BiometricCompatibilityTest {
 	@Test fun strongOnlyPromptIsLegalAcrossSupportedAndroidVersions() {
 		val info = BiometricPrompt.PromptInfo.Builder().setTitle("Authenticate").setNegativeButtonText("Use PIN")

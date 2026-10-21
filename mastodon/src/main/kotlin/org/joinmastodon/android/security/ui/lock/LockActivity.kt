@@ -9,14 +9,11 @@ package org.joinmastodon.android.security.ui.lock
 import android.app.Activity
 import android.app.RemoteInput
 import android.content.Intent
-import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.OnBackPressedCallback
-import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.core.content.IntentCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -35,12 +32,6 @@ class LockActivity : androidx.fragment.app.FragmentActivity() {
 		super.onCreate(savedInstanceState)
 		window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) window.setHideOverlayWindows(true)
-		val darkTheme = UiUtils.isDarkTheme()
-		enableEdgeToEdge(
-			statusBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT) { darkTheme },
-			navigationBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT) { darkTheme },
-		)
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) window.isNavigationBarContrastEnforced = false
 		val graph = SecurityGraph.create(this)
 		val tracker = AppSecurity.authTrackerOrNull() ?: graph.authTracker
 		tracker.onAuthenticateScreen()

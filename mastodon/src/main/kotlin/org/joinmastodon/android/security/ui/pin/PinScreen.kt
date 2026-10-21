@@ -28,7 +28,24 @@ import androidx.compose.ui.unit.sp
 import org.joinmastodon.android.R
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.basic.Scaffold
+
+/** A PIN route paints beneath the bars; only its content consumes the safe drawing/IME insets. */
+@Composable
+internal fun PinScaffold(
+	topBar: @Composable () -> Unit = {},
+	content: @Composable () -> Unit,
+) {
+	val palette = pinPalette()
+	PinWindowAppearance(palette.background)
+	Scaffold(
+		containerColor = palette.background,
+		topBar = topBar,
+		contentWindowInsets = WindowInsets(0, 0, 0, 0),
+	) { padding ->
+		Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) { content() }
+	}
+}
 
 @Composable
 internal fun PinScreen(
@@ -45,10 +62,11 @@ internal fun PinScreen(
 	onBiometrics: () -> Unit = {},
 	modifier: Modifier = Modifier,
 	footer: @Composable () -> Unit = {},
+	contentInsets: WindowInsets = WindowInsets.safeDrawing.union(WindowInsets.ime),
 ) {
 	val palette = pinPalette()
 	val configuration = LocalConfiguration.current
-	BoxWithConstraints(modifier.fillMaxSize().background(palette.background)) {
+	BoxWithConstraints(modifier.fillMaxSize().background(palette.background).windowInsetsPadding(contentInsets)) {
 		val wide = maxWidth >= 600.dp && maxHeight < 560.dp
 		val compact = maxHeight < 650.dp || configuration.fontScale > 1.3f
 		val header: @Composable () -> Unit = {
@@ -76,7 +94,7 @@ internal fun PinScreen(
 					if (state == PinScreenState.Loading || state == PinScreenState.Verifying) {
 						CircularProgressIndicator(color = palette.accent, modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
 					} else if (errorMessage.isNotBlank()) {
-						Text(errorMessage, color = MiuixTheme.colorScheme.error, fontSize = 14.sp,
+						Text(errorMessage, color = palette.error, fontSize = 14.sp,
 							textAlign = TextAlign.Center, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Assertive })
 					}
 				}

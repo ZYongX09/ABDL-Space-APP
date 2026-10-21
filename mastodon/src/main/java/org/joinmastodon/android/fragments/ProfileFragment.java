@@ -161,7 +161,7 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 	private FrameLayout[] tabViews;
 	private TabLayoutMediator tabLayoutMediator;
 	private TextView followsYouView;
-	private LinearLayout countersLayout;
+	private ViewGroup countersLayout;
 	private View nameEditWrap, bioEditWrap;
 	private View tabsDivider;
 	private View actionButtonWrap;

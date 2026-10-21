@@ -183,39 +183,6 @@
 					tools:text="Founder, CEO and lead developer @Mastodon, Germany." />
 
 				<LinearLayout
-					android:id="@+id/profile_friend_card_mini"
-					android:layout_width="wrap_content"
-					android:layout_height="wrap_content"
-					android:minHeight="40dp"
-					android:layout_marginHorizontal="12dp"
-					android:layout_marginTop="4dp"
-					android:paddingHorizontal="4dp"
-					android:paddingVertical="8dp"
-					android:orientation="horizontal"
-					android:gravity="center_vertical"
-					android:background="?android:selectableItemBackground"
-					android:contentDescription="@string/friend_card_profile_view"
-					android:importantForAccessibility="yes"
-					android:visibility="gone">
-
-					<ImageView
-						android:id="@+id/profile_friend_card_icon"
-						android:layout_width="18dp"
-						android:layout_height="18dp"
-						android:src="@drawable/ic_friend_card"
-						android:importantForAccessibility="no" />
-
-					<TextView
-						android:layout_width="wrap_content"
-						android:layout_height="wrap_content"
-						android:layout_marginStart="6dp"
-						android:text="@string/friend_card_profile_view"
-						android:textAppearance="@style/m3_body_medium"
-						android:textColor="?colorM3OnSurfaceVariant"
-						android:importantForAccessibility="no" />
-				</LinearLayout>
-
-				<LinearLayout
 					android:id="@+id/badge_container"
 					android:layout_width="match_parent"
 					android:layout_height="wrap_content"
@@ -226,17 +193,19 @@
 					android:visibility="gone"
 					tools:visibility="visible"/>
 
-				<LinearLayout
-					android:id="@+id/profile_counters"
+					<org.joinmastodon.android.ui.views.WrappingLinearLayout
+						android:id="@+id/profile_counters"
 					android:layout_width="match_parent"
 					android:layout_height="wrap_content"
 					android:layout_marginLeft="8dp"
 					android:layout_marginTop="4dp"
 					android:layout_marginRight="8dp"
-					android:layout_marginBottom="4dp">
+						android:layout_marginBottom="4dp"
+						android:horizontalGap="0dp"
+						android:verticalGap="0dp">
 
-					<LinearLayout
-						android:id="@+id/followers_btn"
+						<LinearLayout
+							android:id="@+id/followers_btn"
 						android:layout_width="wrap_content"
 						android:layout_height="28dp"
 						android:background="@drawable/bg_button_borderless_rounded"
@@ -272,47 +241,88 @@
 							tools:text="followers" />
 					</LinearLayout>
 
+						<LinearLayout
+							android:layout_width="wrap_content"
+							android:layout_height="wrap_content"
+							android:gravity="center_vertical"
+							android:orientation="horizontal">
+
+						<LinearLayout
+							android:id="@+id/following_btn"
+							android:layout_width="wrap_content"
+							android:layout_height="28dp"
+							android:layout_marginStart="-4dp"
+							android:background="@drawable/bg_button_borderless_rounded"
+							android:gravity="center_horizontal"
+							android:orientation="horizontal"
+							android:paddingLeft="8dp"
+							android:paddingTop="4dp"
+							android:paddingRight="8dp"
+							android:paddingBottom="4dp">
+
+							<TextView
+								android:id="@+id/following_count"
+								android:layout_width="wrap_content"
+								android:layout_height="match_parent"
+								android:layout_marginEnd="4dp"
+								android:ellipsize="end"
+								android:fontFamily="sans-serif-black"
+								android:gravity="center_vertical"
+								android:singleLine="true"
+								android:textColor="?colorM3OnSurfaceVariant"
+								android:textSize="14dp"
+								tools:text="123" />
+
+							<TextView
+								android:id="@+id/following_label"
+								android:layout_width="wrap_content"
+								android:layout_height="match_parent"
+								android:ellipsize="middle"
+								android:gravity="center_vertical"
+								android:singleLine="true"
+								android:textAppearance="@style/m3_label_large"
+								android:textColor="?colorM3OnSurfaceVariant"
+								tools:text="following" />
+						</LinearLayout>
+
+						<LinearLayout
+							android:id="@+id/profile_friend_card_mini"
+							android:layout_width="wrap_content"
+							android:layout_height="28dp"
+							android:minWidth="0dp"
+							android:background="@drawable/bg_button_borderless_rounded"
+							android:contentDescription="@string/friend_card_profile_view"
+							android:gravity="center_vertical"
+							android:importantForAccessibility="yes"
+							android:orientation="horizontal"
+							android:paddingHorizontal="8dp"
+							android:visibility="gone">
+
+							<ImageView
+								android:id="@+id/profile_friend_card_icon"
+								android:layout_width="14dp"
+								android:layout_height="14dp"
+								android:src="@drawable/ic_friend_card"
+								android:importantForAccessibility="no" />
+
+							<TextView
+								android:id="@+id/profile_friend_card_label"
+								android:layout_width="wrap_content"
+								android:layout_height="match_parent"
+								android:layout_marginStart="4dp"
+								android:ellipsize="end"
+								android:gravity="center_vertical"
+								android:maxLines="1"
+								android:text="@string/friend_card_profile_view"
+								android:textAppearance="@style/m3_label_large"
+								android:textColor="?colorM3OnSurfaceVariant"
+								android:importantForAccessibility="no" />
+						</LinearLayout>
+						</LinearLayout>
+					</org.joinmastodon.android.ui.views.WrappingLinearLayout>
+
 					<LinearLayout
-						android:id="@+id/following_btn"
-						android:layout_width="wrap_content"
-						android:layout_height="28dp"
-						android:layout_marginStart="-4dp"
-						android:background="@drawable/bg_button_borderless_rounded"
-						android:gravity="center_horizontal"
-						android:orientation="horizontal"
-						android:paddingLeft="8dp"
-						android:paddingTop="4dp"
-						android:paddingRight="8dp"
-						android:paddingBottom="4dp">
-
-						<TextView
-							android:id="@+id/following_count"
-							android:layout_width="wrap_content"
-							android:layout_height="match_parent"
-							android:layout_marginEnd="4dp"
-							android:ellipsize="end"
-							android:fontFamily="sans-serif-black"
-							android:gravity="center_vertical"
-							android:singleLine="true"
-							android:textColor="?colorM3OnSurfaceVariant"
-							android:textSize="14dp"
-							tools:text="123" />
-
-						<TextView
-							android:id="@+id/following_label"
-							android:layout_width="wrap_content"
-							android:layout_height="match_parent"
-							android:ellipsize="middle"
-							android:gravity="center_vertical"
-							android:singleLine="true"
-							android:textAppearance="@style/m3_label_large"
-							android:textColor="?colorM3OnSurfaceVariant"
-							tools:text="following" />
-					</LinearLayout>
-				</LinearLayout>
-
-				<LinearLayout
-					android:id="@+id/familiar_followers"
+						android:id="@+id/familiar_followers"
 					android:layout_width="match_parent"
 					android:layout_height="40dp"
 					android:layout_marginBottom="12dp"

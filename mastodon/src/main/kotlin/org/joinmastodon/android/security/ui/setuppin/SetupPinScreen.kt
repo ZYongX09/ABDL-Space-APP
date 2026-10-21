@@ -10,14 +10,12 @@ import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -25,7 +23,8 @@ import org.joinmastodon.android.R
 import org.joinmastodon.android.security.domain.PinDigits
 import org.joinmastodon.android.security.ui.pin.PinScreen
 import org.joinmastodon.android.ui.compose.component.BackNavigationIcon
-import top.yukonga.miuix.kmp.basic.Scaffold
+import org.joinmastodon.android.security.ui.pin.PinScaffold
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.TextButton
 import org.joinmastodon.android.security.ui.SecuritySelectionDialog
@@ -54,10 +53,12 @@ fun SetupPinScreen(
 			onBack()
 		}
 	}
-	Scaffold(
+	PinScaffold(
 		topBar = {
 			SmallTopAppBar(
 				title = stringResource(R.string.security__create_pin),
+				color = MiuixTheme.colorScheme.background,
+				titleColor = MiuixTheme.colorScheme.onBackground,
 				navigationIcon = {
 						BackNavigationIcon(
 							onClick = {
@@ -72,7 +73,7 @@ fun SetupPinScreen(
 				},
 			)
 		},
-	) { padding ->
+	) {
 		PinScreen(
 			message = stringResource(
 				uiState.messageRes,
@@ -86,7 +87,6 @@ fun SetupPinScreen(
 			showBiometrics = false,
 			onDigit = viewModel::digitEntered,
 			onBackspace = viewModel::backspace,
-			modifier = Modifier.padding(padding),
 			footer = {
 				if (uiState.showPinOptions) {
 					TextButton(

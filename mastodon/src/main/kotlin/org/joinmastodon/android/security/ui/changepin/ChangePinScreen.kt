@@ -7,14 +7,12 @@
 package org.joinmastodon.android.security.ui.changepin
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.delay
@@ -26,7 +24,8 @@ import org.joinmastodon.android.security.ui.pin.PinScreen
 import org.joinmastodon.android.security.ui.setuppin.labelRes
 import org.joinmastodon.android.security.ui.setuppin.vibrateInvalidPin
 import org.joinmastodon.android.ui.compose.component.BackNavigationIcon
-import top.yukonga.miuix.kmp.basic.Scaffold
+import org.joinmastodon.android.security.ui.pin.PinScaffold
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.TextButton
 import org.joinmastodon.android.security.ui.SecuritySelectionDialog
@@ -62,10 +61,12 @@ fun ChangePinScreen(
 			onBack()
 		}
 	}
-	Scaffold(
+	PinScaffold(
 		topBar = {
 			SmallTopAppBar(
 				title = stringResource(R.string.security__change_pin),
+				color = MiuixTheme.colorScheme.background,
+				titleColor = MiuixTheme.colorScheme.onBackground,
 				navigationIcon = {
 					BackNavigationIcon(
 						onClick = {
@@ -80,7 +81,7 @@ fun ChangePinScreen(
 				},
 			)
 		},
-	) { padding ->
+	) {
 		val message = if (uiState.messageIncludesDigits) {
 			stringResource(uiState.messageRes, stringResource(uiState.newDigits.labelRes()))
 		} else {
@@ -105,7 +106,6 @@ fun ChangePinScreen(
 			showBiometrics = false,
 			onDigit = viewModel::digitEntered,
 			onBackspace = viewModel::backspace,
-			modifier = Modifier.padding(padding),
 			footer = {
 				if (uiState.showPinOptions) {
 					TextButton(

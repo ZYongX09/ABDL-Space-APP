@@ -6,7 +6,6 @@
  */
 package org.joinmastodon.android.security.ui.lock
 
-import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -14,7 +13,6 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.Lifecycle
@@ -29,7 +27,7 @@ import org.joinmastodon.android.security.ui.biometric.BiometricDialog
 import org.joinmastodon.android.security.ui.pin.PinScreen
 import org.joinmastodon.android.security.ui.pin.PinScreenState
 import org.joinmastodon.android.security.ui.setuppin.vibrateInvalidPin
-import top.yukonga.miuix.kmp.basic.Scaffold
+import org.joinmastodon.android.security.ui.pin.PinScaffold
 
 @Composable
 internal fun LockScreen(
@@ -69,7 +67,7 @@ internal fun LockScreen(
 			onInvalidated = { showBiometrics = false; viewModel.onBiometricsInvalidated(biometricKeyProvider) },
 		)
 	}
-	Scaffold { padding ->
+	PinScaffold {
 		PinScreen(
 			message = stringResource(R.string.security_pin_unlock_description, state.digits.value),
 			errorMessage = when {
@@ -86,7 +84,6 @@ internal fun LockScreen(
 			onDigit = viewModel::digitEntered,
 			onBackspace = viewModel::backspace,
 			onBiometrics = { if (!showBiometrics) { requestId++; showBiometrics = true } },
-			modifier = Modifier.padding(padding),
 		)
 	}
 }
