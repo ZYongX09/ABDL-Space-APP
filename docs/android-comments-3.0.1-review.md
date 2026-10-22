@@ -48,7 +48,7 @@ Git 历史表明 2026-08-27 `cef3229b` 增加回复禁用全部宝宝新天地�
 
 ### 基线与边界
 
-- 工作区 `/home/ZYongX/projects/ABDL-Space-APP-friend-cards-review`，检查时 `HEAD=develop=65e14033086540f589f9b3ba6eb3fe5730c6dca3`，初始工作区干净。随后按协调者明确指令创建 `fix/nbw-post-lifecycle-20261022` 实施，未提交、未推送、未合并 main。
+- 工作区 `/home/ZYongX/projects/ABDL-Space-APP-friend-cards-review`，基线 `65e14033086540f589f9b3ba6eb3fe5730c6dca3`。修复在 `fix/nbw-post-lifecycle-20261022` 实施后以 `90620424` 快进并推送 develop，临时分支已删除；未合并 main。
 - 已核对主工作树及 graphics 工作树的 AGENTS：日常修复从 develop 切功能分支、保留 develop 包含 main、不擅自正式发布、不生成 debug 交付包、不读取或复制密钥。本轮 Android 代码调查者未运行构建、未触碰 graphics 缓存或设备，构建验证由协调者在独立 graphics 工作树负责。
 - 本节只记录本轮新增代码及待验证项；上文历史测试数字和旧包信息不是本轮结果。本轮后端配套迁移 `0084` 及路由修复仍待部署，客户端代码落盘不等于线上联调通过。
 
@@ -93,6 +93,15 @@ Git 历史表明 2026-08-27 `cef3229b` 增加回复禁用全部宝宝新天地�
 git diff --check
 ```
 
-协调者已实际完成生产 Kotlin/Java 非增量编译，以及上述6个类共 **52次测试执行，0失败/错误/跳过**（CreateStatus含API26/28参数化）。Dialog实际点击会进入原account绑定页；创建/编辑/删除与轻量互动均经真实请求解析/Fragment行为验证。后续新增旧绑定引导入口同nonce协议，需最终Java重编译入包，不能交付旧DEX。API28 Robolectric 的 Dialog 行为断言不等于截图或真机视觉验收。本轮不覆盖安装、不读取账号/密钥、不操作用户设备，未进行带真实账号的发/改/删/赞/藏或外站持久化端到端验收。
+协调者已实际完成生产 Kotlin/Java 非增量编译，以及上述6个类共 **52次测试执行，0失败/错误/跳过**（CreateStatus含API26/28参数化）。Dialog实际点击会进入原account绑定页；创建/编辑/删除与轻量互动均经真实请求解析/Fragment行为验证。后续新增旧绑定引导入口同nonce协议，已重新编译Java并用javap确认实际调用createBindingState，交互6项再次通过；最终包为这一源码版本。API28 Robolectric 的 Dialog 行为断言不等于截图或真机视觉验收。本轮不覆盖安装、不读取账号/密钥、不操作用户设备，未进行带真实账号的发/改/删/赞/藏或外站持久化端到端验收。
 
 协调者的旧基线 Compose 回归卡在 `idleMainLooper → Choreographer → Editor.PositionListener.onPreDraw`，线程证据 `/home/ZYongX/projects/abdl-post-sync-evidence-2026-10-22/android-baseline-thread-dump.txt:174-317`；该次已停止，不能计为测试成功。测试类已有 PAUSED Looper，但 Robolectric 默认 vsync 会自动推进虚拟时钟，持续预绘制无法排空。生产冻结后仅按授权补测试 fixture：Compose 与交互 Activity 测试 `@Before ShadowChoreographer.setPaused(true)`、关闭 Activity 后恢复；只排当前任务、不自动追未来帧，不删断言、不改变正文编辑器或生产发送逻辑。交互测试显式 PAUSED Looper。构建方受内存限制采用独立 fork（`forkEvery=1`）。后续fixture修正还包括真实Activity保存/销毁/重建（避开Robolectric recreate强制window focus的空root限制），原状态断言不删；Dialog按钮改为show后原生click listener，实际导航断言通过。早期失败/中断不计通过；最终6类52项通过证据保存在仓外JUnit归档。
+
+### 最终正式签名测试包
+
+- `/home/ZYongX/projects/ABDL-Space-3.1.0-code33-nbw-lifecycle-test.apk`，150,645,612 bytes（约143.67 MiB）；SHA-256 `12b20aae232d3a137ac424ddc600956671e58903bfe3a2a0fcee547ea772617e`。
+- top.abdl_space.app，3.1.0/code33，min26/target35/compile37，非debug；既有正式证书SHA-256 `fd2098a3d3493222c247a7ba2787ec48fd8f62d38e9432ed4d6290a057dea475`，V2签名、ZIP CRC及4字节zipalign通过。
+- 四ABI与29个native库均保留，DEFLATE压缩延续上轮，各库展开SHA-256与native-compressed基线完全一致；地图密钥verifyMapKeys通过，不输出值。
+- 新版入口最后重编译后，低堆768MiB的DEX合并曾OOM；未清缓存/改项目配置，仅本次改1536MiB、ActiveProcessorCount=2重试，最终assembleRelease成功。此前先完成25分钟非增量Kotlin/Java编译；后续仅Java改变，复用已核对不变的Kotlin输出，测试源码非增量重编译。没有把失败运行算通过。
+- 仓外证据 `/home/ZYongX/projects/abdl-post-sync-evidence-2026-10-22/` 包含全部日志、两批JUnit、source parity、APK签名/完整性和release-artifact.json。旧包保留，不提升版本、不改正式下载/版本JSON、不上传。
+- 后端功能971c165、最终记录7cd4164均仅develop，0084及Worker尚未上线。只装此包不能让线上外站互动/回复后端修复生效；新绑定回调同样依赖配套Worker。未覆盖用户连接设备，未做真实账户/外站闭环或真机视觉验收。
