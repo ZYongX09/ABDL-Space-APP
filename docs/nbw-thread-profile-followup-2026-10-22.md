@@ -22,4 +22,17 @@
 
 Header测试使用native Canvas检查实际1em bounds与四色，不是仅source断言；Avatar通过注册ImageCache实际decode并核原PNG；Profile测试为真实生产tab/container/request方法的局部fixture，有反射mHost/mAdded，不冒称完整Profile生命周期或设备UI验收。前一轮8类首次可见footer测试缺真实UiUtils日期formatter初始化，已只补fixture，不删断言；用户追加消息中断前次运行，没有完整JUnit时不计通过。追加三类最初Account fixture缺url/avatar字段，已补生产真实格式；Profile请求fixture同时会发GetInstanceV2，测试改按实际请求类型定位而不凭数组位置。compileSdk37下Shadows重载引用移除的FingerprintManager，改静态ShadowLooper入口。Robolectric不能分配HARDWARE，先用独立Bitmap.copy探针确认Skia实际回ARGB_8888，再校验同配置解码；保留真实资源尺寸/像素/加工链测试，不能把软件测试说成硬件/真机验收。
 
-整合构建在graphics独立worktree进行：生产Java与测试强制重编译，生产Kotlin未变化，复用已验证源匹配字节码；不生成debug，沿现正式签名/四ABI/native压缩/地图密钥守卫。真实账号/外站/真机闭环未操作；当前无设备/AVD。最终结果、APK hash及提交状态在本节收尾补充。
+整合构建在graphics独立worktree进行：生产Java与测试强制重编译，生产Kotlin未变化，复用已验证源匹配字节码；不生成debug，沿现正式签名/四ABI/native压缩/地图密钥守卫。真实账号/外站/真机闭环未操作；当前无设备/AVD。源码功能以c2f3d688合回并推送develop，原功能分支删除，main未动。最终assembleRelease/verifyMapKeys通过。
+
+## 最终签名测试包
+
+`/home/ZYongX/projects/ABDL-Space-3.1.0-code33-nbw-profile-replies-test.apk`
+
+- 151,509,941 bytes，SHA256 `3133fde86dd7d6bd7c27ce26630b62d7278e30f3d194e37972f71cc200a9aae4`。
+- top.abdl_space.app，3.1.0/code33，min26/target35/compile37，非debug；既有正式证书SHA256 fd2098a3d3493222c247a7ba2787ec48fd8f62d38e9432ed4d6290a057dea475，V2签名、ZIP CRC、4字节zipalign通过。
+- 四ABI、29个native库保留且展开SHA256与旧签名包相同；默认头像经编译资源表找到res/isn.png，逐像素比对用户原图完全一致。APK资源名优化不代表图片丢失，初版校验脚本按原文件名找不到是脚本问题，已改为资源表定位，不放宽资源存在断言。
+- 同一最终源码11类75项通过，source/asset清单21路径与已提交develop和实际build inputs逐项hash一致。原8类68项和新增7项不拼接冒称，是同次JUnit结果。生产Kotlin未改复用既有匹配输出，main/test Java强制重编译，测试Kotlin重编译。
+- 原包和正式下载保留；不升级版本号、不上传正式APK、不代用户安装。配套后端回复09f07f8、profile d906a71仅develop，0084/0085和Worker未部署，不能据测试包交付称线上四项已修。待获明确上线授权后才按独立迁移/部署顺序使其生效。
+- 用户后续提出的AI聚合补充任务又明确暂停，本轮未调研CLIProxyAPI、未增加AI接口/模型配置/统计管理页、未改发帖AI调用。
+
+证据：`/home/ZYongX/projects/abdl-nbw-reply-evidence-2026-10-22/`，最终android-all-verified.log、android-final-summary.json/JUnit、release-artifact.json、delivery-*及源码指纹；失败运行另保留，不计通过。
