@@ -329,7 +329,7 @@ public class AccountSession{
 				if(s.filtered==null)
 					return false;
 				for(FilterResult filter:s.filtered){
-					if(filter.filter.isActive() && filter.filter.filterAction==FilterAction.HIDE)
+					if(filter.filter.isActive() && filter.filter.context.contains(context) && filter.filter.filterAction==FilterAction.HIDE)
 						return true;
 				}
 				return false;

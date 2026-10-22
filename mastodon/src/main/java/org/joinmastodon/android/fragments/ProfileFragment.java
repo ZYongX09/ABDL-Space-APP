@@ -344,7 +344,7 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 		tabbar.setTabTextColors(UiUtils.getThemeColor(getActivity(), R.attr.colorM3OnSurfaceVariant), UiUtils.getThemeColor(getActivity(), R.attr.colorM3Primary));
 		tabbar.setTabTextSize(V.dp(14));
 		tabLayoutMediator=new TabLayoutMediator(tabbar, pager, (tab, position)->{
-			tab.setText(switch(position){
+			tab.setText(switch(getPageType(position)){
 				case 0 -> R.string.baby_albums_profile_tab;
 				case 1 -> R.string.profile_timeline;
 				case 2 -> R.string.profile_about;
@@ -471,9 +471,10 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 						if(refreshing){
 							refreshing=false;
 							refreshLayout.setRefreshing(false);
-							if(timelineFragment.loaded)
+							if(timelineFragment!=null && timelineFragment.loaded)
 								timelineFragment.onRefresh();
-							featuredFragment.refresh();
+							if(featuredFragment!=null)
+								featuredFragment.refresh();
 							if(savedFragment!=null && savedFragment.loaded)
 								savedFragment.onRefresh();
 						}
@@ -554,7 +555,7 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 		args.putParcelable("profileAccount", Parcels.wrap(account));
 		args.putBoolean("__is_tab", true);
 		args.putBoolean("noAutoLoad", true);
-		if(featuredFragment==null){
+		if(featuredFragment==null && !isNBWAccount()){
 			featuredFragment=new org.joinmastodon.android.fragments.albums.AlbumListFragment();
 			Bundle albumArgs=new Bundle(args);
 			albumArgs.putString("ownerId", account.id);
@@ -578,9 +579,10 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 					@Override
 					public boolean onPreDraw(){
 						pager.getViewTreeObserver().removeOnPreDrawListener(this);
-						pager.setCurrentItem(1, false);
+						int timelinePage=isNBWAccount() ? 0 : 1;
+						pager.setCurrentItem(timelinePage, false);
 						updateAlbumPageVisibility();
-						tabbar.selectTab(tabbar.getTabAt(1));
+						tabbar.selectTab(tabbar.getTabAt(timelinePage));
 						return true;
 					}
 				});
@@ -643,7 +645,7 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 
 	private void updateAlbumPageVisibility(){
 		if(featuredFragment!=null)
-			featuredFragment.setProfileVisible(isResumed() && !isHidden() && pager!=null && pager.getCurrentItem()==0);
+			featuredFragment.setProfileVisible(!isNBWAccount() && isResumed() && !isHidden() && pager!=null && getPageType(pager.getCurrentItem())==0);
 	}
 
 	@Override
@@ -707,13 +709,11 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 	@Override
 	public void onSaveInstanceState(Bundle outState){
 		super.onSaveInstanceState(outState);
-		if(featuredFragment==null)
-			return;
-		if(featuredFragment.isAdded())
+		if(featuredFragment!=null && featuredFragment.isAdded())
 			getChildFragmentManager().putFragment(outState, "albums", featuredFragment);
-		if(timelineFragment.isAdded())
+		if(timelineFragment!=null && timelineFragment.isAdded())
 			getChildFragmentManager().putFragment(outState, "timeline", timelineFragment);
-		if(aboutFragment.isAdded())
+		if(aboutFragment!=null && aboutFragment.isAdded())
 			getChildFragmentManager().putFragment(outState, "about", aboutFragment);
 		if(savedFragment!=null && savedFragment.isAdded())
 			getChildFragmentManager().putFragment(outState, "saved", savedFragment);
@@ -744,7 +744,8 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 	private void applyChildWindowInsets(){
 		if(timelineFragment!=null && timelineFragment.isAdded() && childInsets!=null){
 			timelineFragment.onApplyWindowInsets(childInsets);
-			featuredFragment.onApplyWindowInsets(childInsets);
+			if(featuredFragment!=null)
+				featuredFragment.onApplyWindowInsets(childInsets);
 			if(savedFragment!=null)
 				savedFragment.onApplyWindowInsets(childInsets);
 		}
@@ -1302,7 +1303,7 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 	}
 
 	private boolean isNBWAccount(){
-		return account!=null && account.id!=null && account.id.startsWith("nbw_");
+		return account!=null ? account.isNBWAccount() : Account.isNBWAccountID(profileAccountID);
 	}
 
 	private void updateFamiliarFollowers(){
@@ -1395,8 +1396,13 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 		}
 	}
 
+	/** Stable fragment/container types: NBW omits albums, so visible page 0 is timeline (type 1). */
+	private int getPageType(int position){
+		return position+(isNBWAccount() ? 1 : 0);
+	}
+
 	private Fragment getFragmentForPage(int page){
-		return switch(page){
+		return switch(getPageType(page)){
 			case 0 -> featuredFragment;
 			case 1 -> timelineFragment;
 			case 2 -> aboutFragment;
@@ -1805,7 +1811,7 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 		@Override
 		public void onBindViewHolder(@NonNull SimpleViewHolder holder, int position){
 			Fragment fragment=getFragmentForPage(position);
-			FrameLayout fragmentView=tabViews[position];
+			FrameLayout fragmentView=tabViews[getPageType(position)];
 			fragmentView.setVisibility(View.VISIBLE);
 			if(fragmentView.getParent() instanceof ViewGroup parent)
 				parent.removeView(fragmentView);
@@ -1828,7 +1834,7 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 
 		@Override
 		public int getItemCount(){
-			return loaded ? (isOwnProfile ? 4 : 3) : 0;
+			return loaded ? (isOwnProfile ? 4 : 3)-(isNBWAccount() ? 1 : 0) : 0;
 		}
 
 		@Override

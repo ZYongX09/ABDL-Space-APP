@@ -218,6 +218,7 @@ public class PushNotificationReceiver extends BroadcastReceiver{
 			favIntent.putExtra("action", "favorite");
 			favIntent.putExtra("account", accountID);
 			favIntent.putExtra("post", notification.status.id);
+			favIntent.putExtra("status", Parcels.wrap(notification.status));
 			favIntent.putExtra("notificationTag", notificationTag);
 			builder.addAction(new Notification.Action.Builder(Icon.createWithResource(context, R.drawable.ic_star_24px),
 					context.getString(R.string.button_favorite), PendingIntent.getActivity(context, (accountID+pn.notificationId+"favorite").hashCode(), new Intent(context, org.joinmastodon.android.security.ui.lock.LockActivity.class).putExtra("pending_notification_action", favIntent), PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE)).build());

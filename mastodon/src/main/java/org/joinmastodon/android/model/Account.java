@@ -5,6 +5,7 @@ import android.text.TextUtils;
 
 import androidx.annotation.Nullable;
 
+import org.joinmastodon.android.BuildConfig;
 import org.joinmastodon.android.api.ObjectValidationException;
 import org.parceler.Parcel;
 
@@ -18,6 +19,8 @@ import java.util.List;
  */
 @Parcel
 public class Account extends BaseModel implements Searchable{
+	public static final String NBW_DEFAULT_AVATAR="android.resource://"+BuildConfig.APPLICATION_ID+"/drawable/nbw_default_avatar";
+
 	// Base attributes
 
 	/**
@@ -242,8 +245,33 @@ public class Account extends BaseModel implements Searchable{
 		if(acct==null) acct="";
 		if(url==null) url="";
 		if(note==null) note="";
+		if(isNBWAccount()){
+			// Missing NBW avatars stay local. Never replace a real URL (including legacy Discuz URLs).
+			if(avatar==null || avatar.isBlank())
+				avatar=avatarStatic!=null && !avatarStatic.isBlank() ? avatarStatic : NBW_DEFAULT_AVATAR;
+			if(avatarStatic==null || avatarStatic.isBlank())
+				avatarStatic=avatar;
+		}
 		if(avatar==null) avatar="";
 		if(createdAt==null) createdAt=Instant.now();
+	}
+
+	/** Real NBW users only: a local NBW binding or a synthetic nbw_quote_* author is not one. */
+	public boolean isNBWAccount(){
+		return isNBWAccountID(id);
+	}
+
+	public static boolean isNBWAccountID(String id){
+		if(id==null || !id.startsWith("nbw_") || id.length()==4 || id.charAt(4)<'1' || id.charAt(4)>'9') return false;
+		for(int i=5;i<id.length();i++){
+			char c=id.charAt(i);
+			if(c<'0' || c>'9') return false;
+		}
+		try{
+			return Long.parseLong(id.substring(4))>0;
+		}catch(NumberFormatException overflow){
+			return false;
+		}
 	}
 
 	public boolean isLocal(){

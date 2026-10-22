@@ -11,12 +11,14 @@ import android.os.IBinder;
 import android.service.notification.StatusBarNotification;
 
 import org.joinmastodon.android.api.requests.statuses.CreateStatus;
+import org.joinmastodon.android.api.requests.statuses.NBWStatusInteraction;
 import org.joinmastodon.android.api.requests.statuses.SetStatusFavorited;
 import org.joinmastodon.android.api.requests.statuses.SetStatusReblogged;
 import org.joinmastodon.android.events.StatusCountersUpdatedEvent;
 import org.joinmastodon.android.events.StatusCreatedEvent;
 import org.joinmastodon.android.model.Status;
 import org.joinmastodon.android.model.StatusPrivacy;
+import org.parceler.Parcels;
 
 import java.util.UUID;
 
@@ -66,6 +68,10 @@ public class NotificationActionHandlerService extends Service{
 					.setCallback(new Callback<>(){
 						@Override
 						public void onSuccess(Status result){
+							if(result.nbwSync!=null && ("unsupported".equals(result.nbwSync.state) || "failed".equals(result.nbwSync.state)
+									|| "binding_required".equals(result.nbwSync.reason))){
+								android.widget.Toast.makeText(NotificationActionHandlerService.this, R.string.compose_nbw_reply_local_only, android.widget.Toast.LENGTH_LONG).show();
+							}
 							E.post(new StatusCreatedEvent(result, account));
 							if(notification!=null){
 								Notification n=notification.getNotification();
@@ -88,6 +94,13 @@ public class NotificationActionHandlerService extends Service{
 					})
 					.exec(account);
 		}else if("favorite".equals(action)){
+			Status original=Parcels.unwrap(intent.getParcelableExtra("status"));
+			if(postID.startsWith("nbw_") && (!NBWStatusInteraction.supportsID(postID)
+					|| original!=null && original.inReplyToId!=null)){
+				android.widget.Toast.makeText(this, R.string.nbw_reply_interaction_unsupported, android.widget.Toast.LENGTH_LONG).show();
+				maybeStopSelf();
+				return START_NOT_STICKY;
+			}
 			PendingIntent prevActionIntent;
 			if(notification!=null){
 				Notification n=notification.getNotification();
@@ -99,11 +112,10 @@ public class NotificationActionHandlerService extends Service{
 				prevActionIntent=null;
 			}
 			runningRequestCount++;
-			new SetStatusFavorited(postID, true)
-					.setCallback(new Callback<>(){
+			Callback<Status> callback=new Callback<>(){
 						@Override
 						public void onSuccess(Status result){
-							E.post(new StatusCountersUpdatedEvent(result, StatusCountersUpdatedEvent.CounterType.FAVORITES));
+							if(result!=null) E.post(new StatusCountersUpdatedEvent(result, StatusCountersUpdatedEvent.CounterType.FAVORITES));
 							runningRequestCount--;
 							maybeStopSelf();
 						}
@@ -120,8 +132,18 @@ public class NotificationActionHandlerService extends Service{
 							runningRequestCount--;
 							maybeStopSelf();
 						}
-					})
-					.exec(account);
+					};
+			if(postID.startsWith("nbw_")){
+				new NBWStatusInteraction(postID, true, true).setCallback(new Callback<>(){
+					@Override public void onSuccess(NBWStatusInteraction.Result result){
+						// Legacy pending intents may have no snapshot. Do not fabricate counts/content.
+						callback.onSuccess(original!=null && postID.equals(original.id) ? result.merge(original) : null);
+					}
+					@Override public void onError(ErrorResponse error){ callback.onError(error); }
+				}).exec(account);
+			}else{
+				new SetStatusFavorited(postID, true).setCallback(callback).exec(account);
+			}
 		}else if("boost".equals(action)){
 			PendingIntent prevActionIntent;
 			if(notification!=null){

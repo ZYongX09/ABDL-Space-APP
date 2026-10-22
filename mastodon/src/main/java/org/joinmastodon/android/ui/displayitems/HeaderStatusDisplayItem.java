@@ -89,6 +89,7 @@ public class HeaderStatusDisplayItem extends StatusDisplayItem{
 		this.status=status;
 		if(GlobalUserPreferences.customEmojiInNames)
 			HtmlParser.parseCustomEmoji(parsedName, user.emojis);
+		org.joinmastodon.android.ui.text.NBWSourceSpan.appendTo(parsedName, user, context);
 		emojiHelper.setText(parsedName);
 		if(status!=null){
 			hasVisibilityToggle=status.sensitive || !TextUtils.isEmpty(status.spoilerText);

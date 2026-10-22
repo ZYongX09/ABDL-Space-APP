@@ -422,6 +422,9 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 	}
 
 	public void onStatusCreated(Status status){
+		// Replies belong in their thread, not in a locally synthesized root timeline.
+		if(status.inReplyToId!=null || getStatusByID(status.id)!=null)
+			return;
 		prependItems(Collections.singletonList(status), true);
 	}
 

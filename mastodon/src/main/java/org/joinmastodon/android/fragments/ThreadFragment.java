@@ -73,6 +73,9 @@ import me.grishka.appkit.utils.V;
 
 public class ThreadFragment extends StatusListFragment implements AssistContentProviderFragment{
 	private Status mainStatus;
+	private boolean mainStatusDeleted;
+	// Keep successful local replies until context acknowledges them, including stale refreshes.
+	private final ArrayList<Status> pendingCreatedReplies=new ArrayList<>();
 	private ImageView endMark;
 	private FrameLayout replyContainer;
 	private LinearLayout replyButton;
@@ -166,13 +169,36 @@ public class ThreadFragment extends StatusListFragment implements AssistContentP
 
 	@Override
 	protected void doLoadData(int offset, int count){
+		if(mainStatusDeleted)
+			return;
 		currentRequest=new GetStatusContext(mainStatus.id)
 				.setCallback(new SimpleCallback<>(this){
 					@Override
 					public void onSuccess(StatusContext result){
 						currentRequest=null;
-						if(getActivity()==null)
+						if(getActivity()==null || mainStatusDeleted)
 							return;
+						// Context and StatusCreatedEvent may arrive in either order. Never insert the
+						// same ID twice or drop a just-created reply from an older server snapshot.
+						ArrayList<Status> ancestors=new ArrayList<>(result.ancestors);
+						ArrayList<Status> descendants=new ArrayList<>(result.descendants);
+						HashSet<String> acknowledgedIDs=new HashSet<>();
+						for(Status s:ancestors) acknowledgedIDs.add(s.id);
+						for(Status s:descendants) acknowledgedIDs.add(s.id);
+						pendingCreatedReplies.removeIf(s->acknowledgedIDs.contains(s.id));
+						filterStatuses(descendants);
+						filterStatuses(ancestors);
+						filterStatuses(pendingCreatedReplies);
+						HashSet<String> seenIDs=new HashSet<>();
+						seenIDs.add(mainStatus.id);
+						if(!refreshing){
+							for(Status s:data) seenIDs.add(s.id);
+						}
+						ancestors.removeIf(s->!seenIDs.add(s.id));
+						descendants.removeIf(s->!seenIDs.add(s.id));
+						for(Status s:pendingCreatedReplies){
+							if(seenIDs.add(s.id)) descendants.add(s);
+						}
 						final ArrayList<StatusDisplayItem> prevDisplayItems;
 						if(refreshing){
 							prevDisplayItems=new ArrayList<>(displayItems);
@@ -190,17 +216,15 @@ public class ThreadFragment extends StatusListFragment implements AssistContentP
 						}else{
 							prevDisplayItems=null;
 						}
-						filterStatuses(result.descendants);
-						filterStatuses(result.ancestors);
 						if(footerProgress!=null)
 							footerProgress.setVisibility(View.GONE);
-						data.addAll(result.descendants);
+						data.addAll(descendants);
 						int prevCount=displayItems.size();
-						onAppendItems(result.descendants);
+						onAppendItems(descendants);
 						int count=displayItems.size();
 						if(!refreshing)
 							adapter.notifyItemRangeInserted(prevCount, count-prevCount);
-						prependItems(result.ancestors, !refreshing);
+						prependItems(ancestors, !refreshing);
 						dataLoaded();
 						if(refreshing){
 							refreshDone();
@@ -285,7 +309,7 @@ public class ThreadFragment extends StatusListFragment implements AssistContentP
 	@Override
 	protected void onShown(){
 		super.onShown();
-		if(!getArguments().getBoolean("noAutoLoad") && !loaded && !dataLoading){
+		if(!mainStatusDeleted && !getArguments().getBoolean("noAutoLoad") && !loaded && !dataLoading){
 			dataLoading=true;
 			doLoadData();
 		}
@@ -329,12 +353,39 @@ public class ThreadFragment extends StatusListFragment implements AssistContentP
 	}
 
 	protected void onStatusCreated(Status status){
-		if(status.inReplyToId!=null && getStatusByID(status.inReplyToId)!=null && getStatusByID(status.id)==null){
+		if(!mainStatusDeleted && status.inReplyToId!=null && getStatusByID(status.inReplyToId)!=null && getStatusByID(status.id)==null){
+			ArrayList<Status> visible=new ArrayList<>(Collections.singletonList(status));
+			filterStatuses(visible);
+			if(visible.isEmpty()) return;
+			pendingCreatedReplies.add(status);
 			int start=displayItems.size();
 			onAppendItems(Collections.singletonList(status));
 			data.add(status);
 			adapter.notifyItemRangeInserted(start, displayItems.size()-start);
 		}
+	}
+
+	@Override
+	protected void removeStatus(Status status){
+		pendingCreatedReplies.removeIf(s->s.id.equals(status.id));
+		boolean deletingMain=status.id.equals(mainStatus.id);
+		if(deletingMain){
+			mainStatusDeleted=true;
+			pendingCreatedReplies.clear();
+			if(currentRequest!=null){
+				currentRequest.cancel();
+				currentRequest=null;
+			}
+			if(asyncRefreshID!=null){
+				AccountSessionManager.get(accountID).getApiController().cancelPollingAsyncRefresh(asyncRefreshID, asyncRefreshCallback);
+				asyncRefreshID=null;
+			}
+			if(contentView!=null) contentView.removeCallbacks(asyncRefreshPartialRunnable);
+			setRefreshEnabled(false);
+			if(replyContainer!=null) replyContainer.setVisibility(View.GONE);
+		}
+		super.removeStatus(status);
+		if(deletingMain) Nav.finish(this);
 	}
 
 	@Override
@@ -403,6 +454,7 @@ public class ThreadFragment extends StatusListFragment implements AssistContentP
 	}
 
 	private void openReply(){
+		if(mainStatusDeleted) return;
 		maybeShowPreReplySheet(mainStatus, ()->{
 			Bundle args=new Bundle();
 			args.putString("account", accountID);
@@ -472,7 +524,7 @@ public class ThreadFragment extends StatusListFragment implements AssistContentP
 
 	private void onAsyncRefreshFinished(AsyncRefresh ar){
 		asyncRefreshID=null;
-		if(getActivity()==null)
+		if(getActivity()==null || mainStatusDeleted)
 			return;
 		contentView.removeCallbacks(asyncRefreshPartialRunnable);
 		if(ar.resultCount>prevNewRepliesCount){
@@ -483,6 +535,7 @@ public class ThreadFragment extends StatusListFragment implements AssistContentP
 	}
 
 	private void checkAsyncRefreshAndMaybeShowSnackbar(){
+		if(mainStatusDeleted) return;
 		int results=AccountSessionManager.get(accountID).getApiController().getAsyncRefreshResultCount(asyncRefreshID);
 		if(results>0){
 			showMoreRepliesSnackbar();
@@ -491,7 +544,7 @@ public class ThreadFragment extends StatusListFragment implements AssistContentP
 	}
 
 	private void showMoreRepliesSnackbar(){
-		if(moreRepliesSnackbar!=null || getActivity()==null)
+		if(mainStatusDeleted || moreRepliesSnackbar!=null || getActivity()==null)
 			return;
 		moreRepliesSnackbar=new Snackbar.Builder(getActivity())
 				.setText(R.string.more_replies_found)

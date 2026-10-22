@@ -42,6 +42,7 @@ public class MastodonApp extends Application{
 		params.diskCacheSize=100*1024*1024;
 		params.maxMemoryCacheSize=Integer.MAX_VALUE;
 		ImageCache.setParams(params);
+		ImageCache.registerDownloader(new org.joinmastodon.android.ui.utils.NBWAvatarImageDownloader(ImageCache.getInstance(context), context));
 		NetworkUtils.setUserAgent("MastodonAndroid/"+BuildConfig.VERSION_NAME);
 		UiUtils.updateLocalizedDateFormatters(context);
 

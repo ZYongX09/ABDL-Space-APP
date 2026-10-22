@@ -30,6 +30,7 @@ import me.grishka.appkit.utils.V;
 public class AccountTimelineFragment extends StatusListFragment{
 	private Account user;
 	private GetAccountStatuses.Filter filter;
+	private String nbwNextMaxID;
 	private HorizontalScrollView filtersBar;
 	private FilterChipView defaultFilter, withRepliesFilter, mediaFilter;
 
@@ -57,16 +58,25 @@ public class AccountTimelineFragment extends StatusListFragment{
 	}
 
 	@Override
+	protected void doLoadData(){
+		nbwNextMaxID=null; // Initial load, refresh and filter changes start a new sequence.
+		super.doLoadData();
+	}
+
+	@Override
 	protected void doLoadData(int offset, int count){
-		currentRequest=new GetAccountStatuses(user.id, offset>0 ? getMaxID() : null, null, count, filter, null)
-				.setCallback(new SimpleCallback<>(this){
+		// Sparse NBW pages may be empty: offset can remain zero while a next cursor still exists.
+		String maxID=user.isNBWAccount() ? nbwNextMaxID : offset>0 ? getMaxID() : null;
+		GetAccountStatuses request=new GetAccountStatuses(user.id, maxID, null, count, filter, null);
+		currentRequest=request.setCallback(new SimpleCallback<>(this){
 					@Override
 					public void onSuccess(List<Status> result){
 						if(getActivity()==null)
 							return;
 						boolean empty=result.isEmpty();
+						nbwNextMaxID=request.getNextMaxID();
 						AccountSessionManager.get(accountID).filterStatuses(result, FilterContext.ACCOUNT);
-						onDataLoaded(result, !empty);
+						onDataLoaded(result, user.isNBWAccount() ? nbwNextMaxID!=null : !empty);
 					}
 				})
 				.exec(accountID);
@@ -86,11 +96,12 @@ public class AccountTimelineFragment extends StatusListFragment{
 	}
 
 	protected void onStatusCreated(Status status){
-		if(!AccountSessionManager.getInstance().isSelf(accountID, user) || !AccountSessionManager.getInstance().isSelf(accountID, status.account))
+		if(!AccountSessionManager.getInstance().isSelf(accountID, user) || !AccountSessionManager.getInstance().isSelf(accountID, status.account)
+				|| getStatusByID(status.id)!=null)
 			return;
 		if(filter==GetAccountStatuses.Filter.DEFAULT){
-			// Keep replies to self, discard all other replies
-			if(status.inReplyToAccountId!=null && !status.inReplyToAccountId.equals(AccountSessionManager.getInstance().getAccount(accountID).self.id))
+			// Match exclude_replies=true even for self-replies or a missing parent account.
+			if(status.inReplyToId!=null)
 				return;
 		}else if(filter==GetAccountStatuses.Filter.MEDIA){
 			if(status.mediaAttachments.isEmpty())
