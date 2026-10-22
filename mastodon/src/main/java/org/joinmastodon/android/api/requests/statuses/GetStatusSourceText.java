@@ -11,11 +11,23 @@ public class GetStatusSourceText extends MastodonAPIRequest<GetStatusSourceText.
 		super(HttpMethod.GET, "/statuses/"+id+"/source", Response.class);
 	}
 
+	@org.parceler.Parcel
 	public static class Response extends BaseModel{
 		@RequiredField public String id;
 		@RequiredField public String text;
-		@RequiredField public String spoilerText;
-		// Optional even on legacy servers; null is a valid source with no attached card.
+		@RequiredField
+		@SerializedName(value="spoiler_text", alternate={"spoilerText"})
+		public String spoilerText;
+		// Optional metadata: omission on old servers must preserve the original edit state.
 		@SerializedName("friend_card_id") public String friendCardId;
+		public String inReplyToId;
+		public org.joinmastodon.android.model.StatusPrivacy visibility;
+		public String language;
+		public Boolean sensitive, mentalCrisis;
+		public String geoProvince, geoCity, geoDistrict;
+		public Integer nbwFid;
+		public Long nbwTid;
+		public Boolean nbwSyncEnabled;
+		public org.joinmastodon.android.model.Status.NBWSync nbwSync;
 	}
 }

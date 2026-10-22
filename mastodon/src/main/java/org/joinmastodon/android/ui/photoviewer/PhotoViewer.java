@@ -1465,7 +1465,7 @@ public class PhotoViewer implements ZoomPanView.Listener{
 			}
 		}else if(id==R.id.favorite_btn){
 			if(status!=null){
-				AccountSessionManager.get(accountID).getStatusInteractionController().setFavorited(status, !status.favourited);
+				AccountSessionManager.get(accountID).getStatusInteractionController().setFavorited(status, !status.favourited, r->{}, activity);
 			}
 		}else if(id==R.id.share_btn){
 			if(status!=null){
@@ -1473,7 +1473,7 @@ public class PhotoViewer implements ZoomPanView.Listener{
 			}
 		}else if(id==R.id.bookmark_btn){
 			if(status!=null){
-				AccountSessionManager.get(accountID).getStatusInteractionController().setBookmarked(status, !status.bookmarked);
+				AccountSessionManager.get(accountID).getStatusInteractionController().setBookmarked(status, !status.bookmarked, activity);
 			}
 		}else if(id==R.id.reply_btn){
 			parentFragment.maybeShowPreReplySheet(status, ()->{

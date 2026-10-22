@@ -175,6 +175,7 @@ public class HeaderStatusDisplayItem extends StatusDisplayItem{
 										args.putString("sourceText", result.text);
 										args.putString("sourceSpoiler", result.spoilerText);
 										args.putString("sourceFriendCardId", result.friendCardId);
+										args.putParcelable("editSource", Parcels.wrap(result));
 										Nav.go((Activity) item.context, ComposeFragment.class, args);
 									}
 
@@ -217,7 +218,7 @@ public class HeaderStatusDisplayItem extends StatusDisplayItem{
 						Toast.makeText(activity, activity.getString(rel.following ? R.string.followed_user : rel.requested ? R.string.following_user_requested : R.string.unfollowed_user, account.getDisplayUsername()), Toast.LENGTH_SHORT).show();
 					});
 				}else if(id==R.id.bookmark){
-					AccountSessionManager.getInstance().getAccount(item.accountID).getStatusInteractionController().setBookmarked(item.status, !item.status.bookmarked);
+					AccountSessionManager.getInstance().getAccount(item.accountID).getStatusInteractionController().setBookmarked(item.status, !item.status.bookmarked, item.context);
 				}else if(id==R.id.share){
 					UiUtils.openSystemShareSheet(activity, item.status);
 				}else if(id==R.id.translate){

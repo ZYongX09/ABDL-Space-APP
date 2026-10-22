@@ -3,7 +3,6 @@ package org.joinmastodon.android.fragments.settings;
 import android.app.Activity;
 import android.os.Build;
 import android.os.Bundle;
-import android.util.Base64;
 import android.view.View;
 import android.view.WindowInsets;
 import android.widget.Button;
@@ -11,8 +10,6 @@ import android.widget.ImageView;
 
 import org.joinmastodon.android.R;
 import org.joinmastodon.android.ui.utils.UiUtils;
-
-import java.nio.charset.StandardCharsets;
 
 public class NBWBindGuideActivity extends Activity {
 
@@ -39,12 +36,18 @@ public class NBWBindGuideActivity extends Activity {
 
 		Button authButton = findViewById(R.id.btn_auth);
 		authButton.setOnClickListener(v -> {
-			// 记录当前是绑定流程
-			getSharedPreferences("nbw_bind", MODE_PRIVATE).edit().putString("flow", "bind").apply();
-			String state = Base64.encodeToString(
-					("{\"ts\":" + System.currentTimeMillis() + "}").getBytes(StandardCharsets.UTF_8),
-					Base64.NO_WRAP);
-			String url = "https://api.abdl-space.top/api/auth/nbw/mobile-start?state=" + state;
+			String accountID=getIntent().getStringExtra("account");
+			var manager=org.joinmastodon.android.api.session.AccountSessionManager.getInstance();
+			var session=accountID==null ? manager.getLastActiveAccount() : manager.tryGetAccount(accountID);
+			if(session==null){
+				android.widget.Toast.makeText(this, R.string.login_expired, android.widget.Toast.LENGTH_LONG).show();
+				return;
+			}
+			long uid;
+			try{ uid=Long.parseLong(session.self.id); }catch(NumberFormatException error){ return; }
+			String state=NBWPostRegisterActivity.createBindingState(this, session.getID(), uid);
+			String url=android.net.Uri.parse("https://api.abdl-space.top/api/auth/nbw/mobile-start")
+					.buildUpon().appendQueryParameter("state", state).build().toString();
 			UiUtils.launchWebBrowser(this, url);
 		});
 	}

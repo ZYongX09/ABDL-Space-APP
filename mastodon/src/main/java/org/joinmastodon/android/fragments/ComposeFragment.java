@@ -232,6 +232,8 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	public Instance instance;
 
 	public Status editingStatus;
+	private org.joinmastodon.android.api.requests.statuses.GetStatusSourceText.Response editSource;
+	private boolean nbwForumChanged, locationChanged, spoilerChanged, languageChanged;
 	private boolean creatingView;
 	private boolean ignoreSelectionChanges=false;
 	private MenuItem publishButton;
@@ -269,6 +271,19 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		instance=AccountSessionManager.getInstance().getInstanceInfo(instanceDomain);
 		if(getArguments().containsKey("editStatus")){
 			editingStatus=Parcels.unwrap(getArguments().getParcelable("editStatus"));
+			editSource=Parcels.unwrap(getArguments().getParcelable("editSource"));
+			if(editSource!=null){
+				if(editSource.inReplyToId!=null) editingStatus.inReplyToId=editSource.inReplyToId;
+				if(editSource.visibility!=null) editingStatus.visibility=editSource.visibility;
+				if(editSource.language!=null) editingStatus.language=editSource.language;
+				if(editSource.sensitive!=null) editingStatus.sensitive=editSource.sensitive;
+				if(editSource.mentalCrisis!=null) editingStatus.mentalCrisis=editSource.mentalCrisis;
+				editingStatus.spoilerText=editSource.spoilerText;
+			}
+			selectedNBWForumId=editSource!=null && editSource.nbwFid!=null ? editSource.nbwFid
+					: editingStatus.nbwFid!=null ? editingStatus.nbwFid : -1;
+			if(editSource!=null && Boolean.FALSE.equals(editSource.nbwSyncEnabled)) selectedNBWForumId=-1;
+			resolvedNBWForumId=selectedNBWForumId;
 		}
 		if(instance==null){
 			Nav.finish(this);
@@ -288,6 +303,8 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		setTitle(editingStatus==null ? R.string.new_post : R.string.edit_post);
 		if(savedInstanceState!=null){
 			postLang=Parcels.unwrap(savedInstanceState.getParcelable("postLang"));
+		}else if(editingStatus!=null && !TextUtils.isEmpty(editingStatus.language)){
+			postLang=new ComposeLanguageAlertViewController.SelectedOption(-1, Locale.forLanguageTag(editingStatus.language), null);
 		}
 
 		if(getArguments().containsKey("quote"))
@@ -305,6 +322,11 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 			if(savedInstanceState.containsKey("friendCardId")) friendCardId=savedInstanceState.getString("friendCardId");
 			friendCardTitle=savedInstanceState.getString("friendCardTitle", friendCardTitle);
 			friendCardSpecified=savedInstanceState.getBoolean("friendCardSpecified", false);
+			nbwForumChanged=savedInstanceState.getBoolean("nbwForumChanged", false);
+			locationChanged=savedInstanceState.getBoolean("locationChanged", false);
+			spoilerChanged=savedInstanceState.getBoolean("spoilerChanged", false);
+			languageChanged=savedInstanceState.getBoolean("languageChanged", false);
+			selectedLocationLevel=savedInstanceState.getInt("locationLevel", LOCATION_PROVINCE);
 		}
 		if(hasFriendCard()) selectedNBWForumId=resolvedNBWForumId=-1;
 	}
@@ -405,14 +427,23 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		// 位置选择器初始化
 		locationBtn=view.findViewById(R.id.btn_location);
 		locationText=view.findViewById(R.id.location_text);
-		currentLocation=LocationUtils.getCachedLocation(getActivity());
-		if(replyTo==null){
+		if(!locationChanged) currentLocation=LocationUtils.getCachedLocation(getActivity());
+		if(savedInstanceState!=null && savedInstanceState.containsKey("locationProvince")){
+			String province=savedInstanceState.getString("locationProvince");
+			currentLocation=province==null ? null : new LocationUtils.ResolvedLocation(province, savedInstanceState.getString("locationCity"), savedInstanceState.getString("locationDistrict"));
+		}
+		if(editingStatus!=null && editSource!=null && !locationChanged){
+			currentLocation=editSource.geoProvince==null ? null : new LocationUtils.ResolvedLocation(editSource.geoProvince, editSource.geoCity, editSource.geoDistrict);
+			selectedLocationLevel=editSource.geoDistrict!=null ? LOCATION_DISTRICT : editSource.geoCity!=null ? LOCATION_CITY
+					: editSource.geoProvince!=null ? LOCATION_PROVINCE : LOCATION_NONE;
+		}
+		if(!isReply()){
 			// 非回复帖才显示位置选择器
 			locationBtn.setVisibility(View.VISIBLE);
 			updateLocationButton();
 			locationBtn.setOnClickListener(this::onLocationClick);
 			// 进入发帖页时若缓存为空但有定位权限，主动触发一次解析（异步，结果回调后刷新按钮）
-			if(currentLocation==null && LocationUtils.hasLocationPermission(getActivity())){
+			if(editingStatus==null && currentLocation==null && LocationUtils.hasLocationPermission(getActivity())){
 				LocationUtils.fetchAndResolve(getActivity(), loc->{
 					if(loc!=null){
 						currentLocation=loc;
@@ -479,7 +510,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 			hasSpoiler=true;
 			spoilerWrap.setVisibility(View.VISIBLE);
 			spoilerBtn.setSelected(true);
-		}else if(editingStatus!=null && !TextUtils.isEmpty(editingStatus.spoilerText)){
+		}else if(editingStatus!=null && (editingStatus.sensitive || !TextUtils.isEmpty(editingStatus.spoilerText))){
 			hasSpoiler=true;
 			spoilerWrap.setVisibility(View.VISIBLE);
 			spoilerEdit.setText(getArguments().getString("sourceSpoiler", editingStatus.spoilerText));
@@ -532,6 +563,10 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	}
 
 	private boolean hasFriendCard(){ return !TextUtils.isEmpty(friendCardId); }
+
+	private boolean isReply(){ return replyTo!=null || editingStatus!=null && editingStatus.inReplyToId!=null; }
+
+	private boolean preservesNBWOnEdit(){ return editingStatus!=null && !nbwForumChanged; }
 
 	private void updateFriendCardPreview(){
 		if(friendCardPreview==null) return;
@@ -630,6 +665,14 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		outState.putString("friendCardId", friendCardId);
 		outState.putString("friendCardTitle", friendCardTitle);
 		outState.putBoolean("friendCardSpecified", friendCardSpecified);
+		outState.putBoolean("nbwForumChanged", nbwForumChanged);
+		outState.putBoolean("locationChanged", locationChanged);
+		outState.putBoolean("spoilerChanged", spoilerChanged);
+		outState.putBoolean("languageChanged", languageChanged);
+		outState.putInt("locationLevel", selectedLocationLevel);
+		outState.putString("locationProvince", currentLocation==null ? null : currentLocation.province());
+		outState.putString("locationCity", currentLocation==null ? null : currentLocation.city());
+		outState.putString("locationDistrict", currentLocation==null ? null : currentLocation.district());
 		outState.putParcelable("postLang", Parcels.wrap(postLang));
 		if(currentAutocompleteSpan!=null){
 			Editable e=mainEditText.getText();
@@ -644,7 +687,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		if(!creatingView)
 			refreshNewBabyWorldBinding();
 		// 位置权限刚授予后回到本页：刷新成 GPS 精确定位（替代 IP 属地缓存）
-		if(locationBtn!=null && locationBtn.getVisibility()==View.VISIBLE
+		if((editingStatus==null || locationChanged) && locationBtn!=null && locationBtn.getVisibility()==View.VISIBLE
 				&& LocationUtils.hasLocationPermission(getActivity())){
 			boolean needsGpsRefresh=currentLocation==null
 					|| currentLocation.district()==null; // IP 属地无 district
@@ -664,8 +707,8 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	}
 
 	private void refreshNewBabyWorldBinding(){
-		// 回复帖不涉及宝宝新天地同步，不做绑定状态检测
-		if(replyTo!=null || hasFriendCard())
+		// Existing edits preserve metadata without requiring a new cross-post or binding.
+		if(isReply() || hasFriendCard() || preservesNBWOnEdit())
 			return;
 		final int requestGeneration=++newBabyWorldBindingRequestGeneration;
 		newBabyWorldBindingState=BINDING_CHECKING;
@@ -702,7 +745,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		if(newBabyWorldCard==null)
 			return;
 		// Replies and friend-card posts never synchronize to NBW.
-		if(replyTo!=null || hasFriendCard()){
+		if(isReply() || hasFriendCard()){
 			newBabyWorldCard.setVisibility(View.GONE);
 			return;
 		}
@@ -715,6 +758,12 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 			return;
 		}
 		newBabyWorldCard.setVisibility(View.VISIBLE);
+		if(preservesNBWOnEdit()){
+			newBabyWorldCardText.setText(R.string.compose_nbw_edit_preserve);
+			newBabyWorldCardAction.setVisibility(View.GONE);
+			return;
+		}
+		newBabyWorldCardAction.setVisibility(View.VISIBLE);
 		if(newBabyWorldBindingState==BINDING_BOUND){
 			newBabyWorldCardText.setText(getString(R.string.compose_newbabyworld_bound, self.nbwUsername));
 			newBabyWorldCardAction.setText(R.string.compose_newbabyworld_close);
@@ -768,6 +817,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		}else if(newBabyWorldBindingState==BINDING_UNBOUND){
 			Intent intent=new Intent(getActivity(), NBWPostRegisterActivity.class);
 			intent.putExtra("show_back", true);
+			intent.putExtra("account", accountID);
 			startActivity(intent);
 		}else{
 			refreshNewBabyWorldBinding();
@@ -884,7 +934,10 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 			}
 		});
 		updateCrisisWarning(mainEditText.getText());
-		spoilerEdit.addTextChangedListener(new SimpleTextWatcher(e->updateCharCounter()));
+		spoilerEdit.addTextChangedListener(new SimpleTextWatcher(e->{
+			if(!creatingView) spoilerChanged=true;
+			updateCharCounter();
+		}));
 		if(replyTo!=null){
 			InlineStatusStatusDisplayItem item=new InlineStatusStatusDisplayItem("reply", new StatusDisplayItem.NoOpCallbacks(getActivity()), getActivity(), replyTo, accountID, R.drawable.ic_reply_wght700_20px, getString(R.string.in_reply_to, replyTo.account.displayName));
 			item.fullWidth=true;
@@ -974,8 +1027,9 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 
 		if(editingStatus!=null){
 			updateCharCounter();
-			visibilityBtn.setEnabled(false);
-			visibilityBtn.setAlpha(0.5f);
+			// This is a synchronization destination, no longer the immutable Mastodon visibility.
+			visibilityBtn.setEnabled(true);
+			visibilityBtn.setAlpha(1f);
 		}
 		updateMediaPollStates();
 	}
@@ -1056,7 +1110,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	}
 
 	private boolean needsNewBabyWorldBinding(){
-		return replyTo==null && !hasFriendCard() && selectedNBWForumId!=-1;
+		return !isReply() && !hasFriendCard() && !preservesNBWOnEdit() && selectedNBWForumId!=-1;
 	}
 
 	public void updatePublishButtonState(){
@@ -1132,7 +1186,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 
 	private void publish(){
 		// NBW cannot render friend cards. Never recommend a forum or silently cross-post one.
-		if(replyTo!=null || hasFriendCard()){
+		if(isReply() || hasFriendCard() || preservesNBWOnEdit()){
 			resolvedNBWForumId=-1;
 			publishResolved();
 			return;
@@ -1211,7 +1265,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		if(getActivity()==null)
 			return;
 		// 禁止同步宝宝新天地时跳过绑定检查（回复帖已禁用全部宝宝新天地功能）
-		if(replyTo==null && !hasFriendCard() && resolvedNBWForumId!=-1 && newBabyWorldBindingState!=BINDING_BOUND){
+		if(needsNewBabyWorldBinding() && resolvedNBWForumId!=-1 && newBabyWorldBindingState!=BINDING_BOUND){
 			refreshNewBabyWorldBinding();
 			return;
 		}
@@ -1254,13 +1308,13 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		String text=mainEditText.getText().toString();
 		CreateStatus.Request req=new CreateStatus.Request();
 		req.status=text;
-		req.mentalCrisis=containsCrisisKeyword(text);
-		req.visibility=StatusPrivacy.PUBLIC;
-		// 回复帖不同步宝宝新天地，不携带版块字段
-		req.nbwFid=(replyTo!=null || hasFriendCard() || resolvedNBWForumId==-1) ? null : resolvedNBWForumId;
+		req.mentalCrisis=containsCrisisKeyword(text) || editingStatus!=null && editingStatus.mentalCrisis;
+		req.visibility=editingStatus!=null ? editingStatus.visibility : StatusPrivacy.PUBLIC;
+		// Never reinterpret an edit or a reply as a new synchronized root post.
+		req.nbwFid=(isReply() || hasFriendCard() || preservesNBWOnEdit()) ? null : resolvedNBWForumId;
 		if(friendCardSpecified) req.setFriendCard(friendCardId);
 		// 位置信息（回复帖不携带）
-		if(replyTo==null){
+		if(!isReply() && (editingStatus==null || locationChanged)){
 			LocationUtils.ResolvedLocation geo=getGeoForPost();
 			if(geo!=null){
 				req.geoProvince=geo.province();
@@ -1272,8 +1326,8 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 			req.mediaIds=mediaViewController.getAttachmentIDs();
 			req.mediaAttributes=mediaViewController.getAttachmentAttributes();
 		}
-		if(replyTo!=null){
-			req.inReplyToId=replyTo.id;
+		if(isReply()){
+			req.inReplyToId=replyTo!=null ? replyTo.id : editingStatus.inReplyToId;
 		}
 		if(!pollViewController.isEmpty()){
 			req.poll=pollViewController.getPollForRequest();
@@ -1294,8 +1348,15 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 				spoilerEdit.setVisibility(View.VISIBLE);
 			}
 		}
+		if(editingStatus!=null && hasSpoiler && editingStatus.sensitive) req.sensitive=true;
+		if(editingStatus!=null && !spoilerChanged){
+			req.spoilerText=editingStatus.spoilerText;
+			req.sensitive=editingStatus.sensitive || req.sensitive;
+		}
 		if(postLang!=null){
 			req.language=postLang.locale.toLanguageTag();
+		}else if(editingStatus!=null){
+			req.language=editingStatus.language;
 		}
 		if(statusQuotePolicy!=null && instance.supportsQuotePostAuthoring())
 			req.quoteApprovalPolicy=statusQuotePolicy;
@@ -1321,6 +1382,10 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 				}else{
 					E.post(new StatusUpdatedEvent(result));
 				}
+				if(result.nbwSync!=null && ("unsupported".equals(result.nbwSync.state) || "failed".equals(result.nbwSync.state)
+						|| isReply() && "binding_required".equals(result.nbwSync.reason))){
+					Toast.makeText(getActivity(), isReply() ? R.string.compose_nbw_reply_local_only : R.string.compose_nbw_saved_not_synced, Toast.LENGTH_LONG).show();
+				}
 				Nav.finish(ComposeFragment.this);
 			}
 
@@ -1331,7 +1396,20 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		};
 
 		if(editingStatus!=null){
-			new EditStatus(req, editingStatus.id)
+			com.google.gson.JsonObject patch=req.toJson();
+			patch.remove("visibility"); // Immutable on edit; absent preserves the original visibility.
+			patch.remove("quote_approval_policy");
+			if(pollViewController.isEmpty()) patch.add("media_ids", org.joinmastodon.android.api.MastodonAPIController.gson.toJsonTree(mediaViewController.getAttachmentIDs()));
+			if(spoilerChanged) patch.addProperty("spoiler_text", hasSpoiler ? spoilerEdit.getText().toString() : "");
+			if(!nbwForumChanged || isReply() || hasFriendCard()) patch.remove("nbw_fid");
+			else patch.addProperty("nbw_fid", resolvedNBWForumId);
+			if(locationChanged && !isReply()){
+				// Explicit null clears a previously selected component; omission preserves it.
+				patch.add("geo_province", req.geoProvince==null ? com.google.gson.JsonNull.INSTANCE : new com.google.gson.JsonPrimitive(req.geoProvince));
+				patch.add("geo_city", req.geoCity==null ? com.google.gson.JsonNull.INSTANCE : new com.google.gson.JsonPrimitive(req.geoCity));
+				patch.add("geo_district", req.geoDistrict==null ? com.google.gson.JsonNull.INSTANCE : new com.google.gson.JsonPrimitive(req.geoDistrict));
+			}
+			new EditStatus(patch, editingStatus.id)
 					.setCallback(resCallback)
 					.exec(accountID);
 		}else{
@@ -1367,6 +1445,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	private boolean hasDraft(){
 		if(!java.util.Objects.equals(friendCardId, initialFriendCardId)) return true;
 		if(editingStatus!=null){
+			if(nbwForumChanged || locationChanged || languageChanged || spoilerChanged) return true;
 			if(!mainEditText.getText().toString().equals(initialText))
 				return true;
 			List<String> existingMediaIDs=editingStatus.mediaAttachments.stream().map(a->a.id).collect(Collectors.toList());
@@ -1564,6 +1643,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	}
 
 	private void toggleSpoiler(){
+		spoilerChanged=true;
 		hasSpoiler=!hasSpoiler;
 		if(hasSpoiler){
 			spoilerWrap.setVisibility(View.VISIBLE);
@@ -1604,6 +1684,8 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		boolean hasPermission=LocationUtils.hasLocationPermission(getActivity());
 		Consumer<ListItem<Integer>> onClick=item->{
 			selectedLocationLevel=item.parentObject;
+			locationChanged=true;
+			updateDraftState();
 			menu.dismiss();
 			// 点击市/区但没有定位权限 → 弹出位置权限引导（同首次登录），用户同意后申请系统权限
 			if(selectedLocationLevel!=LOCATION_NONE && selectedLocationLevel!=LOCATION_PROVINCE && !hasPermission){
@@ -1656,9 +1738,12 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		ExtendedPopupMenu menu=new ExtendedPopupMenu(getActivity(), items);
 		Consumer<ListItem<Integer>> onClick=item->{
 			selectedNBWForumId=item.parentObject;
+			nbwForumChanged=true;
 			aiRecommendedForumName=null;
 			updateNBWForumButton(true);
+			updateNewBabyWorldCard();
 			updatePublishButtonState();
+			if(editingStatus!=null && needsNewBabyWorldBinding()) refreshNewBabyWorldBinding();
 			menu.dismiss();
 		};
 		items.add(new ListItem<>(R.string.nbw_forum_ai, R.string.nbw_forum_ai_subtitle, R.drawable.ic_fluent_wand_24_regular, 0, onClick));
@@ -1674,7 +1759,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		if(getActivity()==null)
 			return;
 		// No incompatible NBW destination can be selected while a friend card is attached.
-		if(replyTo!=null || hasFriendCard()){
+		if(isReply() || hasFriendCard()){
 			visibilityBtn.setVisibility(View.GONE);
 			return;
 		}
@@ -1694,7 +1779,9 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 			visibilityCurrentText.setVisibility(View.GONE);
 			visibilityCurrentText=visibilityText;
 		}
-		if(selectedNBWForumId==0 && !TextUtils.isEmpty(aiRecommendedForumName))
+		if(preservesNBWOnEdit() && selectedNBWForumId==-1 && (editSource==null || editSource.nbwSyncEnabled==null))
+			visibilityText.setText(R.string.compose_nbw_keep_existing);
+		else if(selectedNBWForumId==0 && !TextUtils.isEmpty(aiRecommendedForumName))
 			visibilityText.setText(getString(R.string.compose_ai_recommend_result, aiRecommendedForumName));
 		else
 			visibilityText.setText(switch(selectedNBWForumId){
@@ -1865,6 +1952,8 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 
 	private void setPostLanguage(ComposeLanguageAlertViewController.SelectedOption language){
 		postLang=language;
+		languageChanged=true;
+		updateDraftState();
 	}
 
 	@Override

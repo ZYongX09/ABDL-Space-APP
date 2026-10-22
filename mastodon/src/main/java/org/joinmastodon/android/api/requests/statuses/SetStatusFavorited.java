@@ -8,4 +8,9 @@ public class SetStatusFavorited extends MastodonAPIRequest<Status>{
 		super(HttpMethod.POST, "/statuses/"+id+"/"+(favorited ? "favourite" : "unfavourite"), Status.class);
 		setRequestBody(new Object());
 	}
+
+	@Override
+	public me.grishka.appkit.api.ErrorResponse deserializeError(com.google.gson.JsonObject body, int status){
+		return org.joinmastodon.android.api.MastodonErrorResponse.nbwBindingError(body, status);
+	}
 }

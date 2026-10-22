@@ -329,9 +329,11 @@ public class ThreadFragment extends StatusListFragment implements AssistContentP
 	}
 
 	protected void onStatusCreated(Status status){
-		if(status.inReplyToId!=null && getStatusByID(status.inReplyToId)!=null){
+		if(status.inReplyToId!=null && getStatusByID(status.inReplyToId)!=null && getStatusByID(status.id)==null){
+			int start=displayItems.size();
 			onAppendItems(Collections.singletonList(status));
 			data.add(status);
+			adapter.notifyItemRangeInserted(start, displayItems.size()-start);
 		}
 	}
 

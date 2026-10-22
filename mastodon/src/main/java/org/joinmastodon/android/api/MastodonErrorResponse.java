@@ -66,6 +66,45 @@ public class MastodonErrorResponse extends ErrorResponse{
 		Toast.makeText(context, message, Toast.LENGTH_SHORT).show();
 	}
 
+	/** Only this machine code opens binding UI; ordinary permission failures keep their text. */
+	public static MastodonErrorResponse nbwBindingError(com.google.gson.JsonObject body, int status){
+		if(status!=403 || body==null || !body.has("code") || !body.get("code").isJsonPrimitive()
+				|| !"NBW_BINDING_REQUIRED".equals(body.get("code").getAsString())) return null;
+		String message=body.has("error") && body.get("error").isJsonPrimitive()
+				? body.get("error").getAsString() : "请先绑定宝宝新天地账号后再操作";
+		return new NBWBindingRequired(message, status);
+	}
+
+	public static class NBWBindingRequired extends MastodonErrorResponse{
+		public final String code="NBW_BINDING_REQUIRED";
+		public String accountID;
+		public NBWBindingRequired(String error, int status){ super(error, status, null); }
+		@Override public void showToast(Context context){
+			Context owner=context;
+			while(owner instanceof android.content.ContextWrapper wrapper && !(owner instanceof android.app.Activity)){
+				Context base=wrapper.getBaseContext();
+				if(base==owner) break;
+				owner=base;
+			}
+			if(!(owner instanceof android.app.Activity activity) || activity.isFinishing() || activity.isDestroyed()){
+				super.showToast(context);
+				return;
+			}
+			android.app.AlertDialog dialog=new org.joinmastodon.android.ui.M3AlertDialogBuilder(activity)
+					.setTitle(R.string.compose_newbabyworld_title)
+					.setMessage(R.string.nbw_interaction_binding_required)
+					.setPositiveButton(R.string.compose_newbabyworld_bind, null)
+					.setNegativeButton(R.string.cancel, null).show();
+			dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener(view->{
+				android.content.Intent intent=new android.content.Intent(activity, org.joinmastodon.android.fragments.settings.NBWPostRegisterActivity.class);
+				intent.putExtra("show_back", true);
+				intent.putExtra("account", accountID);
+				activity.startActivity(intent);
+				dialog.dismiss();
+			});
+		}
+	}
+
 	private static boolean isLoginExpiredError(String error, int httpStatus){
 		if(httpStatus!=401 || error==null)
 			return false;

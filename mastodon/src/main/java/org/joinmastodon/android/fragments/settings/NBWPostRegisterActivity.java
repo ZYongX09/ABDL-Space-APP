@@ -77,23 +77,33 @@ public class NBWPostRegisterActivity extends Activity {
         Button btnBindExisting = findViewById(R.id.btn_bind_existing);
         btnBindExisting.setOnClickListener(v -> {
             getSharedPreferences("nbw_bind", MODE_PRIVATE).edit().putString("flow", "bind").apply();
-            AccountSession session = AccountSessionManager.getInstance().getLastActiveAccount();
+            String accountID = getIntent().getStringExtra("account");
+            AccountSession session = accountID == null ? AccountSessionManager.getInstance().getLastActiveAccount()
+                : AccountSessionManager.getInstance().tryGetAccount(accountID);
+            if (session == null) {
+                android.widget.Toast.makeText(this, R.string.login_expired, android.widget.Toast.LENGTH_LONG).show();
+                return;
+            }
             long uid = 0;
             if (session != null) {
                 String sid = session.getID();
                 int sep = sid.indexOf('_');
                 try { uid = Long.parseLong(sep >= 0 ? sid.substring(sep + 1) : sid); } catch (NumberFormatException ignored) {}
             }
-            String state = Base64.encodeToString(
-                ("{\"ts\":" + System.currentTimeMillis() + ",\"action\":\"bind\",\"uid\":" + uid + "}").getBytes(StandardCharsets.UTF_8),
-                Base64.NO_WRAP);
-            String url = "https://api.abdl-space.top/api/auth/nbw/mobile-start?state=" + state;
+            String state = createBindingState(this, session.getID(), uid);
+            String url = android.net.Uri.parse("https://api.abdl-space.top/api/auth/nbw/mobile-start")
+                .buildUpon().appendQueryParameter("state", state).build().toString();
             UiUtils.launchWebBrowser(this, url);
         });
 
         // 一键注册
         Button btnOneClick = findViewById(R.id.btn_one_click);
         btnOneClick.setOnClickListener(v -> {
+            String accountID = getIntent().getStringExtra("account");
+            if (accountID != null && !accountID.equals(AccountSessionManager.getInstance().getLastActiveAccountID())) {
+                android.widget.Toast.makeText(this, R.string.nbw_register_switch_account, android.widget.Toast.LENGTH_LONG).show();
+                return;
+            }
             Intent intent = new Intent(this, NBWOneClickRegisterActivity.class);
             intent.putExtra("nbw_username", getIntent().getStringExtra("nbw_username"));
             intent.putExtra("nbw_password", getIntent().getStringExtra("nbw_password"));
@@ -105,6 +115,47 @@ public class NBWPostRegisterActivity extends Activity {
         btnSkip.setOnClickListener(v -> {
             navigateToMain();
         });
+    }
+
+    public static synchronized String createBindingState(android.content.Context context, String accountID, long uid) {
+        String nonce=java.util.UUID.randomUUID().toString();
+        long now=System.currentTimeMillis();
+        com.google.gson.JsonObject state=new com.google.gson.JsonObject();
+        state.addProperty("ts", now);
+        state.addProperty("action", "bind");
+        state.addProperty("uid", uid);
+        state.addProperty("nonce", nonce);
+        String encoded=Base64.encodeToString(state.toString().getBytes(StandardCharsets.UTF_8), Base64.NO_WRAP);
+        com.google.gson.JsonObject transaction=new com.google.gson.JsonObject();
+        transaction.addProperty("account", accountID);
+        transaction.addProperty("state", encoded);
+        transaction.addProperty("ts", now);
+        if(!context.getSharedPreferences("nbw_bind", MODE_PRIVATE).edit()
+                .putString("transaction_"+nonce, transaction.toString()).putString("flow", "bind").commit())
+            throw new IllegalStateException("Unable to preserve binding transaction");
+        return encoded;
+    }
+
+    public static synchronized String consumeBindingAccount(android.content.Context context, String encoded) {
+        if(encoded==null || encoded.length()>4096) return null;
+        try {
+            com.google.gson.JsonObject state=com.google.gson.JsonParser.parseString(new String(Base64.decode(encoded, Base64.DEFAULT), StandardCharsets.UTF_8)).getAsJsonObject();
+            if(!"bind".equals(state.get("action").getAsString())) return null;
+            String nonce=state.get("nonce").getAsString();
+            if(!nonce.matches("[0-9a-fA-F-]{36}")) return null;
+            android.content.SharedPreferences prefs=context.getSharedPreferences("nbw_bind", MODE_PRIVATE);
+            String raw=prefs.getString("transaction_"+nonce, null);
+            if(raw==null) return null;
+            com.google.gson.JsonObject transaction=com.google.gson.JsonParser.parseString(raw).getAsJsonObject();
+            long age=System.currentTimeMillis()-transaction.get("ts").getAsLong();
+            String account=transaction.get("account").getAsString();
+            if(!encoded.equals(transaction.get("state").getAsString()) || age<0 || age>10*60*1000
+                    || AccountSessionManager.getInstance().tryGetAccount(account)==null) return null;
+            if(!prefs.edit().remove("transaction_"+nonce).commit()) return null;
+            return account;
+        } catch(RuntimeException error) {
+            return null;
+        }
     }
 
     private void navigateToMain() {

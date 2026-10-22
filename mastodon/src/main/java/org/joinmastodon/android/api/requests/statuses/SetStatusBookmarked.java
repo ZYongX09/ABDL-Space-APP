@@ -8,4 +8,9 @@ public class SetStatusBookmarked extends MastodonAPIRequest<Status>{
 		super(HttpMethod.POST, "/statuses/"+id+"/"+(bookmarked ? "bookmark" : "unbookmark"), Status.class);
 		setRequestBody(new Object());
 	}
+
+	@Override
+	public me.grishka.appkit.api.ErrorResponse deserializeError(com.google.gson.JsonObject body, int status){
+		return org.joinmastodon.android.api.MastodonErrorResponse.nbwBindingError(body, status);
+	}
 }

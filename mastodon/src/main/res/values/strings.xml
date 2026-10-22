@@ -666,8 +666,15 @@
 	<string name="novel_bookshelf_empty">Your bookshelf is empty</string>
 	<string name="novel_creation_empty">No works created yet</string>
 	<string name="nbw_forum_friends">Friends</string>
-	<string name="nbw_forum_none">Strongly Oppose Syncing</string>
-	<string name="nbw_forum_none_subtitle">You strongly oppose syncing your posts to NewBabyWorld</string>
+	<string name="nbw_forum_none">Do not sync</string>
+	<string name="nbw_forum_none_subtitle">Publish only to ABDL Space</string>
+	<string name="nbw_interaction_binding_required">Bind a 宝宝新天地 account to like or bookmark posts from 宝宝新天地.</string>
+	<string name="nbw_register_switch_account">Switch to this ABDL Space account before one-click registration, or bind an existing account above.</string>
+	<string name="nbw_reply_interaction_unsupported">Likes and bookmarks for 宝宝新天地 replies are not available yet.</string>
+	<string name="compose_nbw_keep_existing">Keep existing sync settings</string>
+	<string name="compose_nbw_edit_preserve">Saving preserves your existing sync settings. Changes to posts already on 宝宝新天地 cannot be synchronized yet.</string>
+	<string name="compose_nbw_reply_local_only">This reply was saved only to ABDL Space. 宝宝新天地 reply synchronization is not available yet.</string>
+	<string name="compose_nbw_saved_not_synced">Saved to ABDL Space. 宝宝新天地 was not updated; synchronization is currently unavailable.</string>
 	<string name="nbw_unbind_title">解绑宝宝新天地</string>
 	<string name="nbw_unbind_message">确定解绑 %s？</string>
 	<string name="nbw_unbind">解绑</string>
@@ -675,7 +682,7 @@
 	<string name="nbw_unbind_success">解绑成功</string>
 	<string name="nbw_bound">已绑定</string>
 	<string name="compose_newbabyworld_title">宝宝新天地</string>
-	<string name="compose_newbabyworld_unbound">You must bind a 宝宝新天地 account before posting.</string>
+	<string name="compose_newbabyworld_unbound">Bind a 宝宝新天地 account to sync, or select Do not sync to publish only to ABDL Space.</string>
 	<string name="compose_newbabyworld_bound">宝宝新天地 is an ABDL Space federation partner. After posting, we will try to sync it to 宝宝新天地 as @%s.</string>
 	<string name="compose_newbabyworld_checking">Checking your 宝宝新天地 binding…</string>
 	<string name="compose_newbabyworld_check_failed">Your binding could not be verified. Posting is disabled until verification succeeds.</string>

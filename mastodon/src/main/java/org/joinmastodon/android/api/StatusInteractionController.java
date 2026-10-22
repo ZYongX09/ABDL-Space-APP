@@ -33,9 +33,9 @@ public class StatusInteractionController{
 	// MOSHIDON: for remote interactions
 	private final boolean updateCounters;
 
-	private final HashMap<String, SetStatusFavorited> runningFavoriteRequests=new HashMap<>();
+	private final HashMap<String, MastodonAPIRequest<?>> runningFavoriteRequests=new HashMap<>();
 	private final HashMap<String, SetStatusReblogged> runningReblogRequests=new HashMap<>();
-	private final HashMap<String, SetStatusBookmarked> runningBookmarkRequests=new HashMap<>();
+	private final HashMap<String, MastodonAPIRequest<?>> runningBookmarkRequests=new HashMap<>();
 
 	public StatusInteractionController(String accountID, /* MOSHIDON */ boolean updateCounters){
 		this.accountID=accountID;
@@ -55,6 +55,10 @@ public class StatusInteractionController{
 
 
 	public void setFavorited(Status status, boolean favorited, Consumer<Status> cb){
+		setFavorited(status, favorited, cb, MastodonApp.context);
+	}
+
+	public void setFavorited(Status status, boolean favorited, Consumer<Status> cb, android.content.Context context){
 		if(!Looper.getMainLooper().isCurrentThread())
 			throw new IllegalStateException("Can only be called from main thread");
 
@@ -62,15 +66,19 @@ public class StatusInteractionController{
 		AccountSession session=AccountSessionManager.get(accountID);
 		Instance instance=session.getInstance().get();
 
-		SetStatusFavorited current=runningFavoriteRequests.remove(status.id);
-		if(current!=null){
-			current.cancel();
-		}
-		SetStatusFavorited req=(SetStatusFavorited) new SetStatusFavorited(status.id, favorited)
-				.setCallback(new Callback<>(){
+		if(!supportsInteraction(status, context)) return;
+		if(runningFavoriteRequests.containsKey(status.id)) return;
+		final boolean oldFavorited=status.favourited;
+		final long oldCount=status.favouritesCount;
+		Callback<Status> callback=new Callback<>(){
+					private boolean completed;
 					@Override
 					public void onSuccess(Status result){
+						if(completed) return;
+						completed=true;
 						runningFavoriteRequests.remove(status.id);
+						status.favourited=result.favourited;
+						status.favouritesCount=result.favouritesCount;
 
 						// MOSHIDON:
 						cb.accept(result);
@@ -80,30 +88,28 @@ public class StatusInteractionController{
 
 					@Override
 					public void onError(ErrorResponse error){
+						if(completed) return;
+						completed=true;
 						runningFavoriteRequests.remove(status.id);
-						error.showToast(MastodonApp.context);
-						status.favourited=!favorited;
-						if(favorited)
-							status.favouritesCount--;
-						else
-							status.favouritesCount++;
+						status.favourited=oldFavorited;
+						status.favouritesCount=oldCount;
+						if(error instanceof MastodonErrorResponse.NBWBindingRequired binding) binding.accountID=accountID;
+						error.showToast(context);
 
 						// MOSHIDON:
 						cb.accept(status);
 						if(updateCounters) E.post(new StatusCountersUpdatedEvent(status, StatusCountersUpdatedEvent.CounterType.FAVORITES));
 						if(instance.isIceshrimpJs()) E.post(new EmojiReactionsUpdatedEvent(status.id, status.reactions, false, null));
 					}
-				})
-				.exec(accountID);
+				};
+		MastodonAPIRequest<?> req=interactionRequest(status, true, favorited, callback);
 		runningFavoriteRequests.put(status.id, req);
 		status.favourited=favorited;
-		if(favorited)
-			status.favouritesCount++;
-		else
-			status.favouritesCount--;
+		status.favouritesCount=Math.max(0, oldCount+(oldFavorited==favorited ? 0 : favorited ? 1 : -1));
 
 		// MOSHIDON:
 		if(updateCounters) E.post(new StatusCountersUpdatedEvent(status, StatusCountersUpdatedEvent.CounterType.FAVORITES));
+		req.exec(accountID);
 
 		// MOSHIDON: all below is for the emojis
 		if(instance.configuration==null || instance.configuration.reactions==null)
@@ -207,34 +213,68 @@ public class StatusInteractionController{
 	}
 
 	public void setBookmarked(Status status, boolean bookmarked){
+		setBookmarked(status, bookmarked, MastodonApp.context);
+	}
+
+	public void setBookmarked(Status status, boolean bookmarked, android.content.Context context){
 		if(!Looper.getMainLooper().isCurrentThread())
 			throw new IllegalStateException("Can only be called from main thread");
 
-		SetStatusBookmarked current=runningBookmarkRequests.remove(status.id);
-		if(current!=null){
-			current.cancel();
-		}
-		SetStatusBookmarked req=(SetStatusBookmarked) new SetStatusBookmarked(status.id, bookmarked)
-				.setCallback(new Callback<>(){
+		if(!supportsInteraction(status, context)) return;
+		if(runningBookmarkRequests.containsKey(status.id)) return;
+		final boolean oldBookmarked=status.bookmarked;
+		final long oldCount=status.bookmarksCount;
+		Callback<Status> callback=new Callback<>(){
+					private boolean completed;
 					@Override
 					public void onSuccess(Status result){
+						if(completed) return;
+						completed=true;
 						runningBookmarkRequests.remove(status.id);
+						status.bookmarked=result.bookmarked;
+						status.bookmarksCount=result.bookmarksCount;
 						E.post(new StatusCountersUpdatedEvent(result, StatusCountersUpdatedEvent.CounterType.BOOKMARKS));
 					}
 
 					@Override
 					public void onError(ErrorResponse error){
+						if(completed) return;
+						completed=true;
 						runningBookmarkRequests.remove(status.id);
-						error.showToast(MastodonApp.context);
-						status.bookmarked=!bookmarked;
+						status.bookmarked=oldBookmarked;
+						status.bookmarksCount=oldCount;
+						if(error instanceof MastodonErrorResponse.NBWBindingRequired binding) binding.accountID=accountID;
+						error.showToast(context);
 						E.post(new StatusCountersUpdatedEvent(status, StatusCountersUpdatedEvent.CounterType.BOOKMARKS));
 					}
-				})
-				.exec(accountID);
+				};
+		MastodonAPIRequest<?> req=interactionRequest(status, false, bookmarked, callback);
 		runningBookmarkRequests.put(status.id, req);
 		status.bookmarked=bookmarked;
+		status.bookmarksCount=Math.max(0, oldCount+(oldBookmarked==bookmarked ? 0 : bookmarked ? 1 : -1));
 
 		// MOSHIDON:
 		if(updateCounters) E.post(new StatusCountersUpdatedEvent(status, StatusCountersUpdatedEvent.CounterType.BOOKMARKS));
+		req.exec(accountID);
+	}
+
+	private boolean supportsInteraction(Status status, android.content.Context context){
+		if(status.id.startsWith("nbw_") && (!org.joinmastodon.android.api.requests.statuses.NBWStatusInteraction.supportsID(status.id) || status.inReplyToId!=null)){
+			android.widget.Toast.makeText(context, org.joinmastodon.android.R.string.nbw_reply_interaction_unsupported, android.widget.Toast.LENGTH_LONG).show();
+			return false;
+		}
+		return true;
+	}
+
+	private MastodonAPIRequest<?> interactionRequest(Status status, boolean favorite, boolean enabled, Callback<Status> callback){
+		if(status.id.startsWith("nbw_")){
+			return new org.joinmastodon.android.api.requests.statuses.NBWStatusInteraction(status.id, favorite, enabled)
+					.setCallback(new Callback<>(){
+						@Override public void onSuccess(org.joinmastodon.android.api.requests.statuses.NBWStatusInteraction.Result result){ callback.onSuccess(result.merge(status)); }
+						@Override public void onError(ErrorResponse error){ callback.onError(error); }
+					});
+		}
+		return favorite ? new SetStatusFavorited(status.id, enabled).setCallback(callback)
+				: new SetStatusBookmarked(status.id, enabled).setCallback(callback);
 	}
 }

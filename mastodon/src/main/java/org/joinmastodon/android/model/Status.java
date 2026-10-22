@@ -84,6 +84,17 @@ public class Status extends BaseModel implements DisplayItemsParent, Searchable 
 	public Advertisement advertisement;
 	public Instant editedAt;
 
+	// Optional first-party synchronization metadata; never weaken the required Status contract.
+	public Integer nbwFid;
+	public Long nbwTid;
+	public NBWSync nbwSync;
+
+	@Parcel
+	public static class NBWSync{
+		public String state;
+		public String reason;
+	}
+
 	public String url;
 	public String inReplyToId;
 	public String inReplyToAccountId;
@@ -226,7 +237,10 @@ public class Status extends BaseModel implements DisplayItemsParent, Searchable 
 				reblogged=ev.reblogged;
 			}
 			case REPLIES -> repliesCount=ev.replies;
-			case BOOKMARKS -> bookmarked=ev.bookmarked;
+			case BOOKMARKS -> {
+				bookmarked=ev.bookmarked;
+				bookmarksCount=ev.bookmarks;
+			}
 			case HEAT -> { /* 仅同步浏览量/热度，见下 */ }
 		}
 		if(ev.type==StatusCountersUpdatedEvent.CounterType.HEAT || ev.views>0 || ev.heat>0){

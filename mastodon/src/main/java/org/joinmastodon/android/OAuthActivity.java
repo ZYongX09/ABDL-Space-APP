@@ -73,12 +73,25 @@ public class OAuthActivity extends Activity{
 			String nbwUser=uri.getQueryParameter("nbw_user");
 			String nbwToken=uri.getQueryParameter("nbw_token");
 			String flow = getSharedPreferences("nbw_bind", MODE_PRIVATE).getString("flow", "login");
+			String clientState=uri.getQueryParameter("client_state");
+			String bindingAccount=null;
+			if(clientState!=null || "bind".equals(flow)){
+				bindingAccount=NBWPostRegisterActivity.consumeBindingAccount(this, clientState);
+				if(bindingAccount==null){
+					Toast.makeText(this, "绑定请求已失效，请从原账号重新发起绑定", Toast.LENGTH_LONG).show();
+					finish();
+					return;
+				}
+				flow="bind";
+			}
 			Intent intent;
 			if("already_bound".equals(nbwBind)){
 				// NBW 账号已被其他用户绑定 → 显示错误提示，回到绑定引导页
 				Toast.makeText(this, "该宝宝新天地账号已被其他用户绑定", Toast.LENGTH_LONG).show();
 				Intent backIntent = new Intent(this, NBWPostRegisterActivity.class);
-				backIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+					backIntent.putExtra("account", bindingAccount);
+					backIntent.putExtra("show_back", true);
+					backIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
 				startActivity(backIntent);
 				finish();
 				return;
@@ -97,7 +110,9 @@ public class OAuthActivity extends Activity{
 			}
 			intent.putExtra("nbw_user", nbwUser);
 			intent.putExtra("nbw_token", nbwToken);
-			if(!AccountSessionManager.getInstance().getLoggedInAccounts().isEmpty()){
+			if(bindingAccount!=null){
+				intent.putExtra("account", bindingAccount);
+			}else if(!AccountSessionManager.getInstance().getLoggedInAccounts().isEmpty()){
 				AccountSession session=AccountSessionManager.getInstance().getLastActiveAccount();
 				if(session!=null)
 					intent.putExtra("account", session.getID());

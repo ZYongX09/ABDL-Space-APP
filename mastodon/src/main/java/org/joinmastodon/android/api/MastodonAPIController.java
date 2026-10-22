@@ -213,6 +213,12 @@ public class MastodonAPIController{
 							}
 						}
 						try(ResponseBody body=response.body()){
+							// Resultless requests succeed on HTTP status, including 204/empty/partial bodies.
+							if(response.isSuccessful() && req.respClass==null && req.respTypeToken==null){
+								req.validateAndPostprocessResponse(null, response);
+								req.onSuccess(null);
+								return;
+							}
 							if(body==null){
 								req.onError("服务器返回空响应", response.code(), null);
 								return;

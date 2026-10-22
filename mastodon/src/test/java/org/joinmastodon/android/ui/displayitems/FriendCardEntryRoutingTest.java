@@ -108,6 +108,8 @@ public class FriendCardEntryRoutingTest{
 		assertEquals(List.of(ComposeFragment.class),LocalNavigation.destinations);
 		Bundle args=LocalNavigation.arguments.get(0); assertEquals(source.text,args.getString("sourceText"));
 		assertEquals(source.spoilerText,args.getString("sourceSpoiler")); assertEquals("card-1",args.getString("sourceFriendCardId"));
+		GetStatusSourceText.Response metadata=org.parceler.Parcels.unwrap(args.getParcelable("editSource"));
+		assertEquals("p_101",metadata.id); assertEquals("CW",metadata.spoilerText);
 	}
 
 	@Test public void ownProfileMenuNoLongerContainsMyCardsEntryOrHandler() throws Exception{

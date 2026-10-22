@@ -255,7 +255,7 @@ public class FooterStatusDisplayItem extends StatusDisplayItem{
 		}
 
 		private void onFavoriteClick(View v){
-			AccountSessionManager.getInstance().getAccount(item.accountID).getStatusInteractionController().setFavorited(item.status, !item.status.favourited);
+			AccountSessionManager.getInstance().getAccount(item.accountID).getStatusInteractionController().setFavorited(item.status, !item.status.favourited, r->{}, item.context);
 			favorite.setSelected(item.status.favourited);
 			bindButton(favorite, item.status.favouritesCount);
 		}
@@ -296,13 +296,11 @@ public class FooterStatusDisplayItem extends StatusDisplayItem{
 					status -> {
 						if(status == null)
 							return;
-						bookmarkBtn.setSelected(!status.bookmarked);
+						// Selection follows the controller, including unsupported replies and rollbacks.
 						// vibrateForAction(bookmark, !status.bookmarked);
-						AccountSessionManager.getInstance().getAccount(item.accountID).getStatusInteractionController().setBookmarked(status, !status.bookmarked
-						//		, r->{
-						//	UiUtils.opacityIn(v);
-						//}
-						);
+						AccountSessionManager.getInstance().getAccount(item.accountID).getStatusInteractionController().setBookmarked(status, !status.bookmarked, item.context);
+						bookmarkBtn.setSelected(status.bookmarked);
+						bindButton(bookmarkText, status.bookmarksCount);
 					});
 		}
 
@@ -312,7 +310,7 @@ public class FooterStatusDisplayItem extends StatusDisplayItem{
 			UiUtils.pickInteractAs(v.getContext(),
 					item.accountID, item.status,
 					s -> s.bookmarked,
-					(ic, status, consumer) -> ic.setBookmarked(status, true /*, consumer */),
+					(ic, status, consumer) -> ic.setBookmarked(status, true, item.context),
 					R.string.sk_bookmark_as,
 					R.string.sk_bookmarked_as,
 					R.string.sk_already_bookmarked,
@@ -460,7 +458,7 @@ public class FooterStatusDisplayItem extends StatusDisplayItem{
 			UiUtils.pickInteractAs(v.getContext(),
 					item.accountID, item.status,
 					s -> s.favourited,
-					(ic, status, consumer) -> ic.setFavorited(status, true, consumer),
+					(ic, status, consumer) -> ic.setFavorited(status, true, consumer, item.context),
 					R.string.sk_favorite_as,
 					R.string.sk_favorited_as,
 					R.string.sk_already_favorited,
@@ -476,7 +474,7 @@ public class FooterStatusDisplayItem extends StatusDisplayItem{
 			}else if(id==R.id.boost){
 				onBoostClick(null);
 			}else if(id==R.id.bookmark){
-				AccountSessionManager.getInstance().getAccount(this.item.accountID).getStatusInteractionController().setBookmarked(this.item.status, !this.item.status.bookmarked);
+				AccountSessionManager.getInstance().getAccount(this.item.accountID).getStatusInteractionController().setBookmarked(this.item.status, !this.item.status.bookmarked, this.item.context);
 			}else if(id==R.id.view_favorites){
 				startAccountListFragment(StatusFavoritesListFragment.class);
 			}else if(id==R.id.view_boosts){

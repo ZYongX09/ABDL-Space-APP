@@ -629,8 +629,8 @@ public class UiUtils{
 		Runnable delete=()->new DeleteStatus(status.id)
 				.setCallback(new Callback<>(){
 					@Override
-					public void onSuccess(Status result){
-						resultCallback.accept(result);
+					public void onSuccess(Void result){
+						resultCallback.accept(status);
 						AccountSessionManager.getInstance().getAccount(accountID).getCacheController().deleteStatus(status.id);
 						E.post(new StatusDeletedEvent(status.id, accountID));
 					}

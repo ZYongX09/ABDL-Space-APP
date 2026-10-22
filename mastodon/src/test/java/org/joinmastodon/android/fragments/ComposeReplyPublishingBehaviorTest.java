@@ -123,6 +123,9 @@ public class ComposeReplyPublishingBehaviorTest{
 	@Before
 	@SuppressWarnings("unchecked")
 	public void setUp() throws Exception{
+		// PAUSED looper alone still auto-advances vsync in Robolectric. An active Editor
+		// under the real sending overlay otherwise keeps idleMainLooper in preDraw forever.
+		org.robolectric.shadows.ShadowChoreographer.setPaused(true);
 		Context context=RuntimeEnvironment.getApplication();
 		MastodonApp.context=context;
 		V.setApplicationContext(context);
@@ -173,6 +176,7 @@ public class ComposeReplyPublishingBehaviorTest{
 			GlobalUserPreferences.getPrefs().edit().clear().putBoolean("perAccountMigrationDone", true).commit();
 			GlobalUserPreferences.load();
 			MastodonApp.context=null;
+			org.robolectric.shadows.ShadowChoreographer.setPaused(false);
 		}
 	}
 
@@ -313,7 +317,7 @@ public class ComposeReplyPublishingBehaviorTest{
 	}
 
 	@Test
-	public void disablingSyncImmediatelyEnablesUnboundPostsAndSendsNullNbwWithoutRechecking() throws Exception{
+	public void disablingSyncImmediatelyEnablesUnboundPostsAndSendsExplicitOptOutWithoutRechecking() throws Exception{
 		launch(null);
 		setBody(BODY);
 		int checks=count(GetOwnAccount.class); // Ordinary-screen lifecycle checks are unchanged.
@@ -329,9 +333,9 @@ public class ComposeReplyPublishingBehaviorTest{
 		assertEquals(checks, count(GetOwnAccount.class));
 		assertEquals(0, count(RecommendNBWForum.class));
 		assertEquals(1, count(CreateStatus.class));
-		assertNull(sentStatus().nbwFid);
+		assertEquals(Integer.valueOf(-1), sentStatus().nbwFid);
 		assertNull(sentStatus().inReplyToId);
-		assertFalse(json(last(CreateStatus.class)).has("nbw_fid"));
+		assertEquals(-1, json(last(CreateStatus.class)).get("nbw_fid").getAsInt());
 	}
 
 	@Test
@@ -480,6 +484,89 @@ public class ComposeReplyPublishingBehaviorTest{
 		assertEquals(0, count(CreateStatus.class));
 	}
 
+	@Test public void ordinaryEditPreservesOriginalFieldsAndNeverImplicitlyRepostsOrGeolocates() throws Exception{
+		Status edited=status("p_edit"); edited.visibility=StatusPrivacy.PRIVATE;
+		edited.sensitive=true; edited.mentalCrisis=true; edited.language="zh"; edited.spoilerText="Original CW";
+		Attachment audio=new Attachment(); audio.id="kept-audio"; audio.type=Attachment.Type.AUDIO; audio.description="Original alt";
+		edited.mediaAttachments=List.of(audio);
+		var source=new org.joinmastodon.android.api.requests.statuses.GetStatusSourceText.Response();
+		source.id=edited.id; source.text=BODY; source.spoilerText=edited.spoilerText;
+		source.nbwFid=26; source.nbwTid=123L; source.nbwSyncEnabled=true;
+		source.geoProvince="Original province"; source.geoCity="Original city";
+		launch(null, false, edited, source);
+		assertEquals(0, count(GetOwnAccount.class)); assertTrue(publishItem().isEnabled());
+		assertEquals(26, field(ComposeFragment.class, "selectedNBWForumId").getInt(fragment));
+		assertTrue(fragment.getView().findViewById(R.id.btn_visibility).isEnabled());
+		setGeo(); // A different current location must not replace server-owned metadata.
+		setBody("Edited body"); clickPublish();
+		JsonObject patch=json(last(EditStatus.class));
+		assertEquals("Edited body", patch.get("status").getAsString());
+		assertEquals("zh", patch.get("language").getAsString());
+		assertEquals("Original CW", patch.get("spoiler_text").getAsString());
+		assertTrue(patch.get("sensitive").getAsBoolean()); assertTrue(patch.get("mental_crisis").getAsBoolean());
+		assertEquals("kept-audio", patch.getAsJsonArray("media_ids").get(0).getAsString());
+		for(String key:List.of("nbw_fid", "geo_province", "geo_city", "geo_district", "visibility")) assertFalse(key, patch.has(key));
+		assertEquals(0, count(RecommendNBWForum.class)); assertEquals(0, count(CreateStatus.class));
+	}
+
+	@Test public void legacyEditDoesNotRequireBindingAndExplicitNoSyncIsReachable() throws Exception{
+		launch(null, false, status("p_legacy"), null);
+		assertTrue(publishItem().isEnabled()); assertEquals(0, count(GetOwnAccount.class));
+		chooseForum(R.string.nbw_forum_share);
+		assertDisabledMenuDoesNotSend();
+		chooseForum(R.string.nbw_forum_none);
+		assertTrue(publishItem().isEnabled()); clickPublish();
+		assertEquals(-1, json(last(EditStatus.class)).get("nbw_fid").getAsInt());
+		assertEquals(0, count(RecommendNBWForum.class));
+	}
+
+	@Test public void commentEditPreservesOpaqueParentAndBypassesAllRootSyncGates() throws Exception{
+		for(String parent:List.of("p_123", "c_456", "nbw_123", "nbw_123_456")){
+			Status edited=status("c_edit"); edited.inReplyToId=parent;
+			launch(null, false, edited, null);
+			assertEquals(View.GONE, fragment.getView().findViewById(R.id.btn_visibility).getVisibility());
+			assertEquals(View.GONE, fragment.getView().findViewById(R.id.btn_location).getVisibility());
+			assertEquals(0, count(GetOwnAccount.class)); setGeo(); clickPublish();
+			JsonObject patch=json(last(EditStatus.class)); assertEquals(parent, patch.get("in_reply_to_id").getAsString());
+			for(String key:List.of("nbw_fid", "geo_province", "geo_city", "geo_district")) assertFalse(key, patch.has(key));
+			assertEquals(0, count(RecommendNBWForum.class));
+		}
+	}
+
+	@Test public void nbwReplyKeepsFullParentIdAndReportsOnlyLocalSuccess() throws Exception{
+		for(String id:List.of("nbw_123", "nbw_123_456")){
+			launch(id); setBody(BODY); clickPublish(); assertReplyRequest(id, BODY);
+			Status result=status("c_created"); result.inReplyToId=id; result.nbwSync=new Status.NBWSync();
+			result.nbwSync.state="unsupported"; result.nbwSync.reason="reply_api_unavailable";
+			succeed(last(CreateStatus.class), result);
+			assertEquals(activity.getString(R.string.compose_nbw_reply_local_only), org.robolectric.shadows.ShadowToast.getTextOfLatestToast());
+		}
+	}
+
+	@Test public void editSelectionsSurviveRealActivityRecreationAndClearGeoExplicitly() throws Exception{
+		launch(null, false, status("p_recreate"), null);
+		chooseForum(R.string.nbw_forum_none);
+		setGeo(); field(ComposeFragment.class, "locationChanged").setBoolean(fragment, true);
+		Bundle restoredState=new Bundle();
+		controller.pause().saveInstanceState(restoredState).stop().destroy();
+		controller=Robolectric.buildActivity(FragmentStackActivity.class);
+		activity=controller.get();
+		activity.setTheme(R.style.Theme_Mastodon_Light);
+		controller.create(restoredState).start().restoreInstanceState(restoredState).postCreate(restoredState).resume().visible();
+		idle();
+		fragment=(ComposeFragment)activity.getFragmentManager().getFragments().stream().filter(ComposeFragment.class::isInstance).findFirst().orElseThrow();
+		body=fragment.getView().findViewById(R.id.toot_text); menu=((Toolbar)fragment.getView().findViewById(R.id.toolbar)).getMenu();
+		assertEquals(-1, field(ComposeFragment.class, "selectedNBWForumId").getInt(fragment));
+		assertEquals(2, field(ComposeFragment.class, "selectedLocationLevel").getInt(fragment));
+		assertTrue(field(ComposeFragment.class, "locationChanged").getBoolean(fragment));
+		LocationUtils.ResolvedLocation restored=(LocationUtils.ResolvedLocation)field(ComposeFragment.class, "currentLocation").get(fragment);
+		assertEquals("Offline district", restored.district());
+		field(ComposeFragment.class, "selectedLocationLevel").setInt(fragment, 3);
+		clickPublish(); JsonObject patch=json(last(EditStatus.class));
+		assertEquals(-1, patch.get("nbw_fid").getAsInt());
+		for(String key:List.of("geo_province", "geo_city", "geo_district")) assertTrue(key, patch.get(key).isJsonNull());
+	}
+
 	private FriendCard friendCard(){
 		FriendCard card=new FriendCard(); card.id="current-card"; card.schemaVersion=1;
 		card.title="Current card"; card.state="active"; return card;
@@ -488,6 +575,11 @@ public class ComposeReplyPublishingBehaviorTest{
 	private void launch(String replyId) throws Exception{ launch(replyId, false); }
 
 	private void launch(String replyId, boolean editingFriendCard) throws Exception{
+		launch(replyId, editingFriendCard, null, null);
+	}
+
+	private void launch(String replyId, boolean editingFriendCard, Status editedStatus,
+			org.joinmastodon.android.api.requests.statuses.GetStatusSourceText.Response source) throws Exception{
 		closeScreen();
 		LocalRequests.sent.clear();
 		LocalRequests.accounts.clear();
@@ -507,6 +599,12 @@ public class ComposeReplyPublishingBehaviorTest{
 			args.putParcelable("editStatus", Parcels.wrap(edited));
 			args.putString("sourceText", BODY); args.putString("sourceSpoiler", "");
 			args.putString("sourceFriendCardId", "current-card");
+		}
+		if(editedStatus!=null){
+			args.putParcelable("editStatus", Parcels.wrap(editedStatus));
+			args.putString("sourceText", BODY);
+			args.putString("sourceSpoiler", editedStatus.spoilerText);
+			if(source!=null) args.putParcelable("editSource", Parcels.wrap(source));
 		}
 		fragment.setArguments(args);
 		activity.showFragment(fragment);
