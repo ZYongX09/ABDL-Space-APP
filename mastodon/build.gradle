@@ -235,6 +235,9 @@ android {
 		defaultPropertiesFileName = "/dev/null"
 	}
 	packaging {
+		jniLibs {
+			useLegacyPackaging = true
+		}
 		resources {
 			excludes += ['META-INF/DEPENDENCIES', 'META-INF/LICENSE', 'META-INF/LICENSE.txt', 'META-INF/NOTICE', 'META-INF/NOTICE.txt']
 		}
