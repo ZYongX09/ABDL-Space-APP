@@ -10,6 +10,8 @@ import java.util.List;
 public class StatusContext extends BaseModel{
 	public List<Status> ancestors;
 	public List<Status> descendants;
+	/** Optional extension: missing on older servers, without weakening required context/status fields. */
+	public boolean nbwUnavailable;
 	public transient AsyncRefreshHeader asyncRefresh;
 
 	@Override

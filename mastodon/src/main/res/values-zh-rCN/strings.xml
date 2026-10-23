@@ -176,6 +176,8 @@
 	<string name="nbw_interaction_binding_required">点赞或收藏宝宝新天地的帖子前，请先绑定宝宝新天地账号。</string>
 	<string name="nbw_register_switch_account">一键注册前请先切换到此 ABDL Space 账号，或使用上方的“绑定已有账号”。</string>
 	<string name="nbw_reply_interaction_unsupported">暂不支持对宝宝新天地的楼层回复点赞或收藏。</string>
+	<string name="nbw_context_degraded">外站回复暂不可用，已显示本站评论</string>
+	<string name="nbw_context_degraded_empty">外站回复暂不可用，尚未取回外站回复</string>
 	<string name="compose_nbw_keep_existing">保留原同步设置</string>
 	<string name="compose_nbw_edit_preserve">保存时保留原同步设置。已同步到宝宝新天地的帖子，其修改暂时无法同步。</string>
 	<string name="compose_nbw_reply_local_only">此回复仅保存到 ABDL Space，宝宝新天地回复同步接口暂未提供。</string>

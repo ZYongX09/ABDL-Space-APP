@@ -5,6 +5,8 @@ import static org.junit.Assert.*;
 import android.app.Fragment;
 import android.os.Bundle;
 import android.view.View;
+import android.view.ViewGroup;
+import android.widget.TextView;
 
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -240,6 +242,77 @@ public class ThreadTimelineEventBehaviorTest{
 		created(hiddenEvent); assertEquals(List.of("p_root", "c_home"), threadIDs());
 	}
 
+	@Test @Config(qualifiers="zh-rCN") public void degradedRemoteContextShowsLocalRepliesOnceAndRetryUsesSameRoot() throws Exception{
+		launchThread("nbw_123");
+		success(requestContext(false), degradedContext(List.of(status("c_local", "nbw_123"))));
+		assertEquals(List.of("nbw_123", "c_local"), threadIDs()); assertUniqueDisplayRows();
+		ViewGroup container=snackbarContainer(); Object snackbar=container.getTag(R.id.current_snackbar);
+		assertNotNull(snackbar);
+		assertEquals("外站回复暂不可用，已显示本站评论", thread.getString(R.string.nbw_context_degraded));
+		assertEquals(1, viewsWithText(container, thread.getString(R.string.nbw_context_degraded)).size());
+		success(requestContext(true), degradedContext(List.of(status("c_local", "nbw_123"))));
+		assertSame(snackbar, container.getTag(R.id.current_snackbar));
+		int requests=contextRequests().size();
+		TextView retry=onlyText(container, thread.getString(R.string.retry)); assertTrue(retry.performClick()); idle();
+		assertEquals(requests+1, contextRequests().size());
+		GetStatusContext pending=contextRequests().get(requests);
+		assertEquals("/statuses/nbw_123/context", field(MastodonAPIRequest.class, "path").get(pending));
+		assertTrue(field(thread.getClass(), "refreshing").getBoolean(thread));
+		assertTrue(retry.performClick()); idle(); assertEquals(requests+1, contextRequests().size());
+		success(pending, degradedContext(List.of(status("c_local", "nbw_123"))));
+		assertSame(snackbar, container.getTag(R.id.current_snackbar));
+		assertEquals(1, viewsWithText(container, thread.getString(R.string.nbw_context_degraded)).size());
+		success(requestContext(true), context(List.of(), List.of(status("c_local", "nbw_123"), status("nbw_123_456", "nbw_123"))));
+		assertNull(container.getTag(R.id.current_snackbar));
+		assertTrue(viewsWithText(container, thread.getString(R.string.nbw_context_degraded)).isEmpty());
+		assertEquals(List.of("nbw_123", "c_local", "nbw_123_456"), threadIDs());
+		success(requestContext(true), degradedContext(List.of(status("c_local", "nbw_123"))));
+		assertNotNull(container.getTag(R.id.current_snackbar)); assertNotSame(snackbar, container.getTag(R.id.current_snackbar));
+	}
+
+	@Test @Config(qualifiers="zh-rCN") public void emptyDegradedContextStillWarnsThatExternalRepliesWereNotRetrieved() throws Exception{
+		launchThread(); success(requestContext(false), degradedContext(List.of()));
+		assertEquals(List.of("p_root"), threadIDs());
+		assertEquals("外站回复暂不可用，尚未取回外站回复", thread.getString(R.string.nbw_context_degraded_empty));
+		ViewGroup container=snackbarContainer(); assertNotNull(container.getTag(R.id.current_snackbar));
+		assertEquals(1, viewsWithText(container, thread.getString(R.string.nbw_context_degraded_empty)).size());
+		assertTrue(viewsWithText(container, thread.getString(R.string.nbw_context_degraded)).isEmpty());
+		Object snackbar=container.getTag(R.id.current_snackbar);
+		success(requestContext(true), degradedContext(List.of())); assertSame(snackbar, container.getTag(R.id.current_snackbar));
+	}
+
+	@Test public void degradedNoticeIsRemovedOnExitAndDoesNotReappearFromLateResponses() throws Exception{
+		launchThread(); success(requestContext(false), degradedContext(List.of(status("c_local", "p_root"))));
+		ViewGroup container=snackbarContainer(); assertNotNull(container.getTag(R.id.current_snackbar));
+		GetStatusContext late=requestContext(true); thread.onHidden();
+		assertNull(container.getTag(R.id.current_snackbar));
+		assertTrue(viewsWithText(container, thread.getString(R.string.nbw_context_degraded)).isEmpty());
+		success(late, degradedContext(List.of(status("c_local", "p_root")))); assertNull(container.getTag(R.id.current_snackbar));
+		thread.onShown(); assertNull(container.getTag(R.id.current_snackbar));
+		success(requestContext(true), context(List.of(), List.of()));
+		success(requestContext(true), degradedContext(List.of())); assertNotNull(container.getTag(R.id.current_snackbar));
+		lifecycle.pause(); assertNull(container.getTag(R.id.current_snackbar));
+		lifecycle.resume(); assertNull(container.getTag(R.id.current_snackbar));
+		success(requestContext(true), context(List.of(), List.of()));
+		success(requestContext(true), degradedContext(List.of())); assertNotNull(container.getTag(R.id.current_snackbar));
+		thread.getFragmentManager().beginTransaction().remove(thread).commit();
+		thread.getFragmentManager().executePendingTransactions(); idle();
+		assertNull(container.getTag(R.id.current_snackbar)); assertNull(thread.getView());
+	}
+
+	@Test public void rootDeletionDismissesDegradedNoticeAndRejectsLateRetryAndSuccess() throws Exception{
+		launchThread(); success(requestContext(false), degradedContext(List.of(status("c_local", "p_root"))));
+		ViewGroup container=snackbarContainer(); TextView retry=onlyText(container, thread.getString(R.string.retry));
+		GetStatusContext pending=requestContext(true);
+		E.post(new StatusDeletedEvent("p_root", session.getID())); idle();
+		assertEquals(List.of(thread), LocalNavigation.finished); assertNull(container.getTag(R.id.current_snackbar));
+		assertTrue(field(MastodonAPIRequest.class, "canceled").getBoolean(pending));
+		int requests=contextRequests().size(); assertTrue(retry.performClick()); idle();
+		thread.doLoadData(0, 20); assertEquals(requests, contextRequests().size());
+		success(pending, degradedContext(List.of(status("c_late", "p_root"))));
+		assertNull(container.getTag(R.id.current_snackbar)); assertFalse(threadIDs().contains("c_late"));
+	}
+
 	private AccountProbe accountProbe(GetAccountStatuses.Filter filter) throws Exception{
 		AccountProbe account=new AccountProbe(); account.accountID=session.getID();
 		field(AccountTimelineFragment.class, "user").set(account, session.self);
@@ -247,11 +320,12 @@ public class ThreadTimelineEventBehaviorTest{
 	}
 	private void register(Object listener){ E.register(listener); extraListeners.add(listener); }
 	private void created(Status status){ E.post(new StatusCreatedEvent(status, session.getID())); idle(); }
-	private void launchThread(){
+	private void launchThread(){ launchThread("p_root"); }
+	private void launchThread(String rootID){
 		lifecycle=Robolectric.buildActivity(FragmentStackActivity.class);
 		FragmentStackActivity activity=lifecycle.get(); activity.setTheme(R.style.Theme_Mastodon_Light); lifecycle.create();
 		thread=new ThreadFragment(); Bundle args=new Bundle(); args.putString("account", session.getID());
-		args.putParcelable("status", Parcels.wrap(status("p_root", null))); args.putBoolean("noAutoLoad", true); thread.setArguments(args);
+		args.putParcelable("status", Parcels.wrap(status(rootID, null))); args.putBoolean("noAutoLoad", true); thread.setArguments(args);
 		activity.showFragment(thread); lifecycle.start().resume().visible(); idle(); assertNotNull(thread.getView());
 	}
 	private GetStatusContext requestContext(boolean refreshing) throws Exception{
@@ -266,6 +340,24 @@ public class ThreadTimelineEventBehaviorTest{
 	}
 	private static StatusContext context(List<Status> ancestors, List<Status> descendants){
 		StatusContext context=new StatusContext(); context.ancestors=ancestors; context.descendants=descendants; return context;
+	}
+	private static StatusContext degradedContext(List<Status> descendants){
+		StatusContext context=context(List.of(), descendants); context.nbwUnavailable=true; return context;
+	}
+	private ViewGroup snackbarContainer() throws Exception{ return (ViewGroup)field(thread.getClass(), "contentWrap").get(thread); }
+	private List<GetStatusContext> contextRequests(){
+		return LocalRequests.sent.stream().filter(GetStatusContext.class::isInstance).map(GetStatusContext.class::cast).collect(Collectors.toList());
+	}
+	private static List<TextView> viewsWithText(View view, String text){
+		ArrayList<TextView> matches=new ArrayList<>();
+		if(view instanceof TextView label && text.contentEquals(label.getText())) matches.add(label);
+		if(view instanceof ViewGroup group){
+			for(int i=0;i<group.getChildCount();i++) matches.addAll(viewsWithText(group.getChildAt(i), text));
+		}
+		return matches;
+	}
+	private static TextView onlyText(View view, String text){
+		List<TextView> matches=viewsWithText(view, text); assertEquals(1, matches.size()); return matches.get(0);
 	}
 	private static FilterResult hiddenIn(FilterContext context){
 		Filter filter=new Filter(); filter.id="hide_"+context; filter.title="Offline filter";

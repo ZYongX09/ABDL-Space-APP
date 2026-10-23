@@ -169,6 +169,52 @@ public class StatusLifecycleHttpTest{
 		assertEquals("nbw_123_456", result.descendants.get(1).inReplyToId); assertEquals("c_9", result.descendants.get(1).id);
 	}
 
+	@Test public void contextDegradationIsOptionalAndOrsJsonWithHeader() throws Exception{
+		String[] flags={"", ",\"nbw_unavailable\":false", ",\"nbw_unavailable\":true", "", ",\"nbw_unavailable\":false", ",\"nbw_unavailable\":true"};
+		String[] headers={null, null, null, "nbw", "NBW", "other"};
+		boolean[] degraded={false, false, true, true, true, true};
+		for(int i=0;i<flags.length;i++){
+			String root=i%2==0 ? "p_1" : "nbw_123";
+			String body="{\"ancestors\":[],\"descendants\":["+status("c_local", root)+"]"+flags[i]+"}";
+			MockResponse response=json(200, body);
+			if(headers[i]!=null) response.setHeader("X-ABDL-Context-Degraded", headers[i]);
+			StatusContext result=success(submit(new GetStatusContext(root), response, "GET", "/statuses/"+root+"/context"));
+			assertEquals(degraded[i], result.nbwUnavailable);
+			assertTrue(result.ancestors.isEmpty()); assertEquals(1, result.descendants.size());
+			assertEquals("c_local", result.descendants.get(0).id); assertEquals(root, result.descendants.get(0).inReplyToId);
+		}
+		StatusContext empty=success(submit(new GetStatusContext("nbw_123"),
+				json(200, "{\"ancestors\":[],\"descendants\":[],\"nbw_unavailable\":true}"), "GET", "/statuses/nbw_123/context"));
+		assertTrue(empty.nbwUnavailable); assertTrue(empty.descendants.isEmpty());
+	}
+
+	@Test public void degradedContextStillRequiresBothArraysAndFullStatuses() throws Exception{
+		for(String required:new String[]{"ancestors", "descendants"}){
+			for(boolean explicitNull:new boolean[]{false, true}){
+				JsonObject body=JsonParser.parseString("{\"ancestors\":[],\"descendants\":[],\"nbw_unavailable\":true}").getAsJsonObject();
+				if(explicitNull) body.add(required, com.google.gson.JsonNull.INSTANCE); else body.remove(required);
+				MastodonErrorResponse error=failure(submit(new GetStatusContext("p_1"),
+						json(200, body.toString()).setHeader("X-ABDL-Context-Degraded", "nbw"), "GET", "/statuses/p_1/context"), 200);
+				assertTrue(error.underlyingException instanceof ObjectValidationException); assertTrue(error.error.contains(required));
+			}
+			JsonObject body=JsonParser.parseString("{\"ancestors\":[],\"descendants\":[],\"nbw_unavailable\":true}").getAsJsonObject();
+			JsonObject invalid=JsonParser.parseString(status("c_bad", "p_1")).getAsJsonObject(); invalid.remove("created_at");
+			body.getAsJsonArray(required).add(invalid);
+			assertTrue(failure(submit(new GetStatusContext("p_1"), json(200, body.toString()),
+					"GET", "/statuses/p_1/context"), 200).underlyingException instanceof ObjectValidationException);
+		}
+	}
+
+	@Test public void contextHttpFailuresNeverBecomeDegradedSuccess() throws Exception{
+		for(int code:new int[]{503, 401, 403, 400}){
+			String message=code==400 ? "invalid_cursor" : code==503 ? "nbw_unavailable" : "forbidden";
+			MastodonErrorResponse error=failure(submit(new GetStatusContext("nbw_123"),
+					json(code, "{\"error\":\""+message+"\",\"ancestors\":[],\"descendants\":[],\"nbw_unavailable\":true}")
+							.setHeader("X-ABDL-Context-Degraded", "nbw"), "GET", "/statuses/nbw_123/context"), code);
+			assertEquals(message, error.error);
+		}
+	}
+
 	private static String status(String id, String parent){
 		return "{\"id\":\""+id+"\",\"uri\":\"https://"+HOST+"/statuses/"+id+"\",\"created_at\":\"2026-10-22T00:00:00Z\",\"visibility\":\"public\",\"content\":\"<p>Body</p>\",\"spoiler_text\":\"\",\"account\":{\"id\":\"42\",\"username\":\"offline\",\"acct\":\"offline\",\"url\":\"https://"+HOST+"/profile/42\"},\"mentions\":[],\"tags\":[],\"emojis\":[],\"media_attachments\":[],\"in_reply_to_id\":"+(parent==null ? "null" : "\""+parent+"\"")+"}";
 	}

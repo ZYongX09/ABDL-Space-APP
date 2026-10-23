@@ -16,6 +16,7 @@ public class GetStatusContext extends MastodonAPIRequest<StatusContext>{
 	@Override
 	public void validateAndPostprocessResponse(StatusContext respObj, Response httpResponse) throws IOException{
 		super.validateAndPostprocessResponse(respObj, httpResponse);
+		respObj.nbwUnavailable|="nbw".equalsIgnoreCase(httpResponse.header("X-ABDL-Context-Degraded"));
 		respObj.asyncRefresh=AsyncRefreshHeader.fromHttpResponse(httpResponse);
 	}
 }

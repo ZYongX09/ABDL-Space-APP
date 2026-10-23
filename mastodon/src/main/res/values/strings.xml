@@ -671,6 +671,8 @@
 	<string name="nbw_interaction_binding_required">Bind a 宝宝新天地 account to like or bookmark posts from 宝宝新天地.</string>
 	<string name="nbw_register_switch_account">Switch to this ABDL Space account before one-click registration, or bind an existing account above.</string>
 	<string name="nbw_reply_interaction_unsupported">Likes and bookmarks for 宝宝新天地 replies are not available yet.</string>
+	<string name="nbw_context_degraded">External replies are temporarily unavailable. Local comments are shown.</string>
+	<string name="nbw_context_degraded_empty">External replies are temporarily unavailable and have not been retrieved.</string>
 	<string name="compose_nbw_keep_existing">Keep existing sync settings</string>
 	<string name="compose_nbw_edit_preserve">Saving preserves your existing sync settings. Changes to posts already on 宝宝新天地 cannot be synchronized yet.</string>
 	<string name="compose_nbw_reply_local_only">This reply was saved only to ABDL Space. 宝宝新天地 reply synchronization is not available yet.</string>

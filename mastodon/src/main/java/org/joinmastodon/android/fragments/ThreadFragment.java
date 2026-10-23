@@ -85,6 +85,10 @@ public class ThreadFragment extends StatusListFragment implements AssistContentP
 	private String asyncRefreshID;
 	private Consumer<AsyncRefresh> asyncRefreshCallback=this::onAsyncRefreshFinished;
 	private Snackbar moreRepliesSnackbar;
+	private Snackbar nbwContextSnackbar;
+	private boolean nbwContextUnavailable;
+	private boolean nbwContextHasLocalReplies;
+	private boolean nbwContextNoticeShown;
 	private Runnable asyncRefreshPartialRunnable=this::checkAsyncRefreshAndMaybeShowSnackbar;
 	private int prevNewRepliesCount;
 	private HashSet<String> newReplyIDs=new HashSet<>();
@@ -132,7 +136,20 @@ public class ThreadFragment extends StatusListFragment implements AssistContentP
 	}
 
 	@Override
+	public void onPause(){
+		dismissNbwContextSnackbar();
+		super.onPause();
+	}
+
+	@Override
+	public void onResume(){
+		super.onResume();
+		maybeShowNbwContextSnackbar();
+	}
+
+	@Override
 	public void onDestroyView(){
+		dismissNbwContextSnackbar();
 		moreRepliesSnackbar=null;
 		if(asyncRefreshID!=null){
 			contentView.removeCallbacks(asyncRefreshPartialRunnable);
@@ -297,6 +314,14 @@ public class ThreadFragment extends StatusListFragment implements AssistContentP
 							list.scrollToPosition(displayItems.size()-count);
 						}
 						setRefreshEnabled(true);
+						nbwContextUnavailable=result.nbwUnavailable;
+						nbwContextHasLocalReplies=data.stream().anyMatch(s->!s.id.equals(mainStatus.id) && s.inReplyToId!=null && !s.id.startsWith("nbw_"));
+						if(nbwContextUnavailable){
+							maybeShowNbwContextSnackbar();
+						}else{
+							nbwContextNoticeShown=false;
+							dismissNbwContextSnackbar();
+						}
 					}
 				})
 				.exec(accountID);
@@ -313,6 +338,13 @@ public class ThreadFragment extends StatusListFragment implements AssistContentP
 			dataLoading=true;
 			doLoadData();
 		}
+		maybeShowNbwContextSnackbar();
+	}
+
+	@Override
+	protected void onHidden(){
+		dismissNbwContextSnackbar();
+		super.onHidden();
 	}
 
 	@Override
@@ -371,6 +403,7 @@ public class ThreadFragment extends StatusListFragment implements AssistContentP
 		boolean deletingMain=status.id.equals(mainStatus.id);
 		if(deletingMain){
 			mainStatusDeleted=true;
+			dismissNbwContextSnackbar();
 			pendingCreatedReplies.clear();
 			if(currentRequest!=null){
 				currentRequest.cancel();
@@ -540,6 +573,35 @@ public class ThreadFragment extends StatusListFragment implements AssistContentP
 		if(results>0){
 			showMoreRepliesSnackbar();
 			prevNewRepliesCount=results;
+		}
+	}
+
+	private void maybeShowNbwContextSnackbar(){
+		if(mainStatusDeleted || !nbwContextUnavailable || nbwContextNoticeShown || nbwContextSnackbar!=null
+				|| getActivity()==null || getView()==null || contentWrap==null || !isResumed() || isHidden())
+			return;
+		nbwContextNoticeShown=true;
+		Snackbar snackbar=new Snackbar.Builder(getActivity())
+				.setText(nbwContextHasLocalReplies ? R.string.nbw_context_degraded : R.string.nbw_context_degraded_empty)
+				.setAction(R.string.retry, ()->{
+					if(mainStatusDeleted || !nbwContextUnavailable || getActivity()==null || getView()==null
+							|| !isResumed() || isHidden() || refreshing || dataLoading)
+						return;
+					refresh();
+				})
+				.setPersistent()
+				.create();
+		nbwContextSnackbar=snackbar;
+		snackbar.setDismissListener(()->{
+			if(nbwContextSnackbar==snackbar) nbwContextSnackbar=null;
+		});
+		showSnackbar(snackbar);
+	}
+
+	private void dismissNbwContextSnackbar(){
+		if(nbwContextSnackbar!=null){
+			nbwContextSnackbar.dismissImmediately();
+			nbwContextSnackbar=null;
 		}
 	}
 
