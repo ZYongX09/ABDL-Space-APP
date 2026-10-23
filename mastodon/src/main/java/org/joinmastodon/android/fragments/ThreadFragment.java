@@ -577,6 +577,11 @@ public class ThreadFragment extends StatusListFragment implements AssistContentP
 	}
 
 	private void maybeShowNbwContextSnackbar(){
+		// The thread ID, not an author's NBW binding or cross-post metadata, owns this notice.
+		if(mainStatus==null || !mainStatus.id.startsWith("nbw_")){
+			dismissNbwContextSnackbar();
+			return;
+		}
 		if(mainStatusDeleted || !nbwContextUnavailable || nbwContextNoticeShown || nbwContextSnackbar!=null
 				|| getActivity()==null || getView()==null || contentWrap==null || !isResumed() || isHidden())
 			return;
@@ -584,6 +589,10 @@ public class ThreadFragment extends StatusListFragment implements AssistContentP
 		Snackbar snackbar=new Snackbar.Builder(getActivity())
 				.setText(nbwContextHasLocalReplies ? R.string.nbw_context_degraded : R.string.nbw_context_degraded_empty)
 				.setAction(R.string.retry, ()->{
+					if(mainStatus==null || !mainStatus.id.startsWith("nbw_")){
+						dismissNbwContextSnackbar();
+						return;
+					}
 					if(mainStatusDeleted || !nbwContextUnavailable || getActivity()==null || getView()==null
 							|| !isResumed() || isHidden() || refreshing || dataLoading)
 						return;

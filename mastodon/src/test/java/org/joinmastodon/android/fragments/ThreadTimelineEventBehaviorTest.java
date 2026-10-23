@@ -50,6 +50,7 @@ import org.robolectric.annotation.LooperMode;
 import org.robolectric.annotation.RealObject;
 import org.robolectric.shadows.ShadowChoreographer;
 import org.robolectric.shadows.ShadowLooper;
+import org.robolectric.shadows.ShadowToast;
 
 import java.lang.reflect.Field;
 import java.time.Instant;
@@ -271,8 +272,8 @@ public class ThreadTimelineEventBehaviorTest{
 	}
 
 	@Test @Config(qualifiers="zh-rCN") public void emptyDegradedContextStillWarnsThatExternalRepliesWereNotRetrieved() throws Exception{
-		launchThread(); success(requestContext(false), degradedContext(List.of()));
-		assertEquals(List.of("p_root"), threadIDs());
+		launchThread("nbw_123"); success(requestContext(false), degradedContext(List.of()));
+		assertEquals(List.of("nbw_123"), threadIDs());
 		assertEquals("外站回复暂不可用，尚未取回外站回复", thread.getString(R.string.nbw_context_degraded_empty));
 		ViewGroup container=snackbarContainer(); assertNotNull(container.getTag(R.id.current_snackbar));
 		assertEquals(1, viewsWithText(container, thread.getString(R.string.nbw_context_degraded_empty)).size());
@@ -282,12 +283,12 @@ public class ThreadTimelineEventBehaviorTest{
 	}
 
 	@Test public void degradedNoticeIsRemovedOnExitAndDoesNotReappearFromLateResponses() throws Exception{
-		launchThread(); success(requestContext(false), degradedContext(List.of(status("c_local", "p_root"))));
+		launchThread("nbw_123"); success(requestContext(false), degradedContext(List.of(status("c_local", "nbw_123"))));
 		ViewGroup container=snackbarContainer(); assertNotNull(container.getTag(R.id.current_snackbar));
 		GetStatusContext late=requestContext(true); thread.onHidden();
 		assertNull(container.getTag(R.id.current_snackbar));
 		assertTrue(viewsWithText(container, thread.getString(R.string.nbw_context_degraded)).isEmpty());
-		success(late, degradedContext(List.of(status("c_local", "p_root")))); assertNull(container.getTag(R.id.current_snackbar));
+		success(late, degradedContext(List.of(status("c_local", "nbw_123")))); assertNull(container.getTag(R.id.current_snackbar));
 		thread.onShown(); assertNull(container.getTag(R.id.current_snackbar));
 		success(requestContext(true), context(List.of(), List.of()));
 		success(requestContext(true), degradedContext(List.of())); assertNotNull(container.getTag(R.id.current_snackbar));
@@ -301,16 +302,94 @@ public class ThreadTimelineEventBehaviorTest{
 	}
 
 	@Test public void rootDeletionDismissesDegradedNoticeAndRejectsLateRetryAndSuccess() throws Exception{
-		launchThread(); success(requestContext(false), degradedContext(List.of(status("c_local", "p_root"))));
+		launchThread("nbw_123"); success(requestContext(false), degradedContext(List.of(status("c_local", "nbw_123"))));
 		ViewGroup container=snackbarContainer(); TextView retry=onlyText(container, thread.getString(R.string.retry));
 		GetStatusContext pending=requestContext(true);
-		E.post(new StatusDeletedEvent("p_root", session.getID())); idle();
+		E.post(new StatusDeletedEvent("nbw_123", session.getID())); idle();
 		assertEquals(List.of(thread), LocalNavigation.finished); assertNull(container.getTag(R.id.current_snackbar));
 		assertTrue(field(MastodonAPIRequest.class, "canceled").getBoolean(pending));
 		int requests=contextRequests().size(); assertTrue(retry.performClick()); idle();
 		thread.doLoadData(0, 20); assertEquals(requests, contextRequests().size());
-		success(pending, degradedContext(List.of(status("c_late", "p_root"))));
+		success(pending, degradedContext(List.of(status("c_late", "nbw_123"))));
 		assertNull(container.getTag(R.id.current_snackbar)); assertFalse(threadIDs().contains("c_late"));
+	}
+
+	@Test public void nativeDegradedContextIsSilentWithEmptyLocalAndPendingReplies() throws Exception{
+		assertNativeDegradationStaysSilent(status("p_root", null));
+	}
+
+	@Test public void crossPostedNativeContextWithBoundNbwAuthorIsStillSilent() throws Exception{
+		session.self.nbwUsername="bound_external_name";
+		Status root=status("p_root", null); root.nbwTid=123L; root.nbwFid=27;
+		root.nbwSync=new Status.NBWSync(); root.nbwSync.state="synced";
+		assertNativeDegradationStaysSilent(root);
+	}
+
+	@Test public void legacyNumericNativeContextIsSilentAndRendersLocalReplies() throws Exception{
+		session.self.nbwUsername="bound_external_name";
+		assertNativeDegradationStaysSilent(status("123", null));
+	}
+
+	@Test public void nativeCommentContextIsSilentAndRendersLocalReplies() throws Exception{
+		assertNativeDegradationStaysSilent(status("c_root", "p_parent"));
+	}
+
+	@Test public void nativeDegradationImmediatelyDismissesExistingNoticeAndRejectsItsStaleRetry() throws Exception{
+		launchThread("nbw_123"); success(requestContext(false), degradedContext(List.of()));
+		ViewGroup container=snackbarContainer(); assertNotNull(container.getTag(R.id.current_snackbar));
+		TextView staleRetry=onlyText(container, thread.getString(R.string.retry));
+		// Retain a genuine old notice/action while the authoritative thread is native.
+		field(ThreadFragment.class, "mainStatus").set(thread, status("p_root", null));
+		ShadowToast.reset();
+		success(requestContext(true), degradedContext(List.of(status("c_local", "p_root"))));
+		assertEquals(List.of("p_root", "c_local"), threadIDs()); assertUniqueDisplayRows();
+		assertNoNbwContextNotice(); assertNull(field(ThreadFragment.class, "nbwContextSnackbar").get(thread));
+		assertTrue(field(ThreadFragment.class, "nbwContextUnavailable").getBoolean(thread));
+		int requests=contextRequests().size(); assertTrue(staleRetry.performClick()); idle();
+		assertEquals(requests, contextRequests().size()); assertNoNbwContextNotice();
+	}
+
+	@Test public void degradedNbwFloorContextStillOffersOneRetryNotice() throws Exception{
+		launchThread("nbw_123_456"); success(requestContext(false), degradedContext(List.of()));
+		ViewGroup container=snackbarContainer(); Object notice=container.getTag(R.id.current_snackbar); assertNotNull(notice);
+		int requests=contextRequests().size();
+		assertTrue(onlyText(container, thread.getString(R.string.retry)).performClick()); idle();
+		assertEquals(requests+1, contextRequests().size());
+		GetStatusContext retry=contextRequests().get(requests);
+		assertEquals("/statuses/nbw_123_456/context", field(MastodonAPIRequest.class, "path").get(retry));
+		success(retry, degradedContext(List.of()));
+		assertSame(notice, container.getTag(R.id.current_snackbar));
+		assertEquals(1, viewsWithText(container, thread.getString(R.string.nbw_context_degraded_empty)).size());
+	}
+
+	private void assertNativeDegradationStaysSilent(Status root) throws Exception{
+		launchThread(root); ShadowToast.reset();
+		StatusContext empty=degradedContext(List.of()); success(requestContext(false), empty);
+		assertTrue(empty.nbwUnavailable); assertEquals(List.of(root.id), threadIDs()); assertNoNbwContextNotice();
+		Status local=status("c_local", root.id), legacy=status("72", "c_local");
+		StatusContext degraded=degradedContext(List.of(local, legacy)); success(requestContext(true), degraded);
+		assertTrue(degraded.nbwUnavailable); assertEquals(List.of(root.id, "c_local", "72"), threadIDs());
+		created(status("c_pending", "c_local"));
+		success(requestContext(true), degradedContext(List.of(local, legacy)));
+		assertEquals(List.of(root.id, "c_local", "72", "c_pending"), threadIDs()); assertUniqueDisplayRows();
+		for(String id:threadIDs()) assertTrue("Display items must include "+id, thread.displayItems.stream().anyMatch(item->id.equals(item.parentID)));
+		assertTrue(field(ThreadFragment.class, "nbwContextUnavailable").getBoolean(thread));
+		assertFalse(field(ThreadFragment.class, "nbwContextNoticeShown").getBoolean(thread));
+		assertNoNbwContextNotice();
+		int requests=contextRequests().size();
+		thread.onHidden(); thread.onShown(); lifecycle.pause().resume(); idle();
+		assertEquals(requests, contextRequests().size()); assertNoNbwContextNotice();
+		success(requestContext(true), context(List.of(), List.of(local, legacy, status("c_pending", "c_local"))));
+		assertFalse(field(ThreadFragment.class, "nbwContextUnavailable").getBoolean(thread));
+		assertEquals(List.of(root.id, "c_local", "72", "c_pending"), threadIDs()); assertNoNbwContextNotice();
+	}
+
+	private void assertNoNbwContextNotice() throws Exception{
+		ViewGroup container=snackbarContainer(); assertNull(container.getTag(R.id.current_snackbar));
+		assertTrue(viewsWithText(container, thread.getString(R.string.nbw_context_degraded)).isEmpty());
+		assertTrue(viewsWithText(container, thread.getString(R.string.nbw_context_degraded_empty)).isEmpty());
+		assertTrue(viewsWithText(container, thread.getString(R.string.retry)).isEmpty());
+		assertNull(ShadowToast.getTextOfLatestToast());
 	}
 
 	private AccountProbe accountProbe(GetAccountStatuses.Filter filter) throws Exception{
@@ -321,11 +400,12 @@ public class ThreadTimelineEventBehaviorTest{
 	private void register(Object listener){ E.register(listener); extraListeners.add(listener); }
 	private void created(Status status){ E.post(new StatusCreatedEvent(status, session.getID())); idle(); }
 	private void launchThread(){ launchThread("p_root"); }
-	private void launchThread(String rootID){
+	private void launchThread(String rootID){ launchThread(status(rootID, null)); }
+	private void launchThread(Status root){
 		lifecycle=Robolectric.buildActivity(FragmentStackActivity.class);
 		FragmentStackActivity activity=lifecycle.get(); activity.setTheme(R.style.Theme_Mastodon_Light); lifecycle.create();
 		thread=new ThreadFragment(); Bundle args=new Bundle(); args.putString("account", session.getID());
-		args.putParcelable("status", Parcels.wrap(status(rootID, null))); args.putBoolean("noAutoLoad", true); thread.setArguments(args);
+		args.putParcelable("status", Parcels.wrap(root)); args.putBoolean("noAutoLoad", true); thread.setArguments(args);
 		activity.showFragment(thread); lifecycle.start().resume().visible(); idle(); assertNotNull(thread.getView());
 	}
 	private GetStatusContext requestContext(boolean refreshing) throws Exception{

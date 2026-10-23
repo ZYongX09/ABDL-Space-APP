@@ -186,6 +186,13 @@ public class StatusLifecycleHttpTest{
 		StatusContext empty=success(submit(new GetStatusContext("nbw_123"),
 				json(200, "{\"ancestors\":[],\"descendants\":[],\"nbw_unavailable\":true}"), "GET", "/statuses/nbw_123/context"));
 		assertTrue(empty.nbwUnavailable); assertTrue(empty.descendants.isEmpty());
+		for(String root:new String[]{"123", "c_1"}){
+			StatusContext nativeContext=success(submit(new GetStatusContext(root),
+					json(200, "{\"ancestors\":[],\"descendants\":["+status("c_local", root)+"],\"nbw_unavailable\":true}")
+							.setHeader("X-ABDL-Context-Degraded", "nbw"), "GET", "/statuses/"+root+"/context"));
+			assertTrue(nativeContext.nbwUnavailable); assertEquals("c_local", nativeContext.descendants.get(0).id);
+			assertEquals(root, nativeContext.descendants.get(0).inReplyToId);
+		}
 	}
 
 	@Test public void degradedContextStillRequiresBothArraysAndFullStatuses() throws Exception{
@@ -206,12 +213,14 @@ public class StatusLifecycleHttpTest{
 	}
 
 	@Test public void contextHttpFailuresNeverBecomeDegradedSuccess() throws Exception{
-		for(int code:new int[]{503, 401, 403, 400}){
-			String message=code==400 ? "invalid_cursor" : code==503 ? "nbw_unavailable" : "forbidden";
-			MastodonErrorResponse error=failure(submit(new GetStatusContext("nbw_123"),
-					json(code, "{\"error\":\""+message+"\",\"ancestors\":[],\"descendants\":[],\"nbw_unavailable\":true}")
-							.setHeader("X-ABDL-Context-Degraded", "nbw"), "GET", "/statuses/nbw_123/context"), code);
-			assertEquals(message, error.error);
+		for(String root:new String[]{"p_1", "123", "c_1", "nbw_123"}){
+			for(int code:new int[]{500, 503, 401, 403, 400}){
+				String message=code==400 ? "invalid_cursor" : code==503 ? "nbw_unavailable" : code==500 ? "local_failure" : "forbidden";
+				MastodonErrorResponse error=failure(submit(new GetStatusContext(root),
+						json(code, "{\"error\":\""+message+"\",\"ancestors\":[],\"descendants\":[],\"nbw_unavailable\":true}")
+								.setHeader("X-ABDL-Context-Degraded", "nbw"), "GET", "/statuses/"+root+"/context"), code);
+				assertEquals(message, error.error);
+			}
 		}
 	}
 
