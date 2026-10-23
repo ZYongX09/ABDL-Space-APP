@@ -20,11 +20,23 @@
 
 最终同源码、同次 release 单元回归 **45类408项全部通过，0失败/错误/跳过**，Robolectric仅启用API26/27/28。涵盖登录冷/热回调、NBW头像/来源与主页、Parcel与编辑源、发帖/编辑/删除HTTP契约、线程事件与通知、玻璃回退、折扇菜单、地图门禁、相册选择/上传、相机/窗口和定位。初轮408项中新增OAuth fixture因未加载GlobalUserPreferences在主题入口失败6项；补齐与生产相同的测试初始化后6/6再过，随后整组408再次完整通过，不把早期部分结果拼成最终计数。
 
-API33/35专属的硬件位图与地图图标两类未纳入本次低版本范围，不修改其测试断言。桌面原生Canvas/软件回退与Robolectric不等同老真机验收。只读API lint曾因宿主中断/换页未完成，不能据旧report宣称本轮lint全绿；源码SDK门槛和实际R8回移另行复核。正式签名测试包仍在最终打包核验中，尚不把构建开始等同出包。
+API33/35专属的硬件位图与地图图标两类未纳入本次低版本范围，不修改其测试断言。桌面原生Canvas/软件回退与Robolectric不等同老真机验收。只读API lint曾因宿主中断/换页未完成，不能据旧report宣称本轮lint全绿；源码SDK门槛和实际R8回移另行复核。正式签名测试包已完成构建与核验，见下方交付信息。
 
 首个只读 API lint 构建在宿主中断后重新执行；第二次非增量生产 Kotlin 已完成并输出全部类，Java 阶段受到本机换页压力显著拖慢。为降低峰值，终止该构建并将后续 Java/测试/打包分阶段运行；未删除缓存。仅在确认所有 Kotlin 源文件 hash 与该非增量输出输入一致后，仓外 init 通过 task.onlyIf 保留生产 Kotlin 任务节点、复用已完成输出，生产 Java 与新增测试仍重新编译。
 
 仓外证据目录：`/home/ZYongX/.local/share/abdl-space-release/20261023-android-3.2.0/`。
+
+## 最终交付
+
+- APK：`/home/ZYongX/projects/ABDL-Space-3.2.0-code34-compat-test.apk`。
+- 文件大小：151,512,653 bytes。
+- SHA256：`c214272180dd1f3ad087bf895ddb35bf27e58375921f0df189eaf0498fc4c7cc`。
+- 包名top.abdl_space.app，3.2.0/code34，min26/target35/compile37，非debug。
+- 既有正式证书SHA256 `fd2098a3d3493222c247a7ba2787ec48fd8f62d38e9432ed4d6290a057dea475`，V2签名、ZIP CRC及zipalign通过；verifyMapKeys通过。四ABI/29个原生库均DEFLATE且与上一包字节相同。
+- 对应功能源码提交fb0cf31a；后续仅更新交付文档，不改变已测源码与APK。Android develop已合并推送，正式main仍ed555e85；不改正式下载/更新JSON、不覆盖设备，旧包保留。
+- 后端删帖确认持久化/仅delete_thread有界幂等确认回归51/51，通过后已推develop f2f5905，但main仍acb3fc2，未上线；安装此APK不会自动上线该修复。生产首次删除的确切失败原因尚无日志证明。
+
+完整构建成功；初次打包仓外init脚本过晚修改lint.checkOnly失败，纠正该仓外脚本后重跑成功，项目配置未受此影响。D8仍报告既有工具链对较新Kotlin metadata的兼容警告（SplashActivityKt/AboutPageKt），非零错误未被忽略；本轮未升级AGP/Kotlin，不宣称工具链零警告。签名/完整性/版本/原生库核验已完成，物理低版本设备验收仍见下方边界。
 
 ## 验证边界
 
