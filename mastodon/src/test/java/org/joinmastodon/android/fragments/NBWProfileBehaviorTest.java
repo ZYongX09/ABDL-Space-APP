@@ -52,7 +52,7 @@ import okhttp3.Request;
 import okhttp3.Response;
 
 @RunWith(RobolectricTestRunner.class)
-@Config(sdk=28, application=CompatibilityTestApplication.class, shadows=NBWProfileBehaviorTest.LocalRequests.class)
+@Config(sdk={26,27,28}, application=CompatibilityTestApplication.class, shadows=NBWProfileBehaviorTest.LocalRequests.class)
 public class NBWProfileBehaviorTest{
 	@Implements(MastodonAPIRequest.class) public static class LocalRequests{
 		@RealObject MastodonAPIRequest<?> request;

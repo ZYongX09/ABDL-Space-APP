@@ -137,7 +137,8 @@ public class AppVersionReportingHttpTest {
         assertEquals(expected.getEncodedQuery(), recorded.getRequestUrl().encodedQuery());
         assertEquals(List.of("MastodonAndroid/"+BuildConfig.VERSION_NAME), recorded.getHeaders().values("User-Agent"));
         assertEquals(List.of(String.valueOf(BuildConfig.VERSION_CODE)), recorded.getHeaders().values("X-App-Version-Code"));
-        assertTrue("Internal version must be positive", BuildConfig.VERSION_CODE>0);
+        assertEquals("3.2.0", BuildConfig.VERSION_NAME);
+        assertEquals(34, BuildConfig.VERSION_CODE);
         assertTrue(recorded.getHeader("User-Agent").matches("^MastodonAndroid/.*"));
         if(conflict) assertEquals("preserved", recorded.getHeader("X-Caller-Header"));
         AccountSession session=(AccountSession)field(MastodonAPIController.class, "session").get(controller);

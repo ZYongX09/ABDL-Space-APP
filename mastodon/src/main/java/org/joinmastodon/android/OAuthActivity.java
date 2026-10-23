@@ -164,7 +164,7 @@ public class OAuthActivity extends Activity{
 						.setCallback(new Callback<>(){
 							@Override
 							public void onSuccess(Account account){
-								AccountSessionManager.getInstance().addAccount(instance, token, account, app, null);
+								AccountSessionManager.getInstance().addAccount(finalInstance, token, account, finalApp, null);
 								safeDismiss(progress);
 								finish();
 								Intent intent=new Intent(OAuthActivity.this, MainActivity.class);

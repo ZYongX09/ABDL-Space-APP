@@ -41,7 +41,7 @@ import okhttp3.mockwebserver.RecordedRequest;
 
 /** Real request/controller/Gson/validation over loopback; no account or live backend access. */
 @RunWith(RobolectricTestRunner.class)
-@Config(sdk=28, application=CompatibilityTestApplication.class)
+@Config(sdk={26,27,28}, application=CompatibilityTestApplication.class)
 public class StatusLifecycleHttpTest{
 	private static final String HOST="lifecycle.offline.example.test";
 	private MockWebServer server;
@@ -107,6 +107,9 @@ public class StatusLifecycleHttpTest{
 
 	@Test public void deletionFailureNeverBecomesSuccess() throws Exception{
 		assertEquals("权限不足", failure(submit(new DeleteStatus("p_1"), json(403, "{\"error\":\"权限不足\"}"), "DELETE", "/statuses/p_1"), 403).error);
+		for(int code:new int[]{500,502,503}){
+			assertEquals("local_delete_failed", failure(submit(new DeleteStatus("p_1"), json(code, "{\"error\":\"local_delete_failed\"}"), "DELETE", "/statuses/p_1"), code).error);
+		}
 	}
 
 	@Test public void sourceAcceptsSnakeAndLegacyCamelWithOptionalMetadata() throws Exception{
