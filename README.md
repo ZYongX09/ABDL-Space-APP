@@ -3,18 +3,20 @@
   <h1>ABDL Space · Android</h1>
   <p>面向中文 ABDL 社区的原生客户端，基于 Moshidon（Mastodon fork）二次开发</p>
   <p>
-    <img src="https://img.shields.io/badge/develop-3.1.0%20%2833%29-blue?style=flat-square" alt="develop 配置版本 3.1.0 (33)" />
+    <img src="https://img.shields.io/badge/Release-3.2.0%20%2834%29-blue?style=flat-square" alt="正式版本 3.2.0 (34)" />
     <img src="https://img.shields.io/badge/Android-8.0%2B-green?style=flat-square&logo=android&logoColor=white" alt="Android 8.0 及以上" />
     <img src="https://img.shields.io/badge/License-GPL--3.0-red?style=flat-square" alt="GPL-3.0" />
   </p>
-  <p><a href="https://abdl-space.top/app">官网下载与安装说明</a> · <a href="https://abdl-space.top">社区网站</a></p>
+  <p><a href="https://abdl-space.top/app">官网下载与安装说明</a> · <a href="https://github.com/ZYongX09/ABDL-Space-APP/releases/tag/v3.2.0">3.2.0 更新日志与安装包</a> · <a href="https://abdl-space.top">社区网站</a></p>
 </div>
 
 ## 项目简介
 
 ABDL Space Android 客户端与网页端共用账户和社区数据，在 Mastodon 兼容接口之上接入纸尿裤评价、交友、私信、相册、小说阅读与社区安全等业务。它不是网页套壳，也不是只连接任意 Mastodon 实例即可使用全部扩展功能的通用客户端；业务功能需要配套的 ABDL Space 后端。
 
-本 README 面向运行、调试和维护项目的开发者，描述的是 **`develop` 当前源码**。版本名 `3.1.0`、版本号 `33` 来自 [应用构建配置](mastodon/build.gradle)，不代表官网下载页当前发布版本。**`main` 是正式版代码分支，源码合并、测试包构建与正式发布是不同操作**；交友地图、商家广告和折扇 FAB 等开发能力不能据此认定已经向正式用户发布。
+当前版本为 **3.2.0（内部版本号 34）**，最低支持 Android 8.0。普通用户可从[官网下载页](https://abdl-space.top/app)或 [GitHub Release](https://github.com/ZYongX09/ABDL-Space-APP/releases/tag/v3.2.0) 获取使用既有正式签名的安装包；完整变更见 [3.2.0 更新日志](docs/release-3.2.0.md)。
+
+`main` 保存正式发布源码，`develop` 用于后续开发，具体版本配置见 [应用构建配置](mastodon/build.gradle)。源码合并、构建、上传安装包和更新线上版本信息是独立步骤，推送 `main` 不会自动完成官网发布。
 
 ## 关联仓库
 
@@ -40,13 +42,15 @@ ABDL Space Android 客户端与网页端共用账户和社区数据，在 Mastod
 | 安全与界面 | TensorFlow Lite 本地 NSFW 识别、举报、宝宝认证、PIN/生物识别应用锁；传统 View 页面与 Compose/miuix 页面并存，包含液态玻璃导航与兼容性处理 |
 | 应用更新 | Release 更新实现读取后端 `/api/v1/version`，提示下载并通过系统安装流程更新；生成 APK 不会自动更新该接口或官网下载页 |
 
-### `develop` 中需要单独验证的能力
+### 3.2.0 重点功能
 
 - **交友地图**：首页地图入口、百度/高德原生地图切换、设备定位、软件级模糊位置、公开/仅互关/隐藏设置，以及指定展示位置的赞助权益控制；全国浏览不要求赞助身份。SDK 隐私同意、系统定位授权与是否公开位置是不同步骤，不能用定位授权替代公开确认；隐藏或删除位置也不能仅靠退出登录。实现入口见 [FriendMapFragment](mastodon/src/main/java/org/joinmastodon/android/fragments/discover/FriendMapFragment.java)。
 - **商家/官方广告**：可选时间线广告载荷、独立广告卡片、落地页跳转及曝光/点击等事件上报。客户端展示与上报不等于具备商家投放后台，仍需服务端提供广告数据和事件接口。
-- **折扇 FAB 与发帖路由**：首页折扇菜单提供普通发帖、交友申请和相册上传入口，并与液态工具栏共享业务路由。相册能力本身已有独立实现，折扇入口及导航调整应与后端权限一起回归。
+- **扩列卡（功能测试版）**：提供个人扩列卡、广场、详情和发帖引用入口，让自我介绍、兴趣与社交信息更容易展示；公开字段与可见性按用户设置和后端权限处理。
+- **折扇 FAB 与发帖路由**：普通模式下的小型折扇菜单提供普通发帖、交友申请、扩列卡和相册上传入口，并与液态工具栏共享业务路由。
+- **赞助者感谢与界面优化**：新增赞助者感谢页，统一 PIN 输入页配色，改进宝宝新天地用户主页，并修复帖子编辑、删除、外站点赞和回复相关问题。
 
-这些能力随开发线演进，不是对正式发布包的功能承诺。
+交友地图与扩列卡在 3.2.0 中以功能测试版本提供；实际可用性仍取决于账户权限、地图厂商授权、设备和服务端状态。宝宝新天地外站接口故障不因客户端升级而自动恢复。
 
 ## 技术栈与模块
 
@@ -212,7 +216,14 @@ AAB 输出目录为 `mastodon/build/outputs/bundle/release/`。这两种打包�
 3. [fastlane/Appfile](fastlane/Appfile)仍使用上游包名 `org.joinmastodon.android`，与本应用的 `top.abdl_space.app` 不一致；需先核对目标 Play 应用及上传配置。
 4. CI 使用 [mastodon/ci_signing.gradle](mastodon/ci_signing.gradle)中的 `KEYSTORE_FILE` / `KEYSTORE_PASSWORD` 配置，不等同于本地的 `SIGNING_*`；要确认所用别名与既有正式证书一致。
 
-发布应由维护者在**明确批准后**操作：先完成开发线验证，将 `develop` 以普通 merge 或 fast-forward 合入 `main`，再在 Actions 中选择 `main` 手动运行经核实可用的发布流程。构建或上传成功后，仍须核验包名、版本、签名、地图和登录，并按对应渠道完成 Play 发布、官网下载包及后端版本接口更新。不能将 Google Play draft、beta、Actions artifact 或签名测试包称为正式上线。
+当前官网正式发布沿用已验证的 **R2 安装包 + 版本 API** 流程，不运行上述弃用 Actions，也不自动发布 Google Play：
+
+1. 维护者明确批准后，将已验证的 `develop` 以普通 merge 或 fast-forward 合入 `main`，创建指向正式源码的版本标签，并发布 GitHub Release。
+2. 将同一份正式签名 APK 上传到既有 R2 的独立版本对象，保留旧版对象。**完整回下载后逐字节核对文件大小与 SHA256**，不能只凭上传命令成功或 HTTP 200 判断完整。
+3. 通过既有版本发布入口登记版本名、内部版本号、下载 URL、准确字节数和更新日志；核对版本 API、主站/移动站下载页及 GitHub 附件一致。
+4. 将发布记录同步回 `develop`，保证 `develop` 包含 `main` 的全部提交；不要因补写记录重复部署后端或重新生成不同的 APK。
+
+3.2.0 正式文件名为 `ABDL-Space-3.2.0(34).apk`，大小 **151,512,653 字节**，SHA256 为 `c214272180dd1f3ad087bf895ddb35bf27e58375921f0df189eaf0498fc4c7cc`。构建或上传成功仍不能替代真实设备的覆盖升级、地图授权、登录与业务验收；Google Play draft、beta、Actions artifact 和开发测试包也不等于官网正式上线。
 
 ## 分支与贡献
 
