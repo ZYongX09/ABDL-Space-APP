@@ -29,6 +29,8 @@
 
 早期测试出现 miuix 只测量不放置的 `secondary_probe` 同名语义副本，后按真实布局祖先链 `isPlaced/isAttached` 选择唯一可点击节点，不取 first/last、不直接调用选择回调。首次生命周期测试的注册页失败由隔离 Application 未初始化主题颜色导致；依据真实堆栈补 fixture 并保存/还原颜色后完整 65 项重跑通过，未改生产主题来迎合测试。早期失败日志保留。
 
+既有 `StatusInteractionBehaviorTest` 仍在断言旧 V1 绑定 state 铸造/消费合同，与新版“旧绑定助手失效、旧回调永不入绑定管道”的退役合同冲突；该测试段已改写为断言退役合同（伪造/重放/过期 state 均不得绑定，不恢复旧实现）。随后单独运行 **OAuthActivityCompatibilityTest 6/6 与 StatusInteractionBehaviorTest 6/6 全过**，确认标准 OAuth 回退与既有互动状态保持兼容。65 项 NBW 联合回归不含这两个旧合同测试，它们单独运行核验。
+
 最终验证前后 **28002** 个源码/构建配置文件指纹一致，`changed_paths=[]`。证据 `android-final-tests-assemble.log`、`android-delivery-verification.json`、`android-source-manifest-{before,after}.json` 位于仓外 `/home/ZYongX/projects/nbw-v2-implementation-evidence-20261025/`。
 
 本机 Linux 的 Android 插件桌面模拟器不受支持，当前无设备和 AVD。Robolectric 的菜单交互、构建和签名检查不替代真机视觉验收。

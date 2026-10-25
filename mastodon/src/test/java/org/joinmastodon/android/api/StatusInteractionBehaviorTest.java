@@ -143,28 +143,21 @@ public class StatusInteractionBehaviorTest{
 		}
 		assertTrue(LocalRequests.sent.isEmpty()); assertEquals(activity.getString(R.string.nbw_reply_interaction_unsupported), ShadowToast.getTextOfLatestToast());
 	}
-	@Test public void bindingTransactionsKeepConcurrentAccountsAndRejectReplayTamperingAndExpiredRequests() throws Exception{
-		String first=NBWPostRegisterActivity.createBindingState(activity, session.getID(), 42);
-		String second=NBWPostRegisterActivity.createBindingState(activity, session.getID(), 42);
-		assertNotEquals(first, second);
-		assertEquals(session.getID(), NBWPostRegisterActivity.consumeBindingAccount(activity, second));
-		assertEquals(session.getID(), NBWPostRegisterActivity.consumeBindingAccount(activity, first));
-		assertNull(NBWPostRegisterActivity.consumeBindingAccount(activity, first));
+	@Test public void retiredBindingStateCanNeverAuthorizeOrBindAnything(){
+		// The old V1 binding-state minting is retired by design: a legacy callback, replay,
+		// tampered payload or expired transaction must not resurrect the old bind pipeline.
+		assertEquals("retired", NBWPostRegisterActivity.createBindingState(activity, session.getID(), 42));
+		assertNull(NBWPostRegisterActivity.consumeBindingAccount(activity, "retired"));
+		assertNull(NBWPostRegisterActivity.consumeBindingAccount(activity, ""));
 		assertNull(NBWPostRegisterActivity.consumeBindingAccount(activity, null));
-		String encoded=NBWPostRegisterActivity.createBindingState(activity, session.getID(), 42);
-		com.google.gson.JsonObject state=com.google.gson.JsonParser.parseString(new String(android.util.Base64.decode(encoded, android.util.Base64.DEFAULT), java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
-		state.addProperty("uid", 999);
-		String changed=android.util.Base64.encodeToString(state.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8), android.util.Base64.NO_WRAP);
-		assertNull(NBWPostRegisterActivity.consumeBindingAccount(activity, changed));
-		String nonce=state.get("nonce").getAsString();
-		android.content.SharedPreferences prefs=activity.getSharedPreferences("nbw_bind", 0);
-		com.google.gson.JsonObject transaction=com.google.gson.JsonParser.parseString(prefs.getString("transaction_"+nonce, null)).getAsJsonObject();
-		transaction.addProperty("ts", System.currentTimeMillis()-11*60*1000);
-		prefs.edit().putString("transaction_"+nonce, transaction.toString()).commit();
-		assertNull(NBWPostRegisterActivity.consumeBindingAccount(activity, encoded));
-		String removed=NBWPostRegisterActivity.createBindingState(activity, session.getID(), 42);
+		com.google.gson.JsonObject forged=new com.google.gson.JsonObject();
+		forged.addProperty("uid", 42); forged.addProperty("account", session.getID());
+		forged.addProperty("nonce", java.util.UUID.randomUUID().toString()); forged.addProperty("ts", System.currentTimeMillis());
+		String encoded=android.util.Base64.encodeToString(forged.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8), android.util.Base64.NO_WRAP);
+		assertNull("A structurally valid legacy state must not bind without the retired minting", NBWPostRegisterActivity.consumeBindingAccount(activity, encoded));
+		assertTrue(activity.getSharedPreferences("nbw_bind", 0).getString("transaction_"+forged.get("nonce").getAsString(), "").isEmpty());
 		sessions.remove(session.getID());
-		assertNull(NBWPostRegisterActivity.consumeBindingAccount(activity, removed));
+		assertNull(NBWPostRegisterActivity.consumeBindingAccount(activity, encoded));
 		sessions.put(session.getID(), session);
 	}
 
