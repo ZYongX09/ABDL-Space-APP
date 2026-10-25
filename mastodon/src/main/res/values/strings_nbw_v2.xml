@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+	<string name="nbw_v2_classification_title">板块 / 分类</string>
+	<string name="nbw_v2_classification_settings">分类与默认去向</string>
+	<string name="nbw_v2_publish_explanation">公开内容发布到本站后会自动尝试同步至宝宝新天地。授权、分类或远端故障不会影响本站发布；发布成功仅表示本站已保存。</string>
+	<string name="nbw_v2_no_type">不指定分类</string>
+	<string name="nbw_v2_options_unavailable">分类目录暂不可用，本站仍可正常发布。</string>
+	<string name="nbw_v2_selection_expired">手选分类已失效，请重新选择（不影响本站发布）</string>
+	<string name="nbw_v2_fallback_explanation">无法自动判断分类时，是否使用“闲聊”（FID18，不指定分类）作为默认板块？同意后无需每次选择，可在这里修改。未同意或拒绝均不影响本站发帖，不会先发到默认板块再补问。</string>
+	<string name="nbw_v2_fallback_accepted">已同意在自动分类失败时使用“闲聊”</string>
+	<string name="nbw_v2_fallback_not_accepted">尚未同意使用默认板块</string>
+	<string name="nbw_v2_fallback_accept">同意使用“闲聊”</string>
+	<string name="nbw_v2_fallback_decline">不使用默认板块</string>
+	<string name="nbw_v2_consent_saved">设置已保存，正在读取账号确认状态；不会补发历史内容。</string>
+	<string name="nbw_v2_consent_not_saved">设置未保存，请稍后在此重试。本站发帖不受影响。</string>
+	<string name="nbw_v2_connection_title">宝宝新天地连接</string>
+	<string name="nbw_v2_connect">连接 / 重新授权</string>
+	<string name="nbw_v2_connection_unavailable">连接暂不可用，本站账号、草稿和发帖不受影响。</string>
+	<string name="nbw_v2_connection_ready">已连接，授权长期有效，可由账号方撤销。</string>
+	<string name="nbw_v2_connection_missing">尚未连接或授权不可用。连接不是本站发帖的前提。</string>
+	<string name="nbw_v2_read_only">当前仅可浏览外站内容，不可连接或执行外站写操作。</string>
+	<string name="nbw_v2_connection_pending">正在准备授权页面…</string>
+	<string name="nbw_v2_connection_failed">暂时无法准备授权页面，请稍后在此重试。</string>
+</resources>

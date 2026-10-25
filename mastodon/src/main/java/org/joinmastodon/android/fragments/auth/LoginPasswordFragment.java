@@ -143,14 +143,9 @@ public class LoginPasswordFragment extends AppKitFragment {
             getActivity().onBackPressed();
         });
 
-        // 宝宝新天地登录
-        btnNBW.setOnClickListener(v -> showConsentSheet(() -> {
-            getActivity().getSharedPreferences("nbw_bind", android.content.Context.MODE_PRIVATE)
-                .edit().putString("flow", "login").apply();
-            Intent intent = new Intent(Intent.ACTION_VIEW,
-                Uri.parse("https://abdl-space.top/api/auth/nbw/mobile-start"));
-            startActivity(intent);
-        }));
+        // V2 connects after first-party login; no legacy token login endpoint.
+        btnNBW.setVisibility(View.GONE);
+        btnNBW.setOnClickListener(null);
 
         btnQQ.setVisibility(BuildConfig.QQ_LOGIN_ENABLED ? View.VISIBLE : View.GONE);
         btnQQ.setOnClickListener(v -> showQQConsentSheet());

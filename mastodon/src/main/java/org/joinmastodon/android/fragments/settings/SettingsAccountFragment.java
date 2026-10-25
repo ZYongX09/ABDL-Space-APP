@@ -96,7 +96,7 @@ public class SettingsAccountFragment extends BaseSettingsFragment<Void>{
 				items.add(verificationItem);
 
 			// 第三方账户
-			String nbwStatus=account.self.nbwUsername!=null ? account.self.nbwUsername : getString(R.string.nbw_unbound);
+			String nbwStatus=getString(R.string.nbw_v2_connection_title);
 			items.add(new SectionHeaderListItem(R.string.nbw_third_party_account));
 			nbwItem=new ListItem<>(getString(R.string.nbw_third_party_nbw), nbwStatus, R.drawable.ic_nbw, this::onNBWBindClick);
 			items.add(nbwItem);
@@ -137,30 +137,11 @@ public class SettingsAccountFragment extends BaseSettingsFragment<Void>{
 
 
 	private void refreshNBWStatus(){
-		if(nbwItem==null || verificationItem==null || pinnedSession==null || AccountSessionManager.getInstance().tryGetAccount(accountID)!=pinnedSession) return;
-		if(accountStatusRequest!=null) accountStatusRequest.cancel();
-		final int generation=++accountStatusGeneration;
-		GetOwnAccount request=new GetOwnAccount();
-		accountStatusRequest=request;
-		request.setCallback(new me.grishka.appkit.api.Callback<Account>(){
-			@Override
-			public void onSuccess(Account account){
-				Activity activity=getActivity();
-				if(activity==null) return;
-				activity.runOnUiThread(()->{
-					if(generation!=accountStatusGeneration || getActivity()==null || AccountSessionManager.getInstance().tryGetAccount(accountID)!=pinnedSession) return;
-					accountStatusRequest=null;
-					AccountSessionManager.getInstance().updateAccountInfo(accountID, account);
-					nbwItem.subtitle=account.nbwUsername!=null ? account.nbwUsername : getString(R.string.nbw_unbound);
-					rebindItem(nbwItem);
-				});
-			}
-
-			@Override
-			public void onError(ErrorResponse error){
-				if(generation==accountStatusGeneration) accountStatusRequest=null;
-			}
-		}).exec(accountID);
+		if(nbwItem==null || pinnedSession==null || AccountSessionManager.getInstance().tryGetAccount(accountID)!=pinnedSession) return;
+		var snapshot=pinnedSession.getNBWForumOptionsRepository().getSnapshot();
+		nbwItem.subtitle=getString(!snapshot.canRead() ? R.string.nbw_v2_connection_unavailable
+				: !snapshot.canWrite() ? R.string.nbw_v2_read_only : snapshot.capabilities.hasGrant() ? R.string.nbw_v2_connection_ready : R.string.nbw_v2_connection_missing);
+		rebindItem(nbwItem);
 	}
 
 	@Override
@@ -541,21 +522,10 @@ public class SettingsAccountFragment extends BaseSettingsFragment<Void>{
 	}
 
 	private void onNBWBindClick(ListItem<?> item){
-		AccountSession session=AccountSessionManager.get(accountID);
-		if(session.self.nbwUsername!=null){
-			// 已绑定 → 解绑对话框
-			new M3AlertDialogBuilder(getActivity())
-					.setTitle(R.string.nbw_unbind_title)
-					.setMessage(getString(R.string.nbw_unbind_message, session.self.nbwUsername))
-					.setPositiveButton(R.string.nbw_unbind, (d, w)->unbindNBW())
-					.setNegativeButton(R.string.cancel, null)
-					.show();
-		}else{
-			// 未绑定 → 打开引导页
-			Intent intent=new Intent(getActivity(), NBWPostRegisterActivity.class);
-			intent.putExtra("show_back", true);
-			startActivity(intent);
-		}
+		Intent intent=new Intent(getActivity(), NBWPostRegisterActivity.class);
+		intent.putExtra("show_back", true);
+		intent.putExtra("account", accountID);
+		startActivity(intent);
 	}
 
 	private void unbindNBW(){

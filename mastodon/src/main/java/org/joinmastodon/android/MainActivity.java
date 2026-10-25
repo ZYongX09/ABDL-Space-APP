@@ -627,6 +627,8 @@ public class MainActivity extends FragmentStackActivity implements LifecycleOwne
 	protected void onResume(){
 		super.onResume();
 		lifecycleRegistry.setCurrentState(Lifecycle.State.RESUMED);
+		AccountSession nbwSession=AccountSessionManager.getInstance().getLastActiveAccount();
+		if(nbwSession!=null) nbwSession.getNBWForumOptionsRepository().activate();
 		org.joinmastodon.android.security.AppSecurity.runAfterUnlock(this, ()->{
 			if(chatWsClient!=null) chatWsClient.connect();
 		});
@@ -733,6 +735,7 @@ public class MainActivity extends FragmentStackActivity implements LifecycleOwne
 			}else{
 				session=AccountSessionManager.getInstance().getLastActiveAccount();
 			}
+			session.getNBWForumOptionsRepository().activate();
 			args.putString("account", session.getID());
 			Fragment fragment=session.activated ? new HomeFragment() : new AccountActivationFragment();
 			fragment.setArguments(args);

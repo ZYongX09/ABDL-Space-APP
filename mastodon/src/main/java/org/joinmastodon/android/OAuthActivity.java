@@ -57,6 +57,17 @@ public class OAuthActivity extends Activity{
 			finish();
 			return;
 		}
+		if(uri.getQueryParameter("nbw_v2")!=null){
+			if("authorized".equals(uri.getQueryParameter("nbw_v2"))){
+				String launched=NBWPostRegisterActivity.consumeAuthorizationLaunch(this);
+				AccountSession owner=launched==null ? null : AccountSessionManager.getInstance().tryGetAccount(launched);
+				if(owner!=null) owner.getNBWForumOptionsRepository().refreshNow();
+			}
+			// This callback is not a login code, grant, token, or proof of a binding.
+			finish(); return;
+		}
+		// Old token/UID-proxy callbacks cannot enter the new App's login/binding pipeline.
+		if(uri.getQueryParameter("nbw_bind")!=null || uri.getQueryParameter("token")!=null){ finish(); return; }
 		if(uri.getQueryParameter("error")!=null){
 			String error=uri.getQueryParameter("error_description");
 			if(TextUtils.isEmpty(error))

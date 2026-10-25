@@ -1,172 +1,124 @@
 package org.joinmastodon.android.fragments.settings;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
-import android.content.res.Configuration;
-import android.graphics.Color;
-import android.os.Build;
 import android.os.Bundle;
-import android.util.Base64;
 import android.view.View;
-import android.view.Window;
-import android.view.WindowInsets;
-import android.view.WindowManager;
 import android.widget.Button;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 
-import org.joinmastodon.android.MainActivity;
 import org.joinmastodon.android.R;
+import org.joinmastodon.android.MainActivity;
+import org.joinmastodon.android.api.MastodonAPIRequest;
+import org.joinmastodon.android.api.requests.nbw.NBWAppRequest;
 import org.joinmastodon.android.api.session.AccountSession;
 import org.joinmastodon.android.api.session.AccountSessionManager;
+import org.joinmastodon.android.api.session.NBWForumOptionsRepository;
+import org.joinmastodon.android.ui.compose.NBWClassificationController;
 import org.joinmastodon.android.ui.utils.UiUtils;
 
-import java.nio.charset.StandardCharsets;
+import me.grishka.appkit.api.Callback;
+import me.grishka.appkit.api.ErrorResponse;
 
-/**
- * 注册后 NBW 绑定引导页（三选项）
- * - "绑定已有宝宝新天地账号" → OAuth
- * - "一键注册宝宝新天地新账号" → NBWOneClickRegisterActivity
- * - "暂时跳过" → MainActivity
- */
-public class NBWPostRegisterActivity extends Activity {
+/** Real V2 connection page. No account registration, UID proxy, password or legacy OAuth helper. */
+public class NBWPostRegisterActivity extends Activity{
+	private AccountSession session;
+	private NBWForumOptionsRepository repository;
+	private NBWForumOptionsRepository.Cancelable subscription;
+	private NBWClassificationController classification;
+	private MastodonAPIRequest<?> authorizationRequest;
+	private TextView status;
+	private Button connect, settings;
+	private boolean starting;
 
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        UiUtils.setUserPreferredTheme(this);
-        super.onCreate(savedInstanceState);
+	@Override protected void onCreate(Bundle savedInstanceState){
+		UiUtils.setUserPreferredTheme(this);
+		super.onCreate(savedInstanceState);
+		String id=getIntent().getStringExtra("account");
+		session=id==null ? AccountSessionManager.getInstance().getLastActiveAccount() : AccountSessionManager.getInstance().tryGetAccount(id);
+		if(session==null){ finish(); return; }
+		repository=session.getNBWForumOptionsRepository();
+		LinearLayout root=new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL);
+		int padding=(int)(24*getResources().getDisplayMetrics().density); root.setPadding(padding, padding, padding, padding);
+		TextView title=new TextView(this); title.setText(R.string.nbw_v2_connection_title); title.setTextSize(22); root.addView(title);
+		status=new TextView(this); status.setText(R.string.nbw_v2_connection_unavailable); root.addView(status);
+		TextView explanation=new TextView(this); explanation.setText(R.string.nbw_v2_publish_explanation); root.addView(explanation);
+		connect=new Button(this); connect.setText(R.string.nbw_v2_connect); connect.setOnClickListener(v->startAuthorization()); root.addView(connect);
+		settings=new Button(this); settings.setText(R.string.nbw_v2_classification_settings); settings.setOnClickListener(v->classification.show()); root.addView(settings);
+		Button close=new Button(this); close.setText(R.string.done); close.setOnClickListener(v->completeConnectionPage()); root.addView(close);
+		android.widget.ScrollView scroll=new android.widget.ScrollView(this); scroll.addView(root); setContentView(scroll);
+		classification=new NBWClassificationController(this, repository, ()->{});
+		subscription=repository.observe(snapshot->runOnUiThread(()->render(snapshot)));
+		if(session.getID().equals(AccountSessionManager.getInstance().getLastActiveAccountID())) repository.activate();
+	}
 
-        // 全屏透明状态栏 — SpaceBackgroundView 延伸到状态栏下方
-        Window window = getWindow();
-        window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
-        window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
-        window.setStatusBarColor(Color.TRANSPARENT);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            window.setDecorFitsSystemWindows(false);
-        } else {
-            window.getDecorView().setSystemUiVisibility(
-                View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
-        }
+	private void completeConnectionPage(){
+		// Registration closes its MainActivity before opening this page. Settings keeps it.
+		if(!getIntent().getBooleanExtra("show_back", false)){
+			Intent intent=new Intent(this, MainActivity.class);
+			intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+			startActivity(intent);
+		}
+		finish();
+	}
+	@Override public void onBackPressed(){ completeConnectionPage(); }
 
-        setContentView(R.layout.activity_nbw_post_register);
+	private void render(NBWForumOptionsRepository.Snapshot snapshot){
+		if(isFinishing() || isDestroyed()) return;
+		classification.updateSnapshot(snapshot);
+		connect.setVisibility(snapshot.canWrite() ? View.VISIBLE : View.GONE);
+		settings.setVisibility(snapshot.canWrite() ? View.VISIBLE : View.GONE);
+		connect.setEnabled(!starting);
+		status.setText(starting ? R.string.nbw_v2_connection_pending : !snapshot.canRead() ? R.string.nbw_v2_connection_unavailable
+				: !snapshot.canWrite() ? R.string.nbw_v2_read_only : snapshot.capabilities.hasGrant() ? R.string.nbw_v2_connection_ready : R.string.nbw_v2_connection_missing);
+	}
+	private void startAuthorization(){
+		if(starting || !repository.getSnapshot().canWrite() || AccountSessionManager.getInstance().tryGetAccount(session.getID())!=session) return;
+		starting=true; render(repository.getSnapshot());
+		final long generation=repository.getSnapshot().generation;
+		authorizationRequest=NBWAppRequest.authorizationStart().setCallback(new Callback<>(){
+			@Override public void onSuccess(NBWAppRequest.AuthorizationStart result){ runOnUiThread(()->{
+				if(isFinishing() || isDestroyed() || repository.getSnapshot().generation!=generation || AccountSessionManager.getInstance().tryGetAccount(session.getID())!=session) return;
+				authorizationRequest=null; starting=false;
+				rememberAuthorizationLaunch(NBWPostRegisterActivity.this, session.getID());
+				UiUtils.launchWebBrowser(NBWPostRegisterActivity.this, result.authorizationUrl);
+				render(repository.getSnapshot());
+			}); }
+			@Override public void onError(ErrorResponse error){ runOnUiThread(()->{
+				authorizationRequest=null; starting=false;
+				if(!isFinishing() && !isDestroyed()){ render(repository.getSnapshot()); status.setText(R.string.nbw_v2_connection_failed); }
+			}); }
+		}).setNBWCancellationCleanup(()->{
+			authorizationRequest=null;
+			starting=false;
+			if(!isFinishing() && !isDestroyed()) render(repository.getSnapshot());
+		}).exec(session.getID());
+	}
 
-        // 深色模式检测
-        org.joinmastodon.android.ui.views.SpaceBackgroundView spaceBg = findViewById(R.id.space_bg);
-        boolean isDark = (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
-        spaceBg.setDarkMode(isDark);
+	@Override protected void onResume(){
+		super.onResume();
+		if(repository!=null) repository.refreshIfExpired();
+	}
+	@Override protected void onDestroy(){
+		if(authorizationRequest!=null) authorizationRequest.cancel();
+		if(subscription!=null) subscription.cancel();
+		if(classification!=null) classification.dispose();
+		super.onDestroy();
+	}
+	public static void rememberAuthorizationLaunch(Context context, String account){
+		context.getSharedPreferences("nbw_v2_authorization", MODE_PRIVATE).edit().putString("account", account).putLong("started", System.currentTimeMillis()).commit();
+	}
+	/** Callback is only a metadata-refresh hint. Server owns single-use flow and binding identity. */
+	public static String consumeAuthorizationLaunch(Context context){
+		var prefs=context.getSharedPreferences("nbw_v2_authorization", MODE_PRIVATE);
+		String account=prefs.getString("account", null); long age=System.currentTimeMillis()-prefs.getLong("started", 0);
+		if(!prefs.edit().clear().commit() || account==null || age<0 || age>10*60*1000L) return null;
+		return AccountSessionManager.getInstance().tryGetAccount(account)==null ? null : account;
+	}
 
-        // 内容 padding — 仅 content_container 需要避让状态栏，SpaceBackgroundView 本身全屏绘制
-        View contentContainer = findViewById(R.id.content_container);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            contentContainer.setOnApplyWindowInsetsListener((v, insets) -> {
-                int statusBar = insets.getInsets(WindowInsets.Type.statusBars()).top;
-                v.setPadding(0, statusBar, 0, 0);
-                return insets;
-            });
-        } else {
-            contentContainer.setPadding(0, getStatusBarHeight(), 0, 0);
-        }
-
-        // 返回按钮（仅从设置页跳入时显示）
-        View btnBack = findViewById(R.id.btn_back);
-        boolean showBack = getIntent() != null && getIntent().getBooleanExtra("show_back", false);
-        if (showBack) {
-            btnBack.setVisibility(View.VISIBLE);
-            btnBack.setOnClickListener(v -> finish());
-        }
-
-        // 绑定已有账号
-        Button btnBindExisting = findViewById(R.id.btn_bind_existing);
-        btnBindExisting.setOnClickListener(v -> {
-            getSharedPreferences("nbw_bind", MODE_PRIVATE).edit().putString("flow", "bind").apply();
-            String accountID = getIntent().getStringExtra("account");
-            AccountSession session = accountID == null ? AccountSessionManager.getInstance().getLastActiveAccount()
-                : AccountSessionManager.getInstance().tryGetAccount(accountID);
-            if (session == null) {
-                android.widget.Toast.makeText(this, R.string.login_expired, android.widget.Toast.LENGTH_LONG).show();
-                return;
-            }
-            long uid = 0;
-            if (session != null) {
-                String sid = session.getID();
-                int sep = sid.indexOf('_');
-                try { uid = Long.parseLong(sep >= 0 ? sid.substring(sep + 1) : sid); } catch (NumberFormatException ignored) {}
-            }
-            String state = createBindingState(this, session.getID(), uid);
-            String url = android.net.Uri.parse("https://api.abdl-space.top/api/auth/nbw/mobile-start")
-                .buildUpon().appendQueryParameter("state", state).build().toString();
-            UiUtils.launchWebBrowser(this, url);
-        });
-
-        // 一键注册
-        Button btnOneClick = findViewById(R.id.btn_one_click);
-        btnOneClick.setOnClickListener(v -> {
-            String accountID = getIntent().getStringExtra("account");
-            if (accountID != null && !accountID.equals(AccountSessionManager.getInstance().getLastActiveAccountID())) {
-                android.widget.Toast.makeText(this, R.string.nbw_register_switch_account, android.widget.Toast.LENGTH_LONG).show();
-                return;
-            }
-            Intent intent = new Intent(this, NBWOneClickRegisterActivity.class);
-            intent.putExtra("nbw_username", getIntent().getStringExtra("nbw_username"));
-            intent.putExtra("nbw_password", getIntent().getStringExtra("nbw_password"));
-            startActivity(intent);
-        });
-
-        // 暂时跳过
-        Button btnSkip = findViewById(R.id.btn_skip);
-        btnSkip.setOnClickListener(v -> {
-            navigateToMain();
-        });
-    }
-
-    public static synchronized String createBindingState(android.content.Context context, String accountID, long uid) {
-        String nonce=java.util.UUID.randomUUID().toString();
-        long now=System.currentTimeMillis();
-        com.google.gson.JsonObject state=new com.google.gson.JsonObject();
-        state.addProperty("ts", now);
-        state.addProperty("action", "bind");
-        state.addProperty("uid", uid);
-        state.addProperty("nonce", nonce);
-        String encoded=Base64.encodeToString(state.toString().getBytes(StandardCharsets.UTF_8), Base64.NO_WRAP);
-        com.google.gson.JsonObject transaction=new com.google.gson.JsonObject();
-        transaction.addProperty("account", accountID);
-        transaction.addProperty("state", encoded);
-        transaction.addProperty("ts", now);
-        if(!context.getSharedPreferences("nbw_bind", MODE_PRIVATE).edit()
-                .putString("transaction_"+nonce, transaction.toString()).putString("flow", "bind").commit())
-            throw new IllegalStateException("Unable to preserve binding transaction");
-        return encoded;
-    }
-
-    public static synchronized String consumeBindingAccount(android.content.Context context, String encoded) {
-        if(encoded==null || encoded.length()>4096) return null;
-        try {
-            com.google.gson.JsonObject state=com.google.gson.JsonParser.parseString(new String(Base64.decode(encoded, Base64.DEFAULT), StandardCharsets.UTF_8)).getAsJsonObject();
-            if(!"bind".equals(state.get("action").getAsString())) return null;
-            String nonce=state.get("nonce").getAsString();
-            if(!nonce.matches("[0-9a-fA-F-]{36}")) return null;
-            android.content.SharedPreferences prefs=context.getSharedPreferences("nbw_bind", MODE_PRIVATE);
-            String raw=prefs.getString("transaction_"+nonce, null);
-            if(raw==null) return null;
-            com.google.gson.JsonObject transaction=com.google.gson.JsonParser.parseString(raw).getAsJsonObject();
-            long age=System.currentTimeMillis()-transaction.get("ts").getAsLong();
-            String account=transaction.get("account").getAsString();
-            if(!encoded.equals(transaction.get("state").getAsString()) || age<0 || age>10*60*1000
-                    || AccountSessionManager.getInstance().tryGetAccount(account)==null) return null;
-            if(!prefs.edit().remove("transaction_"+nonce).commit()) return null;
-            return account;
-        } catch(RuntimeException error) {
-            return null;
-        }
-    }
-
-    private void navigateToMain() {
-        Intent intent = new Intent(this, MainActivity.class);
-        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
-        startActivity(intent);
-        finish();
-    }
-
-    private int getStatusBarHeight() {
-        int resourceId = getResources().getIdentifier("status_bar_height", "dimen", "android");
-        return resourceId > 0 ? getResources().getDimensionPixelSize(resourceId) : 0;
-    }
+	/** Retired helpers remain source-compatible only; they cannot authorize or bind V2. */
+	@Deprecated public static String createBindingState(Context context, String account, long uid){ return "retired"; }
+	@Deprecated public static String consumeBindingAccount(Context context, String encoded){ return null; }
 }

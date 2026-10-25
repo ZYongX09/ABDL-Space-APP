@@ -34,6 +34,7 @@ import org.joinmastodon.android.model.Account;
 import org.joinmastodon.android.model.DisplayItemsParent;
 import org.joinmastodon.android.model.Poll;
 import org.joinmastodon.android.model.Relationship;
+import org.joinmastodon.android.model.SearchResult;
 import org.joinmastodon.android.model.Status;
 import org.joinmastodon.android.model.StatusHeatResponse;
 import org.joinmastodon.android.model.Translation;
@@ -101,7 +102,44 @@ public abstract class BaseStatusListFragment<T extends DisplayItemsParent> exten
 	protected TypedObjectPool<MediaGridStatusDisplayItem.GridItemType, MediaAttachmentViewController> attachmentViewsPool=new TypedObjectPool<>(this::makeNewMediaAttachmentView);
 	protected HashMap<String, Status> knownStatuses=new HashMap<>();
 	protected HashSet<APIRequest<?>> requestsToCancelWhenListClears=new HashSet<>();
+	private org.joinmastodon.android.api.session.NBWForumOptionsRepository.Cancelable nbwSubscription;
 	private SpringAnimation listShakeAnimation;
+	private boolean hideNBWRemoteItems(){
+		var session=AccountSessionManager.getInstance().tryGetAccount(accountID);
+		return session!=null && !session.getNBWForumOptionsRepository().getSnapshot().canRead();
+	}
+	private boolean isNBWRemoteItem(T item){
+		if(item instanceof SearchResult result && result.account!=null)
+			return result.account.id!=null && result.account.id.startsWith("nbw_");
+		Status status=asStatus(item);
+		return status!=null && status.id!=null && status.id.startsWith("nbw_")
+				|| item.getID()!=null && item.getID().startsWith("nbw_");
+	}
+	private boolean pruneNBWRemoteItems(){
+		HashSet<String> hiddenParents=new HashSet<>();
+		for(T item:data) if(isNBWRemoteItem(item)) hiddenParents.add(item.getID());
+		for(T item:preloadedData) if(isNBWRemoteItem(item)) hiddenParents.add(item.getID());
+		boolean changed=data.removeIf(this::isNBWRemoteItem);
+		changed|=preloadedData.removeIf(this::isNBWRemoteItem);
+		knownStatuses.entrySet().removeIf(item->item.getKey().startsWith("nbw_"));
+		knownAccounts.entrySet().removeIf(item->item.getKey().startsWith("nbw_"));
+		changed|=displayItems.removeIf(item->hiddenParents.contains(item.parentID)
+				|| item.parentID!=null && item.parentID.startsWith("nbw_"));
+		return changed;
+	}
+	private List<T> visibleNBWItems(List<T> items){
+		if(!hideNBWRemoteItems()) return items;
+		// Thread roots and created replies arrive as immutable singleton lists. Never mutate
+		// callers or a subList owned by AppKit's preloader; data has already been appended there.
+		ArrayList<T> visible=new ArrayList<>(items);
+		visible.removeIf(this::isNBWRemoteItem);
+		pruneNBWRemoteItems();
+		return visible;
+	}
+	private void applyNBWMode(){
+		if(!hideNBWRemoteItems()) return;
+		if(pruneNBWRemoteItems() && adapter!=null) adapter.notifyDataSetChanged();
+	}
 	private boolean retryFailedImagesScheduled;
 	private final Runnable retryFailedImagesRunnable=()->{
 		retryFailedImagesScheduled=false;
@@ -229,7 +267,13 @@ public abstract class BaseStatusListFragment<T extends DisplayItemsParent> exten
 	}
 
 	@Override
+	protected void onDataLoaded(List<T> items, boolean moreAvailable){
+		super.onDataLoaded(visibleNBWItems(items), moreAvailable);
+	}
+
+	@Override
 	public void onAppendItems(List<T> items){
+		items=visibleNBWItems(items);
 		super.onAppendItems(items);
 		for(T s:items){
 			addAccountToKnown(s);
@@ -255,6 +299,7 @@ public abstract class BaseStatusListFragment<T extends DisplayItemsParent> exten
 	}
 
 	protected void prependItems(List<T> items, boolean notify){
+		items=visibleNBWItems(items);
 		data.addAll(0, items);
 		int offset=0;
 		for(T s:items){
@@ -486,6 +531,10 @@ public abstract class BaseStatusListFragment<T extends DisplayItemsParent> exten
 	@Override
 	public void onViewCreated(View view, Bundle savedInstanceState){
 		super.onViewCreated(view, savedInstanceState);
+		var session=AccountSessionManager.getInstance().tryGetAccount(accountID);
+		if(session!=null) nbwSubscription=session.getNBWForumOptionsRepository().observe(snapshot->{
+			if(getActivity()!=null) getActivity().runOnUiThread(this::applyNBWMode);
+		});
 
 		// MOSHIDON: this is for the sake of the fabulous
 		fab=view.findViewById(R.id.fab);
@@ -1142,6 +1191,7 @@ public abstract class BaseStatusListFragment<T extends DisplayItemsParent> exten
 
 	@Override
 	public void onDestroyView(){
+		if(nbwSubscription!=null){ nbwSubscription.cancel(); nbwSubscription=null; }
 		if(list!=null){
 			list.removeCallbacks(retryFailedImagesRunnable);
 			retryFailedImagesScheduled=false;

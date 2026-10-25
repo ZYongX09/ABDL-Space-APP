@@ -181,6 +181,13 @@ public class FooterStatusDisplayItem extends StatusDisplayItem{
 
 			// MOSHIDON:
 			bookmarkBtn.setSelected(item.status.bookmarked);
+			boolean remoteOnly=item.status.id!=null && item.status.id.startsWith("nbw_");
+			var capability=AccountSessionManager.get(item.accountID).getNBWForumOptionsRepository().getSnapshot();
+			boolean remoteWrites=!remoteOnly || capability.canWrite();
+			replyBtn.setEnabled(!remoteOnly || capability.canRead());
+			favoriteBtn.setEnabled(remoteWrites);
+			bookmarkBtn.setEnabled(remoteWrites);
+			if(remoteOnly) boostBtn.setEnabled(false);
 
 			Drawable d=itemView.getResources().getDrawable(switch(item.status.visibility){
 				case PUBLIC, UNLISTED, LOCAL -> R.drawable.ic_boost;

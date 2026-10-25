@@ -376,7 +376,10 @@ public class CacheController{
 				while(cursor.moveToNext()){
 					SearchResult result=MastodonAPIController.gson.fromJson(cursor.getString(0), SearchResult.class);
 					result.postprocess();
-					results.add(result);
+					var session=AccountSessionManager.getInstance().tryGetAccount(accountID);
+					boolean remote=result.account!=null && result.account.id!=null && result.account.id.startsWith("nbw_")
+							|| result.status!=null && result.status.id!=null && result.status.id.startsWith("nbw_");
+					if(!remote || session!=null && session.getNBWForumOptionsRepository().getSnapshot().canRead()) results.add(result);
 				}
 				uiHandler.post(()->callback.accept(results));
 			}
@@ -396,6 +399,19 @@ public class CacheController{
 	public void deleteStatus(String id){
 		runOnDbThread((db)->{
 			db.delete("home_timeline", "`id`=?", new String[]{id});
+		});
+	}
+
+	/** Drop remote-only rows, never a local p_/c_ entity that happens to have NBW metadata. */
+	public void clearNBWRemoteCache(){
+		runOnDbThread(db->{
+			for(String table:new String[]{"home_timeline", "notifications_statuses_all", "notifications_statuses_mentions", "notifications_accounts_all", "notifications_accounts_mentions"}){
+				db.delete(table, "substr(`id`,1,4)=?", new String[]{"nbw_"});
+			}
+			// SearchResult IDs are wrapper keys, not raw Status/Account IDs. Do not use LIKE
+			// (underscores are wildcards) or delete local p_/c_ rows carrying NBW metadata.
+			db.delete("recent_searches", "substr(`id`,1,8)=? OR substr(`id`,1,9)=? OR substr(`id`,1,4)=?",
+					new String[]{"acc_nbw_", "post_nbw_", "nbw_"});
 		});
 	}
 

@@ -46,13 +46,57 @@ public abstract class MastodonAPIRequest<T> extends APIRequest<T>{
 	TypeToken<T> respTypeToken;
 	Call okhttpCall;
 	Token token;
-	boolean canceled;
+	volatile boolean canceled;
 	Map<String, String> headers;
 	long timeout;
 	boolean cacheable;
 	private ProgressDialog progressDialog;
 	protected boolean removeUnsupportedItems;
 	protected boolean skipValidation;
+	private org.joinmastodon.android.api.session.NBWForumOptionsRepository remoteRepository;
+	private final org.joinmastodon.android.api.session.NBWForumOptionsRepository.Cancelable remoteCancellation=this::cancel;
+	private long remoteGeneration=-1, rejectedGeneration=-1;
+	private boolean nbwRemoteRequest;
+	private boolean callbackDelivered;
+	private Runnable nbwCancellationCleanup;
+
+	/** Cancellation is an unknown remote outcome, not a fabricated success or ordinary error. */
+	public MastodonAPIRequest<T> setNBWCancellationCleanup(Runnable cleanup){
+		nbwCancellationCleanup=cleanup;
+		return this;
+	}
+
+	private void finishRemote(){
+		if(remoteRepository!=null) remoteRepository.finishRemote(remoteCancellation);
+	}
+
+	private void completeCancellationOnUiThread(){
+		if(callbackDelivered) return;
+		callbackDelivered=true;
+		finishRemote();
+		onRequestDone();
+		if(nbwCancellationCleanup!=null) nbwCancellationCleanup.run();
+	}
+
+	private boolean guardNBW(AccountSession session){
+		String urlPath=getURL().getPath();
+		// These legacy auth/recommendation flows must never be used by the new native client.
+		if(urlPath!=null && (urlPath.startsWith("/api/auth/nbw/") || urlPath.startsWith("/api/v1/auth/nbw/"))){
+			onError(new MastodonErrorResponse.SilentNBWError("NBW V2 connection required", 503, null));
+			return false;
+		}
+		nbwRemoteRequest=urlPath!=null && (urlPath.contains("/nbw_") || urlPath.endsWith("/timelines/nbw")
+				|| urlPath.endsWith("/nbw/authorization/start"));
+		if(!nbwRemoteRequest) return true;
+		if(session==null){ onError(new MastodonErrorResponse.SilentNBWError("NBW unavailable", 503, null)); return false; }
+		remoteRepository=session.getNBWForumOptionsRepository();
+		rejectedGeneration=remoteRepository.getSnapshot().generation;
+		remoteGeneration=remoteRepository.registerRemote(remoteCancellation, !"GET".equals(method));
+		if(remoteGeneration<0){ onError(new MastodonErrorResponse.SilentNBWError("NBW unavailable", 503, null)); return false; }
+		return true;
+	}
+	private boolean hasOriginalSession(){ return account!=null && AccountSessionManager.getInstance().tryGetAccount(account.getID())==account; }
+	boolean acceptsRemoteResponse(){ return !nbwRemoteRequest || remoteRepository!=null && hasOriginalSession() && remoteRepository.isCurrentRemote(remoteGeneration); }
 
 	public MastodonAPIRequest(HttpMethod method, String path, Class<T> respClass){
 		this.path=path;
@@ -74,6 +118,8 @@ public abstract class MastodonAPIRequest<T> extends APIRequest<T>{
 		if(okhttpCall!=null){
 			okhttpCall.cancel();
 		}
+		if(nbwRemoteRequest || nbwCancellationCleanup!=null)
+			uiThreadHandler.post(this::completeCancellationOnUiThread);
 	}
 
 	@Override
@@ -85,7 +131,7 @@ public abstract class MastodonAPIRequest<T> extends APIRequest<T>{
 		try{
 			account=AccountSessionManager.getInstance().getAccount(accountID);
 			domain=account.domain;
-			account.getApiController().submitRequest(this);
+			if(guardNBW(account)) account.getApiController().submitRequest(this);
 		}catch(Exception x){
 			Log.e(TAG, "exec: this shouldn't happen, but it still did", x);
 			invokeErrorCallback(new MastodonErrorResponse(x.getLocalizedMessage(), -1, x));
@@ -95,14 +141,14 @@ public abstract class MastodonAPIRequest<T> extends APIRequest<T>{
 
 	public MastodonAPIRequest<T> execNoAuth(String domain){
 		this.domain=domain;
-		AccountSessionManager.getInstance().getUnauthenticatedApiController().submitRequest(this);
+		if(guardNBW(null)) AccountSessionManager.getInstance().getUnauthenticatedApiController().submitRequest(this);
 		return this;
 	}
 
 	public MastodonAPIRequest<T> exec(String domain, Token token){
 		this.domain=domain;
 		this.token=token;
-		AccountSessionManager.getInstance().getUnauthenticatedApiController().submitRequest(this);
+		if(guardNBW(null)) AccountSessionManager.getInstance().getUnauthenticatedApiController().submitRequest(this);
 		return this;
 	}
 
@@ -228,18 +274,46 @@ public abstract class MastodonAPIRequest<T> extends APIRequest<T>{
 	}
 
 	void onError(ErrorResponse err){
-		if(!canceled)
-			invokeErrorCallback(err);
+		if(!nbwRemoteRequest){
+			if(!canceled) invokeErrorCallback(err);
+			return;
+		}
+		uiThreadHandler.post(()->{
+			if(callbackDelivered) return;
+			if(canceled || remoteGeneration>=0 && !acceptsRemoteResponse()
+					|| remoteGeneration<0 && remoteRepository!=null && (!hasOriginalSession() || remoteRepository.getSnapshot().generation!=rejectedGeneration)){
+				completeCancellationOnUiThread();
+				return;
+			}
+			callbackDelivered=true;
+			finishRemote();
+			onRequestDone();
+			if(callback!=null) callback.onError(new MastodonErrorResponse.SilentNBWError("NBW operation unavailable", 0, null));
+		});
 	}
 
 	protected void onError(String msg, int httpStatus, Throwable exception){
-		if(!canceled)
-			invokeErrorCallback(new MastodonErrorResponse(msg, httpStatus, exception));
+		onError(nbwRemoteRequest ? new MastodonErrorResponse.SilentNBWError(msg, httpStatus, exception) : new MastodonErrorResponse(msg, httpStatus, exception));
 	}
 
 	void onSuccess(T resp){
-		if(!canceled)
-			invokeSuccessCallback(resp);
+		if(!nbwRemoteRequest){
+			if(!canceled) invokeSuccessCallback(resp);
+			return;
+		}
+		// AppKit posts again without checking cancellation. Validate at the actual delivery point
+		// and keep the request registered until then so a mode/account change can still cancel it.
+		uiThreadHandler.post(()->{
+			if(callbackDelivered) return;
+			if(canceled || !acceptsRemoteResponse()){
+				completeCancellationOnUiThread();
+				return;
+			}
+			callbackDelivered=true;
+			finishRemote();
+			onRequestDone();
+			if(callback!=null) callback.onSuccess(resp);
+		});
 	}
 
 	protected final void dispatchSuccess(T resp){

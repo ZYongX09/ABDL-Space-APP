@@ -59,8 +59,9 @@ import org.joinmastodon.android.E;
 import org.joinmastodon.android.GlobalUserPreferences;
 import org.joinmastodon.android.R;
 import org.joinmastodon.android.api.MastodonErrorResponse;
-import org.joinmastodon.android.api.requests.accounts.GetOwnAccount;
-import org.joinmastodon.android.api.requests.nbw.RecommendNBWForum;
+import org.joinmastodon.android.api.session.NBWForumOptionsRepository;
+import org.joinmastodon.android.model.NBWSelection;
+import org.joinmastodon.android.ui.compose.NBWClassificationController;
 import org.joinmastodon.android.api.requests.friendcards.FriendCardRequest;
 import org.joinmastodon.android.api.requests.friendcards.FriendCardResponses;
 import org.joinmastodon.android.fragments.friendcards.FriendCardDetailFragment;
@@ -186,6 +187,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	private Status quotedStatus;
 	private String initialText;
 	private String uuid;
+	private String publishPayload;
 	private EditText spoilerEdit;
 	private View spoilerWrap;
 	private boolean hasSpoiler;
@@ -194,24 +196,17 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	private WindowManager wm;
 	private StatusPrivacy statusVisibility=StatusPrivacy.PUBLIC;
 	private StatusQuotePolicy statusQuotePolicy=StatusQuotePolicy.PUBLIC;
-	private int selectedNBWForumId;
-	private int resolvedNBWForumId=27;
-	private String aiRecommendedForumName;
+	private NBWForumOptionsRepository nbwRepository;
+	private NBWForumOptionsRepository.Cancelable nbwSubscription;
+	private NBWClassificationController nbwClassificationController;
+	private NBWSelection nbwSelection=NBWSelection.ai();
 	private TextView newBabyWorldCardText, newBabyWorldCardAction;
 	private View newBabyWorldCard;
 	private View crisisCard;
 	private CrisisWarningViewController crisisWarningController;
 	private boolean crisisWarningDismissed;
 	private static final String[] CRISIS_KEYWORDS={"自杀", "自残", "死亡", "抑郁", "双向", "双相", "ADHD", "PTSD", "童年创伤", "不想活", "不想活了", "不想再活", "活不下去", "活着没意思", "活着没有意义", "想死", "去死", "求死", "寻死", "轻生", "结束生命", "结束自己的生命", "了结自己", "离开这个世界", "永远消失", "绝望", "没必要活", "没有活下去的理由", "不值得活", "死了算了", "一死了之", "结束一切", "解脱了", "撑不下去了", "不想醒来", "希望永远睡过去", "割腕", "割脉", "拿刀割自己", "划伤自己", "跳楼", "跳河", "撞车", "卧轨", "吞药", "服毒", "上吊", "自我伤害", "伤害自己", "伤害我自己"};
-	private int newBabyWorldBindingState;
-	private int newBabyWorldBindingRequestGeneration;
-	private int aiRecommendationRequestGeneration;
-	private boolean aiRecommendationInFlight;
-	private static final Set<String> dismissedNewBabyWorldCards=new HashSet<>();
-	private static final int BINDING_CHECKING=0;
-	private static final int BINDING_BOUND=1;
-	private static final int BINDING_UNBOUND=-1;
-	private static final int BINDING_CHECK_FAILED=-2;
+	private boolean localPublishInFlight;
 	private ComposeAutocompleteSpan currentAutocompleteSpan;
 	private FrameLayout mainEditTextWrap;
 	private ComposeLanguageAlertViewController.SelectedOption postLang;
@@ -265,6 +260,13 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 
 		accountID=getArguments().getString("account");
 		AccountSession session=AccountSessionManager.getInstance().getAccount(accountID);
+		nbwRepository=session.getNBWForumOptionsRepository();
+		nbwSelection=nbwRepository.getSnapshot().selection;
+		if(savedInstanceState!=null){
+			int fid=savedInstanceState.getInt("nbwV2Fid", 0);
+			if("manual".equals(savedInstanceState.getString("nbwV2Mode")) && fid>0)
+				nbwSelection=NBWSelection.manual(fid, savedInstanceState.getInt("nbwV2Typeid", 0));
+		}
 		self=session.self;
 		instanceDomain=session.domain;
 		customEmojis=AccountSessionManager.getInstance().getCustomEmojis(instanceDomain);
@@ -280,10 +282,6 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 				if(editSource.mentalCrisis!=null) editingStatus.mentalCrisis=editSource.mentalCrisis;
 				editingStatus.spoilerText=editSource.spoilerText;
 			}
-			selectedNBWForumId=editSource!=null && editSource.nbwFid!=null ? editSource.nbwFid
-					: editingStatus.nbwFid!=null ? editingStatus.nbwFid : -1;
-			if(editSource!=null && Boolean.FALSE.equals(editSource.nbwSyncEnabled)) selectedNBWForumId=-1;
-			resolvedNBWForumId=selectedNBWForumId;
 		}
 		if(instance==null){
 			Nav.finish(this);
@@ -328,14 +326,11 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 			languageChanged=savedInstanceState.getBoolean("languageChanged", false);
 			selectedLocationLevel=savedInstanceState.getInt("locationLevel", LOCATION_PROVINCE);
 		}
-		if(hasFriendCard()) selectedNBWForumId=resolvedNBWForumId=-1;
 	}
 
 	@Override
 	public void onDestroy(){
 		friendCardRequestGeneration++;
-		newBabyWorldBindingRequestGeneration++;
-		aiRecommendationRequestGeneration++;
 		super.onDestroy();
 		mediaViewController.cancelAllUploads();
 		removeBackCallback(emojiKeyboardHider);
@@ -518,8 +513,25 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		}
 
 		statusVisibility=StatusPrivacy.PUBLIC;
+		nbwClassificationController=new NBWClassificationController(getActivity(), nbwRepository, ()->{
+			nbwSelection=nbwRepository.getSnapshot().selection;
+			nbwForumChanged=true;
+			updateNBWForumButton(false);
+		});
+		nbwSubscription=nbwRepository.observe(snapshot->{
+			if(getActivity()==null) return;
+			getActivity().runOnUiThread(()->{
+				if(nbwClassificationController==null) return;
+				nbwClassificationController.updateSnapshot(snapshot);
+				updateNBWForumButton(false);
+				updateNewBabyWorldCard();
+				// Remote availability never gates the local editor: an NBW-parent reply stays
+				// editable and publishes locally; its remote part is dispatched best-effort silently.
+				updatePublishButtonState();
+			});
+		});
 		updateNBWForumButton(false);
-		refreshNewBabyWorldBinding();
+		updateNewBabyWorldCard();
 
 		autocompleteViewController=new ComposeAutocompleteViewController(getActivity(), accountID);
 		autocompleteViewController.setCompletionSelectedListener(new ComposeAutocompleteViewController.AutocompleteListener(){
@@ -584,14 +596,6 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		friendCardSpecified=true;
 		friendCardId=card==null ? null : card.id;
 		friendCardTitle=card==null ? null : card.title;
-		if(hasFriendCard()){
-			// Cancel stale AI/binding callbacks. Removal intentionally stays no-sync until explicitly changed.
-			aiRecommendationRequestGeneration++;
-			newBabyWorldBindingRequestGeneration++;
-			aiRecommendationInFlight=false;
-			selectedNBWForumId=resolvedNBWForumId=-1;
-			aiRecommendedForumName=null;
-		}
 		updateFriendCardPreview();
 		updateNBWForumButton(false);
 		updateNewBabyWorldCard();
@@ -661,7 +665,11 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		pollViewController.onSaveInstanceState(outState);
 		mediaViewController.onSaveInstanceState(outState);
 		outState.putBoolean("hasSpoiler", hasSpoiler);
-		outState.putInt("nbwForumId", selectedNBWForumId);
+		outState.putString("nbwV2Mode", nbwSelection.mode);
+		if(nbwSelection.isManual()){
+			outState.putInt("nbwV2Fid", nbwSelection.fid);
+			outState.putInt("nbwV2Typeid", nbwSelection.typeid);
+		}
 		outState.putString("friendCardId", friendCardId);
 		outState.putString("friendCardTitle", friendCardTitle);
 		outState.putBoolean("friendCardSpecified", friendCardSpecified);
@@ -684,8 +692,8 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	@Override
 	public void onResume(){
 		super.onResume();
-		if(!creatingView)
-			refreshNewBabyWorldBinding();
+		updateNBWForumButton(false);
+		updateNewBabyWorldCard();
 		// 位置权限刚授予后回到本页：刷新成 GPS 精确定位（替代 IP 属地缓存）
 		if((editingStatus==null || locationChanged) && locationBtn!=null && locationBtn.getVisibility()==View.VISIBLE
 				&& LocationUtils.hasLocationPermission(getActivity())){
@@ -706,77 +714,16 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		}
 	}
 
-	private void refreshNewBabyWorldBinding(){
-		// Existing edits preserve metadata without requiring a new cross-post or binding.
-		if(isReply() || hasFriendCard() || preservesNBWOnEdit())
-			return;
-		final int requestGeneration=++newBabyWorldBindingRequestGeneration;
-		newBabyWorldBindingState=BINDING_CHECKING;
-		updateNewBabyWorldCard();
-		updatePublishButtonState();
-		new GetOwnAccount().setCallback(new Callback<>(){
-			@Override
-			public void onSuccess(Account account){
-				if(getActivity()==null || requestGeneration!=newBabyWorldBindingRequestGeneration)
-					return;
-				AccountSessionManager.getInstance().updateAccountInfo(accountID, account);
-				self=account;
-				newBabyWorldBindingState=TextUtils.isEmpty(account.nbwUsername) ? BINDING_UNBOUND : BINDING_BOUND;
-				getActivity().runOnUiThread(()->{
-					updateNewBabyWorldCard();
-					updatePublishButtonState();
-				});
-			}
-
-			@Override
-			public void onError(ErrorResponse error){
-				if(getActivity()==null || requestGeneration!=newBabyWorldBindingRequestGeneration)
-					return;
-				newBabyWorldBindingState=BINDING_CHECK_FAILED;
-				getActivity().runOnUiThread(()->{
-					updateNewBabyWorldCard();
-					updatePublishButtonState();
-				});
-			}
-		}).exec(accountID);
-	}
-
 	private void updateNewBabyWorldCard(){
-		if(newBabyWorldCard==null)
-			return;
-		// Replies and friend-card posts never synchronize to NBW.
-		if(isReply() || hasFriendCard()){
-			newBabyWorldCard.setVisibility(View.GONE);
-			return;
-		}
-		if(crisisWarningController!=null && crisisWarningController.isVisible()){
-			newBabyWorldCard.setVisibility(View.GONE);
-			return;
-		}
-		if(newBabyWorldBindingState==BINDING_BOUND && dismissedNewBabyWorldCards.contains(accountID)){
-			newBabyWorldCard.setVisibility(View.GONE);
-			return;
-		}
-		newBabyWorldCard.setVisibility(View.VISIBLE);
-		if(preservesNBWOnEdit()){
-			newBabyWorldCardText.setText(R.string.compose_nbw_edit_preserve);
-			newBabyWorldCardAction.setVisibility(View.GONE);
-			return;
-		}
+		if(newBabyWorldCard==null || nbwRepository==null) return;
+		NBWForumOptionsRepository.Snapshot snapshot=nbwRepository.getSnapshot();
+		boolean visible=snapshot.canWrite() && !isReply() && !hasFriendCard() && editingStatus==null
+				&& (crisisWarningController==null || !crisisWarningController.isVisible());
+		newBabyWorldCard.setVisibility(visible ? View.VISIBLE : View.GONE);
+		if(!visible) return;
+		newBabyWorldCardText.setText(R.string.nbw_v2_publish_explanation);
 		newBabyWorldCardAction.setVisibility(View.VISIBLE);
-		if(newBabyWorldBindingState==BINDING_BOUND){
-			newBabyWorldCardText.setText(getString(R.string.compose_newbabyworld_bound, self.nbwUsername));
-			newBabyWorldCardAction.setText(R.string.compose_newbabyworld_close);
-		}else if(newBabyWorldBindingState==BINDING_UNBOUND){
-			newBabyWorldCardText.setText(R.string.compose_newbabyworld_unbound);
-			newBabyWorldCardAction.setText(R.string.compose_newbabyworld_bind);
-		}else if(newBabyWorldBindingState==BINDING_CHECK_FAILED){
-			newBabyWorldCardText.setText(R.string.compose_newbabyworld_check_failed);
-			newBabyWorldCardAction.setText(R.string.compose_newbabyworld_retry);
-		}else{
-			newBabyWorldCardText.setText(R.string.compose_newbabyworld_checking);
-			newBabyWorldCardAction.setText(R.string.compose_newbabyworld_retry);
-		}
+		newBabyWorldCardAction.setText(R.string.nbw_v2_classification_settings);
 	}
 
 	private boolean containsCrisisKeyword(String text){
@@ -811,17 +758,13 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	}
 
 	private void onNewBabyWorldCardAction(){
-		if(newBabyWorldBindingState==BINDING_BOUND){
-			dismissedNewBabyWorldCards.add(accountID);
-			updateNewBabyWorldCard();
-		}else if(newBabyWorldBindingState==BINDING_UNBOUND){
-			Intent intent=new Intent(getActivity(), NBWPostRegisterActivity.class);
-			intent.putExtra("show_back", true);
-			intent.putExtra("account", accountID);
-			startActivity(intent);
-		}else{
-			refreshNewBabyWorldBinding();
-		}
+		if(nbwClassificationController!=null) nbwClassificationController.show();
+	}
+
+	@Override public void onDestroyView(){
+		if(nbwSubscription!=null){ nbwSubscription.cancel(); nbwSubscription=null; }
+		if(nbwClassificationController!=null){ nbwClassificationController.dispose(); nbwClassificationController=null; }
+		super.onDestroyView();
 	}
 
 	@Override
@@ -843,9 +786,6 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	public void onViewCreated(View view, Bundle savedInstanceState){
 		super.onViewCreated(view, savedInstanceState);
 		statusVisibility=StatusPrivacy.PUBLIC;
-		if(savedInstanceState!=null)
-			selectedNBWForumId=savedInstanceState.getInt("nbwForumId", 0);
-		if(hasFriendCard()) selectedNBWForumId=resolvedNBWForumId=-1;
 		updateFriendCardPreview();
 		loadAttachedFriendCardTitle();
 		updateNBWForumButton(false);
@@ -1055,10 +995,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	@Override
 	public boolean onOptionsItemSelected(MenuItem item){
 		if(item.getItemId()==R.id.publish){
-			if(needsNewBabyWorldBinding() && newBabyWorldBindingState!=BINDING_BOUND){
-				refreshNewBabyWorldBinding();
-				return true;
-			}
+			if(!item.isEnabled() || localPublishInFlight) return true;
 			if(GlobalUserPreferences.altTextReminders && editingStatus==null)
 				checkAltTextsAndPublish();
 			else
@@ -1109,15 +1046,10 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		updatePublishButtonState();
 	}
 
-	private boolean needsNewBabyWorldBinding(){
-		return !isReply() && !hasFriendCard() && !preservesNBWOnEdit() && selectedNBWForumId!=-1;
-	}
-
 	public void updatePublishButtonState(){
-		uuid=null;
 		if(publishButton==null)
 			return;
-		publishButton.setEnabled((!needsNewBabyWorldBinding() || newBabyWorldBindingState==BINDING_BOUND) && !aiRecommendationInFlight && (trimmedCharCount>0 || !mediaViewController.isEmpty() || hasFriendCard()) && charCount<=charLimit && mediaViewController.getNonDoneAttachmentCount()==0 && (pollViewController.isEmpty() || pollViewController.getNonEmptyOptionsCount()>1));
+		publishButton.setEnabled(!localPublishInFlight && (trimmedCharCount>0 || !mediaViewController.isEmpty() || hasFriendCard()) && charCount<=charLimit && mediaViewController.getNonDoneAttachmentCount()==0 && (pollViewController.isEmpty() || pollViewController.getNonEmptyOptionsCount()>1));
 		updateDraftState();
 	}
 
@@ -1185,91 +1117,16 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	}
 
 	private void publish(){
-		// NBW cannot render friend cards. Never recommend a forum or silently cross-post one.
-		if(isReply() || hasFriendCard() || preservesNBWOnEdit()){
-			resolvedNBWForumId=-1;
-			publishResolved();
-			return;
-		}
-		// 禁止同步宝宝新天地时跳过绑定检查
-		if(needsNewBabyWorldBinding() && newBabyWorldBindingState!=BINDING_BOUND){
-			refreshNewBabyWorldBinding();
-			return;
-		}
-		if(selectedNBWForumId==-1){
-			// 禁止同步宝宝新天地
-			resolvedNBWForumId=-1;
-			publishResolved();
-			return;
-		}
-		if(selectedNBWForumId!=0){
-			resolvedNBWForumId=selectedNBWForumId;
-			publishResolved();
-			return;
-		}
-		if(aiRecommendationInFlight)
-			return;
-		aiRecommendationInFlight=true;
-		updatePublishButtonState();
-		final int requestGeneration=++aiRecommendationRequestGeneration;
-		String content=mainEditText.getText().toString().trim();
-		new RecommendNBWForum(content).setCallback(new Callback<>(){
-			@Override
-			public void onSuccess(RecommendNBWForum.Response result){
-				if(getActivity()==null || requestGeneration!=aiRecommendationRequestGeneration)
-					return;
-				aiRecommendationInFlight=false;
-				updatePublishButtonState();
-				if(result.fallback || !isValidNBWForumId(result.fid)){
-					confirmDefaultNBWForumPublish();
-					return;
-				}
-				resolvedNBWForumId=result.fid;
-				aiRecommendedForumName=result.forumName;
-				selectedNBWForumId=0;
-				updateNBWForumButton(true);
-				publishResolved();
-			}
-
-			@Override
-			public void onError(ErrorResponse error){
-				if(getActivity()==null || requestGeneration!=aiRecommendationRequestGeneration)
-					return;
-				aiRecommendationInFlight=false;
-				updatePublishButtonState();
-				confirmDefaultNBWForumPublish();
-			}
-		}).exec(accountID);
-	}
-
-	private void confirmDefaultNBWForumPublish(){
-		new M3AlertDialogBuilder(getActivity())
-				.setTitle(R.string.compose_ai_recommend_failed_title)
-				.setMessage(R.string.compose_ai_recommend_failed_message)
-				.setPositiveButton(R.string.compose_ai_recommend_publish_default, (dialog, which)->{
-					selectedNBWForumId=27;
-					resolvedNBWForumId=27;
-					aiRecommendedForumName=null;
-					updateNBWForumButton(true);
-					publishResolved();
-				})
-				.setNegativeButton(R.string.cancel, null)
-				.show();
-	}
-
-	private boolean isValidNBWForumId(int fid){
-		return fid==28 || fid==27 || fid==26 || fid==3;
+		// Local creation never waits for capabilities, grant, options, consent or AI.
+		publishResolved();
 	}
 
 	private void publishResolved(){
 		if(getActivity()==null)
 			return;
-		// 禁止同步宝宝新天地时跳过绑定检查（回复帖已禁用全部宝宝新天地功能）
-		if(needsNewBabyWorldBinding() && resolvedNBWForumId!=-1 && newBabyWorldBindingState!=BINDING_BOUND){
-			refreshNewBabyWorldBinding();
-			return;
-		}
+		if(localPublishInFlight) return;
 		Runnable publishAction=()->{
+			localPublishInFlight=true;
 			sendingOverlay=new View(getActivity());
 			WindowManager.LayoutParams overlayParams=new WindowManager.LayoutParams();
 			overlayParams.type=WindowManager.LayoutParams.TYPE_APPLICATION_PANEL;
@@ -1310,8 +1167,14 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		req.status=text;
 		req.mentalCrisis=containsCrisisKeyword(text) || editingStatus!=null && editingStatus.mentalCrisis;
 		req.visibility=editingStatus!=null ? editingStatus.visibility : StatusPrivacy.PUBLIC;
-		// Never reinterpret an edit or a reply as a new synchronized root post.
-		req.nbwFid=(isReply() || hasFriendCard() || preservesNBWOnEdit()) ? null : resolvedNBWForumId;
+		// Replies retain their full typed parent below; only new eligible roots carry classification.
+		if(!isReply() && !hasFriendCard() && editingStatus==null){
+			req.setNBWSelection(nbwSelection);
+			if(!nbwSelection.isLegal(nbwRepository.getSnapshot().options)){
+				// Keep manual intent without silently substituting a different destination.
+				req.nbwFid=null; req.nbwTypeid=null;
+			}
+		}
 		if(friendCardSpecified) req.setFriendCard(friendCardId);
 		// 位置信息（回复帖不携带）
 		if(!isReply() && (editingStatus==null || locationChanged)){
@@ -1362,8 +1225,11 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 			req.quoteApprovalPolicy=statusQuotePolicy;
 		if(quotedStatus!=null)
 			req.quotedStatusId=quotedStatus.id;
-		if(uuid==null)
+		String currentPayload=req.toJson().toString();
+		if(uuid==null || !currentPayload.equals(publishPayload)){
 			uuid=UUID.randomUUID().toString();
+			publishPayload=currentPayload;
+		}
 
 		Callback<Status> resCallback=new Callback<>(){
 			@Override
@@ -1382,10 +1248,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 				}else{
 					E.post(new StatusUpdatedEvent(result));
 				}
-				if(result.nbwSync!=null && ("unsupported".equals(result.nbwSync.state) || "failed".equals(result.nbwSync.state)
-						|| isReply() && "binding_required".equals(result.nbwSync.reason))){
-					Toast.makeText(getActivity(), isReply() ? R.string.compose_nbw_reply_local_only : R.string.compose_nbw_saved_not_synced, Toast.LENGTH_LONG).show();
-				}
+				localPublishInFlight=false;
 				Nav.finish(ComposeFragment.this);
 			}
 
@@ -1401,8 +1264,9 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 			patch.remove("quote_approval_policy");
 			if(pollViewController.isEmpty()) patch.add("media_ids", org.joinmastodon.android.api.MastodonAPIController.gson.toJsonTree(mediaViewController.getAttachmentIDs()));
 			if(spoilerChanged) patch.addProperty("spoiler_text", hasSpoiler ? spoilerEdit.getText().toString() : "");
-			if(!nbwForumChanged || isReply() || hasFriendCard()) patch.remove("nbw_fid");
-			else patch.addProperty("nbw_fid", resolvedNBWForumId);
+			patch.remove("nbw_fid");
+			patch.remove("nbw_typeid");
+			patch.remove("nbw_classification");
 			if(locationChanged && !isReply()){
 				// Explicit null clears a previously selected component; omission preserves it.
 				patch.add("geo_province", req.geoProvince==null ? com.google.gson.JsonNull.INSTANCE : new com.google.gson.JsonPrimitive(req.geoProvince));
@@ -1420,7 +1284,8 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	}
 
 	private void handlePublishError(ErrorResponse error){
-		if(sendingOverlay.isAttachedToWindow())
+		localPublishInFlight=false;
+		if(sendingOverlay!=null && sendingOverlay.isAttachedToWindow())
 			wm.removeView(sendingOverlay);
 		sendingOverlay=null;
 		removeBackCallback(sendingBackButtonBlocker);
@@ -1730,79 +1595,21 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	}
 
 	private void onVisibilityClick(View v){
-		if(hasFriendCard()){
-			Toast.makeText(getActivity(), R.string.friend_card_compose_no_nbw, Toast.LENGTH_LONG).show();
-			return;
-		}
-		ArrayList<ListItem<Integer>> items=new ArrayList<>();
-		ExtendedPopupMenu menu=new ExtendedPopupMenu(getActivity(), items);
-		Consumer<ListItem<Integer>> onClick=item->{
-			selectedNBWForumId=item.parentObject;
-			nbwForumChanged=true;
-			aiRecommendedForumName=null;
-			updateNBWForumButton(true);
-			updateNewBabyWorldCard();
-			updatePublishButtonState();
-			if(editingStatus!=null && needsNewBabyWorldBinding()) refreshNewBabyWorldBinding();
-			menu.dismiss();
-		};
-		items.add(new ListItem<>(R.string.nbw_forum_ai, R.string.nbw_forum_ai_subtitle, R.drawable.ic_fluent_wand_24_regular, 0, onClick));
-		items.add(new ListItem<>(R.string.nbw_forum_selfie, 0, R.drawable.ic_fluent_camera_24_regular, 28, onClick));
-		items.add(new ListItem<>(R.string.nbw_forum_share, 0, R.drawable.ic_fluent_share_24_regular, 27, onClick));
-		items.add(new ListItem<>(R.string.nbw_forum_novel, 0, R.drawable.ic_fluent_book_24_regular, 26, onClick));
-		items.add(new ListItem<>(R.string.nbw_forum_friends, 0, R.drawable.ic_fluent_group_24_regular, 3, onClick));
-		items.add(new ListItem<>(R.string.nbw_forum_none, R.string.nbw_forum_none_subtitle, R.drawable.ic_nbw, -1, onClick));
-		menu.showAsDropDown(v);
+		if(!isReply() && !hasFriendCard() && editingStatus==null && nbwClassificationController!=null)
+			nbwClassificationController.show();
 	}
 
 	private void updateNBWForumButton(boolean animated){
-		if(getActivity()==null)
-			return;
-		// No incompatible NBW destination can be selected while a friend card is attached.
-		if(isReply() || hasFriendCard()){
-			visibilityBtn.setVisibility(View.GONE);
-			return;
-		}
-		visibilityBtn.setVisibility(View.VISIBLE);
-		TextView visibilityText;
-		if(!animated){
-			visibilityText=visibilityCurrentText;
-		}else{
-			TransitionManager.beginDelayedTransition(visibilityBtn, new TransitionSet()
-					.addTransition(new Fade(Fade.IN | Fade.OUT))
-					.addTransition(new ChangeBounds().excludeTarget(TextView.class, true))
-					.setDuration(250)
-					.setInterpolator(CubicBezierInterpolator.DEFAULT)
-			);
-			visibilityText=visibilityCurrentText==visibilityText1 ? visibilityText2 : visibilityText1;
-			visibilityText.setVisibility(View.VISIBLE);
-			visibilityCurrentText.setVisibility(View.GONE);
-			visibilityCurrentText=visibilityText;
-		}
-		if(preservesNBWOnEdit() && selectedNBWForumId==-1 && (editSource==null || editSource.nbwSyncEnabled==null))
-			visibilityText.setText(R.string.compose_nbw_keep_existing);
-		else if(selectedNBWForumId==0 && !TextUtils.isEmpty(aiRecommendedForumName))
-			visibilityText.setText(getString(R.string.compose_ai_recommend_result, aiRecommendedForumName));
-		else
-			visibilityText.setText(switch(selectedNBWForumId){
-				case 28 -> R.string.nbw_forum_selfie;
-				case 27 -> R.string.nbw_forum_share;
-				case 26 -> R.string.nbw_forum_novel;
-				case 3 -> R.string.nbw_forum_friends;
-				case -1 -> R.string.nbw_forum_none;
-				default -> R.string.nbw_forum_ai;
-			});
-		Drawable icon=getResources().getDrawable(switch(selectedNBWForumId){
-			case 28 -> R.drawable.ic_fluent_camera_24_regular;
-			case 27 -> R.drawable.ic_fluent_share_24_regular;
-			case 26 -> R.drawable.ic_fluent_book_24_regular;
-			case 3 -> R.drawable.ic_fluent_group_24_regular;
-			case -1 -> R.drawable.ic_nbw;
-			default -> R.drawable.ic_fluent_wand_24_regular;
-		}, getActivity().getTheme()).mutate();
-		icon.setBounds(0, 0, V.dp(18), V.dp(18));
-		icon.setTint(UiUtils.getThemeColor(getActivity(), R.attr.colorM3OnSurfaceVariant));
-		visibilityText.setCompoundDrawablesRelative(icon, null, null, null);
+		if(getActivity()==null || visibilityBtn==null || nbwRepository==null) return;
+		NBWForumOptionsRepository.Snapshot snapshot=nbwRepository.getSnapshot();
+		boolean visible=snapshot.canWrite() && !isReply() && !hasFriendCard() && editingStatus==null;
+		visibilityBtn.setVisibility(visible ? View.VISIBLE : View.GONE);
+		if(!visible) return;
+		String summary=nbwSelection.isManual()
+				? nbwSelection.isLegal(snapshot.options) ? snapshot.options.label(nbwSelection.fid, nbwSelection.typeid) : getString(R.string.nbw_v2_selection_expired)
+				: getString(R.string.nbw_forum_ai);
+		visibilityCurrentText.setText(summary);
+		visibilityBtn.setContentDescription(getString(R.string.nbw_v2_classification_title)+" / "+summary);
 	}
 
 	@Override

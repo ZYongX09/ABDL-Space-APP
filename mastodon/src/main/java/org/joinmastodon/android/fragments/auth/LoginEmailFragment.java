@@ -149,13 +149,9 @@ public class LoginEmailFragment extends AppKitFragment {
 
         btnPasswordLogin.setOnClickListener(v -> Nav.go(getActivity(), LoginPasswordFragment.class, new Bundle()));
 
-        btnNBW.setOnClickListener(v -> showConsentSheet(() -> {
-            getActivity().getSharedPreferences("nbw_bind", android.content.Context.MODE_PRIVATE)
-                .edit().putString("flow", "login").apply();
-            Intent intent = new Intent(Intent.ACTION_VIEW,
-                Uri.parse("https://abdl-space.top/api/auth/nbw/mobile-start"));
-            startActivity(intent);
-        }));
+        // V2 grants are connected only from an authenticated first-party account.
+        btnNBW.setVisibility(View.GONE);
+        btnNBW.setOnClickListener(null);
 
         btnQQ.setVisibility(BuildConfig.QQ_LOGIN_ENABLED ? View.VISIBLE : View.GONE);
         btnQQ.setOnClickListener(v -> showQQConsentSheet());

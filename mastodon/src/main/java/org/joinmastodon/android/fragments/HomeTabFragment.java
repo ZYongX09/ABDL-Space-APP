@@ -128,6 +128,24 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 	private final Map<Integer, Hashtag> hashtagsItems = new HashMap<>();
 	private List<TimelineDefinition> timelinesList;
 	private int count;
+	private final ArrayList<Integer> visibleTimelineIndices=new ArrayList<>();
+	private org.joinmastodon.android.api.session.NBWForumOptionsRepository.Cancelable nbwSubscription;
+	private int currentTimelineIndex(){
+		int position=pager==null ? 0 : pager.getCurrentItem();
+		return visibleTimelineIndices.isEmpty() ? 0 : visibleTimelineIndices.get(Math.min(position, visibleTimelineIndices.size()-1));
+	}
+	private boolean nbwTimelineVisible(){ return AccountSessionManager.get(accountID).getNBWForumOptionsRepository().getSnapshot().canRead(); }
+	private void updateNBWVisiblePages(){
+		if(pager==null || pager.getAdapter()==null) return;
+		int selected=currentTimelineIndex();
+		ArrayList<Integer> next=new ArrayList<>();
+		for(int i=0;i<timelines.length;i++) if(timelines[i].getType()!=TimelineDefinition.TimelineType.NBW || nbwTimelineVisible()) next.add(i);
+		if(next.equals(visibleTimelineIndices)) return;
+		visibleTimelineIndices.clear(); visibleTimelineIndices.addAll(next);
+		pager.getAdapter().notifyDataSetChanged();
+		pager.setCurrentItem(Math.max(0, visibleTimelineIndices.indexOf(selected)), false);
+		updateSwitcherMenu(); updateSwitcherIcon(currentTimelineIndex()); updateLiquidToolbarState();
+	}
 	private Fragment[] fragments;
 	private FrameLayout[] tabViews;
 	private TimelineDefinition[] timelines;
@@ -297,9 +315,11 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		args.putBoolean("__disable_fab", true);
 		args.putBoolean("onlyPosts", true);
 		FragmentTransaction transaction = null;
+		visibleTimelineIndices.clear();
 		for (int i = 0; i < count; i++) {
 			int containerId=i + 1;
 			timelines[i]=timelinesList.get(i);
+			if(timelines[i].getType()!=TimelineDefinition.TimelineType.NBW || nbwTimelineVisible()) visibleTimelineIndices.add(i);
 			Fragment expectedFragment=timelines[i].getFragment();
 			Class<?> expectedClass=expectedFragment.getClass();
 			Fragment restoredFragment=getChildFragmentManager().findFragmentById(containerId);
@@ -362,9 +382,14 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		UiUtils.reduceSwipeSensitivity(pager);
 		pager.setUserInputEnabled(!GlobalUserPreferences.disableSwipe);
 		pager.setAdapter(new HomePagerAdapter());
+		nbwSubscription=AccountSessionManager.get(accountID).getNBWForumOptionsRepository().observe(snapshot->{
+			if(getActivity()!=null) getActivity().runOnUiThread(this::updateNBWVisiblePages);
+		});
 		pager.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
 			@Override
 			public void onPageSelected(int position){
+				if(position>=visibleTimelineIndices.size()) return;
+				int index=visibleTimelineIndices.get(position);
 				if(position!=0) {
 					addBackCallback(returnToBeginningOfPager);
 				} else {
@@ -378,9 +403,9 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 					switcher.setScaleX(0.85f);
 					switcher.setAlpha(0.65f);
 				}
-				updateSwitcherIcon(position);
-				if (!timelines[position].equals(TimelineDefinition.HOME_TIMELINE)) hideNewPostsButton();
-				if (fragments[position] instanceof BaseRecyclerFragment<?> page){
+				updateSwitcherIcon(index);
+				if (!timelines[index].equals(TimelineDefinition.HOME_TIMELINE)) hideNewPostsButton();
+				if (fragments[index] instanceof BaseRecyclerFragment<?> page){
 					if(!page.loaded && !page.isDataLoading()) page.loadData();
 				}
 			}
@@ -388,7 +413,7 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 
 		if (!reduceMotion) {
 			pager.setPageTransformer((v, pos) -> {
-				if (reduceMotion || tabViews[pager.getCurrentItem()] != v) return;
+				if (reduceMotion || tabViews[currentTimelineIndex()] != v) return;
 				float scaleFactor = Math.max(0.85f, 1 - Math.abs(pos) * 0.06f);
 				switcher.setScaleY(scaleFactor);
 				switcher.setScaleX(scaleFactor);
@@ -593,7 +618,7 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 	}
 
 	private boolean onFabLongClick(View v) {
-		if (fragments[pager.getCurrentItem()] instanceof BaseStatusListFragment<?> l) {
+		if (fragments[currentTimelineIndex()] instanceof BaseStatusListFragment<?> l) {
 			return l.onFabLongClick(v);
 		} else {
 			return false;
@@ -636,7 +661,7 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		toolbar.setNavigationContentDescription(R.string.back);
 		toolbar.setContentInsetsAbsolute(0, toolbar.getContentInsetRight());
 
-		updateSwitcherIcon(pager.getCurrentItem());
+		updateSwitcherIcon(currentTimelineIndex());
 
 		toolbarShowNewPostsBtn=toolbarFrame.findViewById(R.id.show_new_posts_btn);
 		toolbarShowNewPostsBtn.setCompoundDrawableTintList(toolbarShowNewPostsBtn.getTextColors());
@@ -737,10 +762,10 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		ArrayList<HomeToolbarTimeline> toolbarTimelines=new ArrayList<>();
 		for(int i=0;i<timelines.length;i++){
 			TimelineDefinition timeline=timelines[i];
-			if(timeline!=null)
+			if(timeline!=null && (timeline.getType()!=TimelineDefinition.TimelineType.NBW || nbwTimelineVisible()))
 				toolbarTimelines.add(new HomeToolbarTimeline(i, timeline.getTitle(getContext()), timeline.getIcon().iconRes));
 		}
-		liquidToolbarController.setTimelines(toolbarTimelines, pager==null ? 0 : pager.getCurrentItem());
+		liquidToolbarController.setTimelines(toolbarTimelines, currentTimelineIndex());
 		liquidToolbarController.setShowNewPosts(newPostsBtnShown);
 		liquidToolbarController.setReminderState(announcementsBadged, settingsBadged);
 		ArrayList<HomeToolbarMenuItem> root=new ArrayList<>();
@@ -836,6 +861,7 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		timelinesByMenuItem.clear();
 
 		for (TimelineDefinition tl : timelines) {
+			if(tl.getType()==TimelineDefinition.TimelineType.NBW && !nbwTimelineVisible()) continue;
 			int menuItemId = View.generateViewId();
 			timelinesByMenuItem.put(menuItemId, tl);
 			MenuItem item = switcherMenu.add(0, menuItemId, 0, tl.getTitle(getContext()));
@@ -874,13 +900,15 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 	}
 
 	private void navigateTo(int i, boolean smooth) {
-		pager.setCurrentItem(i, smooth);
+		int visible=visibleTimelineIndices.indexOf(i);
+		if(visible<0) return;
+		pager.setCurrentItem(visible, smooth);
 		updateSwitcherIcon(i);
 	}
 
 	@Override
 	public void showFab() {
-		if (fragments[pager.getCurrentItem()] instanceof BaseStatusListFragment<?> l) l.showFab();
+		if (fragments[currentTimelineIndex()] instanceof BaseStatusListFragment<?> l) l.showFab();
 		updateLiquidToolbarMode();
 	}
 
@@ -888,13 +916,13 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 	public void hideFab() {
 		// The FAB cannot slide away while it anchors the open fan.
 		collapseFanMenu();
-		if (fragments[pager.getCurrentItem()] instanceof BaseStatusListFragment<?> l) l.hideFab();
+		if (fragments[currentTimelineIndex()] instanceof BaseStatusListFragment<?> l) l.hideFab();
 		updateLiquidToolbarMode();
 	}
 
 	@Override
 	public boolean isScrolling() {
-		return (fragments[pager.getCurrentItem()] instanceof HasFab fabulous)
+		return (fragments[currentTimelineIndex()] instanceof HasFab fabulous)
 				&& fabulous.isScrolling();
 	}
 
@@ -952,13 +980,13 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 
 	@Override
 	public void scrollToTop(){
-		if (((IsOnTop) fragments[pager.getCurrentItem()]).isOnTop() &&
+		if (((IsOnTop) fragments[currentTimelineIndex()]).isOnTop() &&
 				GlobalUserPreferences.doubleTapToSwipe && !newPostsBtnShown) {
-			int nextPage = (pager.getCurrentItem() + 1) % count;
-			navigateTo(nextPage);
+			int nextPage = (pager.getCurrentItem() + 1) % visibleTimelineIndices.size();
+			navigateTo(visibleTimelineIndices.get(nextPage));
 			return;
 		}
-		((ScrollableToTop) fragments[pager.getCurrentItem()]).scrollToTop();
+		((ScrollableToTop) fragments[currentTimelineIndex()]).scrollToTop();
 	}
 
 	public void hideNewPostsButton(){
@@ -995,7 +1023,7 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 	}
 
 	public void showNewPostsButton(){
-		if(newPostsBtnShown || pager == null || !timelines[pager.getCurrentItem()].equals(TimelineDefinition.HOME_TIMELINE))
+		if(newPostsBtnShown || pager == null || !timelines[currentTimelineIndex()].equals(TimelineDefinition.HOME_TIMELINE))
 			return;
 		newPostsBtnShown=true;
 		updateLiquidToolbarState();
@@ -1077,6 +1105,7 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 
 	@Override
 	public void onDestroyView(){
+		if(nbwSubscription!=null){ nbwSubscription.cancel(); nbwSubscription=null; }
 		liquidToolbarController=null;
 		if(fanMenu!=null){
 			if(fanMenu.isExpanded())
@@ -1175,7 +1204,7 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 	}
 
 	public Fragment getCurrentFragment() {
-		return fragments[pager.getCurrentItem()];
+		return fragments[currentTimelineIndex()];
 	}
 
 	public ImageButton getFab() {
@@ -1184,14 +1213,14 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 
 	@Override
 	public void onProvideAssistContent(AssistContent assistContent) {
-		callFragmentToProvideAssistContent(fragments[pager.getCurrentItem()], assistContent);
+		callFragmentToProvideAssistContent(fragments[currentTimelineIndex()], assistContent);
 	}
 
 	private class HomePagerAdapter extends RecyclerView.Adapter<SimpleViewHolder> {
 		@NonNull
 		@Override
 		public SimpleViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-			FrameLayout tabView = tabViews[viewType % getItemCount()];
+			FrameLayout tabView = tabViews[viewType];
 			ViewGroup tabParent = (ViewGroup) tabView.getParent();
 			if (tabParent != null) tabParent.removeView(tabView);
 			tabView.setVisibility(View.VISIBLE);
@@ -1203,12 +1232,12 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 
 		@Override
 		public int getItemCount(){
-			return count;
+			return visibleTimelineIndices.size();
 		}
 
 		@Override
 		public int getItemViewType(int position){
-			return position;
+			return visibleTimelineIndices.get(position);
 		}
 	}
 }

@@ -138,6 +138,8 @@ public class AccountSessionManager{
 	public void addAccount(Instance instance, Token token, Account self, Application app, AccountActivationInfo activationInfo){
 		instances.put(instance.getDomain(), instance);
 		runOnDbThread(db->insertInstanceIntoDatabase(db, instance.getDomain(), instance, null, 0));
+		AccountSession previous=getLastActiveAccount();
+		if(previous!=null) previous.deactivateNBW();
 		AccountSession session=new AccountSession(token, self, app, instance.getDomain(), activationInfo==null, activationInfo);
 		sessions.put(session.getID(), session);
 		lastActiveAccountID=session.getID();
@@ -197,12 +199,18 @@ public class AccountSessionManager{
 	public void setLastActiveAccountID(String id){
 		if(!sessions.containsKey(id))
 			throw new IllegalStateException("Account session "+id+" not found");
+		if(lastActiveAccountID!=null && !lastActiveAccountID.equals(id)){
+			AccountSession previous=sessions.get(lastActiveAccountID);
+			if(previous!=null) previous.deactivateNBW();
+		}
 		lastActiveAccountID=id;
 		prefs.edit().putString("lastActiveAccount", id).apply();
+		getAccount(id).getNBWForumOptionsRepository().activate();
 	}
 
 	public void removeAccount(String id){
 		AccountSession session=getAccount(id);
+		session.deactivateNBW();
 		NovelAccountDataCleaner.revoke(id, ()->sessions.remove(id));
 		NovelAccountDataCleaner.clean(MastodonApp.context, id);
 		session.getCacheController().closeDatabase();

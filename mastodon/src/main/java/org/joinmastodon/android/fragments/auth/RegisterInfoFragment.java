@@ -276,8 +276,7 @@ public class RegisterInfoFragment extends AppKitFragment {
                                                 }else{
                                                     Intent intent = new Intent(getActivity(), NBWPostRegisterActivity.class);
                                                     intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-                                                    intent.putExtra("nbw_username", username);
-                                                    intent.putExtra("nbw_password", password);
+                                                    intent.putExtra("account", AccountSessionManager.getInstance().getLastActiveAccountID());
                                                     startActivity(intent);
                                                     if (getActivity() instanceof MainActivity mainActivity) {
                                                         mainActivity.finish();

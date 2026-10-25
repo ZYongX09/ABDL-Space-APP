@@ -38,6 +38,16 @@ public class CreateStatus extends MastodonAPIRequest<Status>{
 		public String quotedStatusId;
 		@SerializedName("nbw_fid")
 		public Integer nbwFid;
+		@SerializedName("nbw_typeid")
+		public Integer nbwTypeid;
+		@SerializedName("nbw_classification")
+		public String nbwClassification;
+
+		public void setNBWSelection(org.joinmastodon.android.model.NBWSelection selection){
+			nbwClassification=selection.mode;
+			nbwFid=selection.isManual() ? selection.fid : null;
+			nbwTypeid=selection.isManual() ? selection.typeid : null;
+		}
 		/** Absent preserves an edit's current reference; setFriendCard(null) explicitly removes it. */
 		@SerializedName("friend_card_id")
 		public String friendCardId;

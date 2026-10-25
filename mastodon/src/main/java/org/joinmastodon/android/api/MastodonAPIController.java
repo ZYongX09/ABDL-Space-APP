@@ -128,7 +128,7 @@ public class MastodonAPIController{
 	public <T> void submitRequest(final MastodonAPIRequest<T> req){
 		thread.postRunnable(()->{
 			try{
-				if(req.canceled)
+				if(req.canceled || !req.acceptsRemoteResponse())
 					return;
 				Request.Builder builder=new Request.Builder()
 						.url(req.getURL().toString())
@@ -155,7 +155,8 @@ public class MastodonAPIController{
 				// Native build identity is mandatory, even when a request supplies its own headers.
 				// Keep the MastodonAndroid/ prefix compatible with backend native-client detection.
 				builder.header("User-Agent", "MastodonAndroid/"+BuildConfig.VERSION_NAME)
-						.header("X-App-Version-Code", String.valueOf(BuildConfig.VERSION_CODE));
+						.header("X-App-Version-Code", String.valueOf(BuildConfig.VERSION_CODE))
+						.header("X-ABDL-NBW-Protocol", "2");
 
 				Request hreq=builder.build();
 					OkHttpClient selectedClient=req.requiresSystemTrust() ? systemTrustSensitiveHttpClient : req.isSensitiveRequest() ? sensitiveHttpClient : httpClient;
@@ -186,7 +187,7 @@ public class MastodonAPIController{
 
 					@Override
 					public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException{
-						if(req.canceled){
+						if(req.canceled || !req.acceptsRemoteResponse()){
 							response.close();
 							return;
 						}

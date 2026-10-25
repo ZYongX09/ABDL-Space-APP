@@ -101,6 +101,16 @@ public class AccountSession{
 	private transient SharedPreferences prefs;
 	private transient boolean preferencesNeedSaving;
 	private transient AccountLocalPreferences localPreferences;
+	private transient NBWForumOptionsRepository nbwForumOptionsRepository;
+
+	public synchronized NBWForumOptionsRepository getNBWForumOptionsRepository(){
+		if(nbwForumOptionsRepository==null) nbwForumOptionsRepository=NBWForumOptionsRepository.forSession(this);
+		return nbwForumOptionsRepository;
+	}
+
+	public void deactivateNBW(){
+		if(nbwForumOptionsRepository!=null) nbwForumOptionsRepository.deactivate();
+	}
 
 	AccountSession(Token token, Account self, Application app, String domain, boolean activated, AccountActivationInfo activationInfo){
 		this.token=token;
@@ -320,6 +330,9 @@ public class AccountSession{
 	}
 
 	public <T> void filterStatusContainingObjects(List<T> objects, Function<T, Status> extractor, FilterContext context){
+		if(!getNBWForumOptionsRepository().getSnapshot().canRead()){
+			objects.removeIf(item->{ Status status=extractor.apply(item); return status!=null && status.id!=null && status.id.startsWith("nbw_"); });
+		}
 		if(getLocalPreferences().serverSideFiltersSupported){
 			// Even with server-side filters, clients are expected to remove statuses that match a filter that hides them
 			objects.removeIf(o->{

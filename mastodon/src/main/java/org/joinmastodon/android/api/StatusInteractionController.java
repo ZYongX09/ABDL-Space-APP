@@ -103,6 +103,15 @@ public class StatusInteractionController{
 					}
 				};
 		MastodonAPIRequest<?> req=interactionRequest(status, true, favorited, callback);
+		if(status.id.startsWith("nbw_")) req.setNBWCancellationCleanup(()->{
+			if(!runningFavoriteRequests.remove(status.id, req)) return;
+			// The upstream outcome is unknown. Remove only our optimistic assertion; never
+			// report a success, show OAuth, or deliver an ordinary callback to an old account.
+			status.favourited=oldFavorited;
+			status.favouritesCount=oldCount;
+			if(canNotifyCanceledRemote(session) && updateCounters)
+				E.post(new StatusCountersUpdatedEvent(status, StatusCountersUpdatedEvent.CounterType.FAVORITES));
+		});
 		runningFavoriteRequests.put(status.id, req);
 		status.favourited=favorited;
 		status.favouritesCount=Math.max(0, oldCount+(oldFavorited==favorited ? 0 : favorited ? 1 : -1));
@@ -249,6 +258,14 @@ public class StatusInteractionController{
 					}
 				};
 		MastodonAPIRequest<?> req=interactionRequest(status, false, bookmarked, callback);
+		AccountSession owner=AccountSessionManager.get(accountID);
+		if(status.id.startsWith("nbw_")) req.setNBWCancellationCleanup(()->{
+			if(!runningBookmarkRequests.remove(status.id, req)) return;
+			status.bookmarked=oldBookmarked;
+			status.bookmarksCount=oldCount;
+			if(canNotifyCanceledRemote(owner))
+				E.post(new StatusCountersUpdatedEvent(status, StatusCountersUpdatedEvent.CounterType.BOOKMARKS));
+		});
 		runningBookmarkRequests.put(status.id, req);
 		status.bookmarked=bookmarked;
 		status.bookmarksCount=Math.max(0, oldCount+(oldBookmarked==bookmarked ? 0 : bookmarked ? 1 : -1));
@@ -256,6 +273,12 @@ public class StatusInteractionController{
 		// MOSHIDON:
 		if(updateCounters) E.post(new StatusCountersUpdatedEvent(status, StatusCountersUpdatedEvent.CounterType.BOOKMARKS));
 		req.exec(accountID);
+	}
+
+	private boolean canNotifyCanceledRemote(AccountSession owner){
+		return AccountSessionManager.getInstance().tryGetAccount(accountID)==owner
+				&& accountID.equals(AccountSessionManager.getInstance().getLastActiveAccountID())
+				&& owner.getNBWForumOptionsRepository().getSnapshot().canRead();
 	}
 
 	private boolean supportsInteraction(Status status, android.content.Context context){

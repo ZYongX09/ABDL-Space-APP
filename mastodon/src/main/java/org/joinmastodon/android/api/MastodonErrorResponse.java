@@ -66,6 +66,12 @@ public class MastodonErrorResponse extends ErrorResponse{
 		Toast.makeText(context, message, Toast.LENGTH_SHORT).show();
 	}
 
+	/** V2 remote failures never launch OAuth or interrupt a local publishing flow. */
+	public static class SilentNBWError extends MastodonErrorResponse{
+		public SilentNBWError(String error, int status, Throwable cause){ super(error, status, cause); }
+		@Override public void showToast(Context context){}
+	}
+
 	/** Only this machine code opens binding UI; ordinary permission failures keep their text. */
 	public static MastodonErrorResponse nbwBindingError(com.google.gson.JsonObject body, int status){
 		if(status!=403 || body==null || !body.has("code") || !body.get("code").isJsonPrimitive()
