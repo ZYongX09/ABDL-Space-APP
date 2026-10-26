@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<org.joinmastodon.android.ui.views.CustomScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+	android:id="@+id/nbw_fallback_sheet"
+	android:layout_width="match_parent"
+	android:layout_height="wrap_content"
+	android:background="@drawable/bg_bottom_sheet"
+	android:outlineProvider="background"
+	android:elevation="1dp">
+
+	<LinearLayout
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:orientation="vertical"
+		android:paddingBottom="16dp">
+
+		<View
+			android:layout_width="match_parent"
+			android:layout_height="32dp"
+			android:background="@drawable/bg_bottom_sheet_handle"
+			android:importantForAccessibility="no"/>
+
+		<TextView
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:layout_marginHorizontal="24dp"
+			android:accessibilityHeading="true"
+			android:textAppearance="@style/m3_title_large"
+			android:textColor="?colorM3OnSurface"
+			android:text="@string/nbw_v2_fallback_settings"/>
+
+		<TextView
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:layout_marginHorizontal="24dp"
+			android:layout_marginTop="12dp"
+			android:textAppearance="@style/m3_body_medium"
+			android:textColor="?colorM3OnSurfaceVariant"
+			android:text="@string/nbw_v2_fallback_explanation"/>
+
+		<TextView
+			android:id="@+id/nbw_fallback_status"
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:layout_marginHorizontal="24dp"
+			android:layout_marginTop="12dp"
+			android:accessibilityLiveRegion="polite"
+			android:textAppearance="@style/m3_body_medium"
+			android:textColor="?colorM3OnSurface"
+			android:text="@string/nbw_v2_fallback_not_accepted"/>
+
+		<TextView
+			android:id="@+id/nbw_fallback_result"
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:layout_marginHorizontal="24dp"
+			android:layout_marginTop="8dp"
+			android:accessibilityLiveRegion="polite"
+			android:textAppearance="@style/m3_body_medium"
+			android:textColor="?colorM3OnSurfaceVariant"
+			android:visibility="gone"/>
+
+		<Button
+			android:id="@+id/nbw_fallback_accept"
+			style="@style/Widget.Mastodon.M3.Button.Tonal"
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:layout_marginHorizontal="24dp"
+			android:layout_marginTop="20dp"
+			android:minHeight="48dp"
+			android:singleLine="false"
+			android:ellipsize="none"
+			android:text="@string/nbw_v2_fallback_accept"/>
+
+		<Button
+			android:id="@+id/nbw_fallback_decline"
+			style="@style/Widget.Mastodon.M3.Button.Text"
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:layout_marginHorizontal="24dp"
+			android:layout_marginTop="4dp"
+			android:minHeight="48dp"
+			android:singleLine="false"
+			android:ellipsize="none"
+			android:text="@string/nbw_v2_fallback_decline"/>
+
+		<Button
+			android:id="@+id/nbw_fallback_done"
+			style="@style/Widget.Mastodon.M3.Button.Text"
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:layout_marginHorizontal="24dp"
+			android:layout_marginTop="4dp"
+			android:minHeight="48dp"
+			android:text="@string/done"/>
+	</LinearLayout>
+</org.joinmastodon.android.ui.views.CustomScrollView>

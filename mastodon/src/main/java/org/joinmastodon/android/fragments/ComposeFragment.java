@@ -244,6 +244,11 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 
 	private Runnable emojiKeyboardHider;
 	private Runnable sendingBackButtonBlocker=()->{};
+	private final Runnable nbwMenuBackCallback=this::onNBWMenuBack;
+	private void onNBWMenuBack(){
+		if(nbwClassificationController==null || !nbwClassificationController.onBackPressed())
+			removeBackCallback(nbwMenuBackCallback);
+	}
 	private Runnable discardConfirmationCallback=this::confirmDiscardDraftBackCallback;
 	private boolean prevHadDraft;
 	private boolean keyboardVisible;
@@ -517,7 +522,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 			nbwSelection=nbwRepository.getSnapshot().selection;
 			nbwForumChanged=true;
 			updateNBWForumButton(false);
-		});
+		}, ()->removeBackCallback(nbwMenuBackCallback));
 		nbwSubscription=nbwRepository.observe(snapshot->{
 			if(getActivity()==null) return;
 			getActivity().runOnUiThread(()->{
@@ -723,7 +728,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		if(!visible) return;
 		newBabyWorldCardText.setText(R.string.nbw_v2_publish_explanation);
 		newBabyWorldCardAction.setVisibility(View.VISIBLE);
-		newBabyWorldCardAction.setText(R.string.nbw_v2_classification_settings);
+		newBabyWorldCardAction.setText(R.string.nbw_v2_fallback_settings);
 	}
 
 	private boolean containsCrisisKeyword(String text){
@@ -758,10 +763,11 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	}
 
 	private void onNewBabyWorldCardAction(){
-		if(nbwClassificationController!=null) nbwClassificationController.show();
+		if(nbwClassificationController!=null) nbwClassificationController.showFallbackSettings();
 	}
 
 	@Override public void onDestroyView(){
+		removeBackCallback(nbwMenuBackCallback);
 		if(nbwSubscription!=null){ nbwSubscription.cancel(); nbwSubscription=null; }
 		if(nbwClassificationController!=null){ nbwClassificationController.dispose(); nbwClassificationController=null; }
 		super.onDestroyView();
@@ -1595,8 +1601,10 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	}
 
 	private void onVisibilityClick(View v){
-		if(!isReply() && !hasFriendCard() && editingStatus==null && nbwClassificationController!=null)
-			nbwClassificationController.show();
+		if(!isReply() && !hasFriendCard() && editingStatus==null && nbwClassificationController!=null && nbwRepository.getSnapshot().canWrite()){
+			nbwClassificationController.showMenu(v);
+			addBackCallback(nbwMenuBackCallback);
+		}
 	}
 
 	private void updateNBWForumButton(boolean animated){
@@ -1606,7 +1614,8 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		visibilityBtn.setVisibility(visible ? View.VISIBLE : View.GONE);
 		if(!visible) return;
 		String summary=nbwSelection.isManual()
-				? nbwSelection.isLegal(snapshot.options) ? snapshot.options.label(nbwSelection.fid, nbwSelection.typeid) : getString(R.string.nbw_v2_selection_expired)
+				? nbwSelection.isLegal(snapshot.options) ? snapshot.options.label(nbwSelection.fid, nbwSelection.typeid)
+						+(nbwSelection.typeid==0 ? " / "+getString(R.string.nbw_v2_no_type) : "") : getString(R.string.nbw_v2_selection_expired)
 				: getString(R.string.nbw_forum_ai);
 		visibilityCurrentText.setText(summary);
 		visibilityBtn.setContentDescription(getString(R.string.nbw_v2_classification_title)+" / "+summary);

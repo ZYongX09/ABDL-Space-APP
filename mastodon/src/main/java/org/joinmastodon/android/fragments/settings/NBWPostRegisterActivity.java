@@ -3,11 +3,18 @@ package org.joinmastodon.android.fragments.settings;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.view.View;
+import android.view.Window;
+import android.view.WindowManager;
 import android.widget.Button;
-import android.widget.LinearLayout;
 import android.widget.TextView;
+
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
 
 import org.joinmastodon.android.R;
 import org.joinmastodon.android.MainActivity;
@@ -18,6 +25,7 @@ import org.joinmastodon.android.api.session.AccountSessionManager;
 import org.joinmastodon.android.api.session.NBWForumOptionsRepository;
 import org.joinmastodon.android.ui.compose.NBWClassificationController;
 import org.joinmastodon.android.ui.utils.UiUtils;
+import org.joinmastodon.android.ui.views.SpaceBackgroundView;
 
 import me.grishka.appkit.api.Callback;
 import me.grishka.appkit.api.ErrorResponse;
@@ -40,16 +48,36 @@ public class NBWPostRegisterActivity extends Activity{
 		session=id==null ? AccountSessionManager.getInstance().getLastActiveAccount() : AccountSessionManager.getInstance().tryGetAccount(id);
 		if(session==null){ finish(); return; }
 		repository=session.getNBWForumOptionsRepository();
-		LinearLayout root=new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL);
-		int padding=(int)(24*getResources().getDisplayMetrics().density); root.setPadding(padding, padding, padding, padding);
-		TextView title=new TextView(this); title.setText(R.string.nbw_v2_connection_title); title.setTextSize(22); root.addView(title);
-		status=new TextView(this); status.setText(R.string.nbw_v2_connection_unavailable); root.addView(status);
-		TextView explanation=new TextView(this); explanation.setText(R.string.nbw_v2_publish_explanation); root.addView(explanation);
-		connect=new Button(this); connect.setText(R.string.nbw_v2_connect); connect.setOnClickListener(v->startAuthorization()); root.addView(connect);
-		settings=new Button(this); settings.setText(R.string.nbw_v2_classification_settings); settings.setOnClickListener(v->classification.show()); root.addView(settings);
-		Button close=new Button(this); close.setText(R.string.done); close.setOnClickListener(v->completeConnectionPage()); root.addView(close);
-		android.widget.ScrollView scroll=new android.widget.ScrollView(this); scroll.addView(root); setContentView(scroll);
+		Window window=getWindow();
+		window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
+		window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+		window.setStatusBarColor(Color.TRANSPARENT);
+		WindowCompat.setDecorFitsSystemWindows(window, false);
+		boolean dark=UiUtils.isDarkTheme();
+		WindowCompat.getInsetsController(window, window.getDecorView()).setAppearanceLightStatusBars(!dark);
+		WindowCompat.getInsetsController(window, window.getDecorView()).setAppearanceLightNavigationBars(!dark);
+		window.setNavigationBarColor(Color.TRANSPARENT);
+		setContentView(R.layout.activity_nbw_post_register);
+		SpaceBackgroundView spaceBackground=findViewById(R.id.space_bg);
+		spaceBackground.setDarkMode(dark);
+		// Only foreground content avoids system bars; the original background remains edge-to-edge.
+		View content=findViewById(R.id.content_container);
+		ViewCompat.setOnApplyWindowInsetsListener(content, (view, insets)->{
+			Insets bars=insets.getInsets(WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout());
+			view.setPadding(bars.left, bars.top, bars.right, bars.bottom);
+			return insets;
+		});
+		ViewCompat.requestApplyInsets(content);
+		View back=findViewById(R.id.btn_back);
+		back.setVisibility(getIntent().getBooleanExtra("show_back", false) ? View.VISIBLE : View.GONE);
+		back.setOnClickListener(v->completeConnectionPage());
+		status=findViewById(R.id.nbw_connection_status);
+		connect=findViewById(R.id.btn_nbw_connect);
+		settings=findViewById(R.id.btn_nbw_settings);
 		classification=new NBWClassificationController(this, repository, ()->{});
+		connect.setOnClickListener(v->startAuthorization());
+		settings.setOnClickListener(v->classification.showFallbackSettings());
+		findViewById(R.id.btn_skip).setOnClickListener(v->completeConnectionPage());
 		subscription=repository.observe(snapshot->runOnUiThread(()->render(snapshot)));
 		if(session.getID().equals(AccountSessionManager.getInstance().getLastActiveAccountID())) repository.activate();
 	}
@@ -71,7 +99,8 @@ public class NBWPostRegisterActivity extends Activity{
 		connect.setVisibility(snapshot.canWrite() ? View.VISIBLE : View.GONE);
 		settings.setVisibility(snapshot.canWrite() ? View.VISIBLE : View.GONE);
 		connect.setEnabled(!starting);
-		status.setText(starting ? R.string.nbw_v2_connection_pending : !snapshot.canRead() ? R.string.nbw_v2_connection_unavailable
+		status.setText(starting ? R.string.nbw_v2_connection_pending : !snapshot.canRead()
+				? snapshot.state==NBWForumOptionsRepository.State.LOCAL_ONLY ? R.string.nbw_v2_connection_local_only : R.string.nbw_v2_connection_unavailable
 				: !snapshot.canWrite() ? R.string.nbw_v2_read_only : snapshot.capabilities.hasGrant() ? R.string.nbw_v2_connection_ready : R.string.nbw_v2_connection_missing);
 	}
 	private void startAuthorization(){

@@ -4,14 +4,12 @@ import static org.junit.Assert.*;
 
 import android.content.Intent;
 import android.os.Looper;
-import android.view.View;
-import android.view.ViewGroup;
-import android.widget.Button;
 
 import org.joinmastodon.android.CompatibilityTestApplication;
 import org.joinmastodon.android.MainActivity;
 import org.joinmastodon.android.GlobalUserPreferences;
 import org.joinmastodon.android.api.session.AccountLocalPreferences;
+import org.joinmastodon.android.api.requests.nbw.NBWAppRequest;
 import org.joinmastodon.android.MastodonApp;
 import org.joinmastodon.android.R;
 import org.joinmastodon.android.api.session.AccountSession;
@@ -132,6 +130,7 @@ public class NBWV2LifecycleIntegrationTest{
 		field(AccountSession.class, "nbwForumOptionsRepository").set(session, repository);
 		controller=new CapturingController(session);
 		field(AccountSession.class, "apiController").set(session, controller);
+		MastodonApp.context.getSharedPreferences("nbw_v2_authorization", 0).edit().clear().commit();
 		ShadowToast.reset();
 	}
 	@After public void cleanup() throws Exception{
@@ -141,6 +140,7 @@ public class NBWV2LifecycleIntegrationTest{
 		if(previousInstance==null) instances.remove(session.domain); else instances.put(session.domain, previousInstance);
 		field(AccountSessionManager.class, "lastActiveAccountID").set(AccountSessionManager.getInstance(), previousActive);
 		GlobalUserPreferences.color=previousColor;
+		MastodonApp.context.getSharedPreferences("nbw_v2_authorization", 0).edit().clear().commit();
 	}
 	private void ready(){
 		repository.activate();
@@ -243,16 +243,84 @@ public class NBWV2LifecycleIntegrationTest{
 		assertTrue(((Map<?, ?>)field(StatusInteractionController.class, "runningFavoriteRequests").get(interactions)).isEmpty());
 		sessions.put(session.getID(), session);
 	}
-	@Test public void postRegistrationDoneAndBackReturnHomeButSettingsOnlyCloses(){
+	@Test public void postRegistrationSkipAndBackReturnHomeButSettingsOnlyCloses(){
 		for(boolean back:new boolean[]{false, true}){
 			NBWPostRegisterActivity page=openConnectionPage(false);
-			if(back) page.onBackPressed(); else doneButton(page.findViewById(android.R.id.content)).performClick();
+			if(back) page.onBackPressed(); else page.findViewById(R.id.btn_skip).performClick();
 			Intent intent=org.robolectric.shadow.api.Shadow.<org.robolectric.shadows.ShadowActivity>extract(page).getNextStartedActivity();
 			assertNotNull(intent); assertEquals(MainActivity.class.getName(), intent.getComponent().getClassName()); assertTrue(page.isFinishing());
+			assertEquals(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP, intent.getFlags());
 		}
-		NBWPostRegisterActivity settings=openConnectionPage(true);
-		doneButton(settings.findViewById(android.R.id.content)).performClick();
-		assertNull(org.robolectric.shadow.api.Shadow.<org.robolectric.shadows.ShadowActivity>extract(settings).getNextStartedActivity()); assertTrue(settings.isFinishing());
+		for(int control:new int[]{R.id.btn_skip, R.id.btn_back, 0}){
+			NBWPostRegisterActivity settings=openConnectionPage(true);
+			if(control==0) settings.onBackPressed(); else settings.findViewById(control).performClick();
+			assertNull(org.robolectric.shadow.api.Shadow.<org.robolectric.shadows.ShadowActivity>extract(settings).getNextStartedActivity()); assertTrue(settings.isFinishing());
+		}
+	}
+	@Test public void authorizationCancellationResetsRealButtonAndCannotLaunchAnOldGeneration() throws Exception{
+		ready(); NBWPostRegisterActivity page=openConnectionPage(true);
+		page.findViewById(R.id.btn_nbw_connect).performClick();
+		MastodonAPIRequest<?> request=controller.requests.get(0);
+		assertEquals("/api/app/nbw/authorization/start", request.getURL().getPath());
+		assertFalse(page.findViewById(R.id.btn_nbw_connect).isEnabled());
+		readOnly(); idle();
+		assertTrue(request.canceled); assertNull(field(NBWPostRegisterActivity.class, "authorizationRequest").get(page));
+		assertFalse(field(NBWPostRegisterActivity.class, "starting").getBoolean(page));
+		assertNull(authorizationTicket().getString("account", null));
+		repository.refreshNow();
+		transport.capabilities.get(transport.capabilities.size()-1).result.success(NBWV2RepositoryTest.capabilities("full"));
+		idle(); assertTrue(page.findViewById(R.id.btn_nbw_connect).isEnabled());
+		authorizationResult(request).onSuccess(authorizationStart()); idle();
+		assertNull(authorizationTicket().getString("account", null));
+		assertNull(org.robolectric.shadow.api.Shadow.<org.robolectric.shadows.ShadowActivity>extract(page).getNextStartedActivity());
+		page.findViewById(R.id.btn_nbw_connect).performClick(); assertEquals(2, controller.requests.size());
+	}
+	@Test public void closingConnectionPageCancelsStartAndUnsubscribesWithoutDeactivatingSessionRepository() throws Exception{
+		ready(); NBWPostRegisterActivity page=openConnectionPage(true);
+		assertEquals(1, ((Set<?>)field(NBWForumOptionsRepository.class, "observers").get(repository)).size());
+		page.findViewById(R.id.btn_nbw_connect).performClick(); MastodonAPIRequest<?> request=controller.requests.get(0);
+		activities.get(activities.size()-1).close(); idle();
+		assertTrue(page.isDestroyed()); assertTrue(request.canceled);
+		assertTrue(((Set<?>)field(NBWForumOptionsRepository.class, "observers").get(repository)).isEmpty());
+		assertNull(field(NBWPostRegisterActivity.class, "authorizationRequest").get(page));
+		assertTrue(repository.getSnapshot().canWrite());
+		authorizationResult(request).onSuccess(authorizationStart()); idle();
+		assertNull(authorizationTicket().getString("account", null));
+		assertNull(org.robolectric.shadow.api.Shadow.<org.robolectric.shadows.ShadowActivity>extract(page).getNextStartedActivity());
+		activities.remove(activities.size()-1);
+	}
+	@Test public void switchingAccountsBeforeQueuedStartSuccessCannotRememberOrLaunchAuthorization() throws Exception{
+		ready(); NBWPostRegisterActivity page=openConnectionPage(true);
+		page.findViewById(R.id.btn_nbw_connect).performClick(); MastodonAPIRequest<?> request=controller.requests.get(0);
+		authorizationResult(request).onSuccess(authorizationStart());
+		sessions.remove(session.getID()); repository.deactivate(); idle();
+		assertNull(authorizationTicket().getString("account", null));
+		assertFalse(field(NBWPostRegisterActivity.class, "starting").getBoolean(page));
+		assertNull(org.robolectric.shadow.api.Shadow.<org.robolectric.shadows.ShadowActivity>extract(page).getNextStartedActivity());
+		sessions.put(session.getID(), session);
+	}
+	@Test public void authorizationFailureAllowsAnExplicitRetryWithoutLegacyFallback() throws Exception{
+		ready(); NBWPostRegisterActivity page=openConnectionPage(true);
+		page.findViewById(R.id.btn_nbw_connect).performClick();
+		controller.requests.get(0).onError(new MastodonErrorResponse("offline", 503, null)); idle();
+		assertTrue(page.findViewById(R.id.btn_nbw_connect).isEnabled());
+		assertEquals(page.getString(R.string.nbw_v2_connection_failed), ((android.widget.TextView)page.findViewById(R.id.nbw_connection_status)).getText().toString());
+		assertNull(authorizationTicket().getString("account", null));
+		page.findViewById(R.id.btn_nbw_connect).performClick(); assertEquals(2, controller.requests.size());
+		for(MastodonAPIRequest<?> request:controller.requests) assertEquals("/api/app/nbw/authorization/start", request.getURL().getPath());
+	}
+	@Test public void authorizationTicketIsSingleUseScopedAndExpiresWithoutBindingState(){
+		NBWPostRegisterActivity.rememberAuthorizationLaunch(MastodonApp.context, session.getID());
+		assertEquals(session.getID(), NBWPostRegisterActivity.consumeAuthorizationLaunch(MastodonApp.context));
+		assertNull(NBWPostRegisterActivity.consumeAuthorizationLaunch(MastodonApp.context));
+		NBWPostRegisterActivity.rememberAuthorizationLaunch(MastodonApp.context, session.getID());
+		authorizationTicket().edit().putLong("started", System.currentTimeMillis()-11*60*1000L).commit();
+		assertNull(NBWPostRegisterActivity.consumeAuthorizationLaunch(MastodonApp.context)); assertTrue(authorizationTicket().getAll().isEmpty());
+		NBWPostRegisterActivity.rememberAuthorizationLaunch(MastodonApp.context, session.getID());
+		authorizationTicket().edit().putLong("started", System.currentTimeMillis()+60*1000L).commit();
+		assertNull(NBWPostRegisterActivity.consumeAuthorizationLaunch(MastodonApp.context));
+		NBWPostRegisterActivity.rememberAuthorizationLaunch(MastodonApp.context, session.getID());
+		sessions.remove(session.getID()); assertNull(NBWPostRegisterActivity.consumeAuthorizationLaunch(MastodonApp.context)); sessions.put(session.getID(), session);
 	}
 	@Test public void disabledRecentSearchCachePurgesWrappedRemoteIdsButPreservesLocalMetadata() throws Exception{
 		CacheController cache=session.getCacheController();
@@ -275,12 +343,14 @@ public class NBWV2LifecycleIntegrationTest{
 		ActivityController<NBWPostRegisterActivity> lifecycle=Robolectric.buildActivity(NBWPostRegisterActivity.class, intent);
 		activities.add(lifecycle); lifecycle.setup(); return lifecycle.get();
 	}
-	private static Button doneButton(View view){
-		if(view instanceof Button button && MastodonApp.context.getString(R.string.done).contentEquals(button.getText())) return button;
-		if(view instanceof ViewGroup group) for(int i=0;i<group.getChildCount();i++){
-			Button button=doneButton(group.getChildAt(i)); if(button!=null) return button;
-		}
-		return null;
+	private static android.content.SharedPreferences authorizationTicket(){ return MastodonApp.context.getSharedPreferences("nbw_v2_authorization", 0); }
+	@SuppressWarnings("unchecked") private static MastodonAPIRequest<NBWAppRequest.AuthorizationStart> authorizationResult(MastodonAPIRequest<?> request){
+		return (MastodonAPIRequest<NBWAppRequest.AuthorizationStart>)request;
+	}
+	private static NBWAppRequest.AuthorizationStart authorizationStart(){
+		NBWAppRequest.AuthorizationStart result=new NBWAppRequest.AuthorizationStart();
+		result.authorizationUrl="https://authorization.offline.example.test/nbw/connect";
+		return result;
 	}
 	private static Field field(Class<?> type, String name) throws Exception{ Field value=type.getDeclaredField(name); value.setAccessible(true); return value; }
 }

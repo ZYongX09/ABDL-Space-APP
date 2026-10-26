@@ -107,6 +107,7 @@ public class ComposeReplyPublishingBehaviorTest{
 	private Map<String, AccountSession> sessions;
 	private Map<String, Instance> instances;
 	private Map<String, List<EmojiCategory>> emojis;
+	private int activityTheme=R.style.Theme_Mastodon_Light;
 	private AccountSession previousSession;
 	private Instance previousInstance;
 	private List<EmojiCategory> previousEmojis;
@@ -701,7 +702,7 @@ public class ComposeReplyPublishingBehaviorTest{
 		LocalRequests.accounts.clear();
 		controller=Robolectric.buildActivity(FragmentStackActivity.class);
 		activity=controller.get();
-		activity.setTheme(R.style.Theme_Mastodon_Light);
+		activity.setTheme(activityTheme);
 		controller.create();
 		fragment=new ComposeFragment();
 		Bundle args=new Bundle();
@@ -730,6 +731,19 @@ public class ComposeReplyPublishingBehaviorTest{
 		bindViews();
 		assertEquals("Opening an editor only observes metadata; it must not fetch it", 0, count(NBWAppRequest.class));
 	}
+
+	/** Shared real-editor fixture for the Compose popup interaction/render tests. */
+	public ComposeFragment launchClassificationEditor() throws Exception{
+		launch(null);
+		return fragment;
+	}
+	public ComposeFragment launchClassificationEditor(int theme) throws Exception{
+		activityTheme=theme;
+		return launchClassificationEditor();
+	}
+	public AccountSession classificationSession(){ return session; }
+	public NBWForumOptionsRepository classificationRepository(){ return repository; }
+	public FragmentStackActivity classificationActivity(){ return activity; }
 
 	private void bindViews(){
 		assertNotNull(fragment.getView());

@@ -16,7 +16,7 @@
         android:orientation="vertical"
         android:clipToPadding="false">
 
-        <!-- 返回按钮（仅从设置页跳入时显示） -->
+        <!-- Only the settings entry exposes an in-page back control. -->
         <ImageView
             android:id="@+id/btn_back"
             android:layout_width="44dp"
@@ -28,13 +28,13 @@
             android:tint="?colorM3OnSurface"
             android:background="?android:attr/selectableItemBackgroundBorderless"
             android:visibility="gone"
-            android:contentDescription="返回" />
+            android:contentDescription="@string/back" />
 
-        <!-- 标题 -->
         <TextView
+            android:id="@+id/nbw_connection_title"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="宝宝新天地账号绑定"
+            android:text="@string/nbw_v2_connection_title"
             android:textSize="28sp"
             android:textStyle="bold"
             android:textColor="?colorM3OnSurface"
@@ -45,6 +45,7 @@
             android:gravity="start" />
 
         <ScrollView
+            android:id="@+id/nbw_connection_scroll"
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
@@ -56,9 +57,11 @@
                 android:orientation="vertical"
                 android:gravity="center_horizontal"
                 android:paddingStart="32dp"
-                android:paddingEnd="32dp">
+                android:paddingEnd="32dp"
+                android:paddingBottom="24dp">
 
                 <ImageView
+                    android:id="@+id/nbw_connection_logo"
                     android:layout_width="64dp"
                     android:layout_height="64dp"
                     android:layout_marginTop="16dp"
@@ -67,34 +70,45 @@
                     android:scaleType="fitCenter"
                     android:background="@drawable/bg_circle_white"
                     android:padding="12dp"
-                    android:contentDescription="宝宝新天地" />
+                    android:contentDescription="@string/nbw_third_party_nbw" />
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="宝宝新天地"
-                android:textSize="18sp"
-                android:textStyle="bold"
-                android:textColor="?colorM3OnSurface" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/nbw_third_party_nbw"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:textColor="?colorM3OnSurface" />
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:layout_marginBottom="16dp"
-                android:text="ABDL Space 联邦·深度合作成员"
-                android:textSize="13sp"
-                android:textColor="?colorM3OnSurfaceVariant" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:layout_marginBottom="16dp"
+                    android:text="ABDL Space 联邦·深度合作成员"
+                    android:textSize="13sp"
+                    android:textColor="?colorM3OnSurfaceVariant" />
 
-            <!-- 说明文字 -->
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp"
-                android:text="绑定宝宝新天地账户后，您可以在 ABDL Space 发帖并同步到宝宝新天地社区，享受更多互动体验。"
-                android:textSize="14sp"
-                android:textColor="?colorM3OnSurfaceVariant"
+                <TextView
+                    android:id="@+id/nbw_connection_explanation"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="16dp"
+                    android:text="@string/nbw_v2_publish_explanation"
+                    android:textSize="14sp"
+                    android:textColor="?colorM3OnSurfaceVariant"
                     android:lineSpacingExtra="4dp" />
+
+                <TextView
+                    android:id="@+id/nbw_connection_status"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="16dp"
+                    android:text="@string/nbw_v2_connection_unavailable"
+                    android:textSize="14sp"
+                    android:textColor="?colorM3OnSurface"
+                    android:lineSpacingExtra="4dp"
+                    android:accessibilityLiveRegion="polite" />
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -102,43 +116,47 @@
                     android:layout_marginBottom="24dp"
                     android:orientation="horizontal"
                     android:gravity="center_vertical"
-                    android:background="@drawable/bg_warning_rounded"
+                    android:background="@drawable/bg_card_with_border"
                     android:padding="12dp">
 
                     <ImageView
                         android:layout_width="20dp"
                         android:layout_height="20dp"
                         android:layout_marginEnd="8dp"
-                        android:src="@drawable/ic_warning_24px"
-                        android:tint="#FF4444"
-                        android:contentDescription="警告" />
+                        android:src="@drawable/ic_info_24px"
+                        android:tint="?colorM3OnSurfaceVariant"
+                        android:importantForAccessibility="no" />
 
                     <TextView
-                        android:layout_width="wrap_content"
+                        android:id="@+id/nbw_connection_local_publish"
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:text="未绑定宝宝新天地账户将无法发帖"
+                        android:layout_weight="1"
+                        android:text="@string/nbw_v2_local_publish_unaffected"
                         android:textSize="13sp"
-                        android:textStyle="bold"
-                        android:textColor="#FF4444" />
+                        android:textColor="?colorM3OnSurfaceVariant" />
                 </LinearLayout>
 
+                <!-- The old solid light-blue rounded primary now starts only V2 authorization. -->
                 <Button
-                    android:id="@+id/btn_one_click"
+                    android:id="@+id/btn_nbw_connect"
                     android:layout_width="match_parent"
                     android:layout_height="52dp"
                     android:background="@drawable/bg_btn_gradient_purple"
-                    android:text="一键注册宝宝新天地新账号"
+                    android:backgroundTint="@null"
+                    android:text="@string/nbw_v2_connect"
                     android:textSize="15sp"
                     android:textAllCaps="false"
-                    android:textColor="#FFFFFF"
+                    android:textColor="#10384D"
                     android:layout_marginBottom="12dp" />
 
                 <Button
-                    android:id="@+id/btn_bind_existing"
+                    android:id="@+id/btn_nbw_settings"
                     android:layout_width="match_parent"
                     android:layout_height="52dp"
                     android:background="@drawable/bg_btn_outline_blue"
-                    android:text="绑定已有宝宝新天地账号"
+                    android:backgroundTint="@null"
+                    android:text="@string/nbw_v2_fallback_settings"
                     android:textSize="15sp"
                     android:textAllCaps="false"
                     android:textColor="?colorM3OnSurface"
@@ -149,10 +167,11 @@
                     android:layout_width="match_parent"
                     android:layout_height="48dp"
                     android:background="@android:color/transparent"
+                    android:backgroundTint="@null"
                     android:text="暂时跳过"
                     android:textSize="14sp"
                     android:textAllCaps="false"
-                    android:textColor="#A1D9F7" />
+                    android:textColor="?colorM3Primary" />
 
             </LinearLayout>
         </ScrollView>
