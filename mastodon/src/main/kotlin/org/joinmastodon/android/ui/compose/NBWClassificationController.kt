@@ -35,6 +35,7 @@ import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import org.joinmastodon.android.R
 import org.joinmastodon.android.api.session.NBWForumOptionsRepository
+import org.joinmastodon.android.model.NBWForumPolicy
 import org.joinmastodon.android.model.NBWSelection
 import org.joinmastodon.android.ui.sheets.NBWFallbackConsentSheet
 import top.yukonga.miuix.kmp.basic.DropdownEntry
@@ -188,7 +189,7 @@ class NBWClassificationController @JvmOverloads constructor(
             selected = !choice.isManual,
             onClick = { select(NBWSelection.ai(), generation) },
         ))
-        snapshot.options?.forums.orEmpty().forEach { forum ->
+        NBWForumPolicy.FORUM_IDS.mapNotNull { snapshot.options?.findForum(it) }.forEach { forum ->
             val children = mutableListOf<DropdownItem>()
             if (forum.required == false) {
                 val selection = NBWSelection.manual(forum.fid, 0)
@@ -216,7 +217,7 @@ class NBWClassificationController @JvmOverloads constructor(
     private fun select(value: NBWSelection, generation: Long) {
         val latest = repository.snapshot
         // Revalidate against current authenticated options, never the frozen display tree.
-        if (latest.canWrite() && latest.generation == generation && repository.select(value)) onChanged.run()
+        if (latest.canWrite() && latest.generation == generation && NBWForumPolicy.isLegal(value, latest.options) && repository.select(value)) onChanged.run()
         else Toast.makeText(context, R.string.nbw_v2_selection_expired, Toast.LENGTH_LONG).show()
     }
 
@@ -294,7 +295,7 @@ class NBWClassificationController @JvmOverloads constructor(
         fun selectionSummary(context: Context, snapshot: NBWForumOptionsRepository.Snapshot): String {
             val selection = snapshot.selection
             if (!selection.isManual) return context.getString(R.string.nbw_forum_ai)
-            return if (selection.isLegal(snapshot.options)) {
+            return if (NBWForumPolicy.isLegal(selection, snapshot.options)) {
                 val label = snapshot.options?.label(selection.fid, selection.typeid).orEmpty()
                 if (selection.typeid == 0) "$label / ${context.getString(R.string.nbw_v2_no_type)}" else label
             } else context.getString(R.string.nbw_v2_selection_expired)

@@ -61,7 +61,9 @@ import org.joinmastodon.android.R;
 import org.joinmastodon.android.api.MastodonErrorResponse;
 import org.joinmastodon.android.api.session.NBWForumOptionsRepository;
 import org.joinmastodon.android.model.NBWSelection;
+import org.joinmastodon.android.model.NBWForumPolicy;
 import org.joinmastodon.android.ui.compose.NBWClassificationController;
+import org.joinmastodon.android.ui.compose.ComposeLocationController;
 import org.joinmastodon.android.api.requests.friendcards.FriendCardRequest;
 import org.joinmastodon.android.api.requests.friendcards.FriendCardResponses;
 import org.joinmastodon.android.fragments.friendcards.FriendCardDetailFragment;
@@ -200,7 +202,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	private NBWForumOptionsRepository.Cancelable nbwSubscription;
 	private NBWClassificationController nbwClassificationController;
 	private NBWSelection nbwSelection=NBWSelection.ai();
-	private TextView newBabyWorldCardText, newBabyWorldCardAction;
+	private TextView newBabyWorldCardTitle, newBabyWorldCardText, newBabyWorldCardAction;
 	private View newBabyWorldCard;
 	private View crisisCard;
 	private CrisisWarningViewController crisisWarningController;
@@ -220,6 +222,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	private LinearLayout locationBtn;
 	private TextView locationText;
 	private LocationUtils.ResolvedLocation currentLocation;
+	private ComposeLocationController locationController;
 
 	private ComposeAutocompleteViewController autocompleteViewController;
 	private ComposePollViewController pollViewController=new ComposePollViewController(this);
@@ -248,6 +251,10 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	private void onNBWMenuBack(){
 		if(nbwClassificationController==null || !nbwClassificationController.onBackPressed())
 			removeBackCallback(nbwMenuBackCallback);
+	}
+	private final Runnable locationMenuBackCallback=this::onLocationMenuBack;
+	private void onLocationMenuBack(){
+		if(locationController==null || !locationController.onBackPressed()) removeBackCallback(locationMenuBackCallback);
 	}
 	private Runnable discardConfirmationCallback=this::confirmDiscardDraftBackCallback;
 	private boolean prevHadDraft;
@@ -382,6 +389,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		newBabyWorldCard=view.findViewById(R.id.newbabyworld_card);
 		crisisCard=view.findViewById(R.id.compose_crisis_card);
 		crisisWarningController=new CrisisWarningViewController(view);
+		newBabyWorldCardTitle=view.findViewById(R.id.newbabyworld_card_title);
 		newBabyWorldCardText=view.findViewById(R.id.newbabyworld_card_text);
 		newBabyWorldCardAction=view.findViewById(R.id.newbabyworld_card_action);
 		newBabyWorldCardAction.setOnClickListener(v->onNewBabyWorldCardAction());
@@ -427,6 +435,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		// 位置选择器初始化
 		locationBtn=view.findViewById(R.id.btn_location);
 		locationText=view.findViewById(R.id.location_text);
+		locationController=new ComposeLocationController(getActivity(), this::selectLocationLevel, ()->removeBackCallback(locationMenuBackCallback));
 		if(!locationChanged) currentLocation=LocationUtils.getCachedLocation(getActivity());
 		if(savedInstanceState!=null && savedInstanceState.containsKey("locationProvince")){
 			String province=savedInstanceState.getString("locationProvince");
@@ -726,9 +735,14 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 				&& (crisisWarningController==null || !crisisWarningController.isVisible());
 		newBabyWorldCard.setVisibility(visible ? View.VISIBLE : View.GONE);
 		if(!visible) return;
-		newBabyWorldCardText.setText(R.string.nbw_v2_publish_explanation);
+		boolean unbound="unbound".equals(snapshot.capabilities.binding.state);
+		boolean hasGrant=snapshot.capabilities.hasGrant();
+		newBabyWorldCardTitle.setText(unbound ? R.string.nbw_v2_binding_required_title : R.string.compose_newbabyworld_title);
+		newBabyWorldCardText.setText(unbound ? R.string.nbw_v2_publish_unbound
+				: hasGrant ? R.string.nbw_v2_publish_explanation : R.string.nbw_v2_publish_authorization_missing);
 		newBabyWorldCardAction.setVisibility(View.VISIBLE);
-		newBabyWorldCardAction.setText(R.string.nbw_v2_fallback_settings);
+		newBabyWorldCardAction.setText(unbound ? R.string.nbw_v2_bind_action
+				: hasGrant ? R.string.nbw_v2_fallback_settings : R.string.nbw_v2_connect);
 	}
 
 	private boolean containsCrisisKeyword(String text){
@@ -763,11 +777,23 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	}
 
 	private void onNewBabyWorldCardAction(){
-		if(nbwClassificationController!=null) nbwClassificationController.showFallbackSettings();
+		if(getActivity()==null || nbwRepository==null || isReply() || hasFriendCard() || editingStatus!=null) return;
+		NBWForumOptionsRepository.Snapshot snapshot=nbwRepository.getSnapshot();
+		if(!snapshot.canWrite()) return;
+		if(snapshot.capabilities.hasGrant()){
+			if(nbwClassificationController!=null) nbwClassificationController.showFallbackSettings();
+		}else{
+			Intent intent=new Intent(getActivity(), NBWPostRegisterActivity.class);
+			intent.putExtra("account", accountID);
+			intent.putExtra("show_back", true);
+			startActivity(intent);
+		}
 	}
 
 	@Override public void onDestroyView(){
 		removeBackCallback(nbwMenuBackCallback);
+		removeBackCallback(locationMenuBackCallback);
+		if(locationController!=null){ locationController.dispose(); locationController=null; }
 		if(nbwSubscription!=null){ nbwSubscription.cancel(); nbwSubscription=null; }
 		if(nbwClassificationController!=null){ nbwClassificationController.dispose(); nbwClassificationController=null; }
 		super.onDestroyView();
@@ -1176,7 +1202,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		// Replies retain their full typed parent below; only new eligible roots carry classification.
 		if(!isReply() && !hasFriendCard() && editingStatus==null){
 			req.setNBWSelection(nbwSelection);
-			if(!nbwSelection.isLegal(nbwRepository.getSnapshot().options)){
+			if(!NBWForumPolicy.isLegal(nbwSelection, nbwRepository.getSnapshot().options)){
 				// Keep manual intent without silently substituting a different destination.
 				req.nbwFid=null; req.nbwTypeid=null;
 			}
@@ -1547,45 +1573,38 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	}
 
 	private void onLocationClick(View v){
-		ArrayList<ListItem<Integer>> items=new ArrayList<>();
-		ExtendedPopupMenu menu=new ExtendedPopupMenu(getActivity(), items);
+		if(isReply() || getActivity()==null || locationController==null) return;
+		if(nbwClassificationController!=null) nbwClassificationController.dismiss();
 		String province=currentLocation!=null ? currentLocation.province() : getString(R.string.location_unknown);
 		String city=(currentLocation!=null && currentLocation.city()!=null) ? currentLocation.city() : getString(R.string.location_unknown);
 		String district=(currentLocation!=null && currentLocation.district()!=null) ? currentLocation.district() : getString(R.string.location_unknown);
 		boolean hasPermission=LocationUtils.hasLocationPermission(getActivity());
-		Consumer<ListItem<Integer>> onClick=item->{
-			selectedLocationLevel=item.parentObject;
-			locationChanged=true;
-			updateDraftState();
-			menu.dismiss();
-			// 点击市/区但没有定位权限 → 弹出位置权限引导（同首次登录），用户同意后申请系统权限
-			if(selectedLocationLevel!=LOCATION_NONE && selectedLocationLevel!=LOCATION_PROVINCE && !hasPermission){
-				selectedLocationLevel=LOCATION_PROVINCE;
-				updateLocationButton();
-				new LocationPermissionSheet(getActivity(), getActivity(), null).show();
-				return;
-			}
+		List<ComposeLocationController.Choice> choices=List.of(
+				new ComposeLocationController.Choice(LOCATION_PROVINCE, getString(R.string.location_province, province), getString(R.string.location_province_desc), true, selectedLocationLevel==LOCATION_PROVINCE, R.drawable.ic_fluent_location_12_filled),
+				new ComposeLocationController.Choice(LOCATION_CITY, getString(R.string.location_city, city), getString(hasPermission ? R.string.location_city_desc : R.string.location_disabled_no_permission), hasPermission || currentLocation!=null && currentLocation.city()!=null, selectedLocationLevel==LOCATION_CITY, R.drawable.ic_fluent_location_12_filled),
+				new ComposeLocationController.Choice(LOCATION_DISTRICT, getString(R.string.location_district, district), getString(hasPermission ? R.string.location_district_desc : R.string.location_disabled_no_permission), hasPermission || currentLocation!=null && currentLocation.district()!=null, selectedLocationLevel==LOCATION_DISTRICT, R.drawable.ic_fluent_location_12_filled),
+				new ComposeLocationController.Choice(LOCATION_NONE, getString(R.string.location_none), getString(R.string.location_none_desc), true, selectedLocationLevel==LOCATION_NONE, R.drawable.ic_fluent_location_12_regular));
+		if(locationController.showMenu(v, choices)) addBackCallback(locationMenuBackCallback);
+	}
+
+	private void selectLocationLevel(int level){
+		if(getActivity()==null || isReply() || level<LOCATION_PROVINCE || level>LOCATION_NONE) return;
+		selectedLocationLevel=level;
+		locationChanged=true;
+		updateDraftState();
+		// Recheck permission at selection time; opening the popup never requests location.
+		if(level!=LOCATION_NONE && level!=LOCATION_PROVINCE && !LocationUtils.hasLocationPermission(getActivity())){
+			selectedLocationLevel=LOCATION_PROVINCE;
 			updateLocationButton();
-			// 选择非省时如果没有位置数据，尝试获取
-			if(selectedLocationLevel!=LOCATION_NONE && selectedLocationLevel!=LOCATION_PROVINCE && currentLocation==null){
-				LocationUtils.fetchAndResolve(getActivity(), loc->{
-					if(loc!=null){
-						currentLocation=loc;
-						updateLocationButton();
-					}
-				});
-			}
-		};
-		// 用 String 构造器避免 %s 未格式化
-		items.add(new ListItem<>(getString(R.string.location_province, province), getString(R.string.location_province_desc), R.drawable.ic_fluent_location_12_filled, onClick, LOCATION_PROVINCE));
-		ListItem<Integer> cityItem=new ListItem<>(getString(R.string.location_city, city), hasPermission ? getString(R.string.location_city_desc) : getString(R.string.location_disabled_no_permission), R.drawable.ic_fluent_location_12_filled, onClick, LOCATION_CITY);
-		cityItem.isEnabled=hasPermission || (currentLocation!=null && currentLocation.city()!=null);
-		items.add(cityItem);
-		ListItem<Integer> districtItem=new ListItem<>(getString(R.string.location_district, district), hasPermission ? getString(R.string.location_district_desc) : getString(R.string.location_disabled_no_permission), R.drawable.ic_fluent_location_12_filled, onClick, LOCATION_DISTRICT);
-		districtItem.isEnabled=hasPermission || (currentLocation!=null && currentLocation.district()!=null);
-		items.add(districtItem);
-		items.add(new ListItem<>(getString(R.string.location_none), getString(R.string.location_none_desc), R.drawable.ic_fluent_location_12_regular, onClick, LOCATION_NONE));
-		menu.showAsDropDown(v);
+			new LocationPermissionSheet(getActivity(), getActivity(), null).show();
+			return;
+		}
+		updateLocationButton();
+		if(level!=LOCATION_NONE && level!=LOCATION_PROVINCE && currentLocation==null){
+			LocationUtils.fetchAndResolve(getActivity(), loc->{
+				if(loc!=null){ currentLocation=loc; updateLocationButton(); }
+			});
+		}
 	}
 
 	/** 获取发帖时要发送的位置数据（根据用户选择级别） */
@@ -1602,6 +1621,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 
 	private void onVisibilityClick(View v){
 		if(!isReply() && !hasFriendCard() && editingStatus==null && nbwClassificationController!=null && nbwRepository.getSnapshot().canWrite()){
+			if(locationController!=null) locationController.dispose();
 			nbwClassificationController.showMenu(v);
 			addBackCallback(nbwMenuBackCallback);
 		}
@@ -1614,7 +1634,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		visibilityBtn.setVisibility(visible ? View.VISIBLE : View.GONE);
 		if(!visible) return;
 		String summary=nbwSelection.isManual()
-				? nbwSelection.isLegal(snapshot.options) ? snapshot.options.label(nbwSelection.fid, nbwSelection.typeid)
+				? NBWForumPolicy.isLegal(nbwSelection, snapshot.options) ? snapshot.options.label(nbwSelection.fid, nbwSelection.typeid)
 						+(nbwSelection.typeid==0 ? " / "+getString(R.string.nbw_v2_no_type) : "") : getString(R.string.nbw_v2_selection_expired)
 				: getString(R.string.nbw_forum_ai);
 		visibilityCurrentText.setText(summary);

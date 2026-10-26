@@ -118,27 +118,27 @@ class NBWClassificationMenuInteractionTest {
         }
     }
 
-    @Test fun optionalZeroHasExplicitNoSubtypeLeafWhileRequiredAndModeratorOnlyForumsNeverOfferIt() {
+    @Test fun optionalZeroHasExplicitDefaultSubtypeLeafWhileRequiredAndModeratorOnlyForumsNeverOfferIt() {
         ready(optionsWithOptionalAndModeratorOnlyForums())
         openMenu()
         compose.onNodeWithText("仅管理").assertDoesNotExist()
         compose.onNodeWithText("可选").performClick()
         settle()
         compose.onNodeWithText("管理").assertDoesNotExist()
-        assertEquals("无子分类", context.getString(R.string.nbw_v2_no_type))
+        assertEquals("默认子分类", context.getString(R.string.nbw_v2_no_type))
         compose.onNodeWithText("不指定分类").assertDoesNotExist()
         clickPlacedLeaf(context.getString(R.string.nbw_v2_no_type))
         settle()
         compose.runOnUiThread {
             assertEquals(NBWSelection.manual(26, 0), repository.snapshot.selection)
-            assertEquals("可选 / 无子分类", summary())
+            assertEquals("可选 / 默认子分类", summary())
             assertFalse(repository.select(NBWSelection.manual(27, 0)))
             assertEquals(NBWSelection.manual(26, 0), repository.snapshot.selection)
         }
         openMenu()
         compose.onNodeWithText("分享").performClick()
         settle()
-        compose.onNodeWithText("无子分类").assertDoesNotExist()
+        compose.onNodeWithText("默认子分类").assertDoesNotExist()
         compose.onNodeWithText("管理").assertDoesNotExist()
         clickPlacedLeaf("经验分享")
         settle()
@@ -151,10 +151,28 @@ class NBWClassificationMenuInteractionTest {
         compose.onNodeWithText("闲聊").performClick()
         settle()
         assertEquals(NBWSelection.ai(), repository.snapshot.selection)
-        clickPlacedLeaf("无子分类")
+        clickPlacedLeaf("默认子分类")
         settle()
         assertEquals(NBWSelection.manual(18, 0), repository.snapshot.selection)
-        assertEquals("闲聊 / 无子分类", summary())
+        assertEquals("闲聊 / 默认子分类", summary())
+    }
+
+    @Test fun onlySixDestinationsAppearInPolicyOrderEvenWhenTheCachedCatalogIncludesExtraForums() {
+        val ordered = listOf(18 to "闲聊", 28 to "自拍", 27 to "分享", 26 to "小说/漫画", 3 to "交友", 19 to "社群")
+        ready(NBWV2RepositoryTest.options().apply {
+            forums = (ordered.reversed() + (88 to "精选")).map { (id, label) ->
+                NBWForumOptions.Forum().apply { fid = id; name = label; required = false; types = emptyList() }
+            }
+        })
+        openMenu()
+        compose.onNodeWithText("精选").assertDoesNotExist()
+        var previousTop = Float.NEGATIVE_INFINITY
+        for ((_, name) in ordered) {
+            val node = compose.onNodeWithText(name).assertIsDisplayed().fetchSemanticsNode()
+            assertTrue("Forum order must not follow a stale catalog's order", node.boundsInRoot.top > previousTop)
+            previousTop = node.boundsInRoot.top
+        }
+        compose.runOnUiThread { assertNoPublishingOrRecommendation() }
     }
 
     @Test fun nativeBackCollapsesNestedMenuBeforeDismissingRootAndNeverDiscardsTheEditor() {
@@ -194,7 +212,7 @@ class NBWClassificationMenuInteractionTest {
             assertEquals(2, wire.size())
             assertFalse(repository.snapshot.hasFallbackConsent())
             ComposeReplyPublishingBehaviorTest.callback(request).onSuccess(Any())
-            assertEquals(2, calls(CAPS))
+            assertEquals(3, calls(CAPS))
             assertFalse("PUT success cannot fabricate account consent", repository.snapshot.hasFallbackConsent())
         }
         deliver(CAPS, NBWV2RepositoryTest.capabilities("full").apply { fallback.consented = true })
@@ -210,7 +228,7 @@ class NBWClassificationMenuInteractionTest {
         openMenu()
         compose.onNodeWithText("闲聊").performClick()
         settle()
-        clickPlacedLeaf("无子分类")
+        clickPlacedLeaf("默认子分类")
         settle()
         val sheet = openFallbackSheet()
         compose.runOnUiThread {
@@ -392,6 +410,11 @@ class NBWClassificationMenuInteractionTest {
     }
 
     private fun openFallbackSheet(): NBWFallbackConsentSheet {
+        // The editor card opens account defaults only for an authenticated ready grant.
+        compose.runOnUiThread { repository.refreshNow() }
+        deliver(CAPS, NBWV2RepositoryTest.capabilities("full").apply {
+            binding.state = "bound"; binding.uid = "offline-remote-42"; authorization.state = "ready"
+        })
         compose.runOnUiThread {
             assertTrue(fragment.view!!.findViewById<View>(R.id.newbabyworld_card_action).performClick())
         }
