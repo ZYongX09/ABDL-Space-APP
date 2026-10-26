@@ -156,7 +156,8 @@ public class MastodonAPIController{
 				// Keep the MastodonAndroid/ prefix compatible with backend native-client detection.
 				builder.header("User-Agent", "MastodonAndroid/"+BuildConfig.VERSION_NAME)
 						.header("X-App-Version-Code", String.valueOf(BuildConfig.VERSION_CODE))
-						.header("X-ABDL-NBW-Protocol", "2");
+						.header("X-ABDL-NBW-Protocol", "2")
+						.header("X-ABDL-App-AI", "1");
 
 				Request hreq=builder.build();
 					OkHttpClient selectedClient=req.requiresSystemTrust() ? systemTrustSensitiveHttpClient : req.isSensitiveRequest() ? sensitiveHttpClient : httpClient;

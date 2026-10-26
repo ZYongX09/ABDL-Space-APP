@@ -119,6 +119,7 @@ public class AppVersionReportingHttpTest {
         if(conflict) request.headers=Map.of(
             "user-agent", "Mozilla/5.0 caller", "USER-AGENT", "OtherNative/999",
             "x-app-version-code", "-1", "X-APP-VERSION-CODE", "999999",
+            "x-abdl-app-ai", "0", "X-ABDL-APP-AI", "legacy",
             "X-Caller-Header", "preserved");
         AtomicBoolean done=new AtomicBoolean();
         AtomicReference<List<Status>> result=new AtomicReference<>();
@@ -137,6 +138,8 @@ public class AppVersionReportingHttpTest {
         assertEquals(expected.getEncodedQuery(), recorded.getRequestUrl().encodedQuery());
         assertEquals(List.of("MastodonAndroid/"+BuildConfig.VERSION_NAME), recorded.getHeaders().values("User-Agent"));
         assertEquals(List.of(String.valueOf(BuildConfig.VERSION_CODE)), recorded.getHeaders().values("X-App-Version-Code"));
+        assertEquals(List.of("1"), recorded.getHeaders().values("X-ABDL-App-AI"));
+        assertEquals(List.of("2"), recorded.getHeaders().values("X-ABDL-NBW-Protocol"));
         assertEquals("3.2.0", BuildConfig.VERSION_NAME);
         assertEquals(34, BuildConfig.VERSION_CODE);
         assertTrue(recorded.getHeader("User-Agent").matches("^MastodonAndroid/.*"));

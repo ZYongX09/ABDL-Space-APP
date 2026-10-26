@@ -3,10 +3,14 @@
 	<string name="nbw_v2_classification_title">板块 / 分类</string>
 	<string name="nbw_v2_classification_settings">默认去向设置</string>
 	<string name="nbw_v2_publish_explanation">公开内容发布到本站后会自动尝试同步至宝宝新天地。授权、分类或远端故障不会影响本站发布；发布成功仅表示本站已保存。</string>
-	<string name="nbw_v2_no_type">无子分类</string>
+	<string name="nbw_v2_binding_required_title">未绑定无法发帖</string>
+	<string name="nbw_v2_publish_unbound">未绑定宝宝新天地账户无法发帖。请先绑定或连接后再继续使用。</string>
+	<string name="nbw_v2_bind_action">去绑定</string>
+	<string name="nbw_v2_publish_authorization_missing">宝宝新天地授权不可用，暂时无法向宝宝新天地发帖或同步。本站发帖不受影响，请连接或重新授权。</string>
+	<string name="nbw_v2_no_type">默认子分类</string>
 	<string name="nbw_v2_options_unavailable">分类目录暂不可用，本站仍可正常发布。</string>
 	<string name="nbw_v2_selection_expired">手选分类已失效，请重新选择（不影响本站发布）</string>
-	<string name="nbw_v2_fallback_explanation">自动分类失败时，是否使用“闲聊 / 无子分类”作为默认去向？这是账号级设置，可随时修改。未同意不使用默认板块，本站发帖不受影响，也不会补发历史内容。</string>
+	<string name="nbw_v2_fallback_explanation">自动分类失败时，是否使用“闲聊 / 默认子分类”作为默认去向？这是账号级设置，可随时修改。未同意不使用默认板块，本站发帖不受影响，也不会补发历史内容。</string>
 	<string name="nbw_v2_fallback_accepted">已同意在自动分类失败时使用“闲聊”</string>
 	<string name="nbw_v2_fallback_not_accepted">尚未同意使用默认板块</string>
 	<string name="nbw_v2_fallback_accept">同意使用“闲聊”</string>

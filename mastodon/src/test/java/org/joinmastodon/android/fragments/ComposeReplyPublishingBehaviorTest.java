@@ -339,6 +339,51 @@ public class ComposeReplyPublishingBehaviorTest{
 	}
 
 	@Test
+	public void unboundReminderHasExactCopyAndNeverBlocksLocalPublishing() throws Exception{
+		launch(null);
+		session.self.nbwUsername="stale-legacy-name";
+		metadata("full");
+		setBody(BODY);
+		assertEquals(View.VISIBLE, fragment.getView().findViewById(R.id.newbabyworld_card).getVisibility());
+		assertEquals("未绑定无法发帖", ((android.widget.TextView)fragment.getView().findViewById(R.id.newbabyworld_card_title)).getText().toString());
+		android.widget.TextView explanation=fragment.getView().findViewById(R.id.newbabyworld_card_text);
+		assertTrue(explanation.isShown());
+		assertEquals("未绑定宝宝新天地账户无法发帖。请先绑定或连接后再继续使用。", explanation.getText().toString());
+		assertEquals("去绑定", ((android.widget.TextView)fragment.getView().findViewById(R.id.newbabyworld_card_action)).getText().toString());
+		org.robolectric.shadows.ShadowActivity shadow=Shadow.extract(activity);
+		assertNull("Metadata must never auto-launch the connection guide", shadow.getNextStartedActivity());
+		assertTrue(fragment.getView().findViewById(R.id.newbabyworld_card_action).performClick());
+		android.content.Intent guide=shadow.getNextStartedActivity();
+		assertEquals(org.joinmastodon.android.fragments.settings.NBWPostRegisterActivity.class.getName(), guide.getComponent().getClassName());
+		assertEquals(session.getID(), guide.getStringExtra("account"));
+		assertTrue(guide.getBooleanExtra("show_back", false));
+		assertFalse(repository.getSnapshot().capabilities.hasGrant());
+		clickPublish();
+		assertEquals(1, count(CreateStatus.class));
+		assertEquals("ai", json(last(CreateStatus.class)).get("nbw_classification").getAsString());
+		assertEquals(0, appCount("/api/app/nbw/authorization/start"));
+		assertEquals(0, count(GetOwnAccount.class));
+	}
+
+	@Test
+	public void aCachedOffPolicyDestinationNeverLeaksManualIdsToTheServer() throws Exception{
+		metadata("options_loading");
+		var options=NBWV2RepositoryTest.options();
+		var extra=new org.joinmastodon.android.model.NBWForumOptions.Forum();
+		extra.fid=88; extra.name="精选"; extra.required=false; extra.types=List.of();
+		options.forums=new ArrayList<>(options.forums); options.forums.add(extra);
+		succeed(lastAppRequest(OPTIONS), options);
+		assertTrue(repository.select(NBWSelection.manual(88, 0))); // Simulate a persisted old-client preference.
+		launch(null);
+		setBody(BODY);
+		assertEquals(activity.getString(R.string.nbw_v2_selection_expired), ((android.widget.TextView)fragment.getView().findViewById(R.id.visibility_text1)).getText().toString());
+		clickPublish();
+		JsonObject wire=json(last(CreateStatus.class));
+		assertEquals("manual", wire.get("nbw_classification").getAsString());
+		assertFalse(wire.has("nbw_fid")); assertFalse(wire.has("nbw_typeid"));
+	}
+
+	@Test
 	public void manualPublishingFixtureRequiresReadyOptionsAndCompleteLegalPairAndKeepsExplicitGeo() throws Exception{
 		assertFalse(repository.select(NBWSelection.manual(27, 41)));
 		metadata("options_loading");
@@ -650,36 +695,17 @@ public class ComposeReplyPublishingBehaviorTest{
 				.putString("district", "Offline district").putLong("last_update", System.currentTimeMillis()).commit();
 	}
 
-	/** Real existing geo popup/holder dispatch. This helper is not used for NBW classification. */
-	private void chooseLocation(String title, boolean allowCachedDistrict){
+	/** Publishing input fixture only. ComposeLocationMenuInteractionTest clicks the actual MIUIX rows. */
+	private void chooseLocation(String title, boolean allowCachedDistrict) throws Exception{
 		if(allowCachedDistrict){
 			ShadowApplication appShadow=Shadow.extract(RuntimeEnvironment.getApplication());
 			appShadow.grantPermissions(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION);
 		}
-		assertTrue(fragment.getView().findViewById(R.id.btn_location).performClick());
+		int level=title.equals(activity.getString(R.string.location_none)) ? 3 : 2;
+		var select=ComposeFragment.class.getDeclaredMethod("selectLocationLevel", int.class);
+		select.setAccessible(true);
+		select.invoke(fragment, level);
 		idle();
-		ShadowApplication appShadow=Shadow.extract(RuntimeEnvironment.getApplication());
-		PopupWindow popup=appShadow.getLatestPopupWindow();
-		assertNotNull(popup);
-		assertTrue(popup.isShowing());
-		RecyclerView list=(RecyclerView)popup.getContentView();
-		list.measure(View.MeasureSpec.makeMeasureSpec(V.dp(240), View.MeasureSpec.EXACTLY),
-				View.MeasureSpec.makeMeasureSpec(V.dp(640), View.MeasureSpec.EXACTLY));
-		list.layout(0, 0, V.dp(240), V.dp(640));
-		idle();
-		for(int i=0; i<list.getAdapter().getItemCount(); i++){
-			RecyclerView.ViewHolder holder=list.findViewHolderForAdapterPosition(i);
-			assertTrue("Real location rows must be bound", holder instanceof ListItemViewHolder);
-			ListItemViewHolder<?> item=(ListItemViewHolder<?>)holder;
-			if(title.equals(item.getItem().title)){
-				assertTrue(item.isEnabled());
-				item.onClick();
-				idle();
-				assertFalse(popup.isShowing());
-				return;
-			}
-		}
-		fail("Missing real location row "+title);
 	}
 
 	private FriendCard friendCard(){
