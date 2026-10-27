@@ -10,7 +10,10 @@ import android.widget.Toast;
 
 import org.joinmastodon.android.MainActivity;
 import org.joinmastodon.android.R;
+import org.joinmastodon.android.api.MastodonAPIRequest;
 import org.joinmastodon.android.api.requests.accounts.GetOwnAccount;
+
+import java.util.function.BooleanSupplier;
 import org.joinmastodon.android.api.session.AccountSession;
 import org.joinmastodon.android.api.session.AccountSessionManager;
 import org.joinmastodon.android.model.Account;
@@ -32,16 +35,26 @@ public final class AuthSessionInstaller{
 	private AuthSessionInstaller(){}
 
 	public static void install(Activity activity, String accessToken, boolean openMainActivity, Listener listener){
+		install(activity, accessToken, openMainActivity, listener, null);
+	}
+
+	/** Guarded login checks ownership at delivery, not merely before GetOwnAccount is sent. */
+	public static MastodonAPIRequest<Account> install(Activity activity, String accessToken, boolean openMainActivity, Listener listener, BooleanSupplier isCurrent){
 		if(activity==null || TextUtils.isEmpty(accessToken)){
 			if(listener!=null) listener.onError(new InstallationErrorResponse());
-			return;
+			return null;
 		}
+		if(isCurrent!=null && (!isCurrent.getAsBoolean() || activity.isFinishing() || activity.isDestroyed())) return null;
 		Token token=new Token();
 		token.accessToken=accessToken;
-		new GetOwnAccount()
+		return new GetOwnAccount(){
+			@Override public boolean isSensitiveRequest(){ return isCurrent!=null || super.isSensitiveRequest(); }
+			@Override public boolean requiresSystemTrust(){ return isCurrent!=null || super.requiresSystemTrust(); }
+		}
 					.setCallback(new Callback<>(){
 						@Override
 						public void onSuccess(Account account){
+							if(isCurrent!=null && (!isCurrent.getAsBoolean() || activity.isFinishing() || activity.isDestroyed())) return;
 							if(account==null || TextUtils.isEmpty(account.id)){
 								if(listener!=null) listener.onError(new InstallationErrorResponse());
 								return;
@@ -56,6 +69,7 @@ public final class AuthSessionInstaller{
 							app.clientId="";
 							app.clientSecret="";
 							AccountSessionManager manager=AccountSessionManager.getInstance();
+							if(isCurrent!=null && (!isCurrent.getAsBoolean() || activity.isFinishing() || activity.isDestroyed())) return;
 							manager.addAccount(instance, token, account, app, null);
 							String accountID=instance.getDomain()+"_"+account.id;
 							AccountSession installedSession=manager.tryGetAccount(accountID);
@@ -73,6 +87,7 @@ public final class AuthSessionInstaller{
 
 						@Override
 						public void onError(ErrorResponse error){
+							if(isCurrent!=null && (!isCurrent.getAsBoolean() || activity.isFinishing() || activity.isDestroyed())) return;
 							if(listener!=null) listener.onError(error);
 						}
 					})

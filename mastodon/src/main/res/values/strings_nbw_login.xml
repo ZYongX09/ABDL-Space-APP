@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="nbw_login_title">使用宝宝新天地账号登录本站</string>
+    <string name="nbw_login_consent_message">将通过系统浏览器前往宝宝新天地授权，仅用于登录已连接的 ABDL Space 账号。本站不会获取宝宝新天地密码，也不会自动注册或合并账号。请先阅读并同意本页用户协议与隐私政策。</string>
+    <string name="nbw_login_agreement_required">请先阅读并同意用户协议与隐私政策</string>
+    <string name="nbw_login_starting">正在准备安全登录…</string>
+    <string name="nbw_login_authorizing">请在系统浏览器完成宝宝新天地授权，并允许浏览器打开 ABDL Space。返回此页但未完成回调时不会兑换登录凭据。</string>
+    <string name="nbw_login_finishing">正在验证授权并登录本站…</string>
+    <string name="nbw_login_pending">授权尚未完成。请在浏览器完成授权后，点击重试。</string>
+    <string name="nbw_login_retry">重试</string>
+    <string name="nbw_login_cancel">取消登录</string>
+    <string name="nbw_login_failed">登录未完成，请取消后重新开始。</string>
+    <string name="nbw_login_expired">登录请求已失效或应用已重启，请返回登录页重新开始。</string>
+    <string name="nbw_login_not_bound">此宝宝新天地账号尚未连接本站账号。请先使用邮箱登录或注册 ABDL Space，再在设置中连接宝宝新天地。</string>
+    <string name="nbw_login_reauth_required">请先使用本站账号登录，并在设置中重新连接宝宝新天地后重试。</string>
+    <string name="nbw_login_rejected">此账号暂时无法通过宝宝新天地登录，请使用本站账号登录。</string>
+    <string name="nbw_login_unavailable">登录服务暂不可用，请稍后重新开始。</string>
+    <string name="nbw_login_network_error">网络连接未完成，可点击重试；若请求已失效，请重新开始登录。</string>
+    <string name="nbw_login_rate_limited">操作过于频繁，请稍候再点击重试。</string>
+    <string name="nbw_login_browser_unavailable">未找到可用的系统浏览器，请安装浏览器后重新登录。</string>
+</resources>

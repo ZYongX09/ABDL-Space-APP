@@ -27,6 +27,7 @@ import com.google.gson.Gson;
 import org.joinmastodon.android.BuildConfig;
 import org.joinmastodon.android.MainActivity;
 import org.joinmastodon.android.QQAuthActivity;
+import org.joinmastodon.android.NBWLoginActivity;
 import org.joinmastodon.android.R;
 import org.joinmastodon.android.api.requests.accounts.GetOwnAccount;
 import org.joinmastodon.android.api.session.AccountSessionManager;
@@ -143,9 +144,8 @@ public class LoginPasswordFragment extends AppKitFragment {
             getActivity().onBackPressed();
         });
 
-        // V2 connects after first-party login; no legacy token login endpoint.
-        btnNBW.setVisibility(View.GONE);
-        btnNBW.setOnClickListener(null);
+        btnNBW.setVisibility(View.VISIBLE);
+        btnNBW.setOnClickListener(v -> showNBWConsentSheet());
 
         btnQQ.setVisibility(BuildConfig.QQ_LOGIN_ENABLED ? View.VISIBLE : View.GONE);
         btnQQ.setOnClickListener(v -> showQQConsentSheet());
@@ -264,6 +264,20 @@ public class LoginPasswordFragment extends AppKitFragment {
                     });
                 }
             });
+    }
+
+    private void showNBWConsentSheet() {
+        if (!cbAgreement.isChecked()) {
+            Toast.makeText(getActivity(), R.string.nbw_login_agreement_required, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        showConsentSheet(getString(R.string.nbw_login_title), getString(R.string.nbw_login_consent_message), R.drawable.ic_nbw, false, () -> {
+            android.app.Activity activity = getActivity();
+            if (activity == null || !cbAgreement.isChecked()) return;
+            Intent intent = new Intent(activity, NBWLoginActivity.class);
+            intent.putExtra(NBWLoginActivity.EXTRA_PERMISSION_CONFIRMED, true);
+            startActivity(intent);
+        });
     }
 
     private void showQQConsentSheet() {
