@@ -4,6 +4,7 @@ import android.app.Fragment;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.content.res.ColorStateList;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -304,7 +305,11 @@ public class ChatFragment extends Fragment implements WindowInsetsAwareFragment 
 	public void onApplyWindowInsets(WindowInsets insets) {
 		if (toolbar == null || inputBar == null) return;
 		int top = insets.getSystemWindowInsetTop();
-		int bottom = insets.getStableInsetBottom();
+		// Stable insets exclude the keyboard; this plain layout owns its bottom reservation.
+		int bottom = Math.max(insets.getStableInsetBottom(), insets.getSystemWindowInsetBottom());
+		if (Build.VERSION.SDK_INT >= 30) {
+			bottom = Math.max(bottom, insets.getInsets(WindowInsets.Type.ime() | WindowInsets.Type.navigationBars()).bottom);
+		}
 		toolbar.setPadding(toolbar.getPaddingLeft(), top, toolbar.getPaddingRight(), 0);
 		ViewGroup.LayoutParams toolbarParams = toolbar.getLayoutParams();
 		toolbarParams.height = baseToolbarHeight + top;
