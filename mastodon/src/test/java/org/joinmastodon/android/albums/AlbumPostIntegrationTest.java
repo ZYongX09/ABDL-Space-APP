@@ -144,9 +144,10 @@ public class AlbumPostIntegrationTest{
 				FrameLayout parent=new FrameLayout(activity);
 				AlbumUpdateStatusDisplayItem.Holder holder=new AlbumUpdateStatusDisplayItem.Holder(activity, parent);
 				Status status=post();
+				status.albumUpdate.coverUrl="https://offline.example.test/album-layout-cover";
 				AlbumUpdateStatusDisplayItem item=new AlbumUpdateStatusDisplayItem(status.id, new StatusDisplayItem.NoOpCallbacks(activity), activity, status, "offline");
 				item.fullWidth=true;
-				holder.onBind(item);
+				holder.bind(item);
 				FrameLayout wrapper=(FrameLayout)holder.itemView;
 				LinearLayout card=(LinearLayout)wrapper.getChildAt(0);
 				ImageView image=(ImageView)card.getChildAt(0);

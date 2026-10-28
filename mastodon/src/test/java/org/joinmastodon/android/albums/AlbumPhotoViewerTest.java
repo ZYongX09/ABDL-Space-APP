@@ -206,7 +206,7 @@ public class AlbumPhotoViewerTest{
 	@Test public void exactSessionReplacementIsNotAValidAuthorization() throws Exception{
 		try(ActivityController<Activity> lifecycle=Robolectric.buildActivity(Activity.class).setup()){
 			Constructor<AccountSession> sessionConstructor=AccountSession.class.getDeclaredConstructor(); sessionConstructor.setAccessible(true);
-			AccountSession session=sessionConstructor.newInstance(); session.domain="album-test.example"; session.self=new Account(); session.self.id="42"; session.token=new Token();
+			AccountSession session=sessionConstructor.newInstance(); session.domain="album-test.example"; session.self=new Account(); session.self.id="42"; session.token=new Token(); session.token.accessToken="album-viewer-test-token";
 			String accountID="album-test.example_42";
 			AccountSessionManager manager=AccountSessionManager.getInstance();
 			@SuppressWarnings("unchecked") HashMap<String,AccountSession> sessions=(HashMap<String,AccountSession>)field(AccountSessionManager.class, "sessions").get(manager);
@@ -576,7 +576,7 @@ public class AlbumPhotoViewerTest{
 	private interface SessionTest{ void run(String accountID, AccountSession session) throws Exception; }
 	private void withSession(SessionTest test) throws Exception{
 		Constructor<AccountSession> constructor=AccountSession.class.getDeclaredConstructor(); constructor.setAccessible(true);
-		AccountSession session=constructor.newInstance(); session.domain="album-comment-gate.example.test"; session.self=new Account(); session.self.id="42"; session.token=new Token();
+		AccountSession session=constructor.newInstance(); session.domain="album-comment-gate.example.test"; session.self=new Account(); session.self.id="42"; session.token=new Token(); session.token.accessToken="album-viewer-test-token";
 		String accountID=session.getID(); AccountSessionManager manager=AccountSessionManager.getInstance();
 		@SuppressWarnings("unchecked") Map<String,AccountSession> sessions=(Map<String,AccountSession>)field(AccountSessionManager.class, "sessions").get(manager);
 		String previous=(String)field(AccountSessionManager.class, "lastActiveAccountID").get(manager); AccountSession old=sessions.put(accountID, session);

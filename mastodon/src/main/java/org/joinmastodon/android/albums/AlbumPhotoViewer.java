@@ -36,6 +36,7 @@ import org.joinmastodon.android.api.session.AccountSession;
 import org.joinmastodon.android.api.session.AccountSessionManager;
 import org.joinmastodon.android.fragments.sponsors.SponsorCenterFragment;
 import org.joinmastodon.android.model.Attachment;
+import org.joinmastodon.android.model.Token;
 import org.joinmastodon.android.model.albums.AlbumModels;
 import org.joinmastodon.android.model.sponsors.SponsorModels;
 import org.joinmastodon.android.sponsors.SponsorUi;
@@ -71,6 +72,8 @@ public final class AlbumPhotoViewer implements PhotoViewer.AlbumDelegate, Applic
 	private final Activity activity;
 	private final String accountID;
 	private final AccountSession session;
+	private final Token sessionToken;
+	private final String accessToken;
 	private final List<AlbumModels.Photo> photos;
 	private final PhotoPolicyListener policyListener;
 	private boolean policyDismissed;
@@ -142,8 +145,10 @@ public final class AlbumPhotoViewer implements PhotoViewer.AlbumDelegate, Applic
 		this.photos=new ArrayList<>(photos);
 		currentIndex=index;
 		session=AccountSessionManager.getInstance().tryGetAccount(accountID);
+		sessionToken=session==null ? null : session.token;
+		accessToken=sessionToken==null ? null : sessionToken.accessToken;
 		accountPrefs=activity.getSharedPreferences("account_manager", Context.MODE_PRIVATE);
-		accountListener=(prefs,key)->{ if("lastActiveAccount".equals(key)) close(); };
+		accountListener=(prefs,key)->{ if(key==null || "lastActiveAccount".equals(key)){ invalidatePreviewSession(); close(); } };
 	}
 
 	private void show(){
@@ -215,10 +220,15 @@ public final class AlbumPhotoViewer implements PhotoViewer.AlbumDelegate, Applic
 		return body;
 	}
 
+	private void invalidatePreviewSession(){ AlbumPreviewMemoryCache.getInstance(activity).invalidateSession(accountID, session); }
+
 	private boolean sessionValid(){
-		return !closed && !activity.isFinishing() && !activity.isDestroyed() && session!=null
+		boolean valid=session!=null && session.activated && sessionToken!=null && !TextUtils.isEmpty(accessToken)
+				&& session.token==sessionToken && sessionToken.accessToken==accessToken
 				&& AccountSessionManager.getInstance().tryGetAccount(accountID)==session
 				&& accountID.equals(AccountSessionManager.getInstance().getLastActiveAccountID());
+		if(!valid) invalidatePreviewSession();
+		return valid && !closed && !activity.isFinishing() && !activity.isDestroyed();
 	}
 
 	private boolean live(long token){ return token==generation && !paused && sessionValid() && viewer!=null && viewer.isAlbumHostValid(); }
@@ -302,9 +312,11 @@ public final class AlbumPhotoViewer implements PhotoViewer.AlbumDelegate, Applic
 			previewRequest=null; previewRefreshing=false;
 			AlbumModels.Photo photo=result==null ? null : result.photo;
 			if(photo==null || !previous.id.equals(photo.id)){
+				viewer.invalidateAlbumPreviewCache(position);
 				callback.onFailed(); Toast.makeText(activity, R.string.album_viewer_image_error, Toast.LENGTH_LONG).show(); return;
 			}
 			if(Boolean.TRUE.equals(photo.adminBlocked) || TextUtils.isEmpty(photo.previewUrl)){
+				viewer.invalidateAlbumPreviewCache(position);
 				photos.set(position, photo);
 				revokeChangedPolicy(previous, photo);
 				try{ if(policyListener!=null) policyListener.onPhotoPolicyChanged(photo); }
@@ -335,6 +347,7 @@ public final class AlbumPhotoViewer implements PhotoViewer.AlbumDelegate, Applic
 		}, error->{
 			if(revision!=previewRevision || position!=currentIndex) return;
 			previewRequest=null; previewRefreshing=false;
+			viewer.invalidateAlbumPreviewCache(position);
 			if(error instanceof MastodonErrorResponse response && (response.httpStatus==403 || response.httpStatus==404)){
 				callback.onAccessDenied(); return;
 			}
@@ -343,7 +356,9 @@ public final class AlbumPhotoViewer implements PhotoViewer.AlbumDelegate, Applic
 	}
 
 	private void revokeChangedPolicy(AlbumModels.Photo previous, AlbumModels.Photo photo){
+		if(photo.downloadProtected || Boolean.TRUE.equals(photo.adminBlocked)) viewer.invalidateAlbumPreviewCache(currentIndex);
 		if(!(Boolean.TRUE.equals(photo.adminBlocked) && !Boolean.TRUE.equals(previous.adminBlocked)
+				|| previous.downloadProtected!=photo.downloadProtected
 				|| !protectedNonowner(previous) && protectedNonowner(photo)
 				|| mayDownload(previous) && !mayDownload(photo)
 				|| mayUseLossless(previous) && !mayUseLossless(photo))) return;
@@ -799,8 +814,8 @@ public final class AlbumPhotoViewer implements PhotoViewer.AlbumDelegate, Applic
 			else viewer.resumeAlbum();
 		}
 	}
-	@Override public void onActivityStopped(Activity host){ if(host==activity) close(); }
-	@Override public void onActivityDestroyed(Activity host){ if(host==activity) close(); }
+	@Override public void onActivityStopped(Activity host){ if(host==activity){ invalidatePreviewSession(); close(); } }
+	@Override public void onActivityDestroyed(Activity host){ if(host==activity){ invalidatePreviewSession(); close(); } }
 	@Override public void onActivityCreated(Activity host, Bundle state){}
 	@Override public void onActivityStarted(Activity host){}
 	@Override public void onActivitySaveInstanceState(Activity host, Bundle state){}

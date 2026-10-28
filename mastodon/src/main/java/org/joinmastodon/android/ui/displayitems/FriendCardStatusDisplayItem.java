@@ -48,6 +48,7 @@ public class FriendCardStatusDisplayItem extends StatusDisplayItem{
 	public final FriendCardAttachment attachment;
 	public final Presentation presentation;
 	private final String accountID;
+	private final boolean hideCover;
 	private final ImageLoaderRequest coverRequest;
 
 	public FriendCardStatusDisplayItem(String parentID, Callbacks callbacks, Context context, Status status, String accountID, boolean hideCover){
@@ -56,12 +57,13 @@ public class FriendCardStatusDisplayItem extends StatusDisplayItem{
 		this.attachment=status.friendCard;
 		this.presentation=presentation(attachment);
 		this.accountID=accountID;
-		FriendCard card=attachment==null ? null : attachment.card;
+		this.hideCover=hideCover;
 		// Only the API's live owned-cover projection is used, never attachment.url or a LINK's card snapshot.
 		// Protected or unavailable rows must not request a cover or accept a recycled late image.
-		boolean allowCover=!hideCover && !status.sensitive && status.visibility!=StatusPrivacy.PRIVATE && status.visibility!=StatusPrivacy.DIRECT;
-		String cover=allowCover ? (presentation==Presentation.PUBLICATION && card!=null ? card.coverUrl
-				: presentation==Presentation.LINK && attachment.linkPreview!=null ? attachment.linkPreview.coverUrl : null) : null;
+		// CW expansion reuses this model. Keep a candidate, but expose/restore it only while
+		// permittedCoverUrl allows it; merely constructing a request performs no IO.
+		String cover=presentation==Presentation.PUBLICATION ? attachment.card.coverUrl
+				: presentation==Presentation.LINK && attachment.linkPreview!=null ? attachment.linkPreview.coverUrl : null;
 		coverRequest=hasText(cover) && (cover.startsWith("https://") || cover.startsWith("http://"))
 				? new UrlImageLoaderRequest(cover, V.dp(presentation==Presentation.LINK ? 108 : 440), V.dp(presentation==Presentation.LINK ? 150 : 200)) : null;
 	}
@@ -129,9 +131,26 @@ public class FriendCardStatusDisplayItem extends StatusDisplayItem{
 		return result;
 	}
 
+	private String permittedCoverUrl(){
+		if(hideCover || status.sensitive || status.visibility==StatusPrivacy.PRIVATE || status.visibility==StatusPrivacy.DIRECT
+				|| (!TextUtils.isEmpty(status.spoilerText) && !status.revealedSpoilers.contains(Status.SpoilerType.CONTENT_WARNING))
+				|| status.friendCard!=attachment || presentation(attachment)!=presentation) return null;
+		return presentation==Presentation.PUBLICATION ? attachment.card.coverUrl
+				: presentation==Presentation.LINK && attachment.linkPreview!=null ? attachment.linkPreview.coverUrl : null;
+	}
+
+	private ImageLoaderRequest permittedCoverRequest(){
+		return coverRequest instanceof UrlImageLoaderRequest request && request.uri.toString().equals(permittedCoverUrl()) ? coverRequest : null;
+	}
+
+	private CoverImageBinding.Key coverKey(){
+		ImageLoaderRequest request=permittedCoverRequest();
+		return request==null ? null : new CoverImageBinding.Key(accountID, parentID, attachment.id, presentation, request.getMemoryCacheKey());
+	}
+
 	@Override public Type getType(){ return Type.FRIEND_CARD; }
-	@Override public int getImageCount(){ return coverRequest==null ? 0 : 1; }
-	@Override public ImageLoaderRequest getImageRequest(int index){ return index==0 ? coverRequest : null; }
+	@Override public int getImageCount(){ return permittedCoverRequest()==null ? 0 : 1; }
+	@Override public ImageLoaderRequest getImageRequest(int index){ return index==0 ? permittedCoverRequest() : null; }
 
 	public static class Holder extends StatusDisplayItem.Holder<FriendCardStatusDisplayItem> implements ImageLoaderViewHolder{
 		private final FrameLayout wrapper;
@@ -146,6 +165,8 @@ public class FriendCardStatusDisplayItem extends StatusDisplayItem{
 		private final FlowLayout aboutChips, interestChips;
 		private boolean acceptsCover;
 		private boolean coloredPublication;
+		private FriendCardStatusDisplayItem boundItem;
+		private final CoverImageBinding coverBinding=new CoverImageBinding();
 
 		public Holder(Activity activity, ViewGroup parent){
 			super(new FrameLayout(activity));
@@ -291,20 +312,15 @@ public class FriendCardStatusDisplayItem extends StatusDisplayItem{
 		}
 
 		@Override public void onBind(FriendCardStatusDisplayItem item){
+			boundItem=item;
 			wrapper.setPaddingRelative(V.dp(item.fullWidth ? 16 : 64), 0, V.dp(16), V.dp(8));
 			boolean publication=item.presentation==Presentation.PUBLICATION;
 			boolean link=item.presentation==Presentation.LINK || item.presentation==Presentation.UNAVAILABLE_LINK;
 			boolean available=publication || item.presentation==Presentation.LINK;
 			FriendCard data=publication ? item.attachment.card : null;
-			acceptsCover=available && item.coverRequest!=null;
-			cover.setImageDrawable(null);
-			linkCover.setImageDrawable(null);
-			linkCover.setVisibility(View.GONE);
-			linkIcon.setVisibility(View.VISIBLE);
+			acceptsCover=available && item.permittedCoverRequest()!=null;
 			card.setVisibility(link ? View.GONE : View.VISIBLE);
 			linkContainer.setVisibility(link ? View.VISIBLE : View.GONE);
-			// Stay compact until an image actually arrives. A failed load leaves no empty banner.
-			setCoverVisible(false);
 			cover.setFocus(data==null ? .5f : data.coverFocusX, data==null ? .4f : data.coverFocusY);
 			CharSequence heading=available ? (publication ? data.title : item.attachment.title)
 					: wrapper.getContext().getString(R.string.friend_card_post_unavailable);
@@ -345,6 +361,9 @@ public class FriendCardStatusDisplayItem extends StatusDisplayItem{
 			linkContainer.setFocusable(link && available);
 			linkContainer.setEnabled(available);
 			linkContainer.setContentDescription(link ? ownership+"，"+heading : null);
+			Drawable image=coverBinding.bind(wrapper.getContext(), item.coverKey(), item.permittedCoverRequest());
+			if(image!=null) showCover(image);
+			else clearImage(0); // Failed/missing covers keep the original compact title or LINK icon.
 		}
 
 		private void setCoverVisible(boolean visible){
@@ -383,25 +402,34 @@ public class FriendCardStatusDisplayItem extends StatusDisplayItem{
 		}
 
 		@Override public void setImage(int index, Drawable image){
-			if(index!=0 || !acceptsCover) return;
-			if(item.presentation==Presentation.LINK){
-				linkCover.setImageDrawable(image);
-				linkCover.setVisibility(image!=null ? View.VISIBLE : View.GONE);
-				linkIcon.setVisibility(image!=null ? View.GONE : View.VISIBLE);
-			}else{
-				cover.setImageDrawable(image);
-				setCoverVisible(image!=null);
-			}
+			if(index!=0) return;
+			// The loader owns request/position matching; this callback has no source request key.
+			if(!acceptsCover || boundItem==null || !coverBinding.matches(boundItem.coverKey())){ clearImage(0); return; }
+			showCover(coverBinding.loaded(image));
+		}
+		private void showCover(Drawable image){
+			boolean link=boundItem.presentation==Presentation.LINK;
+			cover.setImageDrawable(link ? null : image);
+			setCoverVisible(!link && image!=null);
+			linkCover.setImageDrawable(link ? image : null);
+			linkCover.setVisibility(link && image!=null ? View.VISIBLE : View.GONE);
+			linkIcon.setVisibility(link && image!=null ? View.GONE : View.VISIBLE);
 		}
 		@Override public void clearImage(int index){
 			if(index!=0) return;
+			coverBinding.clear();
 			cover.setImageDrawable(null);
 			linkCover.setImageDrawable(null);
 			linkCover.setVisibility(View.GONE);
 			linkIcon.setVisibility(View.VISIBLE);
 			setCoverVisible(false);
 		}
-		@Override public void onImageLoadingFailed(int index, Throwable error){ clearImage(index); }
+		@Override public void onImageLoadingFailed(int index, Throwable error){
+			if(index!=0) return;
+			clearImage(0);
+			if(acceptsCover && boundItem!=null && coverBinding.shouldRetry(boundItem.coverKey()))
+				boundItem.callbacks.scheduleRetryFailedImages();
+		}
 		@Override public void onClick(){
 			if(item==null || !(item.context instanceof Activity activity)
 					|| (item.presentation!=Presentation.PUBLICATION && item.presentation!=Presentation.LINK)) return;

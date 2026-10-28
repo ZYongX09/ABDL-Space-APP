@@ -72,9 +72,13 @@ public final class AlbumUi{
 	/** Use the cache's public cancellation handle, rather than ViewImageLoader's private LoadTask. */
 	static void loadImage(ImageView view, String url, int size){
 		cancelImage(view);
+		var cache=me.grishka.appkit.imageloader.ImageCache.getInstance(view.getContext());
+		var request=new me.grishka.appkit.imageloader.requests.UrlImageLoaderRequest(url, size, size);
+		Drawable cached=cache.getFromTop(request);
+		if(cached!=null){ view.setImageDrawable(cached); return; }
+		view.setImageDrawable(null);
 		ImageLoad load=new ImageLoad(view); imageLoads.put(view, load); view.addOnAttachStateChangeListener(load);
-		load.request=me.grishka.appkit.imageloader.ImageCache.getInstance(view.getContext()).get(
-				new me.grishka.appkit.imageloader.requests.UrlImageLoaderRequest(url, size, size), null, load, true);
+		load.request=cache.get(request, null, load, true);
 	}
 	static boolean isImageLoading(ImageView view){ return imageLoads.containsKey(view); }
 	static void cancelImage(ImageView view){

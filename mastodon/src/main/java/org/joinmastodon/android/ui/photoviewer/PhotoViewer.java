@@ -71,7 +71,9 @@ import org.joinmastodon.android.E;
 import org.joinmastodon.android.GlobalUserPreferences;
 import org.joinmastodon.android.R;
 import org.joinmastodon.android.api.MastodonAPIController;
+import org.joinmastodon.android.albums.AlbumPreviewMemoryCache;
 import org.joinmastodon.android.api.session.AccountSession;
+import org.joinmastodon.android.model.Token;
 import org.joinmastodon.android.api.session.AccountSessionManager;
 import org.joinmastodon.android.events.StatusCountersUpdatedEvent;
 import org.joinmastodon.android.fragments.BaseStatusListFragment;
@@ -149,6 +151,9 @@ public class PhotoViewer implements ZoomPanView.Listener{
 	private BaseStatusListFragment<?> parentFragment;
 	private final AlbumDelegate albumDelegate;
 	private final AccountSession albumSession;
+	private final Token albumToken;
+	private final String albumAccessToken;
+	private final AlbumPreviewMemoryCache albumPreviewCache;
 	private TextView albumLosslessButton, albumPreviewRetryButton;
 	private LinearLayout albumQualityControls;
 	private long albumPreviewGeneration=-1, albumPreviewRevision;
@@ -248,6 +253,9 @@ public class PhotoViewer implements ZoomPanView.Listener{
 	public PhotoViewer(Activity activity, BaseStatusListFragment<?> parentFragment, List<Attachment> attachments, int index, Status status, String accountID, Listener listener, @Nullable AlbumDelegate albumDelegate){
 		this.albumDelegate=albumDelegate;
 		albumSession=albumDelegate==null ? null : AccountSessionManager.getInstance().tryGetAccount(accountID);
+		albumToken=albumSession==null ? null : albumSession.token;
+		albumAccessToken=albumToken==null ? null : albumToken.accessToken;
+		albumPreviewCache=albumDelegate==null ? null : AlbumPreviewMemoryCache.getInstance(activity);
 		albumHttpClient=albumDelegate==null ? null : MastodonAPIController.getHttpClient().newBuilder()
 				.cache(null).followRedirects(false).followSslRedirects(false).retryOnConnectionFailure(false)
 				.callTimeout(60, TimeUnit.SECONDS).build();
@@ -565,10 +573,19 @@ public class PhotoViewer implements ZoomPanView.Listener{
 	}
 
 	public boolean isAlbumHostValid(){
-		return albumDelegate!=null && !closing && !dismissed && !activity.isFinishing() && !activity.isDestroyed()
-				&& windowView.isAttachedToWindow() && albumSession!=null
+		boolean sameSession=albumSession!=null && albumSession.activated && albumToken!=null && !TextUtils.isEmpty(albumAccessToken)
+				&& albumSession.token==albumToken && albumToken.accessToken==albumAccessToken
 				&& AccountSessionManager.getInstance().tryGetAccount(accountID)==albumSession
 				&& accountID.equals(AccountSessionManager.getInstance().getLastActiveAccountID());
+		if(albumPreviewCache!=null && !sameSession) albumPreviewCache.invalidateSession(accountID, albumSession);
+		return albumDelegate!=null && sameSession && !closing && !dismissed && !activity.isFinishing() && !activity.isDestroyed()
+				&& windowView.isAttachedToWindow();
+	}
+
+	/** Scoped invalidation: never touches another account/session's preview RAM. */
+	public void invalidateAlbumPreviewCache(int position){
+		if(albumPreviewCache!=null && position>=0 && position<attachments.size())
+			albumPreviewCache.invalidatePhoto(accountID, albumSession, attachments.get(position).id);
 	}
 
 	public int getCurrentIndex(){ return currentIndex; }
@@ -776,12 +793,17 @@ public class PhotoViewer implements ZoomPanView.Listener{
 		long generation=mediaGeneration, revision=++albumPreviewRevision;
 		for(Call call:albumPreviewCalls.values()) call.cancel();
 		albumPreviewCalls.clear();
+		// No cached/private pixels until this entry's fresh ACL has succeeded.
+		for(PhotoViewHolder holder:albumPhotoHolders) holder.imageView.setImageDrawable(null);
 		albumPreviewRetryButton.setVisibility(View.GONE);
 		albumDelegate.refreshPreview(position, new AlbumPreviewCallback(){
 			private boolean live(){ return generation==mediaGeneration && revision==albumPreviewRevision && position==currentIndex && isAlbumHostValid(); }
 			@Override public void onRefreshed(String previewUrl, String description, int width, int height){
 				if(!live()) return;
-				if(TextUtils.isEmpty(previewUrl) || !isAcceptableImageUrl(previewUrl) || !previewUrl.startsWith("https://")){ onFailed(); return; }
+				if(albumDelegate.getInfo(position).adminBlocked){ showAlbumPhotoBlocked(position); return; }
+				if(TextUtils.isEmpty(previewUrl) || !isAcceptableImageUrl(previewUrl) || !previewUrl.startsWith("https://")){
+					invalidateAlbumPreviewCache(position); onFailed(); return;
+				}
 				Attachment attachment=attachments.get(position);
 				// Only renewed preview enters Attachment. HD/lossless remain transient separate sources.
 					attachment.adminBlocked=false;
@@ -800,12 +822,14 @@ public class PhotoViewer implements ZoomPanView.Listener{
 			}
 			@Override public void onFailed(){
 				if(!live()) return;
+				invalidateAlbumPreviewCache(position);
 				albumPreviewRefreshing=false;
 				albumPreviewRetryButton.setVisibility(View.VISIBLE);
 				refreshAlbumControls();
 			}
 				@Override public void onAccessDenied(){
 					if(!live()) return;
+					invalidateAlbumPreviewCache(position);
 					Toast.makeText(activity, R.string.album_viewer_access_denied, Toast.LENGTH_LONG).show();
 					onDismissed(); // Clears every drawable/request before returning to the album screen.
 				}
@@ -817,6 +841,7 @@ public class PhotoViewer implements ZoomPanView.Listener{
 
 	public void showAlbumPhotoBlocked(int position){
 		if(!isAlbumHostValid() || position!=currentIndex || !albumDelegate.getInfo(position).adminBlocked) return;
+		invalidateAlbumPreviewCache(position);
 		revokeAlbumQuality();
 		albumPreviewRevision++; albumPreviewRefreshing=false;
 		albumPreviewGeneration=-1; albumPreviewPosition=-1;
@@ -840,40 +865,60 @@ public class PhotoViewer implements ZoomPanView.Listener{
 	}
 
 	private void loadAlbumPreview(PhotoViewHolder holder, Attachment attachment){
-		if(attachment.adminBlocked){ holder.setImageDrawable(AlbumUi.adminBlockedPlaceholder(activity)); return; }
 		int position=holder.getAbsoluteAdapterPosition();
+		if(attachment.adminBlocked){ invalidateAlbumPreviewCache(position); holder.setImageDrawable(AlbumUi.adminBlockedPlaceholder(activity)); return; }
 		if(position<0 || position!=currentIndex || !isAlbumHostValid()) return;
 		if(albumPreviewRefreshing) return;
 		if(albumPreviewGeneration!=mediaGeneration || albumPreviewPosition!=position){ renewAlbumPreview(position); return; }
+		AlbumInfo info=albumDelegate.getInfo(position);
+		if(info.adminBlocked){ showAlbumPhotoBlocked(position); return; }
+		if(info.downloadProtected) invalidateAlbumPreviewCache(position); // Even protected owners are transient-only.
 		if(position==albumSourcePosition && albumSourceDrawable!=null){ holder.setImageDrawable(albumSourceDrawable); return; }
-		Call previous=albumPreviewCalls.remove(holder); if(previous!=null) previous.cancel();
 		if(TextUtils.isEmpty(attachment.previewUrl) || !isAcceptableImageUrl(attachment.previewUrl) || !attachment.previewUrl.startsWith("https://")){
+			invalidateAlbumPreviewCache(position);
 			albumPreviewRetryButton.setVisibility(View.VISIBLE);
 			Toast.makeText(activity, R.string.album_viewer_image_error, Toast.LENGTH_LONG).show();
 			return;
 		}
+		// Only reachable after this entry's fresh ACL, current metadata and exact session checks.
+		Bitmap cached=albumPreviewCache.get(accountID, albumSession, attachment, maxImageDimensions, info.downloadProtected);
+		if(cached!=null){
+			Call previous=albumPreviewCalls.remove(holder); if(previous!=null) previous.cancel();
+			holder.setImageDrawable(new BitmapDrawable(activity.getResources(), cached)); holder.zoomPanView.updateLayout();
+			albumPreviewRetryButton.setVisibility(View.GONE); return;
+		}
+		Call pending=albumPreviewCalls.get(holder);
+		if(pending!=null && !pending.isCanceled()) return; // Traversal/attach must not duplicate bytes/decode.
 		long generation=mediaGeneration, revision=albumPreviewRevision;
-		Call call=albumHttpClient.newCall(new Request.Builder().url(attachment.previewUrl).cacheControl(new CacheControl.Builder().noStore().build()).build());
+		String previewUrl=attachment.previewUrl;
+		Call call=albumHttpClient.newCall(new Request.Builder().url(previewUrl).cacheControl(new CacheControl.Builder().noStore().build()).build());
 		albumPreviewCalls.put(holder, call);
 		call.enqueue(new okhttp3.Callback(){
 			@Override public void onFailure(@NonNull Call c, @NonNull IOException error){ complete(null, false); }
 			@Override public void onResponse(@NonNull Call c, @NonNull Response response){
 				Drawable result=null;
-				boolean expired=response.code()==403;
+				boolean expired=response.code()==403 || response.code()==404;
 				try(response){ if(response.isSuccessful() && response.body()!=null) result=readAlbumDrawable(response.body()); }
 				catch(IOException | RuntimeException | OutOfMemoryError ignored){}
 				complete(result, expired);
 			}
 			private void complete(Drawable result, boolean expired){
 				activity.runOnUiThread(()->{
-					if(albumPreviewCalls.get(holder)!=call || generation!=mediaGeneration || revision!=albumPreviewRevision
-							|| position!=currentIndex || !isAlbumHostValid() || holder.getAbsoluteAdapterPosition()!=position) return;
+					if(albumPreviewCalls.get(holder)!=call || call.isCanceled() || generation!=mediaGeneration || revision!=albumPreviewRevision
+							|| albumPreviewGeneration!=generation || albumPreviewPosition!=position
+							|| position!=currentIndex || !isAlbumHostValid() || holder.getAbsoluteAdapterPosition()!=position
+							|| !previewUrl.equals(attachment.previewUrl)) return;
 					albumPreviewCalls.remove(holder);
+					AlbumInfo currentInfo=albumDelegate.getInfo(position);
+					if(currentInfo.adminBlocked){ showAlbumPhotoBlocked(position); return; }
 					if(result!=null){
+						if(result instanceof BitmapDrawable bitmap) albumPreviewCache.put(accountID, albumSession, attachment, maxImageDimensions, currentInfo.downloadProtected, bitmap.getBitmap());
 						holder.setImageDrawable(result); holder.zoomPanView.updateLayout(); albumPreviewRetryButton.setVisibility(View.GONE);
 					}else if(expired && albumPreviewRenewals++<1){
+						invalidateAlbumPreviewCache(position);
 						renewAlbumPreview(position); // COS signature expiry rechecks ACL via GET, never quota authorization.
 					}else{
+						invalidateAlbumPreviewCache(position);
 						albumPreviewRetryButton.setVisibility(View.VISIBLE);
 						Toast.makeText(activity, R.string.album_viewer_image_error, Toast.LENGTH_LONG).show();
 					}
@@ -1013,6 +1058,7 @@ public class PhotoViewer implements ZoomPanView.Listener{
 
 	/** A renewed ACL revoked quality/download access; discard already displayed HD as well. */
 	public void revokeAlbumQuality(){
+		invalidateAlbumPreviewCache(currentIndex);
 		cancelAlbumMedia();
 		albumSourceDrawable=null; albumSourcePosition=-1;
 		for(PhotoViewHolder holder:albumPhotoHolders) holder.imageView.setImageDrawable(null);
