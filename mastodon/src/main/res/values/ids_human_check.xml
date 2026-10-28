@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item name="human_check_modal_progress" type="id" />
+    <item name="human_check_modal_status" type="id" />
+    <item name="human_check_web_container" type="id" />
+    <item name="human_check_modal_close" type="id" />
+    <item name="human_check_webview" type="id" />
+</resources>

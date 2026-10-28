@@ -86,6 +86,11 @@
 			android:exported="false"
 			android:theme="@style/Theme.Mastodon.AutoLightDark" />
 		<activity
+			android:name=".HumanCheckActivity"
+			android:exported="false"
+			android:theme="@style/Theme.Mastodon.AutoLightDark"
+			android:windowSoftInputMode="stateAlwaysHidden|adjustResize" />
+		<activity
 			android:name=".NBWLoginActivity"
 			android:exported="false"
 			android:launchMode="singleTop"

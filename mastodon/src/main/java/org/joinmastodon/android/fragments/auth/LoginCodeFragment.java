@@ -62,6 +62,11 @@ public class LoginCodeFragment extends AppKitFragment {
     private CountDownTimer resendTimer;
     private boolean verifying = false;
     private boolean isDark;
+    private static final int HUMAN_CHECK_RESULT = 4872;
+    private final org.joinmastodon.android.auth.HumanCheckCoordinator humanCheck = org.joinmastodon.android.auth.HumanCheckCoordinator.getInstance();
+    private org.joinmastodon.android.auth.HumanCheckCoordinator.Handle humanCheckHandle;
+    private ProgressDialog humanCheckProgress;
+    private boolean humanCheckLaunched;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -237,44 +242,73 @@ public class LoginCodeFragment extends AppKitFragment {
     }
 
     private void resendCode() {
-        ProgressDialog progress = new ProgressDialog(getActivity());
-        progress.setMessage("正在发送...");
-        progress.setCancelable(false);
-        progress.show();
+        if (humanCheckHandle != null) {
+            var current = humanCheck.snapshot(humanCheckHandle);
+            if (current != null && current.canQuery) { humanCheck.query(humanCheckHandle); renderHumanCheck(); return; }
+            if (current != null && current.busy) return;
+        }
+        humanCheckLaunched = false;
+        humanCheckHandle = humanCheck.begin(email, org.joinmastodon.android.auth.HumanCheckCoordinator.Action.RESEND, this::renderHumanCheck);
+        if (humanCheckHandle == null) {
+            Toast.makeText(getActivity(), R.string.human_check_unknown, Toast.LENGTH_LONG).show(); return;
+        }
+        renderHumanCheck();
+    }
 
-        String json = new Gson().toJson(new SendCodeBody(email, "register"));
-        RequestBody body = RequestBody.create(MediaType.parse("application/json"), json);
+    private void renderHumanCheck() {
+        if (getActivity() == null || getView() == null || humanCheckHandle == null) return;
+        var snapshot = humanCheck.snapshot(humanCheckHandle);
+        if (snapshot == null) { clearHumanCheck(); tvResend.setEnabled(true); return; }
+        boolean waiting = snapshot.phase == org.joinmastodon.android.auth.HumanCheckCoordinator.Phase.SENDING;
+        if (waiting && humanCheckProgress == null) {
+            humanCheckProgress = new ProgressDialog(getActivity());
+            humanCheckProgress.setMessage(getString(R.string.human_check_sending)); humanCheckProgress.setCancelable(true);
+            humanCheckProgress.setOnCancelListener(dialog -> humanCheck.cancel(humanCheckHandle)); humanCheckProgress.show();
+        } else if (!waiting && humanCheckProgress != null) { humanCheckProgress.dismiss(); humanCheckProgress = null; }
+        tvResend.setEnabled(false);
+        if (snapshot.phase == org.joinmastodon.android.auth.HumanCheckCoordinator.Phase.PROMPT && !humanCheckLaunched) {
+            humanCheckLaunched = true;
+            startActivityForResult(org.joinmastodon.android.HumanCheckActivity.intent(getActivity(), humanCheckHandle), HUMAN_CHECK_RESULT);
+        } else if (snapshot.phase == org.joinmastodon.android.auth.HumanCheckCoordinator.Phase.SENT && !humanCheckLaunched) {
+            finishHumanCheckSent(humanCheckHandle.generation, humanCheckHandle.owner);
+        } else if (snapshot.canQuery) {
+            tvResend.setText(R.string.human_check_query); tvResend.setEnabled(true);
+            tvError.setText(snapshot.message); tvError.setVisibility(View.VISIBLE);
+        } else if (!snapshot.busy && !humanCheckLaunched) {
+            tvError.setText(snapshot.message); tvError.setVisibility(View.VISIBLE);
+            clearHumanCheck(); tvResend.setEnabled(true);
+        }
+    }
 
-        httpClient.newCall(new Request.Builder()
-                .url("https://abdl-space.top/api/auth/send-code")
-                .post(body).build())
-            .enqueue(new okhttp3.Callback() {
-                @Override
-                public void onFailure(Call call, IOException e) {
-                    if (getActivity() == null) return;
-                    getActivity().runOnUiThread(() -> {
-                        progress.dismiss();
-                        Toast.makeText(getActivity(), "发送失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                    });
-                }
+    private void finishHumanCheckSent(long generation, long owner) {
+        if (!humanCheck.consumeSent(humanCheckHandle, email, org.joinmastodon.android.auth.HumanCheckCoordinator.Action.RESEND, generation, owner)) return;
+        clearHumanCheck(); tvError.setVisibility(View.GONE);
+        Toast.makeText(getActivity(), R.string.human_check_resent, Toast.LENGTH_SHORT).show();
+        startResendTimer();
+    }
 
-                @Override
-                public void onResponse(Call call, Response response) throws IOException {
-                    if (getActivity() == null) return;
-                    getActivity().runOnUiThread(() -> {
-                        progress.dismiss();
-                        if (response.isSuccessful()) {
-                            Toast.makeText(getActivity(), "验证码已重新发送", Toast.LENGTH_SHORT).show();
-                            startResendTimer();
-                        } else {
-                            Toast.makeText(getActivity(), "发送失败", Toast.LENGTH_SHORT).show();
-                        }
-                    });
-                }
-            });
+    private void clearHumanCheck() {
+        if (humanCheckProgress != null) { humanCheckProgress.dismiss(); humanCheckProgress = null; }
+        humanCheckHandle = null; humanCheckLaunched = false;
+        if (tvResend != null) tvResend.setText("重新发送验证码");
+    }
+
+    @Override public void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != HUMAN_CHECK_RESULT || humanCheckHandle == null) return;
+        if (resultCode == android.app.Activity.RESULT_OK && data != null && data.getExtras() != null
+                && data.getExtras().keySet().equals(java.util.Set.of(org.joinmastodon.android.HumanCheckActivity.EXTRA_GENERATION, org.joinmastodon.android.HumanCheckActivity.EXTRA_OWNER))) {
+            finishHumanCheckSent(data.getLongExtra(org.joinmastodon.android.HumanCheckActivity.EXTRA_GENERATION, 0), data.getLongExtra(org.joinmastodon.android.HumanCheckActivity.EXTRA_OWNER, 0));
+        } else {
+            humanCheck.cancel(humanCheckHandle); humanCheckLaunched = false;
+            var state = humanCheck.snapshot(humanCheckHandle);
+            if (state != null && state.canQuery) renderHumanCheck();
+            else { clearHumanCheck(); tvResend.setEnabled(true); }
+        }
     }
 
     private void startResendTimer() {
+        if (resendTimer != null) resendTimer.cancel();
         tvResend.setEnabled(false);
         resendTimer = new CountDownTimer(60000, 1000) {
             @Override
@@ -297,6 +331,8 @@ public class LoginCodeFragment extends AppKitFragment {
 
     @Override
     public void onDestroyView() {
+        humanCheck.detachEntry(humanCheckHandle);
+        clearHumanCheck();
         super.onDestroyView();
         if (resendTimer != null) resendTimer.cancel();
     }

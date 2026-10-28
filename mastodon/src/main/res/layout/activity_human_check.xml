@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/human_check_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="?attr/colorM3Surface">
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="64dp">
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:paddingStart="64dp"
+            android:paddingEnd="64dp"
+            android:text="@string/human_check_title"
+            android:textSize="20sp"
+            android:textColor="?attr/colorM3OnSurface" />
+        <ImageButton
+            android:id="@+id/human_check_back"
+            android:layout_width="56dp"
+            android:layout_height="match_parent"
+            android:layout_gravity="start"
+            android:padding="18dp"
+            android:src="@drawable/ic_arrow_back_24"
+            android:tint="?attr/colorM3OnSurface"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/human_check_back" />
+    </FrameLayout>
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true"
+        android:clipToPadding="false">
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center_horizontal"
+            android:paddingStart="24dp"
+            android:paddingEnd="24dp"
+            android:paddingTop="36dp"
+            android:paddingBottom="40dp">
+            <ImageView
+                android:id="@+id/human_check_illustration"
+                android:layout_width="136dp"
+                android:layout_height="136dp"
+                android:src="@drawable/ic_human_check_security"
+                android:importantForAccessibility="no" />
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="32dp"
+                android:gravity="center"
+                android:text="@string/human_check_headline"
+                android:textColor="?attr/colorM3OnSurface"
+                android:textSize="23sp" />
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:gravity="center"
+                android:lineSpacingExtra="5dp"
+                android:text="@string/human_check_description"
+                android:textColor="?attr/colorM3OnSurfaceVariant"
+                android:textSize="15sp" />
+            <TextView
+                android:id="@+id/human_check_status"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:gravity="center"
+                android:accessibilityLiveRegion="polite"
+                android:textColor="?attr/colorM3OnSurfaceVariant"
+                android:textSize="14sp"
+                android:visibility="gone" />
+            <ProgressBar
+                android:id="@+id/human_check_progress"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_marginTop="16dp"
+                android:indeterminateTint="?attr/colorM3Primary"
+                android:visibility="gone" />
+            <Button
+                android:id="@+id/human_check_start"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="40dp"
+                android:minHeight="52dp"
+                android:paddingTop="12dp"
+                android:paddingBottom="12dp"
+                android:paddingStart="24dp"
+                android:paddingEnd="24dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:text="@string/human_check_start"
+                android:textAllCaps="false"
+                android:textSize="17sp"
+                android:textColor="?attr/colorM3OnPrimary" />
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>

@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Hand-traced security illustration; paired source: assets/illustrations/human-check-security.svg.
+    192-unit circular artwork; the phone continues below and is clipped by the circle.
+    M3 theme colors stay live (including manually selected dark/dynamic palettes).
+    Do not apply a whole-drawable tint: it would flatten the gradients and the check.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="128dp"
+    android:height="128dp"
+    android:viewportWidth="192"
+    android:viewportHeight="192">
+
+    <group android:name="circularIllustration">
+        <clip-path
+            android:name="circularCrop"
+            android:pathData="M96,0 A96,96 0,1 1,96,192 A96,96 0,1 1,96,0 Z" />
+
+        <path
+            android:name="paleCircularBackground"
+            android:fillAlpha="0.18"
+            android:pathData="M96,0 A96,96 0,1 1,96,192 A96,96 0,1 1,96,0 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient android:type="linear"
+                    android:startX="0" android:startY="96"
+                    android:endX="192" android:endY="96">
+                    <item android:offset="0" android:color="?attr/colorM3SecondaryContainer" />
+                    <item android:offset="1" android:color="?attr/colorM3PrimaryContainer" />
+                </gradient>
+            </aapt:attr>
+        </path>
+
+        <path
+            android:name="phoneOutline"
+            android:fillColor="#00000000"
+            android:strokeWidth="3.7"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:pathData="M45.8,198 L45.8,159.4 C45.8,150.1 51.6,143.8 60.5,143.8 L131.5,143.8 C140.4,143.8 146.2,150.1 146.2,159.4 L146.2,198">
+            <aapt:attr name="android:strokeColor">
+                <gradient android:type="linear"
+                    android:startX="96" android:startY="142"
+                    android:endX="96" android:endY="184">
+                    <item android:offset="0" android:color="?attr/colorM3Primary" />
+                    <item android:offset="1" android:color="?attr/colorM3Secondary" />
+                </gradient>
+            </aapt:attr>
+        </path>
+        <path
+            android:name="phoneEarpiece"
+            android:fillColor="#00000000"
+            android:strokeColor="?attr/colorM3Primary"
+            android:strokeWidth="5.6"
+            android:strokeLineCap="round"
+            android:pathData="M83.5,160.3 L108.5,160.3" />
+
+        <path
+            android:name="shieldBevel"
+            android:pathData="M95.9,36.5 C101.7,36.5 105,41.3 113.1,44.1 C118.6,46.1 125.2,47.5 130.3,48.8 C132.9,49.4 134.6,51.2 134.6,54 L134.6,70.4 C134.6,92.2 123,109.1 102.5,118.7 C98.3,120.7 94.8,121.1 90.4,119.3 C69,110.4 57.6,92.7 57.6,70.6 L57.6,54.2 C57.6,51.5 59.3,49.5 62.4,48.9 C75.5,46.5 82.3,43.7 88.5,39.5 C91,37.8 93.1,36.5 95.9,36.5 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient android:type="linear"
+                    android:startX="63" android:startY="43"
+                    android:endX="127" android:endY="119">
+                    <item android:offset="0" android:color="?attr/colorM3PrimaryContainer" />
+                    <item android:offset="0.52" android:color="?attr/colorM3Primary" />
+                    <item android:offset="1" android:color="?attr/colorM3Secondary" />
+                </gradient>
+            </aapt:attr>
+        </path>
+        <path
+            android:name="shieldInsetFace"
+            android:pathData="M95.9,39 C100.5,39 104.3,43.4 112.2,46.3 C118,48.4 124.8,49.9 129.5,51.1 C131.2,51.5 132.1,52.5 132.1,54.3 L132.1,70.4 C132.1,90.9 121,107.1 101.4,116.4 C97.7,118.1 95.1,118.4 91.4,116.9 C70.9,108.3 60.1,91.5 60.1,70.6 L60.1,54.5 C60.1,52.6 60.9,51.7 62.9,51.3 C76,48.9 83.5,45.7 90,41.5 C92.1,40.1 93.8,39 95.9,39 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient android:type="linear"
+                    android:startX="78" android:startY="48"
+                    android:endX="119" android:endY="112">
+                    <item android:offset="0" android:color="?attr/colorM3Primary" />
+                    <item android:offset="0.6" android:color="?attr/colorM3Primary" />
+                    <item android:offset="1" android:color="?attr/colorM3Secondary" />
+                </gradient>
+            </aapt:attr>
+        </path>
+
+        <group android:name="shieldSurfaceLighting">
+            <clip-path
+                android:name="shieldLightingCrop"
+                android:pathData="M95.9,36.5 C101.7,36.5 105,41.3 113.1,44.1 C118.6,46.1 125.2,47.5 130.3,48.8 C132.9,49.4 134.6,51.2 134.6,54 L134.6,70.4 C134.6,92.2 123,109.1 102.5,118.7 C98.3,120.7 94.8,121.1 90.4,119.3 C69,110.4 57.6,92.7 57.6,70.6 L57.6,54.2 C57.6,51.5 59.3,49.5 62.4,48.9 C75.5,46.5 82.3,43.7 88.5,39.5 C91,37.8 93.1,36.5 95.9,36.5 Z" />
+            <path android:name="upperLeftSoftHighlight"
+                android:pathData="M56,34 L136,34 L136,122 L56,122 Z">
+                <aapt:attr name="android:fillColor">
+                    <gradient android:type="radial"
+                        android:centerX="66" android:centerY="47" android:gradientRadius="70">
+                        <item android:offset="0" android:color="#70FFFFFF" />
+                        <item android:offset="0.52" android:color="#23FFFFFF" />
+                        <item android:offset="1" android:color="#00FFFFFF" />
+                    </gradient>
+                </aapt:attr>
+            </path>
+            <path android:name="lowerBevelReflectedLight"
+                android:pathData="M56,34 L136,34 L136,122 L56,122 Z">
+                <aapt:attr name="android:fillColor">
+                    <gradient android:type="radial"
+                        android:centerX="96" android:centerY="122" android:gradientRadius="37">
+                        <item android:offset="0" android:color="#36FFFFFF" />
+                        <item android:offset="1" android:color="#00FFFFFF" />
+                    </gradient>
+                </aapt:attr>
+            </path>
+        </group>
+
+        <path
+            android:name="checkSoftUnderside"
+            android:fillColor="#00000000"
+            android:strokeColor="?attr/colorM3Secondary"
+            android:strokeAlpha="0.24"
+            android:strokeWidth="8.6"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:pathData="M79.2,76.4 L91.6,87.4 L112.4,70.2" />
+        <path
+            android:name="checkFace"
+            android:fillColor="#00000000"
+            android:strokeColor="?attr/colorM3OnPrimary"
+            android:strokeWidth="6.6"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:pathData="M79.2,75.1 L91.6,86.1 L112.4,68.9" />
+        <path
+            android:name="checkTopBevel"
+            android:fillColor="#00000000"
+            android:strokeColor="#FFFFFFFF"
+            android:strokeAlpha="0.26"
+            android:strokeWidth="2"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:pathData="M79.2,73.8 L91.6,84.8 L112.4,67.6" />
+    </group>
+</vector>

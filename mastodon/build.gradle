@@ -290,6 +290,8 @@ dependencies {
 	implementation 'me.grishka.appkit:appkit:1.4.8'
 	implementation 'com.google.code.gson:gson:2.8.9'
 	implementation 'androidx.core:core:1.12.0'
+	// Official 1.18.0 AAR: minSdk 24, minCompileSdk 33, minAGP 7.2.0; app minSdk remains 26.
+	implementation 'androidx.webkit:webkit:1.18.0'
 	implementation 'androidx.exifinterface:exifinterface:1.3.7'
 	implementation 'org.jsoup:jsoup:1.14.3'
 	implementation 'com.squareup:otto:1.3.8'

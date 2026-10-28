@@ -42,6 +42,12 @@ ABDL Space Android 客户端与网页端共用账户和社区数据，在 Mastod
 | 安全与界面 | TensorFlow Lite 本地 NSFW 识别、举报、宝宝认证、PIN/生物识别应用锁；传统 View 页面与 Compose/miuix 页面并存，包含液态玻璃导航与兼容性处理 |
 | 应用更新 | Release 更新实现读取后端 `/api/v1/version`，提示下载并通过系统安装流程更新；生成 APK 不会自动更新该接口或官网下载页 |
 
+### 开发线新增人机验证（未正式发布）
+
+新版邮箱首次发送及重发验证码使用独立人机协议，由配套管理端配置关闭/按风险/每次验证，默认关闭。服务器要求验证后先显示主题一致的原生安全提示页；仅点击“开始验证”才创建居中验证弹窗并立即显示加载动画。提示页返回、弹窗关闭、初始化完成和页面加载完成均不是验证通过；只有服务端确认邮件发送成功才进入验证码页或启动重发倒计时。未知发送结果只查询，不自动重发，不回退旧接口。
+
+该功能需配套后端与两站管理端发布，旧 App/网页接口保留，不强制升级。本轮不部署生产、不执行 0097 迁移、不修改 widget/密钥/允许域名/WAF。原生请求 proof 仅进程内保存；WebView 仅固定 HTTPS 页面、origin/主 frame 限定消息桥和必要 Cloudflare 资源。TLS 错误始终取消；WebView 沿用既有 App 证书信任策略，本轮不全局调整用户 CA 行为。受控 API/Canvas 回归不能代替真实 Turnstile、邮件送达或真机验收。实现入口为 [HumanCheckActivity](mastodon/src/main/java/org/joinmastodon/android/HumanCheckActivity.java)，完整交互及开发发布边界见 [App 人机验证](docs/app-human-check.md)，服务端合同见后端仓 `docs/app-human-check.md`。
+
 ### 3.2.0 重点功能
 
 - **交友地图**：首页地图入口、百度/高德原生地图切换、设备定位、软件级模糊位置、公开/仅互关/隐藏设置，以及指定展示位置的赞助权益控制；全国浏览不要求赞助身份。SDK 隐私同意、系统定位授权与是否公开位置是不同步骤，不能用定位授权替代公开确认；隐藏或删除位置也不能仅靠退出登录。实现入口见 [FriendMapFragment](mastodon/src/main/java/org/joinmastodon/android/fragments/discover/FriendMapFragment.java)。
