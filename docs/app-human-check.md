@@ -46,4 +46,6 @@ off/risk/always 由两站管理员卡控制，revision CAS 防冲突，secret �
 
 正式签名 release 测试包：`/home/ZYongX/projects/ABDL-Space-3.2.0-code34-human-check-test.apk`，151747108 字节，SHA-256 `abec6a65bb9f54e75ff447ada22283462581b88c24fff9d1423eb813afbf7eb3`。仍 3.2.0/code34，非 debuggable，既有正式证书 `fd2098a3d3493222c247a7ba2787ec48fd8f62d38e9432ed4d6290a057dea475`；apksigner、ZIP CRC 和 16KiB 对齐通过，旧包保留。证据在 `/home/ZYongX/projects/app-human-check-evidence-20261028/`，含 final-report、失败日志、原生图和 APK 校验。
 
-本轮只交付 develop 与既有正式签名 release 测试包，不推 main、不更新正式下载、不执行生产迁移 0097、不创建或旋转 widget、不修改密钥、允许域名或 WAF。尚未发布新后端时，新版邮箱发送会明确不可用，不回退旧接口；测试包构建不等于生产功能已经可用。真实 widget、真实邮箱送达及真机闭环未代验。
+Android 仍只交付 develop 与既有正式签名 release 测试包，不推本仓 main、不更新正式下载。用户随后授权“新后端完整上线”，配套后端 main `ab9651b` 已部署 Worker 791 `f187357c`，2026-10-28 07:09:20 UTC 起承接 100% 流量；0097 已于 07:06:43 UTC 单次登记 ID18，不要重放。新发码路径的后端缺失限制已解除，默认 off 下新协议已用隔离 test.top 验证；不回退旧接口。
+
+生产人机策略仍无设置行、默认关闭，两站策略卡尚未正式发布。没有创建或旋转 widget，没有修改密钥、允许域名或 WAF。真实 widget、真实邮箱送达及真机闭环未代验，不能将接口上线或测试包构建当作这些验收。详见后端仓 `docs/app-human-check-production-2026-10-28.md`。

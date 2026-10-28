@@ -46,7 +46,7 @@ ABDL Space Android 客户端与网页端共用账户和社区数据，在 Mastod
 
 新版邮箱首次发送及重发验证码使用独立人机协议，由配套管理端配置关闭/按风险/每次验证，默认关闭。服务器要求验证后先显示主题一致的原生安全提示页；仅点击“开始验证”才创建居中验证弹窗并立即显示加载动画。提示页返回、弹窗关闭、初始化完成和页面加载完成均不是验证通过；只有服务端确认邮件发送成功才进入验证码页或启动重发倒计时。未知发送结果只查询，不自动重发，不回退旧接口。
 
-该功能需配套后端与两站管理端发布，旧 App/网页接口保留，不强制升级。本轮不部署生产、不执行 0097 迁移、不修改 widget/密钥/允许域名/WAF。原生请求 proof 仅进程内保存；WebView 仅固定 HTTPS 页面、origin/主 frame 限定消息桥和必要 Cloudflare 资源。TLS 错误始终取消；WebView 沿用既有 App 证书信任策略，本轮不全局调整用户 CA 行为。受控 API/Canvas 回归不能代替真实 Turnstile、邮件送达或真机验收。实现入口为 [HumanCheckActivity](mastodon/src/main/java/org/joinmastodon/android/HumanCheckActivity.java)，完整交互及开发发布边界见 [App 人机验证](docs/app-human-check.md)，服务端合同见后端仓 `docs/app-human-check.md`。
+配套后端已于 2026-10-28 上线：main `ab9651b`、Worker 791 承接 100% 流量，0097 已单次登记，不要重放。生产策略仍默认关闭；本仓 App 与两站管理卡仍未正式发布，旧 App/网页接口保留，不强制升级。未修改 widget/密钥/允许域名/WAF。原生请求 proof 仅进程内保存；WebView 仅固定 HTTPS 页面、origin/主 frame 限定消息桥和必要 Cloudflare 资源。TLS 错误始终取消；WebView 沿用既有 App 证书信任策略，本轮不全局调整用户 CA 行为。受控 API/Canvas 回归不能代替真实 Turnstile、邮件送达或真机验收。实现入口为 [HumanCheckActivity](mastodon/src/main/java/org/joinmastodon/android/HumanCheckActivity.java)，完整交互及开发发布边界见 [App 人机验证](docs/app-human-check.md)，服务端合同见后端仓 `docs/app-human-check.md`。
 
 ### 3.2.0 重点功能
 
