@@ -12,6 +12,7 @@ import org.joinmastodon.android.novel.importer.NovelImportCoordinator
 import org.joinmastodon.android.novel.upload.NovelUploadWorker
 import org.joinmastodon.android.novel.sync.NovelSyncWorker
 import org.joinmastodon.android.novel.author.AuthorDraftSyncWorker
+import org.joinmastodon.android.novel.app.NovelSessionRequests
 import org.joinmastodon.reader.data.NovelDatabase
 
 object NovelAccountDataCleaner {
@@ -22,6 +23,9 @@ object NovelAccountDataCleaner {
 	private val leases = ConcurrentHashMap<String, AtomicLong>()
 	private val cleaningAccounts = ConcurrentHashMap.newKeySet<String>()
 	private val lock = java.lang.Object()
+
+	// Network registration/dispatch and local leases share this generation gate with logout.
+	internal fun <T> withAccountLock(block: () -> T): T = synchronized(lock) { block() }
 
 	@JvmStatic
 	fun captureGeneration(accountId: String): Long = generations.computeIfAbsent(accountId) { AtomicLong() }.get()
@@ -78,14 +82,15 @@ object NovelAccountDataCleaner {
 	@JvmStatic
 	fun invalidate(accountId: String) = synchronized(lock) {
 		generations.computeIfAbsent(accountId) { AtomicLong() }.incrementAndGet()
+		NovelSessionRequests.cancelAccount(accountId)
 		uploads.remove(accountId)?.forEach(PrivateBookUpload::cancel)
 	}
 
 	@JvmStatic
 	fun revoke(accountId: String, removeSession: Runnable) = synchronized(lock) {
+		// Revoke authority before cancellation callbacks or session-removal work can run.
+		invalidate(accountId)
 		removeSession.run()
-		generations.computeIfAbsent(accountId) { AtomicLong() }.incrementAndGet()
-		uploads.remove(accountId)?.forEach(PrivateBookUpload::cancel)
 	}
 
 	@JvmStatic
@@ -140,10 +145,15 @@ object NovelAccountDataCleaner {
 			File(filesDir, "novels/$hash"),
 			File(filesDir, "novels/transfers/$hash"),
 			File(cacheDir, "novels/import/$hash"),
+			File(filesDir, "novel-app/$hash"),
+			File(cacheDir, "novel-app/$hash"),
 		)
 		roots.forEach { it.deleteRecursively() }
 		val database = NovelDatabase.databaseName(accountId)
-		val databaseFiles = listOf(database, "$database-wal", "$database-shm", "$database-journal").map { File(databasesDir, it) }
+		val editorDatabase = org.joinmastodon.noveleditor.NovelEditorStorage.databaseName(accountId)
+		val databaseFiles = listOf(database, editorDatabase).flatMap { name ->
+			listOf(name, "$name-wal", "$name-shm", "$name-journal")
+		}.map { File(databasesDir, it) }
 		databaseFiles.forEach { it.delete() }
 		return roots.none(File::exists) && databaseFiles.none(File::exists)
 	}

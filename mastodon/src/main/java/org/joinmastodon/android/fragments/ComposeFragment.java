@@ -240,6 +240,8 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	private int friendCardRequestGeneration;
 	private View friendCardPreview;
 	private TextView friendCardPreviewTitle;
+	private final org.joinmastodon.android.novel.app.design.NovelComposeState novelState=new org.joinmastodon.android.novel.app.design.NovelComposeState();
+	private org.joinmastodon.android.ui.viewcontrollers.ComposeNovelController novelController;
 	private boolean wasDetached;
 
 	private BackgroundColorSpan overLimitBG;
@@ -328,6 +330,12 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 			if(editingStatus.friendCard!=null && editingStatus.friendCard.available)
 				friendCardTitle=editingStatus.friendCard.title;
 		}
+		if(editingStatus!=null){
+			org.joinmastodon.android.model.NovelAttachment data=editSource!=null && editSource.novel!=null ? editSource.novel : editingStatus.novel;
+			String id=editSource!=null && editSource.novelId!=null ? editSource.novelId : data!=null && data.isSupported() ? data.workId : null;
+			novelState.initialize(id,data);
+		}
+		org.joinmastodon.android.ui.viewcontrollers.ComposeNovelController.restore(novelState,savedInstanceState);
 		if(savedInstanceState!=null){
 			if(savedInstanceState.containsKey("friendCardId")) friendCardId=savedInstanceState.getString("friendCardId");
 			friendCardTitle=savedInstanceState.getString("friendCardTitle", friendCardTitle);
@@ -343,6 +351,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	@Override
 	public void onDestroy(){
 		friendCardRequestGeneration++;
+		if(novelController!=null){ novelController.dispose(); novelController=null; }
 		super.onDestroy();
 		mediaViewController.cancelAllUploads();
 		removeBackCallback(emojiKeyboardHider);
@@ -472,7 +481,11 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		pollBtn.setOnClickListener(v->togglePoll());
 		emojiBtn.setOnClickListener(v->emojiKeyboard.toggleKeyboardPopup(mainEditText));
 		spoilerBtn.setOnClickListener(v->toggleSpoiler());
-		languageBtn.setOnClickListener(v->showLanguageAlert());
+		ViewGroup attachmentParent=(ViewGroup)friendCardPreview.getParent();
+		novelController=new org.joinmastodon.android.ui.viewcontrollers.ComposeNovelController(getActivity(),accountID,self.id,novelState,languageBtn,
+				attachmentParent,attachmentParent.indexOfChild(friendCardPreview)+1,this::hasFriendCard,()->{
+			updateNBWForumButton(false); updateNewBabyWorldCard(); updatePublishButtonState(); updateDraftState();
+		},this::showLanguageAlert);
 		visibilityBtn.setOnClickListener(this::onVisibilityClick);
 		if(!instance.supportsQuotePostAuthoring()){
 			visibilityBtn.setAccessibilityDelegate(new View.AccessibilityDelegate(){
@@ -608,6 +621,10 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	private void setAttachedFriendCard(FriendCard card){
 		friendCardRequestGeneration++;
 		friendCardSpecified=true;
+		if(card!=null && novelState.hasNovel()){
+			Toast.makeText(getActivity(),R.string.novel_compose_mixed,Toast.LENGTH_LONG).show();
+			return;
+		}
 		friendCardId=card==null ? null : card.id;
 		friendCardTitle=card==null ? null : card.title;
 		updateFriendCardPreview();
@@ -617,6 +634,10 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	}
 
 	private void insertMyFriendCard(){
+		if(novelState.hasNovel()){
+			Toast.makeText(getActivity(),R.string.novel_compose_mixed,Toast.LENGTH_LONG).show();
+			return;
+		}
 		final int generation=++friendCardRequestGeneration;
 		FriendCardRequest.me().setCallback(new Callback<FriendCardResponses.Me>(){
 			@Override public void onSuccess(FriendCardResponses.Me result){
@@ -684,6 +705,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 			outState.putInt("nbwV2Fid", nbwSelection.fid);
 			outState.putInt("nbwV2Typeid", nbwSelection.typeid);
 		}
+		org.joinmastodon.android.ui.viewcontrollers.ComposeNovelController.save(novelState,outState);
 		outState.putString("friendCardId", friendCardId);
 		outState.putString("friendCardTitle", friendCardTitle);
 		outState.putBoolean("friendCardSpecified", friendCardSpecified);
@@ -731,7 +753,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	private void updateNewBabyWorldCard(){
 		if(newBabyWorldCard==null || nbwRepository==null) return;
 		NBWForumOptionsRepository.Snapshot snapshot=nbwRepository.getSnapshot();
-		boolean visible=snapshot.canWrite() && !isReply() && !hasFriendCard() && editingStatus==null
+		boolean visible=snapshot.canWrite() && !isReply() && !hasFriendCard() && !novelState.hasNovel() && editingStatus==null
 				&& (crisisWarningController==null || !crisisWarningController.isVisible());
 		newBabyWorldCard.setVisibility(visible ? View.VISIBLE : View.GONE);
 		if(!visible) return;
@@ -777,7 +799,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	}
 
 	private void onNewBabyWorldCardAction(){
-		if(getActivity()==null || nbwRepository==null || isReply() || hasFriendCard() || editingStatus!=null) return;
+		if(getActivity()==null || nbwRepository==null || isReply() || hasFriendCard() || novelState.hasNovel() || editingStatus!=null) return;
 		NBWForumOptionsRepository.Snapshot snapshot=nbwRepository.getSnapshot();
 		if(!snapshot.canWrite()) return;
 		if(snapshot.capabilities.hasGrant()){
@@ -793,6 +815,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	@Override public void onDestroyView(){
 		removeBackCallback(nbwMenuBackCallback);
 		removeBackCallback(locationMenuBackCallback);
+		if(novelController!=null){ novelController.dispose(); novelController=null; }
 		if(locationController!=null){ locationController.dispose(); locationController=null; }
 		if(nbwSubscription!=null){ nbwSubscription.cancel(); nbwSubscription=null; }
 		if(nbwClassificationController!=null){ nbwClassificationController.dispose(); nbwClassificationController=null; }
@@ -1081,7 +1104,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	public void updatePublishButtonState(){
 		if(publishButton==null)
 			return;
-		publishButton.setEnabled(!localPublishInFlight && (trimmedCharCount>0 || !mediaViewController.isEmpty() || hasFriendCard()) && charCount<=charLimit && mediaViewController.getNonDoneAttachmentCount()==0 && (pollViewController.isEmpty() || pollViewController.getNonEmptyOptionsCount()>1));
+		publishButton.setEnabled(!localPublishInFlight && (trimmedCharCount>0 || !mediaViewController.isEmpty() || hasFriendCard() || novelState.hasNovel()) && charCount<=charLimit && mediaViewController.getNonDoneAttachmentCount()==0 && (pollViewController.isEmpty() || pollViewController.getNonEmptyOptionsCount()>1));
 		updateDraftState();
 	}
 
@@ -1200,7 +1223,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		req.mentalCrisis=containsCrisisKeyword(text) || editingStatus!=null && editingStatus.mentalCrisis;
 		req.visibility=editingStatus!=null ? editingStatus.visibility : StatusPrivacy.PUBLIC;
 		// Replies retain their full typed parent below; only new eligible roots carry classification.
-		if(!isReply() && !hasFriendCard() && editingStatus==null){
+		if(!isReply() && !hasFriendCard() && !novelState.hasNovel() && editingStatus==null){
 			req.setNBWSelection(nbwSelection);
 			if(!NBWForumPolicy.isLegal(nbwSelection, nbwRepository.getSnapshot().options)){
 				// Keep manual intent without silently substituting a different destination.
@@ -1208,6 +1231,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 			}
 		}
 		if(friendCardSpecified) req.setFriendCard(friendCardId);
+		novelState.apply(req);
 		// 位置信息（回复帖不携带）
 		if(!isReply() && (editingStatus==null || locationChanged)){
 			LocationUtils.ResolvedLocation geo=getGeoForPost();
@@ -1340,6 +1364,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	}
 
 	private boolean hasDraft(){
+		if(novelState.isChanged()) return true;
 		if(!java.util.Objects.equals(friendCardId, initialFriendCardId)) return true;
 		if(editingStatus!=null){
 			if(nbwForumChanged || locationChanged || languageChanged || spoilerChanged) return true;
@@ -1620,7 +1645,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	}
 
 	private void onVisibilityClick(View v){
-		if(!isReply() && !hasFriendCard() && editingStatus==null && nbwClassificationController!=null && nbwRepository.getSnapshot().canWrite()){
+		if(!isReply() && !hasFriendCard() && !novelState.hasNovel() && editingStatus==null && nbwClassificationController!=null && nbwRepository.getSnapshot().canWrite()){
 			if(locationController!=null) locationController.dispose();
 			nbwClassificationController.showMenu(v);
 			addBackCallback(nbwMenuBackCallback);
@@ -1630,7 +1655,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	private void updateNBWForumButton(boolean animated){
 		if(getActivity()==null || visibilityBtn==null || nbwRepository==null) return;
 		NBWForumOptionsRepository.Snapshot snapshot=nbwRepository.getSnapshot();
-		boolean visible=snapshot.canWrite() && !isReply() && !hasFriendCard() && editingStatus==null;
+		boolean visible=snapshot.canWrite() && !isReply() && !hasFriendCard() && !novelState.hasNovel() && editingStatus==null;
 		visibilityBtn.setVisibility(visible ? View.VISIBLE : View.GONE);
 		if(!visible) return;
 		String summary=nbwSelection.isManual()

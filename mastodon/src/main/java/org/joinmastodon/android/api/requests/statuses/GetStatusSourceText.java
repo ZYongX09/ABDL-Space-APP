@@ -20,6 +20,9 @@ public class GetStatusSourceText extends MastodonAPIRequest<GetStatusSourceText.
 		public String spoilerText;
 		// Optional metadata: omission on old servers must preserve the original edit state.
 		@SerializedName("friend_card_id") public String friendCardId;
+		@SerializedName("novel_id") public String novelId;
+		@com.google.gson.annotations.JsonAdapter(org.joinmastodon.android.model.NovelAttachment.Deserializer.class)
+		public org.joinmastodon.android.model.NovelAttachment novel;
 		public String inReplyToId;
 		public org.joinmastodon.android.model.StatusPrivacy visibility;
 		public String language;

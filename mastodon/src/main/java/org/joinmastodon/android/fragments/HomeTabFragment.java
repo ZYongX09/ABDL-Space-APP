@@ -71,7 +71,7 @@ import org.joinmastodon.android.model.FollowList;
 import org.joinmastodon.android.model.StatusPrivacy;
 import org.joinmastodon.android.model.TimelineDefinition;
 import org.joinmastodon.android.model.viewmodel.ListItem;
-import org.joinmastodon.android.novel.editor.NovelEditorActivity;
+import org.joinmastodon.android.novel.app.NovelAppActivity;
 import org.joinmastodon.android.ui.ExtendedPopupMenu;
 import org.joinmastodon.android.ui.SimpleViewHolder;
 import org.joinmastodon.android.ui.compose.navigation.ComposeFanMenuController;
@@ -772,6 +772,7 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		root.add(new HomeToolbarMenuItem(R.id.settings, getString(R.string.settings), R.drawable.ic_fluent_settings_24_regular));
 		root.add(new HomeToolbarMenuItem(R.id.announcements, getString(R.string.sk_announcements), R.drawable.ic_fluent_megaphone_24_regular));
 		root.add(new HomeToolbarMenuItem(R.id.edit_timelines, getString(R.string.sk_edit_timelines), R.drawable.ic_fluent_edit_24_regular));
+		root.add(new HomeToolbarMenuItem(R.id.novel, getString(R.string.novel), R.drawable.ic_novel_rebuilt));
 		root.add(new HomeToolbarMenuItem(R.id.scan_qr, getString(R.string.scan_qr), R.drawable.ic_fluent_scan_24_regular));
 		if(!listItems.isEmpty())
 			root.add(new HomeToolbarMenuItem(R.id.lists, getString(R.string.sk_your_lists), R.drawable.ic_fluent_people_24_regular));
@@ -821,7 +822,7 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 
 	public void onLiquidMenuItem(int id){
 		if(id==R.id.novel){
-			startActivity(new Intent(getActivity(), NovelEditorActivity.class).putExtra(NovelEditorActivity.EXTRA_ACCOUNT_ID, accountID));
+			startActivity(NovelAppActivity.intent(getActivity(), accountID));
 			return;
 		}
 		if(id==R.id.scan_qr){
@@ -965,7 +966,7 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		} else if (id == R.id.edit_timelines) {
 			Nav.go(getActivity(), EditTimelinesFragment.class, args);
 		} else if (id == R.id.novel) {
-			startActivity(new Intent(getActivity(), NovelEditorActivity.class).putExtra(NovelEditorActivity.EXTRA_ACCOUNT_ID, accountID));
+			startActivity(NovelAppActivity.intent(getActivity(), accountID));
 		} else if ((list = listItems.get(id)) != null) {
 			args.putString("listID", list.id);
 			args.putString("listTitle", list.title);

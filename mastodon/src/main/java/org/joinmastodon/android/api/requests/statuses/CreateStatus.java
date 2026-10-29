@@ -58,8 +58,21 @@ public class CreateStatus extends MastodonAPIRequest<Status>{
 			friendCardSpecified=true;
 		}
 
+		@SerializedName("novel_id") public String novelId;
+		private transient boolean novelSpecified;
+
+		/** Omitted on unchanged edits, JSON null on removal, a string on selection/replacement. */
+		public void setNovel(String id){ novelId=id; novelSpecified=true; }
+
 		public JsonObject toJson(){
+			if(novelId!=null && friendCardId!=null)
+				throw new IllegalArgumentException("mixed_entity_refs");
 			JsonObject body=MastodonAPIController.gson.toJsonTree(this).getAsJsonObject();
+			if(novelSpecified || novelId!=null) body.addProperty("novel_id", novelId);
+			if(novelId!=null){
+				body.remove("nbw_fid"); body.remove("nbw_typeid");
+				body.remove("nbw_classification");
+			}
 			if(friendCardSpecified || friendCardId!=null){
 				body.addProperty("friend_card_id", friendCardId);
 				// NBW has no friend-card representation. Never silently synchronize an attached card.

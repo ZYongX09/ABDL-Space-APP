@@ -1,6 +1,7 @@
 package org.joinmastodon.android.novel
 
 import java.io.File
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -19,17 +20,20 @@ class NovelEntryContractTest {
 	}
 
 	@Test
-	fun novelEntryStaysHiddenWhileSourceIsPreserved() {
-		// 决策：小说源码与处理器保留，但所有主页/菜单入口隐藏
-		assertFalse(homeTabFragment.contains("new HomeToolbarMenuItem(R.id.novel"))
-		assertTrue(homeOverflow.substringAfter("@+id/novel").substringBefore("/>").contains("android:visible=\"false\""))
+	fun rebuiltNovelEntryIsVisibleInClassicAndLiquidMoreMenus() {
+		assertTrue(homeTabFragment.contains("new HomeToolbarMenuItem(R.id.novel"))
+		for (menu in listOf(homeCustom, homeOverflow)) {
+			val item = menu.substringAfter("@+id/novel").substringBefore("/>")
+			assertTrue(item.contains("android:visible=\"true\""))
+			assertTrue(item.contains("@drawable/ic_novel_rebuilt"))
+		}
 	}
 
 	@Test
-	fun novelHandlersRemainWiredForFutureReEnable() {
+	fun bothNovelHandlersOpenTheRebuiltAccountScopedActivity() {
 		assertTrue(homeTabFragment.contains("if(id==R.id.novel)"))
-		assertTrue(homeTabFragment.contains("new Intent(getActivity(), NovelEditorActivity.class)"))
-		assertTrue(homeTabFragment.contains("NovelEditorActivity.EXTRA_ACCOUNT_ID"))
+		assertEquals(2, Regex("NovelAppActivity\\.intent\\(getActivity\\(\\), accountID\\)").findAll(homeTabFragment).count())
+		assertFalse(homeTabFragment.contains("NovelEditorActivity.EXTRA_ACCOUNT_ID"))
 		assertTrue(homeTabFragment.contains("id == R.id.novel"))
 	}
 
@@ -43,5 +47,9 @@ class NovelEntryContractTest {
 	@Test
 	fun novelActivityIsNotExported() {
 		assertTrue(manifest.contains(Regex("""<activity\s+android:name="\.novel\.NovelActivity"\s+android:exported="false"\s*/>""")))
+		for (name in listOf("NovelAppActivity", "NovelAccountActionActivity", "editor.NovelCreationActivity", "editor.NovelReaderActivity")) {
+			val declaration = manifest.substringAfter("android:name=\"org.joinmastodon.android.novel.app.$name\"").substringBefore("/>")
+			assertTrue("$name must be registered privately", declaration.contains("android:exported=\"false\""))
+		}
 	}
 }

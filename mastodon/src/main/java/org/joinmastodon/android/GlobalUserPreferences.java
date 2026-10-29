@@ -54,6 +54,7 @@ public class GlobalUserPreferences{
 	public static boolean showSuicideHelp;
 	public static boolean underlinedLinks;
 	public static AccountLocalPreferences.ColorPreference color;
+	public static boolean colorExplicitlyChosen;
 	public static boolean likeIcon;
 	public static boolean showDividers;
 	public static boolean relocatePublishButton;
@@ -122,6 +123,7 @@ public class GlobalUserPreferences{
 		showSuicideHelp=prefs.getBoolean("showSuicideHelp", true);
 		underlinedLinks=prefs.getBoolean("underlinedLinks", true);
 		color=AccountLocalPreferences.ColorPreference.valueOf(prefs.getString("color", AccountLocalPreferences.ColorPreference.NORD.name()));
+		colorExplicitlyChosen=prefs.getBoolean("colorExplicitlyChosen", false);
 		likeIcon=prefs.getBoolean("likeIcon", false);
 		uniformNotificationIcon=prefs.getBoolean("uniformNotificationIcon", false);
 		showDividers =prefs.getBoolean("showDividers", false);
@@ -224,6 +226,7 @@ public class GlobalUserPreferences{
 				.putBoolean("showSuicideHelp", showSuicideHelp)
 				.putBoolean("underlinedLinks", underlinedLinks)
 				.putString("color", color.name())
+				.putBoolean("colorExplicitlyChosen", colorExplicitlyChosen)
 				.putBoolean("likeIcon", likeIcon)
 				.putBoolean("defaultToUnlistedReplies", defaultToUnlistedReplies)
 				.putBoolean("doubleTapToSearch", doubleTapToSearch)

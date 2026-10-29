@@ -16,8 +16,8 @@ import java.util.UUID;
 import static org.joinmastodon.noveleditor.EditorModels.*;
 
 /** Local-first author workspace. Directory queries never read chapter content. */
-public final class NovelEditorStorage extends SQLiteOpenHelper{
-	private static final int VERSION=1;
+public final class NovelEditorStorage extends SQLiteOpenHelper implements java.io.Closeable{
+	private static final int VERSION=3;
 	private final String accountId;
 
 	public NovelEditorStorage(Context context, String accountId){
@@ -49,9 +49,112 @@ public final class NovelEditorStorage extends SQLiteOpenHelper{
 		db.execSQL("CREATE INDEX editor_publish_jobs_list ON editor_publish_jobs(work_id,state,updated_at DESC)");
 		db.execSQL("CREATE TABLE editor_sync_operations(id TEXT PRIMARY KEY,work_id TEXT NOT NULL REFERENCES editor_works(id),entity_type TEXT NOT NULL,entity_id TEXT NOT NULL,operation TEXT NOT NULL,generation INTEGER NOT NULL,payload_hash TEXT NOT NULL,state TEXT NOT NULL,attempts INTEGER NOT NULL DEFAULT 0,last_error TEXT,created_at INTEGER NOT NULL,updated_at INTEGER NOT NULL)");
 		db.execSQL("CREATE INDEX editor_sync_pending ON editor_sync_operations(state,updated_at)");
+		createAppTables(db);
 	}
 
-	@Override public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion){}
+	private static void createAppTables(SQLiteDatabase db){
+		db.execSQL("CREATE TABLE IF NOT EXISTS editor_app_metadata(work_id TEXT PRIMARY KEY REFERENCES editor_works(id) ON DELETE CASCADE,payload TEXT NOT NULL,server_work_id TEXT UNIQUE,base_release_id TEXT,server_client_work_id TEXT,owner_payload TEXT,owner_conflict TEXT)");
+		db.execSQL("CREATE TABLE IF NOT EXISTS editor_app_chapters(chapter_id TEXT PRIMARY KEY REFERENCES editor_chapters(id) ON DELETE CASCADE,remote_status TEXT NOT NULL DEFAULT 'draft',submission_id TEXT,review_reason TEXT,remote_generation INTEGER NOT NULL DEFAULT 0,remote_sort_order INTEGER)");
+		db.execSQL("CREATE TABLE IF NOT EXISTS editor_app_submissions(id TEXT PRIMARY KEY,work_id TEXT NOT NULL REFERENCES editor_works(id),metadata TEXT NOT NULL,server_submission_id TEXT,state TEXT NOT NULL DEFAULT 'prepared',result TEXT,created_at INTEGER NOT NULL)");
+		db.execSQL("CREATE TABLE IF NOT EXISTS editor_app_submission_chapters(submission_id TEXT NOT NULL REFERENCES editor_app_submissions(id) ON DELETE CASCADE,ordinal INTEGER NOT NULL,chapter_id TEXT NOT NULL,title TEXT NOT NULL,body TEXT NOT NULL,generation INTEGER NOT NULL,sha256 TEXT NOT NULL,sort_order INTEGER NOT NULL,PRIMARY KEY(submission_id,ordinal))");
+		db.execSQL("CREATE TABLE IF NOT EXISTS editor_app_reading(work_id TEXT PRIMARY KEY,chapter_id TEXT NOT NULL,page INTEGER NOT NULL,release_id TEXT,updated_at INTEGER NOT NULL)");
+		db.execSQL("CREATE TABLE IF NOT EXISTS editor_app_annotations(id TEXT PRIMARY KEY,work_id TEXT NOT NULL,chapter_id TEXT NOT NULL,page INTEGER NOT NULL,note TEXT,created_at INTEGER NOT NULL)");
+	}
+
+	@Override public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion){
+		if(oldVersion<2) createAppTables(db);
+		else if(oldVersion<3){
+			db.execSQL("ALTER TABLE editor_app_metadata ADD COLUMN server_client_work_id TEXT");
+			db.execSQL("ALTER TABLE editor_app_metadata ADD COLUMN owner_payload TEXT");
+			db.execSQL("ALTER TABLE editor_app_metadata ADD COLUMN owner_conflict TEXT");
+		}
+	}
+
+	public static String databaseName(String accountId){return "novel_editor_"+EditorText.sha256(Objects.requireNonNull(accountId)).substring(0,24)+".db";}
+
+	/** Metadata/bindings are additive: existing author drafts and private Room books are untouched. */
+	public void putAppMetadata(String workId,String payload,@Nullable String serverId,@Nullable String releaseId){
+		assertOwnWork(workId); if(payload==null||payload.length()>32_000)throw new IllegalArgumentException("Invalid metadata");
+		ContentValues v=new ContentValues();v.put("work_id",workId);v.put("payload",payload);v.put("server_work_id",serverId);v.put("base_release_id",releaseId);
+		// Updating local metadata must not erase the separately persisted owner binding or conflict.
+		if(getWritableDatabase().update("editor_app_metadata",v,"work_id=?",new String[]{workId})==0)insert(getWritableDatabase(),"editor_app_metadata",v);
+	}
+	@Nullable public AppMetadata appMetadata(String workId){assertOwnWork(workId);try(Cursor c=getReadableDatabase().rawQuery("SELECT payload,server_work_id,base_release_id,server_client_work_id,owner_payload,owner_conflict FROM editor_app_metadata WHERE work_id=?",new String[]{workId})){return c.moveToFirst()?new AppMetadata(c.getString(0),c.getString(1),c.getString(2),c.getString(3),c.getString(4),c.getString(5)):null;}}
+	public void putOwnerState(String workId,String clientWorkId,@Nullable String payload,@Nullable String conflict){
+		AppMetadata old=appMetadata(workId);if(old==null)throw new IllegalArgumentException("Metadata not found");
+		if(clientWorkId==null||clientWorkId.isBlank())throw new IllegalArgumentException("Owner client_work_id required");
+		if(old.clientWorkId()!=null&&!old.clientWorkId().equals(clientWorkId))throw new IllegalStateException("Owner client_work_id changed");
+		ContentValues v=new ContentValues();v.put("server_client_work_id",clientWorkId);v.put("owner_payload",payload);v.put("owner_conflict",conflict);getWritableDatabase().update("editor_app_metadata",v,"work_id=?",new String[]{workId});
+	}
+	public void acknowledgeOwnerConflict(String workId,String expectedOwnerPayload){AppMetadata old=appMetadata(workId);if(old==null||!Objects.equals(old.ownerPayload(),expectedOwnerPayload))throw new IllegalStateException("Owner state changed; refresh before confirming");ContentValues v=new ContentValues();v.putNull("owner_conflict");getWritableDatabase().update("editor_app_metadata",v,"work_id=?",new String[]{workId});}
+	@Nullable public String localWorkForServer(String serverId){try(Cursor c=getReadableDatabase().rawQuery("SELECT m.work_id FROM editor_app_metadata m JOIN editor_works w ON w.id=m.work_id WHERE m.server_work_id=? AND w.account_id=? AND w.deleted_at IS NULL",new String[]{serverId,accountId})){return c.moveToFirst()?c.getString(0):null;}}
+	public record AppMetadata(String payload,@Nullable String serverId,@Nullable String releaseId,@Nullable String clientWorkId,@Nullable String ownerPayload,@Nullable String ownerConflict){}
+	public record RemoteChapter(String status,@Nullable String submissionId,@Nullable String reason,long generation){}
+	public RemoteChapter remoteChapter(String chapterId){if(getChapter(chapterId)==null)throw new IllegalArgumentException("Chapter not found");try(Cursor c=getReadableDatabase().rawQuery("SELECT remote_status,submission_id,review_reason,remote_generation FROM editor_app_chapters WHERE chapter_id=?",new String[]{chapterId})){return c.moveToFirst()?new RemoteChapter(c.getString(0),c.getString(1),c.getString(2),c.getLong(3)):new RemoteChapter("draft",null,null,0);}}
+	public void putRemoteChapter(String chapterId,String status,@Nullable String submissionId,@Nullable String reason,long generation){if(getChapter(chapterId)==null)throw new IllegalArgumentException("Chapter not found");ContentValues v=new ContentValues();v.put("chapter_id",chapterId);v.put("remote_status",status);v.put("submission_id",submissionId);v.put("review_reason",reason);v.put("remote_generation",generation);if(getWritableDatabase().update("editor_app_chapters",v,"chapter_id=?",new String[]{chapterId})==0)insert(getWritableDatabase(),"editor_app_chapters",v);}
+
+	public void renameChapter(String chapterId,String title){Chapter c=getChapter(chapterId);if(c==null)throw new IllegalArgumentException("Chapter not found");ContentValues v=new ContentValues();v.put("title",EditorText.bounded(title,EditorLimits.CHAPTER_TITLE,"Title"));v.put("updated_at",System.currentTimeMillis());getWritableDatabase().update("editor_chapters",v,"id=?",new String[]{chapterId});}
+	public void updateWorkInfo(String workId,String title,String description){assertOwnWork(workId);if(description==null||description.length()>EditorLimits.WORK_DESCRIPTION)throw new IllegalArgumentException("Invalid description");ContentValues v=new ContentValues();v.put("title",EditorText.bounded(title,EditorLimits.WORK_TITLE,"Title"));v.put("description",description);getWritableDatabase().update("editor_works",v,"id=? AND account_id=?",new String[]{workId,accountId});touchWork(getWritableDatabase(),workId,System.currentTimeMillis());}
+	public SaveResult checkpointWithTitle(String chapterId,long expected,String title,String body,int start,int end,int scroll){SQLiteDatabase db=getWritableDatabase();db.beginTransaction();try{renameChapter(chapterId,title);SaveResult result=checkpoint(chapterId,expected,body,start,end,scroll,true);db.setTransactionSuccessful();return result;}finally{db.endTransaction();}}
+	/** Header-only owner mirror; never overwrite an existing local chapter. */
+	public void ensureRemoteChapter(String workId,String chapterId,String title,int ordinal,long remoteGeneration,String status,@Nullable String submissionId,@Nullable String reason){
+		assertOwnWork(workId);Chapter existing=getChapter(chapterId);if(existing!=null){if(!existing.workId().equals(workId))throw new IllegalArgumentException("Chapter belongs to another work");putRemoteChapter(chapterId,status,submissionId,reason,remoteGeneration);putRemoteSort(chapterId,ordinal);return;}
+		SQLiteDatabase db=getWritableDatabase();db.beginTransaction();try{String volume=structure(workId).volumes().get(0).id();insertChapter(db,workId,volume,chapterId,EditorText.bounded(title,EditorLimits.CHAPTER_TITLE,"Title"),(ordinal+1L)*1024,"",System.currentTimeMillis());ContentValues v=new ContentValues();v.put("state","REMOTE_STUB");db.update("editor_chapters",v,"id=?",new String[]{chapterId});putRemoteChapter(chapterId,status,submissionId,reason,remoteGeneration);putRemoteSort(chapterId,ordinal);db.setTransactionSuccessful();}finally{db.endTransaction();}
+	}
+	private void putRemoteSort(String chapterId,int sort){ContentValues v=new ContentValues();v.put("remote_sort_order",sort);getWritableDatabase().update("editor_app_chapters",v,"chapter_id=?",new String[]{chapterId});}
+	public void hydrateRemoteChapter(String chapterId,String body,long remoteGeneration){
+		Chapter c=getChapter(chapterId);if(c==null||!"REMOTE_STUB".equals(c.state()))return;
+		SQLiteDatabase db=getWritableDatabase();db.beginTransaction();try{SaveResult saved=checkpoint(chapterId,c.currentGeneration(),body,0,0,0,true);long generation=Math.max(saved.generation(),remoteGeneration+1);ContentValues v=new ContentValues();v.put("current_generation",generation);db.update("editor_chapters",v,"id=?",new String[]{chapterId});v=new ContentValues();v.put("generation",generation);db.update("editor_drafts",v,"chapter_id=?",new String[]{chapterId});db.setTransactionSuccessful();}finally{db.endTransaction();}
+	}
+	public void reorderChapters(String workId,List<String> ids){assertOwnWork(workId);List<Chapter> chapters=structure(workId).chapters();if(ids.size()!=chapters.size()||new java.util.HashSet<>(ids).size()!=ids.size()||!new java.util.HashSet<>(ids).equals(chapters.stream().map(Chapter::id).collect(java.util.stream.Collectors.toSet())))throw new IllegalArgumentException("Chapter list changed");SQLiteDatabase db=getWritableDatabase();db.beginTransaction();try{int i=1;for(String id:ids){ContentValues v=new ContentValues();v.put("sort_key",i++*1024L);db.update("editor_chapters",v,"id=? AND work_id=?",new String[]{id,workId});}touchWork(db,workId,System.currentTimeMillis());db.setTransactionSuccessful();}finally{db.endTransaction();}}
+	public void softDeleteChapter(String chapterId){Chapter c=getChapter(chapterId);if(c==null)throw new IllegalArgumentException("Chapter not found");ContentValues v=new ContentValues();v.put("deleted_at",System.currentTimeMillis());getWritableDatabase().update("editor_chapters",v,"id=?",new String[]{chapterId});touchWork(getWritableDatabase(),c.workId(),System.currentTimeMillis());}
+
+	/** Freeze only explicitly selected bodies, transactionally; later edits cannot alter a retry. */
+	public String prepareAppSubmission(String workId,String metadata,List<String> chapterIds){
+		assertOwnWork(workId);java.util.Set<String> selected=new java.util.HashSet<>(chapterIds);
+		if(chapterIds.isEmpty()||chapterIds.size()>1000||selected.size()!=chapterIds.size())throw new IllegalArgumentException("Select 1–1000 unique chapters");
+		if(metadata==null||metadata.length()>32_000)throw new IllegalArgumentException("Invalid metadata");
+		String id=UUID.randomUUID().toString();SQLiteDatabase db=getWritableDatabase();db.beginTransaction();try{
+			List<Chapter> directory=structure(workId).chapters();
+			if(!directory.stream().map(Chapter::id).collect(java.util.stream.Collectors.toSet()).containsAll(selected))throw new IllegalArgumentException("Chapter not found");
+			java.util.Map<String,Integer> remoteSort=new java.util.HashMap<>();int nextSort=0;
+			try(Cursor c=db.rawQuery("SELECT a.chapter_id,a.remote_sort_order FROM editor_app_chapters a JOIN editor_chapters c ON c.id=a.chapter_id WHERE c.work_id=? AND a.remote_sort_order IS NOT NULL",new String[]{workId})){while(c.moveToNext()){remoteSort.put(c.getString(0),c.getInt(1));nextSort=Math.max(nextSort,c.getInt(1)+1);}}
+			boolean completeOrder=selected.containsAll(remoteSort.keySet());
+			ContentValues v=new ContentValues();v.put("id",id);v.put("work_id",workId);v.put("metadata",metadata);v.put("created_at",System.currentTimeMillis());insert(db,"editor_app_submissions",v);
+			int ordinal=0;long total=0;java.util.Set<Integer> sortOrders=new java.util.HashSet<>();
+			for(int index=0;index<directory.size();index++){
+				Chapter c=directory.get(index);if(!selected.contains(c.id()))continue;
+				if("REMOTE_STUB".equals(c.state()))throw new IllegalArgumentException("Load selected chapters first");
+				Draft d=loadDraft(c.id());if(d==null||d.content().isEmpty())throw new IllegalArgumentException("Selected chapter is empty");
+				total+=d.content().getBytes(java.nio.charset.StandardCharsets.UTF_8).length;if(total>20L*1024*1024)throw new IllegalArgumentException("Selected text exceeds 20 MiB");
+				int sort=completeOrder?index:remoteSort.containsKey(c.id())?remoteSort.get(c.id()):nextSort++;
+				if(sort<0||!sortOrders.add(sort))throw new IllegalArgumentException("Chapter order conflicts; refresh the owner directory");
+				v=new ContentValues();v.put("submission_id",id);v.put("ordinal",ordinal++);v.put("chapter_id",c.id());v.put("title",c.title());v.put("body",d.content());v.put("generation",Math.max(c.currentGeneration(),remoteChapter(c.id()).generation()+1));v.put("sha256",d.sha256());v.put("sort_order",sort);insert(db,"editor_app_submission_chapters",v);
+			}
+			db.setTransactionSuccessful();return id;
+		}finally{db.endTransaction();}
+	}
+	public record AppSubmission(String id,String workId,String metadata,@Nullable String serverSubmissionId,String state,@Nullable String result){}
+	public AppSubmission appSubmission(String id){try(Cursor c=getReadableDatabase().rawQuery("SELECT s.id,s.work_id,s.metadata,s.server_submission_id,s.state,s.result FROM editor_app_submissions s JOIN editor_works w ON w.id=s.work_id WHERE s.id=? AND w.account_id=?",new String[]{id,accountId})){if(!c.moveToFirst())throw new IllegalArgumentException("Submission not found");return new AppSubmission(c.getString(0),c.getString(1),c.getString(2),c.getString(3),c.getString(4),c.getString(5));}}
+	@Nullable public String pendingAppSubmission(String workId){assertOwnWork(workId);try(Cursor c=getReadableDatabase().rawQuery("SELECT id FROM editor_app_submissions WHERE work_id=? AND state IN ('prepared','starting','uploading') ORDER BY created_at DESC,rowid DESC LIMIT 1",new String[]{workId})){return c.moveToFirst()?c.getString(0):null;}}
+	@Nullable public String localAppSubmissionForServer(String workId,String remoteId){assertOwnWork(workId);try(Cursor c=getReadableDatabase().rawQuery("SELECT id FROM editor_app_submissions WHERE work_id=? AND server_submission_id=? LIMIT 1",new String[]{workId,remoteId})){return c.moveToFirst()?c.getString(0):null;}}
+	@Nullable public String cancellableAppSubmission(String workId){assertOwnWork(workId);try(Cursor c=getReadableDatabase().rawQuery("SELECT id FROM editor_app_submissions WHERE work_id=? AND state IN ('prepared','starting','uploading','pending') ORDER BY created_at DESC,rowid DESC LIMIT 1",new String[]{workId})){return c.moveToFirst()?c.getString(0):null;}}
+	public List<String> appSubmissionChapterIds(String id){appSubmission(id);ArrayList<String> result=new ArrayList<>();try(Cursor c=getReadableDatabase().rawQuery("SELECT chapter_id FROM editor_app_submission_chapters WHERE submission_id=? ORDER BY ordinal",new String[]{id})){while(c.moveToNext())result.add(c.getString(0));}return result;}
+	public record SubmissionChapter(String id,String title,String body,long generation,String sha256,int sortOrder){}
+	public SubmissionChapter appSubmissionChapter(String id,int ordinal){appSubmission(id);try(Cursor c=getReadableDatabase().rawQuery("SELECT chapter_id,title,body,generation,sha256,sort_order FROM editor_app_submission_chapters WHERE submission_id=? AND ordinal=?",new String[]{id,String.valueOf(ordinal)})){if(!c.moveToFirst())throw new IllegalArgumentException("Chapter not found");return new SubmissionChapter(c.getString(0),c.getString(1),c.getString(2),c.getLong(3),c.getString(4),c.getInt(5));}}
+	public void updateAppSubmission(String id,@Nullable String remoteId,String state,@Nullable String result){appSubmission(id);ContentValues v=new ContentValues();v.put("server_submission_id",remoteId);v.put("state",state);v.put("result",result);getWritableDatabase().update("editor_app_submissions",v,"id=?",new String[]{id});}
+
+	public CreatedWork appendReviewedImport(String jobId,String workId){
+		assertOwnWork(workId);ImportModels.Job job=getImportJob(jobId);if(job==null||!"AWAITING_REVIEW".equals(job.state()))throw new IllegalArgumentException("Import is not ready");
+		SQLiteDatabase db=getWritableDatabase();db.beginTransaction();try{String volume=structure(workId).volumes().get(0).id(),first=null;long sort;try(Cursor c=db.rawQuery("SELECT COALESCE(MAX(sort_key),0)+1024 FROM editor_chapters WHERE work_id=?",new String[]{workId})){c.moveToFirst();sort=c.getLong(0);}try(Cursor c=db.rawQuery("SELECT suggested_title,content FROM editor_import_chapters WHERE job_id=? AND included=1 ORDER BY ordinal",new String[]{jobId})){while(c.moveToNext()){String id=UUID.randomUUID().toString();if(first==null)first=id;insertChapter(db,workId,volume,id,EditorText.bounded(c.getString(0),EditorLimits.CHAPTER_TITLE,"Title"),sort,c.getString(1),System.currentTimeMillis());sort+=1024;}}if(first==null)throw new IllegalArgumentException("Select chapters");ContentValues done=new ContentValues();done.put("state","READY");done.put("phase","COMMITTED");done.put("result_work_id",workId);if(db.update("editor_import_jobs",done,"id=? AND state='AWAITING_REVIEW'",new String[]{jobId})!=1)throw new IllegalStateException("Import changed");touchWork(db,workId,System.currentTimeMillis());db.setTransactionSuccessful();return new CreatedWork(workId,volume,first);}finally{db.endTransaction();}
+	}
+	public record ReadingMark(String chapterId,int page,@Nullable String releaseId,long updatedAt){}
+	@Nullable public ReadingMark readingMark(String workId){try(Cursor c=getReadableDatabase().rawQuery("SELECT chapter_id,page,release_id,updated_at FROM editor_app_reading WHERE work_id=?",new String[]{workId})){return c.moveToFirst()?new ReadingMark(c.getString(0),c.getInt(1),c.getString(2),c.getLong(3)):null;}}
+	public void putReadingMark(String workId,String chapterId,int page,@Nullable String releaseId){ContentValues v=new ContentValues();v.put("work_id",workId);v.put("chapter_id",chapterId);v.put("page",Math.max(0,page));v.put("release_id",releaseId);v.put("updated_at",System.currentTimeMillis());getWritableDatabase().insertWithOnConflict("editor_app_reading",null,v,SQLiteDatabase.CONFLICT_REPLACE);}
+	public void addReadingAnnotation(String workId,String chapterId,int page,@Nullable String note){ContentValues v=new ContentValues();v.put("id",UUID.randomUUID().toString());v.put("work_id",workId);v.put("chapter_id",chapterId);v.put("page",Math.max(0,page));v.put("note",note);v.put("created_at",System.currentTimeMillis());insert(getWritableDatabase(),"editor_app_annotations",v);}
+	public record ReadingAnnotation(String id,String chapterId,int page,@Nullable String note){}
+	public List<ReadingAnnotation> readingAnnotations(String workId){ArrayList<ReadingAnnotation> result=new ArrayList<>();try(Cursor c=getReadableDatabase().rawQuery("SELECT id,chapter_id,page,note FROM editor_app_annotations WHERE work_id=? ORDER BY created_at",new String[]{workId})){while(c.moveToNext())result.add(new ReadingAnnotation(c.getString(0),c.getString(1),c.getInt(2),c.getString(3)));}return result;}
+
 
 	public ImportModels.Job createImportJob(String displayName,String mimeType,String stagedPath,long sourceSize,String sourceSha256){
 		if(sourceSize<=0 || sourceSize>ImportLimits.SOURCE_BYTES) throw new IllegalArgumentException("Source size out of range");

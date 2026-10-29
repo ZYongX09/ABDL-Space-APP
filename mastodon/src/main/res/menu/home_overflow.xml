@@ -15,9 +15,9 @@
 			android:title="@string/sk_edit_timelines" />
 		<item
 			android:id="@+id/novel"
-			android:icon="@drawable/ic_fluent_book_24_regular"
+			android:icon="@drawable/ic_novel_rebuilt"
 			android:title="@string/novel"
-			android:visible="false" />
+			android:visible="true" />
 		<item
 			android:id="@+id/scan_qr"
 			android:icon="@drawable/ic_fluent_scan_24_regular"

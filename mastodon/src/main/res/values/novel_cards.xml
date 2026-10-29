@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="novel_card_cover_placeholder">小说</string>
+    <string name="novel_compose_close">关闭</string>
+    <string name="novel_card_new_book">新书上架</string>
+    <string name="novel_card_update">章节更新</string>
+    <string name="novel_card_unavailable">作品暂不可用</string>
+    <string name="novel_card_my_work">我的小说</string>
+    <string name="novel_card_read_new">开始阅读</string>
+    <string name="novel_card_read_update">阅读新章节</string>
+    <string name="novel_card_read_link">阅读作品</string>
+    <string name="novel_card_shelf_add">加入书架</string>
+    <string name="novel_card_shelf_remove">移出书架</string>
+    <string name="novel_card_shelf_added">已加入书架</string>
+    <string name="novel_compose_insert">插入我的小说</string>
+    <string name="novel_compose_replace">更换作品</string>
+    <string name="novel_compose_remove">移除作品</string>
+    <string name="novel_compose_attached">已附带 1 部小说</string>
+    <string name="novel_compose_scope">仅显示自己已发布且可见的作品</string>
+    <string name="novel_compose_hidden">草稿、私密和已下架作品不在此显示。每条帖子可附带 1 部自己的小说。</string>
+    <string name="novel_compose_search">搜索作品名称</string>
+    <string name="novel_compose_empty">暂无可插入的小说</string>
+    <string name="novel_compose_no_results">没有找到匹配的小说</string>
+    <string name="novel_compose_select">插入作品</string>
+    <string name="novel_compose_select_count">已选择 %1$d 部</string>
+    <string name="novel_compose_mixed">小说和扩列卡不能同时附带，请先移除另一种卡片。</string>
+</resources>

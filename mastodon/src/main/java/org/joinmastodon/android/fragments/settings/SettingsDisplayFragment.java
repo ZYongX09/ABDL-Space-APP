@@ -197,29 +197,18 @@ public class SettingsDisplayFragment extends BaseSettingsFragment<Void>{
 	// MOSHIDON:
 	private void onColorClick(ListItem<?> item_){
 		boolean multiple=AccountSessionManager.getInstance().getLoggedInAccounts().size() > 1;
-		int indexOffset=multiple ? 1 : 0;
-		int selected=lp.color==null ? 0 : lp.color.ordinal() + indexOffset;
+		int selected=colorSelectionIndex(lp, multiple);
 		int[] newSelected={selected};
 		List<String> items=Arrays.stream(AccountLocalPreferences.ColorPreference.values()).map(AccountLocalPreferences.ColorPreference::getName).map(this::getString).collect(Collectors.toList());
 		if(multiple)
 			items.add(0, getString(R.string.sk_settings_color_palette_default, items.get(GlobalUserPreferences.color.ordinal())));
 
 		Consumer<Boolean> save=(asDefault)->{
-			boolean defaultSelected=multiple && newSelected[0]==0;
-			AccountLocalPreferences.ColorPreference pref=defaultSelected ? null : AccountLocalPreferences.ColorPreference.values()[newSelected[0]-indexOffset];
-			if(pref!=lp.color){
-				AccountLocalPreferences.ColorPreference prev=lp.color;
-				lp.color=asDefault ? null : pref;
-				lp.save();
-				if((asDefault || !multiple) && pref!=null){
-					GlobalUserPreferences.color=pref;
-					GlobalUserPreferences.save();
-				}
-				colorItem.subtitle=getColorPaletteValue();
-				rebindItem(colorItem);
-				if(prev==null && pref!=null) restartActivityToApplyNewTheme();
-				else maybeApplyNewThemeRightNow(null, prev, null);
-			}
+			AccountLocalPreferences.ColorPreference previous=lp.getCurrentColor();
+			applyColorSelection(lp, multiple, newSelected[0], asDefault);
+			colorItem.subtitle=getColorPaletteValue();
+			rebindItem(colorItem);
+			maybeApplyNewThemeRightNow(null, previous, null);
 		};
 
 		AlertDialog.Builder alert=new M3AlertDialogBuilder(getActivity())
@@ -230,6 +219,22 @@ public class SettingsDisplayFragment extends BaseSettingsFragment<Void>{
 				.setNegativeButton(R.string.cancel, null);
 		if(multiple) alert.setNeutralButton(R.string.sk_set_as_default, (dlg, item)->save.accept(true));
 		alert.show();
+	}
+
+	static int colorSelectionIndex(AccountLocalPreferences preferences, boolean multiple){
+		return multiple && preferences.color==null ? 0 : preferences.getCurrentColor().ordinal()+(multiple ? 1 : 0);
+	}
+
+	static void applyColorSelection(AccountLocalPreferences preferences, boolean multiple, int selected, boolean asDefault){
+		boolean inherits=multiple && selected==0;
+		AccountLocalPreferences.ColorPreference chosen=inherits ? null : AccountLocalPreferences.ColorPreference.values()[selected-(multiple ? 1 : 0)];
+		preferences.color=asDefault ? null : chosen;
+		preferences.save();
+		if((asDefault || !multiple) && chosen!=null){
+			GlobalUserPreferences.color=chosen;
+			GlobalUserPreferences.colorExplicitlyChosen=true;
+			GlobalUserPreferences.save();
+		}
 	}
 
 	private void setUseDynamicColors(boolean useDynamicColors){

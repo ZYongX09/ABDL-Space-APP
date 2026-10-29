@@ -22,6 +22,21 @@ class NovelHomeUiContractTest {
 	private val storeViewModel = File(projectDir, "src/main/kotlin/org/joinmastodon/android/novel/NovelStoreViewModel.kt").readText()
 	private val storeApi = File(projectDir, "src/main/java/org/joinmastodon/android/api/novels/PublicNovelStoreApi.java").readText()
 
+	@Test fun rebuiltEntryUsesRealThreeTabBackdropWithoutReplacingThePrivateLibrary() {
+		val rebuilt = File(projectDir, "src/main/kotlin/org/joinmastodon/android/novel/app/NovelAppActivity.kt").readText()
+		val creator = File(projectDir, "src/main/kotlin/org/joinmastodon/android/novel/app/NovelCreatorScreens.kt").readText()
+		assertTrue(rebuilt.contains("IosLiquidGlassNavigationBar"))
+		assertTrue(rebuilt.contains("Modifier.layerBackdrop(backdrop)"))
+		assertTrue(rebuilt.contains("NovelPage.Store, NovelPage.Shelf, NovelPage.Creator"))
+		assertTrue(rebuilt.contains("NovelLibraryFragment.newInstance(account)"))
+		assertTrue(rebuilt.contains("listLocalWorks(applicationContext, id)"))
+		assertTrue(creator.contains("creator.requiredPosts"))
+		assertTrue(creator.contains("creator.requiredLikes"))
+		assertTrue(creator.contains("vm::applyCreator"))
+		assertTrue(creator.contains("local.updatedAt / 1000"))
+		assertFalse(creator.contains("qualifyingPosts = 2"))
+	}
+
 	@Test
 	fun novelHomeUsesMiuixPageChrome() {
 		assertTrue(screen.contains("top.yukonga.miuix.kmp.basic.Scaffold"))

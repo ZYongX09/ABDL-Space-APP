@@ -116,7 +116,8 @@ public abstract class StatusDisplayItem{
 				case EMOJI_REACTIONS -> new EmojiReactionsStatusDisplayItem.Holder(activity, parent);
 				case FRIEND_REQUEST_ITEM -> new FriendRequestStatusDisplayItem.Holder(activity, parent);
 				case ALBUM_UPDATE -> new AlbumUpdateStatusDisplayItem.Holder(activity, parent);
-				case FRIEND_CARD -> new FriendCardStatusDisplayItem.Holder(activity, parent);
+					case FRIEND_CARD -> new FriendCardStatusDisplayItem.Holder(activity, parent);
+					case NOVEL -> new NovelStatusDisplayItem.Holder(activity, parent);
 				case ADVERTISEMENT -> new AdvertisementStatusDisplayItem.Holder(activity, parent);
 			};
 	}
@@ -204,10 +205,11 @@ public abstract class StatusDisplayItem{
 		}
 
 		FriendCardStatusDisplayItem.Presentation friendCard=FriendCardStatusDisplayItem.presentation(statusForContent.friendCard);
+		NovelStatusDisplayItem.Presentation novel=NovelStatusDisplayItem.presentation(statusForContent.novel);
 		boolean friendCardBody=FriendCardStatusDisplayItem.replacesBody(friendCard);
 		boolean albumUpdate=!friendCardBody && AlbumUpdateStatusDisplayItem.supported(statusForContent.albumUpdate);
 		String displayedContent=friendCardBody ? null : albumUpdate ? statusForContent.albumUpdate.description
-				: FriendCardStatusDisplayItem.contentWithoutFallback(statusForContent.content, statusForContent.friendCard);
+				: NovelStatusDisplayItem.contentWithoutFallback(FriendCardStatusDisplayItem.contentWithoutFallback(statusForContent.content, statusForContent.friendCard), statusForContent.novel);
 		if(!TextUtils.isEmpty(displayedContent)){
 			SpannableStringBuilder parsedText=albumUpdate ? new SpannableStringBuilder(displayedContent)
 					: HtmlParser.parse(displayedContent, statusForContent.emojis, statusForContent.mentions, statusForContent.tags, accountID, statusForContent, context);
@@ -222,6 +224,9 @@ public abstract class StatusDisplayItem{
 
 		if(friendCard!=FriendCardStatusDisplayItem.Presentation.NONE)
 			contentItems.add(new FriendCardStatusDisplayItem(parentID, callbacks, context, statusForContent, accountID, (flags & FLAG_MEDIA_FORCE_HIDDEN)!=0));
+
+		if(novel!=NovelStatusDisplayItem.Presentation.NONE)
+			contentItems.add(new NovelStatusDisplayItem(parentID, callbacks, context, statusForContent, accountID, (flags & FLAG_MEDIA_FORCE_HIDDEN)!=0, status));
 
 		if(albumUpdate)
 			contentItems.add(new AlbumUpdateStatusDisplayItem(parentID, callbacks, context, statusForContent, accountID));
@@ -244,7 +249,7 @@ public abstract class StatusDisplayItem{
 		if(statusForContent.poll!=null){
 			buildPollItems(parentID, callbacks, context, statusForContent.poll, status, contentItems);
 		}
-		if(!albumUpdate && statusForContent.card!=null && statusForContent.mediaAttachments.isEmpty() && TextUtils.isEmpty(statusForContent.spoilerText)){
+		if(novel==NovelStatusDisplayItem.Presentation.NONE && !albumUpdate && statusForContent.card!=null && statusForContent.mediaAttachments.isEmpty() && TextUtils.isEmpty(statusForContent.spoilerText)){
 			contentItems.add(new LinkCardStatusDisplayItem(parentID, callbacks, context, statusForContent, accountID));
 		}
 		if(statusForContent.quote!=null){
@@ -338,8 +343,9 @@ public abstract class StatusDisplayItem{
 			EMOJI_REACTIONS,
 			FRIEND_REQUEST_ITEM,
 			ALBUM_UPDATE,
-			FRIEND_CARD,
-			ADVERTISEMENT
+				FRIEND_CARD,
+				NOVEL,
+				ADVERTISEMENT
 		}
 
 	public static abstract class Holder<T> extends BindableViewHolder<T> implements UsableRecyclerView.DisableableClickable{

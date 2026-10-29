@@ -75,6 +75,10 @@ public class Status extends BaseModel implements DisplayItemsParent, Searchable 
 	@com.google.gson.annotations.JsonAdapter(FriendCardDeserializer.class)
 	@Nullable
 	public FriendCardAttachment friendCard;
+	/** A malformed novel projection cannot discard the status, its reblog, or surrounding timeline. */
+	@SerializedName("novel")
+	@com.google.gson.annotations.JsonAdapter(NovelAttachment.Deserializer.class)
+	@Nullable public NovelAttachment novel;
 		@SerializedName("album_update")
 		public org.joinmastodon.android.model.albums.AlbumModels.AlbumUpdate albumUpdate;
 
