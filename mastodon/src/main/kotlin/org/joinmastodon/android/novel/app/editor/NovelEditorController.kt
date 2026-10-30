@@ -166,7 +166,7 @@ internal class NovelEditorController(application: Application, val repository: N
     fun undo() { editing?.undo(); reflect() }
     fun redo() { editing?.redo(); reflect() }
     fun insert(text: String) { val f = editing?.frame() ?: return; val a = minOf(f.start(), f.end()).coerceIn(0, f.body().length); val b = maxOf(f.start(), f.end()).coerceIn(a, f.body().length); val next = f.body().replaceRange(a, b, text); frame(EditorSession.Frame(f.title(), next, a + text.length, a + text.length, f.scroll())) }
-    fun saveExplicit() { viewModelScope.launch { if (save()) update { it.copy(notice = "已保存到本机，不会自动上传") } } }
+    fun saveExplicit() { viewModelScope.launch { save() } }
     /** Navigation/manual saves acknowledge the newest revision, including input delivered during local IO. */
     suspend fun save(latest: Boolean = true): Boolean = saveLock.withLock {
         val session = editing ?: return@withLock true

@@ -278,13 +278,20 @@ class NovelEditorScreenshotTest {
         compose.onNodeWithText("提交章节审核").assertDoesNotExist()
         compose.onNodeWithText("完成").assertIsDisplayed().assertIsEnabled()
         fixture.capture(compose, "editor-focus-compact")
+        val focusedHeight = input.height
         controller.saveExplicit(); fixture.settle(compose)
         assertSame(editable, input.text); assertTrue(BaseInputConnection.getComposingSpanStart(input.text) >= 0)
+        compose.onNodeWithText("已保存到本机，不会自动上传").assertDoesNotExist()
+        compose.onNodeWithText("已存本机").assertDoesNotExist()
+        assertEquals("Saving must not insert a banner above the manuscript", focusedHeight, input.height)
         NovelEditorStorage(app, account).use { assertEquals(input.text.toString(), it.loadDraft(work!!.chapterId()).content()) }
         click("完成")
         assertSame(native, findManuscript(compose.activity.window.decorView))
         assertFalse(input.hasFocus())
         compose.onNodeWithText("提交章节审核").assertIsDisplayed().assertIsEnabled()
+        compose.onNodeWithText("已保存到本机，不会自动上传").assertDoesNotExist()
+        compose.onNodeWithText("已保存到本机").assertDoesNotExist()
+        compose.onNodeWithText(" 预览").assertIsDisplayed().assertIsEnabled()
         fixture.capture(compose, "editor-focus-done")
         assertNoUpload()
     }

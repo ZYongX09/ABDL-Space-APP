@@ -3,12 +3,9 @@ package org.joinmastodon.reader.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -52,7 +49,7 @@ fun ReaderScreen(
 	externalChapterCount: Int? = null,
 	showAnnotations: Boolean = true,
 	initialPalette: ReaderPalette = ReaderPalette.PAPER,
-	toolbarActions: @Composable () -> Unit = {},
+	toolbarActions: @Composable BoxScope.() -> Unit = {},
 	contentBackdropModifier: Modifier = Modifier,
 	onBack: () -> Unit,
 ) {
@@ -62,9 +59,30 @@ fun ReaderScreen(
 	var controlsVisible by rememberSaveable(book.id) { mutableStateOf(false) }
 	var settingsVisible by remember { mutableStateOf(false) }
 	val chapter = chapters.getOrNull(chapterIndex)
-	BoxWithConstraints(Modifier.fillMaxSize().background(settings.palette.background).windowInsetsPadding(WindowInsets.safeDrawing)) {
-		val maxControlsHeight = maxHeight / 2
-		Column(Modifier.fillMaxSize()) {
+	Box(Modifier.fillMaxSize().background(settings.palette.background)) {
+		Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
+			// Record only the unchanged reading surface, never the overlaid controls or host actions.
+			Box(Modifier.fillMaxSize().then(contentBackdropModifier).background(settings.palette.background)) {
+				if (chapter == null) {
+					Text("暂无正文", color = settings.palette.secondaryText, modifier = Modifier.align(Alignment.Center))
+				} else if (settings.paged) {
+					PagedReader(
+						chapter = chapter,
+						settings = settings,
+						initialPage = pageIndex,
+						onPageChanged = { pageIndex = it; onPositionChanged(ReaderPosition(chapterIndex, it)) },
+						onToggleControls = { controlsVisible = !controlsVisible },
+					)
+				} else {
+					Text(
+						text = chapter.content,
+						color = settings.palette.text,
+						style = readerBodyTextStyle(settings),
+						modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = settings.horizontalPadding.dp, vertical = 28.dp)
+							.pointerInput(chapter.id) { detectTapGestures(onTap = { controlsVisible = !controlsVisible }) },
+					)
+				}
+			}
 			if (controlsVisible && chapter != null) {
 				ReaderControls(
 					bookTitle = book.title,
@@ -86,35 +104,12 @@ fun ReaderScreen(
 					onNextChapter = onNextChapter,
 					showChapterSlider = externalChapterCount == null,
 					showAnnotations = showAnnotations,
-					modifier = Modifier.heightIn(max = maxControlsHeight).verticalScroll(rememberScrollState()),
-					toolbarActions = toolbarActions,
+					modifier = Modifier.align(Alignment.TopCenter),
 				)
 			}
-			// Actual available height: safeDrawing already consumed outside, title/tools above
-			// measured in the Column, and page margins inside PagedReader. No text under a bar.
-			// A host may record this PURE CONTENT layer for the existing liquid toolbar material.
-			Box(Modifier.weight(1f).fillMaxWidth().then(contentBackdropModifier).background(settings.palette.background)) {
-				if (chapter == null) {
-					Text("暂无正文", color = settings.palette.secondaryText, modifier = Modifier.align(Alignment.Center))
-				} else if (settings.paged) {
-					PagedReader(
-						chapter = chapter,
-						settings = settings,
-						initialPage = pageIndex,
-						onPageChanged = { pageIndex = it; onPositionChanged(ReaderPosition(chapterIndex, it)) },
-						onToggleControls = { controlsVisible = !controlsVisible },
-					)
-				} else {
-					Text(
-						text = chapter.content,
-						color = settings.palette.text,
-						style = readerBodyTextStyle(settings),
-						modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = settings.horizontalPadding.dp, vertical = 28.dp)
-							.pointerInput(chapter.id) { detectTapGestures(onTap = { controlsVisible = !controlsVisible }) },
-					)
-				}
-			}
 		}
+		// The host keeps its original window-relative placement/insets; visibility never reflows text.
+		if (controlsVisible && chapter != null) toolbarActions()
 	}
 	if (settingsVisible) ReaderSettingsSheet(settings, { settings = it }, { settingsVisible = false })
 }

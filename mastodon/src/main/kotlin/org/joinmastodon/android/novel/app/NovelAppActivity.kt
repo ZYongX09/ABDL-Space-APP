@@ -238,7 +238,11 @@ class NovelAccountActionActivity : FragmentStackActivity() {
                 consumeWindowInsets = false // Insets have already been applied by the outer Compose host.
                 setParentCompositionContext(parent)
                 setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
-                setContent { latestContent() }
+                setContent {
+                    // Capture draws only this host's children, not the outer page background.
+                    // Keep the theme fill inside the ComposeView so list gaps stay opaque too.
+                    Box(Modifier.fillMaxSize().background(NovelTheme.colors.background)) { latestContent() }
+                }
             }, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
             captureView = this
         }

@@ -90,6 +90,31 @@ internal object NovelCoverImages {
 internal fun interface NovelCoverUploader { suspend fun upload(file: File): String }
 internal data class NovelCoverSession(val domain: String, val token: String, val authority: NovelSessionRequests.Authority)
 
+/** Display only this message/structured fields, never the internal cause's message or stack. */
+internal class NovelCoverUploadException(val failure: CosMediaUpload.UploadException) : IOException(coverFailureMessage(failure), failure)
+
+private fun coverFailureMessage(error: CosMediaUpload.UploadException): String {
+    val stage = when (error.stage) {
+        CosMediaUpload.Stage.AUTHORIZE -> "授权"
+        CosMediaUpload.Stage.PUT -> "传输"
+        CosMediaUpload.Stage.COMPLETE -> "完成校验"
+    }
+    val category = when (error.category) {
+        CosMediaUpload.Category.AUTHENTICATION -> "账号授权失效，请重新登录"
+        CosMediaUpload.Category.PERMISSION -> "签名或权限校验失败"
+        CosMediaUpload.Category.EXPIRED -> "上传授权过期或时间校验失败"
+        CosMediaUpload.Category.CONFLICT -> "上传状态冲突"
+        CosMediaUpload.Category.VERIFICATION -> "服务端对象校验失败"
+        CosMediaUpload.Category.SERVER -> "服务暂时不可用"
+        CosMediaUpload.Category.REDIRECT -> "服务返回不允许的重定向"
+        CosMediaUpload.Category.INVALID_REQUEST -> "上传参数未通过校验"
+        CosMediaUpload.Category.INVALID_RESPONSE -> "服务响应无效"
+        CosMediaUpload.Category.NETWORK -> "网络连接失败"
+        CosMediaUpload.Category.HTTP -> "HTTP 请求失败"
+    }
+    return "封面上传${stage}阶段失败（${category}${if (error.status > 0) "，HTTP ${error.status}" else ""}），本地图片已保留，请重试"
+}
+
 /** Uses the existing generic media contract, not avatar credentials or the /media MIME fallback. */
 internal class NovelCoverUpload private constructor(
     private val domain: String, private val token: String, private val authority: NovelSessionRequests.Authority,
@@ -101,6 +126,7 @@ internal class NovelCoverUpload private constructor(
         val active = AtomicReference<Call?>()
         val result = suspendCancellableCoroutine<String> { continuation ->
             val job = launch(io) {
+                var preparing = true
                 try {
                     require(file.isFile && file.length() in 1..NovelCoverImages.MAX_BYTES) { "封面文件无效或超过 5 MB，请重新选择" }
                     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true; BitmapFactory.decodeFile(file.path, this) }
@@ -111,25 +137,30 @@ internal class NovelCoverUpload private constructor(
                         NovelSessionRequests.register(authority, call)
                         NovelSessionRequests.dispatch(authority, call) { if (!continuation.isActive) call.cancel() }
                     }
+                    preparing = false
                     val auth = CosMediaUpload.authorize(client, domain, token, "generic", body, bounds.outWidth, bounds.outHeight, listener)
                     authority.requireActive()
-                    require(HttpUrl.parse(auth.uploadUrl)?.isHttps == true && HttpUrl.parse(auth.publicUrl)?.isHttps == true) { "封面上传地址无效" }
+                    if (HttpUrl.parse(auth.uploadUrl)?.isHttps != true || HttpUrl.parse(auth.publicUrl)?.isHttps != true)
+                        throw CosMediaUpload.UploadException(CosMediaUpload.Stage.AUTHORIZE, 200, CosMediaUpload.Category.INVALID_RESPONSE, null)
                     CosMediaUpload.put(client, auth, body, listener)
                     authority.requireActive()
                     val attachment = CosMediaUpload.complete(client, domain, token, auth.uploadId, null, listener)
                     authority.requireActive()
-                    val url = attachment.url?.takeIf { HttpUrl.parse(it)?.isHttps == true } ?: throw IOException("封面服务未返回有效 HTTPS 地址，请重试")
+                    val url = attachment.url?.takeIf { HttpUrl.parse(it)?.isHttps == true }
+                        ?: throw CosMediaUpload.UploadException(CosMediaUpload.Stage.COMPLETE, 200, CosMediaUpload.Category.INVALID_RESPONSE, null)
                     if (continuation.isActive) continuation.resume(url)
                 } catch (cancel: CancellationException) { throw cancel }
                 catch (error: Exception) {
-                    if (!authority.isActive()) {
-                        if (continuation.isActive) continuation.resumeWithException(NovelSessionExpiredException())
-                        return@launch
+                    val failure = when {
+                        error is NovelSessionExpiredException -> error
+                        !authority.isActive() -> NovelSessionExpiredException()
+                        error is CosMediaUpload.UploadException -> NovelCoverUploadException(error)
+                        // Cancellation IO keeps its type; local validation retains its safe local message.
+                        error is IOException && active.get()?.isCanceled() == true -> error
+                        preparing && error is IllegalArgumentException -> error
+                        else -> IOException("封面上传准备失败，本地图片已保留，请重试", error)
                     }
-                    // Only a safe category/status is shown: signed headers, tokens and response bodies stay private.
-                    val status = Regex("(?:HTTP |failed: )(\\d{3})").find(error.message.orEmpty())?.groupValues?.get(1)
-                    val message = when (status) { "401" -> "封面上传授权已失效（401），请重新登录后重试"; "403" -> "封面上传签名或权限校验失败（403），本地图片已保留，可重试"; else -> "封面上传失败${status?.let { "（$it）" }.orEmpty()}，本地图片已保留，请重试" }
-                    if (continuation.isActive) continuation.resumeWithException(IOException(message))
+                    if (continuation.isActive) continuation.resumeWithException(failure)
                 } finally { active.getAndSet(null)?.let { NovelSessionRequests.unregister(authority, it) } }
             }
             continuation.invokeOnCancellation { active.get()?.cancel(); job.cancel() }

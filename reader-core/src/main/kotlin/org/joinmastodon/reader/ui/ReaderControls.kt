@@ -42,8 +42,6 @@ fun ReaderControls(
 				Text(chapterTitle, color = palette.secondaryText, maxLines = 1)
 			}
 			TextButton(onClick = onSettings) { Text("设置", color = palette.text) }
-			// Owned by the visible toolbar, never a host overlay on the reading viewport.
-			toolbarActions()
 		}
 		if (showChapterSlider && chapterCount > 1) {
 			Slider(
@@ -66,5 +64,8 @@ fun ReaderControls(
 			}
 		}
 		Text("第 ${chapterIndex + 1} / $chapterCount 章", color = palette.secondaryText, modifier = Modifier.align(Alignment.CenterHorizontally))
+		// Retain the optional legacy slot without crowding the original title/settings row.
+		// Window-positioned host actions use ReaderScreen's BoxScope slot instead.
+		toolbarActions()
 	}
 }

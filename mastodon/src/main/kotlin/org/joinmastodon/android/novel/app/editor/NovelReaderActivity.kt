@@ -133,7 +133,8 @@ internal fun ReaderHostScreen(state: ReaderHostState, controller: NovelReaderCon
                     externalChapterIndex = state.index, externalChapterCount = state.headers.size,
                     initialPalette = if (UiUtils.isDarkTheme()) ReaderPalette.NIGHT else ReaderPalette.PAPER, onBack = back,
                     toolbarActions = {
-                        ReaderHostToolbarActions(liquid, backdrop, onAnnotations = { annotations = true }, onDirectory = { directory = true })
+                        ReaderHostToolbarActions(liquid, backdrop, onAnnotations = { annotations = true }, onDirectory = { directory = true },
+                            modifier = Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(8.dp))
                     },
                     contentBackdropModifier = if (liquid && isRuntimeShaderSupported()) Modifier.layerBackdrop(backdrop) else Modifier)
             }
@@ -156,12 +157,12 @@ internal fun ReaderHostScreen(state: ReaderHostState, controller: NovelReaderCon
     if (note) { var body by remember { mutableStateOf("") }; AlertDialog(onDismissRequest = { note = false }, title = { Text("添加阅读笔记") }, text = { OutlinedTextField(body, { body = it.take(2000) }, label = { Text("笔记（绑定当前章节与页码）") }) }, confirmButton = { TextButton(enabled = body.isNotBlank(), onClick = { controller.annotation(body); note = false }) { Text("保存") } }, dismissButton = { TextButton(onClick = { note = false }) { Text("取消") } }) }
 }
 
-/** Composed only by ReaderControls' action slot, so hiding tools also removes their hit targets. */
+/** ReaderScreen composes this original bottom-end overlay only while its controls are visible. */
 @Composable
-internal fun ReaderHostToolbarActions(liquid: Boolean, backdrop: Backdrop, onAnnotations: () -> Unit, onDirectory: () -> Unit) {
+internal fun ReaderHostToolbarActions(liquid: Boolean, backdrop: Backdrop, onAnnotations: () -> Unit, onDirectory: () -> Unit, modifier: Modifier = Modifier) {
     val dark = NovelTheme.colors.background.luminance() < .5f
     CompositionLocalProvider(LocalColorMode provides if (dark) 2 else 1) {
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(modifier, horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
             ReaderHostToolbarButton(NovelIcons.Bookmark, "书签与笔记", liquid, backdrop, onAnnotations)
             ReaderHostToolbarButton(NovelIcons.List, "章节目录", liquid, backdrop, onDirectory)
         }
@@ -180,5 +181,5 @@ private fun ReaderHostToolbarButton(icon: ImageVector, label: String, liquid: Bo
             closedContent = { Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) { Icon(icon, null, tint = NovelTheme.colors.text) } },
             expandedContent = {},
         )
-    } else FilledTonalIconButton(onClick = onClick, modifier = Modifier.size(48.dp)) { Icon(icon, label) }
+    } else FilledTonalIconButton(onClick = onClick) { Icon(icon, label) }
 }

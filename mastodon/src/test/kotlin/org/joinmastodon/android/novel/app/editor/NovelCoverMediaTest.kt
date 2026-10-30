@@ -38,6 +38,7 @@ import okhttp3.mockwebserver.SocketPolicy
 import org.json.JSONObject
 import org.joinmastodon.android.CompatibilityTestApplication
 import org.joinmastodon.android.MastodonApp
+import org.joinmastodon.android.api.CosMediaUpload
 import org.joinmastodon.android.api.session.AccountSession
 import org.joinmastodon.android.api.session.AccountSessionManager
 import org.joinmastodon.android.model.Account
@@ -217,12 +218,94 @@ class NovelCoverMediaTest {
             if (putStage) server.enqueue(MockResponse().setBody(authorization().toString()))
             server.enqueue(MockResponse().setResponseCode(status).setBody("""{"error":"private-token private-signature private-response"}"""))
             val error = runCatching { uploader().upload(file) }.exceptionOrNull()
-            assertTrue(error is IOException); assertTrue(error!!.message!!.contains(status.toString()))
+            assertTrue(error is NovelCoverUploadException); assertTrue(error!!.message!!.contains(status.toString()))
+            val structured = (error as NovelCoverUploadException).failure
+            assertEquals(if (putStage) CosMediaUpload.Stage.PUT else CosMediaUpload.Stage.AUTHORIZE, structured.stage)
+            assertEquals(status, structured.status); assertSame(structured, error.cause)
+            assertEquals(if (status == 401) CosMediaUpload.Category.AUTHENTICATION else CosMediaUpload.Category.PERMISSION, structured.category)
             assertFalse(error.message!!.contains("private-")); assertFalse(error.message!!.contains("test-account-token"))
             assertEquals(before + if (putStage) 2 else 1, server.requestCount)
             assertTrue(file.isFile)
         }
         assertTrue(originals.none { it.url().encodedPath().endsWith("/complete") })
+    }
+
+    @Test fun xml403Html502MalformedAndEmptyBodyKeepExactStageStatusAndSafeUiMessage() = runBlocking {
+        val file = image()
+        for (stage in CosMediaUpload.Stage.values()) for ((status, payload) in listOf(
+            403 to "<Error><Code>SignatureDoesNotMatch</Code><Message>private-token https://secret/?signature</Message><RequestId>xml-request_42</RequestId></Error>",
+            502 to "<html>private-token signed-url gateway failure</html>",
+            502 to "{malformed private-token", 502 to "",
+        )) {
+            val before = server.requestCount
+            if (stage != CosMediaUpload.Stage.AUTHORIZE) server.enqueue(MockResponse().setBody(authorization().toString()))
+            if (stage == CosMediaUpload.Stage.COMPLETE) server.enqueue(MockResponse().setResponseCode(200))
+            server.enqueue(MockResponse().setResponseCode(status).setBody(payload))
+            val error = runCatching { uploader().upload(file) }.exceptionOrNull()
+            assertTrue(error is NovelCoverUploadException)
+            val failure = (error as NovelCoverUploadException).failure
+            assertEquals(stage, failure.stage); assertEquals(status, failure.status); assertSame(failure, error.cause)
+            val label = when (stage) { CosMediaUpload.Stage.AUTHORIZE -> "授权阶段"; CosMediaUpload.Stage.PUT -> "传输阶段"; CosMediaUpload.Stage.COMPLETE -> "完成校验阶段" }
+            assertTrue(error.message!!.contains(label)); assertTrue(error.message!!.contains("HTTP $status"))
+            assertFalse(error.toString().contains("private-token")); assertFalse(error.message!!.contains("https://"))
+            if (status == 403) { assertEquals("SignatureDoesNotMatch", failure.cosCode); assertEquals("xml-request_42", failure.requestId) }
+            assertTrue(file.isFile); assertNotNull(NovelCoverImages.decode(file).also { it.recycle() })
+            assertEquals(before + stage.ordinal + 1, server.requestCount)
+        }
+    }
+
+    @Test fun complete409422502ExposeSafeCategoryAndCodeWithoutLosingCauseOrLocalPixels() = runBlocking {
+        val file = image()
+        for ((status, code, category) in listOf(
+            Triple(409, "upload_expired", CosMediaUpload.Category.EXPIRED),
+            Triple(409, "upload_conflict", CosMediaUpload.Category.CONFLICT),
+            Triple(422, "verification_header_missing", CosMediaUpload.Category.VERIFICATION),
+            Triple(422, "size_mismatch", CosMediaUpload.Category.VERIFICATION),
+            Triple(422, "type_mismatch", CosMediaUpload.Category.VERIFICATION),
+            Triple(502, "cos_head_failed", CosMediaUpload.Category.VERIFICATION),
+        )) {
+            server.enqueue(MockResponse().setBody(authorization().toString())); server.enqueue(MockResponse().setResponseCode(200))
+            server.enqueue(MockResponse().setResponseCode(status).setBody("""{"code":"$code","error":{"token":"private-token"},"request_id":"https://unsafe/signature"}"""))
+            val error = runCatching { uploader().upload(file) }.exceptionOrNull() as NovelCoverUploadException
+            assertEquals(CosMediaUpload.Stage.COMPLETE, error.failure.stage); assertEquals(status, error.failure.status)
+            assertEquals(code, error.failure.code); assertEquals(category, error.failure.category); assertNull(error.failure.requestId)
+            assertTrue(error.message!!.contains("完成校验阶段")); assertTrue(error.message!!.contains("本地图片已保留"))
+            assertFalse(error.toString().contains("private-token")); assertFalse(error.message!!.contains("https://")); assertTrue(file.isFile)
+        }
+    }
+
+    @Test fun malformedSuccessfulAuthorizeAndInvalidCompleteUrlUseStructuredStageNotRawParserMessage() = runBlocking {
+        val file = image()
+        for (payload in listOf("{private-token malformed", "[]", "", "null")) {
+            server.enqueue(MockResponse().setBody(payload))
+            val error = runCatching { uploader().upload(file) }.exceptionOrNull() as NovelCoverUploadException
+            assertEquals(CosMediaUpload.Stage.AUTHORIZE, error.failure.stage); assertEquals(200, error.failure.status)
+            assertEquals(CosMediaUpload.Category.INVALID_RESPONSE, error.failure.category); assertNotNull(error.failure.cause)
+            assertFalse(error.toString().contains("private-token")); assertTrue(file.isFile)
+        }
+        server.enqueue(MockResponse().setBody(authorization().toString())); server.enqueue(MockResponse().setResponseCode(200))
+        server.enqueue(MockResponse().setBody("""{"id":"attachment","type":"image","url":"http://unsafe.example.test/private-token"}"""))
+        val error = runCatching { uploader().upload(file) }.exceptionOrNull() as NovelCoverUploadException
+        assertEquals(CosMediaUpload.Stage.COMPLETE, error.failure.stage); assertEquals(CosMediaUpload.Category.INVALID_RESPONSE, error.failure.category)
+        assertFalse(error.toString().contains("private-token")); assertTrue(file.isFile)
+    }
+
+    @Test fun unsafeTransportCauseRemainsInternalWithoutMessageOrStageRegexParsing() = runBlocking {
+        val file = image(); val underlying = IOException("private-token https://signed-url/?credential HTTP 403")
+        var requests = 0
+        val local = OkHttpClient.Builder().addInterceptor { chain ->
+            if (chain.request().url().encodedPath().endsWith("/authorize")) {
+                requests++
+                okhttp3.Response.Builder().request(chain.request()).protocol(okhttp3.Protocol.HTTP_1_1).code(200).message("OK")
+                    .body(okhttp3.ResponseBody.create(okhttp3.MediaType.get("application/json"), authorization().toString())).build()
+            } else { requests++; throw underlying }
+        }.build()
+        try {
+            val error = runCatching { NovelCoverUpload.forTests("api.example.test", "fixture-token", authority(), local).upload(file) }.exceptionOrNull() as NovelCoverUploadException
+            assertEquals(2, requests); assertEquals(CosMediaUpload.Stage.PUT, error.failure.stage); assertEquals(0, error.failure.status)
+            assertEquals(CosMediaUpload.Category.NETWORK, error.failure.category); assertSame(underlying, error.failure.cause)
+            assertFalse(error.toString().contains("private-token")); assertFalse(error.message!!.contains("403")); assertTrue(file.isFile)
+        } finally { local.connectionPool().evictAll(); local.dispatcher().executorService().shutdownNow() }
     }
 
     @Test fun redirectsAndMissingSignedHeaderContractStopBeforePutOrCompletion() = runBlocking {
@@ -250,7 +333,7 @@ class NovelCoverMediaTest {
             assertTrue(server.takeRequest(5, TimeUnit.SECONDS)!!.path!!.endsWith("/authorize"))
             assertEquals("PUT", server.takeRequest(5, TimeUnit.SECONDS)!!.method)
             val put = calls.last()
-            if (logout == 0) pending.cancelAndJoin()
+            if (logout == 0) { pending.cancelAndJoin(); assertTrue(pending.isCancelled); assertTrue(runCatching { pending.await() }.exceptionOrNull() is kotlinx.coroutines.CancellationException) }
             else {
                 NovelAccountDataCleaner.invalidate(account)
                 val error = withTimeout(5000) { pending.await() }.exceptionOrNull()

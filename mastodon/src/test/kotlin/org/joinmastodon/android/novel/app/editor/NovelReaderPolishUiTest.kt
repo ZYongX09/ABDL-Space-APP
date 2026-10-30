@@ -6,12 +6,20 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.os.SystemClock
 import android.view.MotionEvent
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.Icon
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.LocalSaveableStateRegistry
 import androidx.compose.runtime.saveable.SaveableStateRegistry
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Rect
@@ -29,6 +37,7 @@ import androidx.lifecycle.ViewModelStore
 import kotlinx.coroutines.Dispatchers
 import org.joinmastodon.android.CompatibilityTestApplication
 import org.joinmastodon.android.novel.app.NovelScreenshotFixture
+import org.joinmastodon.android.novel.app.design.NovelIcons
 import org.joinmastodon.noveleditor.NovelEditorStorage
 import org.joinmastodon.reader.domain.BookFormat
 import org.joinmastodon.reader.domain.ReaderBook
@@ -73,6 +82,7 @@ class NovelReaderPolishUiTest {
 
     private data class ActualPage(val node: SemanticsNode, val layout: TextLayoutResult) {
         val text get() = layout.layoutInput.text.text
+        val bounds = node.boundsInWindow
     }
 
     private fun currentPage(source: String = content): ActualPage? = compose.nodes(unmerged = true).mapNotNull { node ->
@@ -109,23 +119,75 @@ class NovelReaderPolishUiTest {
         }
     }
 
+    private fun pagerNode(): SemanticsNode = compose.nodes().single {
+        it.config.getOrNull(SemanticsActions.ScrollToIndex)?.action != null
+    }
+
+    private fun assertNoPaginationSpinner() {
+        assertFalse("Toolbar gestures must not recreate pagination or flash its spinner", compose.nodes().any {
+            it.config.getOrNull(SemanticsProperties.ProgressBarRangeInfo) != null
+        })
+    }
+
+    private fun dispatchTouch(down: Long, time: Long, action: Int, x: Float, y: Float) {
+        val event = MotionEvent.obtain(down, time, action, x, y, 0)
+        try { assertTrue(compose.activity.window.decorView.dispatchTouchEvent(event)) } finally { event.recycle() }
+        compose.settle(frames = 1)
+        assertNoPaginationSpinner()
+    }
+
     private fun tapBody(page: ActualPage = awaitPage()) {
         val bounds = page.node.boundsInWindow
-        val x = ((maxOf(bounds.left, 0f) + minOf(bounds.right, compose.viewport().first.toFloat())) / 2)
-        val y = ((maxOf(bounds.top, 0f) + minOf(bounds.bottom, compose.viewport().second.toFloat())) / 2)
+        val x = (maxOf(bounds.left, 0f) + minOf(bounds.right, compose.viewport().first.toFloat())) / 2
+        // Below the top overlay and above the bottom-end host actions, even on a short final page.
+        val pager = pagerNode().boundsInWindow
+        val y = maxOf((maxOf(bounds.top, 0f) + minOf(bounds.bottom, compose.viewport().second.toFloat())) / 2,
+            pager.top + pager.height * .55f).coerceAtMost(pager.bottom - 80f)
         val down = SystemClock.uptimeMillis()
-        for ((action, time) in listOf(MotionEvent.ACTION_DOWN to down, MotionEvent.ACTION_UP to down + 80)) {
-            val event = MotionEvent.obtain(down, time, action, x, y, 0)
-            try { compose.activity.window.decorView.dispatchTouchEvent(event) } finally { event.recycle() }
-            compose.settle(frames = 2)
-        }
+        dispatchTouch(down, down, MotionEvent.ACTION_DOWN, x, y)
+        compose.settle(frames = 4)
+        dispatchTouch(down, down + 80, MotionEvent.ACTION_UP, x, y)
         compose.settle()
+        assertNoPaginationSpinner()
+    }
+
+    private fun swipeBody(forward: Boolean) {
+        val bounds = pagerNode().boundsInWindow
+        val start = bounds.left + bounds.width * if (forward) .85f else .15f
+        val end = bounds.left + bounds.width * if (forward) .15f else .85f
+        val y = bounds.top + bounds.height * .6f
+        val down = SystemClock.uptimeMillis()
+        dispatchTouch(down, down, MotionEvent.ACTION_DOWN, start, y)
+        repeat(12) { step ->
+            val fraction = (step + 1) / 12f
+            dispatchTouch(down, down + (step + 1) * 16L, MotionEvent.ACTION_MOVE, start + (end - start) * fraction, y)
+        }
+        dispatchTouch(down, down + 208, MotionEvent.ACTION_UP, end, y)
+        compose.settle(frames = 100)
+        assertNoPaginationSpinner()
     }
 
     private fun scrollToPage(index: Int) {
-        val pager = compose.nodes().first { it.config.getOrNull(SemanticsActions.ScrollToIndex)?.action != null }
-        assertTrue(requireNotNull(pager.config[SemanticsActions.ScrollToIndex].action).invoke(index))
+        assertTrue(requireNotNull(pagerNode().config[SemanticsActions.ScrollToIndex].action).invoke(index))
         compose.settle()
+    }
+
+    private fun assertSameReadingSurface(before: ActualPage, after: ActualPage, pagerId: Int, pagerBounds: Rect) {
+        assertEquals("Toolbar visibility must not change the source range", before.text, after.text)
+        assertEquals("Toolbar visibility must not change the text's pixel viewport", before.layout.layoutInput.constraints, after.layout.layoutInput.constraints)
+        assertEquals("The same page Text stays composed", before.node.id, after.node.id)
+        assertEquals("Text keeps its original placement", before.bounds, after.bounds)
+        assertEquals("Do not recreate the Pager when tools toggle", pagerId, pagerNode().id)
+        assertEquals("Pager keeps the original full-width bounds", pagerBounds, pagerNode().boundsInWindow)
+        assertNoPaginationSpinner()
+    }
+
+    private fun assertFullWidthPager(page: ActualPage, expectedBounds: Rect) {
+        assertEquals("Pager must span the original safe reading surface, not its padded text area", expectedBounds, pagerNode().boundsInWindow)
+        assertEquals(expectedBounds.left + 28f, page.node.boundsInWindow.left, .5f)
+        assertEquals(expectedBounds.top + 18f, page.node.boundsInWindow.top, .5f)
+        assertEquals(expectedBounds.width - 56f, page.layout.layoutInput.constraints.maxWidth.toFloat(), .5f)
+        assertEquals(expectedBounds.height - 36f, page.layout.layoutInput.constraints.maxHeight.toFloat(), .5f)
     }
 
     @Test fun renderedPageKeepsItsSourceAnchorAcrossFontScaleLineHeightPaddingAndViewportRoundTrips() {
@@ -189,6 +251,7 @@ class NovelReaderPolishUiTest {
     }
 
     @Test fun productionHostActionsOnlyExistInVisibleToolbarAndDirectoryOpensFromItsActualButton() {
+        val legacyMaterialGeometry = renderOriginalMaterialActionsGeometry()
         val app = compose.activity.application
         val work = NovelEditorStorage(app, account).use { storage ->
             storage.createWork(book.title, "测试", "fiction").also { storage.checkpoint(it.chapterId(), content, 0, 0, 0, true) }
@@ -201,13 +264,17 @@ class NovelReaderPolishUiTest {
             ReaderHostScreen(state, controller) {}
         }
         val hidden = awaitPage()
+        val pager = pagerNode()
+        val pagerBounds = pager.boundsInWindow
+        assertFullWidthPager(hidden, Rect(0f, 0f, compose.viewport().first.toFloat(), compose.viewport().second.toFloat()))
         compose.onNodeWithContentDescription("书签与笔记").assertDoesNotExist()
         compose.onNodeWithContentDescription("章节目录").assertDoesNotExist()
         tapBody(hidden)
         val shown = awaitPage()
         compose.onNodeWithContentDescription("书签与笔记").assertIsDisplayed().assertHasClickAction()
         compose.onNodeWithContentDescription("章节目录").assertIsDisplayed().assertHasClickAction()
-        assertActionsAboveBody(shown)
+        assertSameReadingSurface(hidden, shown, pager.id, pagerBounds)
+        assertActionsAtOriginalBottomEnd(legacyMaterialGeometry)
         captureNative("reader-toolbar-light-393x852")
         compose.onNodeWithContentDescription("章节目录").performClick()
         compose.assertDialogShowing()
@@ -223,19 +290,26 @@ class NovelReaderPolishUiTest {
         fixture.show(compose) {
             val backdrop = rememberLayerBackdrop()
             ReaderScreen(book, listOf(chapter),
-                toolbarActions = { ReaderHostToolbarActions(true, backdrop, { annotations++ }, { directory++ }) },
+                toolbarActions = {
+                    ReaderHostToolbarActions(true, backdrop, { annotations++ }, { directory++ },
+                        Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(8.dp))
+                },
                 contentBackdropModifier = Modifier.onGloballyPositioned { contentBounds = it.boundsInRoot() }
                     .drawWithContent { drawContent(); contentDraws++ },
                 onBack = {})
         }
         val initial = awaitPage()
-        val fullHeight = contentBounds.height
-        assertTrue(fullHeight > 0)
+        val initialContentBounds = contentBounds
+        val pager = pagerNode()
+        val pagerBounds = pager.boundsInWindow
+        assertTrue(initialContentBounds.height > 0)
+        assertFullWidthPager(initial, initialContentBounds)
         compose.onNodeWithContentDescription("章节目录").assertDoesNotExist()
         tapBody(initial)
         val visible = awaitPage()
-        assertTrue(contentBounds.height < fullHeight)
-        assertActionsAboveBody(visible, contentBounds)
+        assertEquals("Overlay tools must not shrink the text/backdrop viewport", initialContentBounds, contentBounds)
+        assertSameReadingSurface(initial, visible, pager.id, pagerBounds)
+        assertActionsAtOriginalBottomEnd()
         compose.onNodeWithContentDescription("书签与笔记").performClick()
         compose.onNodeWithContentDescription("章节目录").performClick()
         assertEquals(1, annotations); assertEquals(1, directory)
@@ -243,10 +317,47 @@ class NovelReaderPolishUiTest {
         captureNative("reader-glass-component-api28-fallback-393x852")
         assertTrue("The content-only backdrop modifier must actually draw", contentDraws > 0)
         tapBody(visible)
-        awaitPage()
+        val hiddenAgain = awaitPage()
         compose.onNodeWithContentDescription("书签与笔记").assertDoesNotExist()
         compose.onNodeWithContentDescription("章节目录").assertDoesNotExist()
-        assertEquals(fullHeight, contentBounds.height, .5f)
+        assertEquals(initialContentBounds, contentBounds)
+        assertSameReadingSurface(initial, hiddenAgain, pager.id, pagerBounds)
+    }
+
+    @Test fun fullWidthPagerTouchSwipesKeepConsecutiveSourcePagesAcrossToolbarToggles() {
+        val reports = mutableListOf<Int>()
+        fixture.show(compose) {
+            ReaderScreen(book, listOf(chapter), onPositionChanged = { reports += it.pageIndex }, onBack = {})
+        }
+        val first = awaitPage()
+        val pager = pagerNode()
+        val pagerBounds = pager.boundsInWindow
+        assertFullWidthPager(first, Rect(0f, 0f, compose.viewport().first.toFloat(), compose.viewport().second.toFloat()))
+        assertEquals(0, content.indexOf(first.text))
+        assertEquals(0, reports.last())
+        tapBody(first)
+        assertSameReadingSurface(first, awaitPage(), pager.id, pagerBounds)
+        compose.onNodeWithText("设置").assertIsDisplayed()
+        swipeBody(forward = true)
+        val second = awaitPage { it.text != first.text && reports.lastOrNull() == 1 }
+        assertEquals("A real swipe advances to the next contiguous source range", first.text.length, content.indexOf(second.text))
+        compose.onNodeWithText("设置").assertIsDisplayed()
+        tapBody(second)
+        val hidden = awaitPage()
+        assertSameReadingSurface(second, hidden, pager.id, pagerBounds)
+        compose.onNodeWithText("设置").assertDoesNotExist()
+        swipeBody(forward = true)
+        val third = awaitPage { it.text != second.text && reports.lastOrNull() == 2 }
+        assertEquals(content.indexOf(second.text) + second.text.length, content.indexOf(third.text))
+        assertTrue("Rendered pages must concatenate an exact prefix of the unmodified Unicode source",
+            content.startsWith(first.text + second.text + third.text))
+        swipeBody(forward = false)
+        assertEquals(second.text, awaitPage { it.text == second.text && reports.lastOrNull() == 1 }.text)
+        swipeBody(forward = false)
+        assertEquals(first.text, awaitPage { it.text == first.text && reports.lastOrNull() == 0 }.text)
+        assertEquals(listOf(0, 1, 2, 1, 0), reports)
+        assertEquals(pager.id, pagerNode().id)
+        assertEquals(pagerBounds, pagerNode().boundsInWindow)
     }
 
     @Test fun legacyTrailingBackLambdaAndDefaultSlotsStillRenderAndInvokeBack() {
@@ -260,16 +371,66 @@ class NovelReaderPolishUiTest {
         compose.onNodeWithContentDescription("章节目录").assertDoesNotExist()
     }
 
-    private fun assertActionsAboveBody(page: ActualPage, contentBounds: Rect? = null) {
-        val actions = compose.nodes().filter { node ->
-            node.config.getOrNull(SemanticsProperties.ContentDescription)?.any { it == "章节目录" || it == "书签与笔记" } == true
+    private data class ActionGeometry(val visual: Rect, val touch: Rect)
+
+    private fun actionNodes() = compose.nodes().filter { node ->
+        node.config.getOrNull(SemanticsProperties.ContentDescription)?.any { it == "章节目录" || it == "书签与笔记" } == true
+    }.sortedBy { it.boundsInRoot.left }
+
+    private fun actionGeometry() = actionNodes().map { ActionGeometry(it.boundsInRoot, it.touchBoundsInRoot) }
+
+    /** Render the exact 96ea7b45 Row/default Material buttons in the same attached native fixture.
+     * A default button draws 40dp inside a 48dp touch slot: visual end/bottom are 12dp, not 8dp.
+     * Compare both rectangles exactly; do not shift production placement to satisfy visual semantics.
+     */
+    private fun renderOriginalMaterialActionsGeometry(): List<ActionGeometry> {
+        fixture.show(compose) {
+            Box(Modifier.fillMaxSize()) {
+                Row(Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(8.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    FilledTonalIconButton(onClick = {}) { Icon(NovelIcons.Bookmark, "书签与笔记") }
+                    FilledTonalIconButton(onClick = {}) { Icon(NovelIcons.List, "章节目录") }
+                }
+            }
         }
+        val (width, height) = compose.viewport()
+        val expectedTouch = listOf(
+            Rect(width - 108f, height - 56f, width - 60f, height - 8f),
+            Rect(width - 56f, height - 56f, width - 8f, height - 8f),
+        )
+        val expected = expectedTouch.map { touch -> ActionGeometry(
+            Rect(touch.left + 4f, touch.top + 4f, touch.right - 4f, touch.bottom - 4f), touch,
+        ) }
+        return actionGeometry().also {
+            assertEquals("Original Material defaults must render 40dp visuals centered in the old 48dp slots", expected, it)
+        }
+    }
+
+    private fun assertActionsAtOriginalBottomEnd(legacyMaterialGeometry: List<ActionGeometry>? = null) {
+        val actions = actionNodes()
         assertEquals(2, actions.size)
-        actions.forEach { node ->
-            assertTrue("Host action must stay above the actual body, never float over its text", node.boundsInWindow.bottom <= page.node.boundsInWindow.top)
-            contentBounds?.let { assertTrue(node.boundsInRoot.bottom <= it.top) }
-            assertTrue("Minimum 48dp reader action target", node.boundsInWindow.width >= 48f && node.boundsInWindow.height >= 48f)
+        val (width, height) = compose.viewport()
+        val geometry = actionGeometry()
+        assertEquals(listOf("书签与笔记"), actions[0].config[SemanticsProperties.ContentDescription])
+        assertEquals(listOf("章节目录"), actions[1].config[SemanticsProperties.ContentDescription])
+        if (legacyMaterialGeometry != null) {
+            assertEquals("Production Material visuals AND touch slots must match the actual old Row render exactly", legacyMaterialGeometry, geometry)
+        } else {
+            // Glass has a 48dp visual container, unlike the default Material button's 40dp visual.
+            assertEquals(width - 8f, geometry[1].visual.right, 0f)
+            assertEquals(height - 8f, geometry[1].visual.bottom, 0f)
+            assertEquals(4f, geometry[1].visual.left - geometry[0].visual.right, 0f)
         }
+        assertEquals("Keep the old 8dp touch-slot end padding", width - 8f, geometry[1].touch.right, 0f)
+        assertEquals("Keep the old 8dp touch-slot bottom padding", height - 8f, geometry[1].touch.bottom, 0f)
+        assertEquals("Keep the old 4dp spacing between touch slots", 4f, geometry[1].touch.left - geometry[0].touch.right, 0f)
+        geometry.forEach {
+            assertEquals("Exactly 48dp reader touch target width", 48f, it.touch.width, 0f)
+            assertEquals("Exactly 48dp reader touch target height", 48f, it.touch.height, 0f)
+        }
+        val title = compose.nodes(unmerged = true).single { node ->
+            node.config.getOrNull(SemanticsProperties.Text)?.singleOrNull()?.text == book.title
+        }
+        assertEquals("Host actions must not crowd the original centered title row", width / 2f, title.boundsInWindow.center.x, .5f)
     }
 
     private fun captureNative(name: String) {
@@ -282,7 +443,7 @@ class NovelReaderPolishUiTest {
             val samples = buildList { for (y in 0 until bitmap.height step 5) for (x in 0 until bitmap.width step 5) add(bitmap.getPixel(x, y)) }
             assertTrue("Require actual native text/icon rasterization, not a blank page", samples.distinct().size > 24)
             val directory = File(System.getProperty("readerRenderDir")
-                ?: "/home/ZYongX/.local/share/abdl-novel-polish-20261029/android-ui-renders/reader")
+                ?: "/home/ZYongX/.local/share/abdl-novel-reader-upload-20261030/android-ui-renders/reader")
             assertTrue(directory.isDirectory || directory.mkdirs())
             val file = File(directory, "$name.png")
             file.outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }

@@ -70,10 +70,15 @@ fun PagedReader(
 	var anchor by rememberSaveable(chapter.id, chapter.content) { mutableIntStateOf(-1) }
 	BoxWithConstraints(
 		modifier.fillMaxSize().background(settings.palette.background)
-			.pointerInput(chapter.id) { detectTapGestures(onTap = { toggleControls() }) }
-			.padding(horizontal = settings.horizontalPadding.dp, vertical = 18.dp),
+			.pointerInput(chapter.id) { detectTapGestures(onTap = { toggleControls() }) },
 	) {
-		val viewport = Constraints(maxWidth = constraints.maxWidth, maxHeight = constraints.maxHeight)
+		// Measure the page's inner text area, but keep the Pager itself full-width as before.
+		val horizontalPaddingPx = with(density) { settings.horizontalPadding.dp.roundToPx() }
+		val verticalPaddingPx = with(density) { 18.dp.roundToPx() }
+		val viewport = Constraints(
+			maxWidth = (constraints.maxWidth - horizontalPaddingPx * 2).coerceAtLeast(0),
+			maxHeight = (constraints.maxHeight - verticalPaddingPx * 2).coerceAtLeast(0),
+		)
 		if (viewport.maxWidth <= 0 || viewport.maxHeight <= 0) return@BoxWithConstraints
 		// Recreate only the measured layout/pager, NEVER the saved source anchor. LocalDensity
 		// (including fontScale) is part of rememberTextMeasurer's identity.
@@ -105,7 +110,7 @@ fun PagedReader(
 				}
 				HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
 					val range = readyPages[page]
-					Box(Modifier.fillMaxSize()) {
+					Box(Modifier.fillMaxSize().padding(horizontal = settings.horizontalPadding.dp, vertical = 18.dp)) {
 						Text(
 							text = chapter.content.substring(range.start, range.end),
 							color = settings.palette.text,

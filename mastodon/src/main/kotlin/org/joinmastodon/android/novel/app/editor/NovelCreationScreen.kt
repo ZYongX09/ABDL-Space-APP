@@ -64,12 +64,14 @@ internal fun NovelCreationScreen(state: NovelEditorState, controller: NovelEdito
                         IconButton(onClick = controller::undo, enabled = state.canUndo && !state.busy) { Icon(NovelIcons.Undo2, "撤销") }
                         IconButton(onClick = controller::redo, enabled = state.canRedo && !state.busy) { Icon(NovelIcons.Redo2, "重做") }
                         IconButton(onClick = { controller.insert("\n\n　　") }, enabled = !state.busy) { Icon(NovelIcons.Pilcrow, "新段落并缩进") }
-                        Text(if (state.saving) "保存中" else if (state.dirty) "10秒本机保存" else "已存本机", maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis, fontSize = 11.sp, color = NovelTheme.colors.textSecondary, modifier = Modifier.weight(1f))
+                        if (state.saving || state.dirty) Text(if (state.saving) "保存中" else "10秒本机保存", maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis, fontSize = 11.sp, color = NovelTheme.colors.textSecondary, modifier = Modifier.weight(1f))
+                        else Spacer(Modifier.weight(1f))
                         IconButton(onClick = controller::saveExplicit, enabled = !state.busy) { Icon(NovelIcons.CheckCheck, "保存草稿") }
                     }
                 } else Column(Modifier.fillMaxWidth().background(NovelTheme.colors.background).navigationBarsPadding().padding(horizontal = 20.dp, vertical = 8.dp)) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text(if (state.saving) "正在保存本机…" else if (state.dirty) "有未保存修改 · 每 10 秒本地保存" else "已保存到本机", fontSize = 11.sp, color = NovelTheme.colors.textSecondary, modifier = Modifier.weight(1f))
+                        if (state.saving || state.dirty) Text(if (state.saving) "正在保存本机…" else "有未保存修改 · 每 10 秒本地保存", fontSize = 11.sp, color = NovelTheme.colors.textSecondary, modifier = Modifier.weight(1f))
+                        else Spacer(Modifier.weight(1f))
                         TextButton(onClick = { controller.preview(onPreview) }, enabled = !state.busy) { Icon(NovelIcons.Eye, null, Modifier.size(17.dp)); Text(" 预览") }
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {

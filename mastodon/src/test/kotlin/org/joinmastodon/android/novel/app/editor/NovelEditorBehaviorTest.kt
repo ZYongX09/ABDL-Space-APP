@@ -81,6 +81,22 @@ class NovelEditorBehaviorTest {
         assertEquals("下个固定周期18", stored(work.chapterId()).content()); assertTrue(api.requests.isEmpty())
     }
 
+    @Test fun explicitSaveNeverAddsAPersistentSuccessNoticeOrUploads() {
+        val work = work(); val model = open(work)
+        edit(model, "手动保存的完整本机正文")
+        model.saveExplicit(); drain()
+        assertEquals("手动保存的完整本机正文", stored(work.chapterId()).content())
+        assertFalse(model.state.value.dirty)
+        assertNull(model.state.value.notice)
+        model.saveExplicit(); drain()
+        assertNull("Saving an unchanged draft must not add a banner", model.state.value.notice)
+        edit(model, "继续写作仍不显示保存成功横幅")
+        main.advanceTimeBy(10_000); drain()
+        assertEquals("继续写作仍不显示保存成功横幅", stored(work.chapterId()).content())
+        assertNull(model.state.value.notice)
+        assertTrue(api.requests.isEmpty())
+    }
+
     @Test fun inputWhileManualSaveIsInFlightIsNotDiscardedAndBarrierPersistsNewestFrame() {
         val work = work(); val model = open(work); edit(model, "第一次输入")
         model.saveExplicit(); main.runCurrent() // suspended at actual SQLite IO dispatch
@@ -105,8 +121,11 @@ class NovelEditorBehaviorTest {
         model.openChapter(second); drain(); assertEquals(work.chapterId(), model.state.value.chapterId); assertEquals(expected, model.state.value.frame)
         var left = false; model.leaveEditor { left = true }; drain(); assertFalse(left); assertEquals("editor", model.state.value.page)
         val restarted = open(work); assertEquals(expected, restarted.state.value.frame); assertTrue(restarted.state.value.dirty)
+        val recoveryNotice = restarted.state.value.notice
+        assertEquals("已恢复未完成保存的本机文稿；请检查并保存", recoveryNotice)
         NovelEditorStorage(app, account).use { it.writableDatabase.execSQL("DROP TRIGGER reject_editor_save") }
         restarted.saveExplicit(); drain(); assertEquals(expected.body(), stored(work.chapterId()).content()); assertEquals(expected.start(), stored(work.chapterId()).selectionStart()); assertFalse(restarted.state.value.dirty)
+        assertEquals("Removing save-success banners must not consume a recovery notice", recoveryNotice, restarted.state.value.notice)
         restarted.openChapter(second); drain(); assertEquals(second, restarted.state.value.chapterId)
         assertTrue(api.requests.isEmpty())
     }
