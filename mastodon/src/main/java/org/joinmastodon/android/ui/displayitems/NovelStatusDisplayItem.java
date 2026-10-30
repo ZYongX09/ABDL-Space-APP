@@ -177,7 +177,7 @@ public final class NovelStatusDisplayItem extends StatusDisplayItem{
 			header.setVisibility(available && !link ? View.VISIBLE : View.GONE);badge.setText(update ? R.string.novel_card_update : R.string.novel_card_new_book);
 			headerIcon.setImageResource(update ? R.drawable.ic_novel_pen_line : R.drawable.ic_novel_book_open);
 			title.setText(available ? data.title : wrapper.getContext().getString(R.string.novel_card_unavailable));title.setTextSize(link ? 18 : 20);
-			String authorName=available ? (TextUtils.isEmpty(data.author.displayName) ? data.author.username : data.author.displayName) : "";
+			String authorName=available ? data.getDisplayAuthorName() : "";
 			bind(author,available && link ? authorName+" 著" : null);
 			String type=available ? switch(data.workType==null ? "" : data.workType){case "original" -> "原创";case "repost" -> "授权转载";case "ai" -> "AI 辅助";default -> "作品";} : "";
 			String status=available ? (data.completed ? "已完结" : "连载中") : "";
@@ -210,10 +210,8 @@ public final class NovelStatusDisplayItem extends StatusDisplayItem{
 		}
 		private void read(){
 			if(bound==null || !bound.attachment.isDisplayable()) return;
-			// LINK delegates progress/first-chapter resolution to the reader. Automatic updates start at their first updated chapter.
-			String chapter=bound.presentation==Presentation.LINK ? null : bound.attachment.firstChapterId;
-			if(chapter==null && bound.presentation!=Presentation.LINK && bound.attachment.chapters!=null && !bound.attachment.chapters.isEmpty()) chapter=bound.attachment.chapters.get(0).id;
-			openReader(wrapper.getContext(),bound.accountID,bound.attachment.workId,chapter);
+			if(bound.presentation==Presentation.LINK) openReader(wrapper.getContext(),bound.accountID,bound.attachment.workId,null);
+			else openDetail(wrapper.getContext(),bound.accountID,bound.attachment.workId);
 		}
 		private void toggleShelf(){
 			NovelStatusDisplayItem current=bound; if(current==null || !current.attachment.isDisplayable() || !shelf.isEnabled())return;

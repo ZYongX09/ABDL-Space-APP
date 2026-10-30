@@ -17,7 +17,7 @@ import org.joinmastodon.android.novel.app.design.NovelIcons
 import org.joinmastodon.android.novel.app.design.NovelTheme
 import org.joinmastodon.android.novel.app.models.Work
 
-@Composable internal fun NovelShelfScreen(state: NovelAppState, vm: NovelAppViewModel, onBack: () -> Unit, onRead: (Work, String?) -> Unit, onPrivateLibrary: () -> Unit) {
+@Composable internal fun NovelShelfScreen(state: NovelAppState, vm: NovelAppViewModel, onBack: () -> Unit, onRead: (Work, String?) -> Unit) {
     var managing by remember { mutableStateOf(false) }
     var menu by remember { mutableStateOf(false) }
     val shelf = state.shelf.value
@@ -26,7 +26,6 @@ import org.joinmastodon.android.novel.app.models.Work
             NovelHeader("书架", onBack, "收藏喜欢的故事，留住阅读的片刻") {
                 NovelIconButton(NovelIcons.Search, "搜索小说", { vm.navigate(NovelPage.Search) })
                 Box { NovelIconButton(NovelIcons.MoreHorizontal, "书架更多", { menu = true }); DropdownMenu(menu, { menu = false }) {
-                    DropdownMenuItem(text = { Text("私人书库") }, onClick = { menu = false; onPrivateLibrary() })
                     DropdownMenuItem(text = { Text("刷新书架") }, onClick = { menu = false; vm.refresh() })
                 } }
             }
@@ -41,7 +40,7 @@ import org.joinmastodon.android.novel.app.models.Work
                         NovelBookCover(work, width = 78.dp)
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             NovelHeading(work.title, size = 23)
-                            Text("${work.author.name} / ${work.typeLabel}", color = NovelTheme.colors.textSecondary, fontSize = 11.sp)
+                            Text("${work.displayAuthorName} / ${work.typeLabel}", color = NovelTheme.colors.textSecondary, fontSize = 11.sp)
                             Text(work.chapters.firstOrNull { it.id == work.progress?.chapterId }?.title ?: "继续上次的章节", color = NovelTheme.colors.text, fontSize = 12.sp)
                             LinearProgressIndicator(progress = { ((work.progress?.percent ?: 0.0) / 100.0).toFloat().coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth().height(3.dp), color = NovelTheme.colors.primary, trackColor = NovelTheme.colors.outline)
                         }
@@ -72,13 +71,5 @@ import org.joinmastodon.android.novel.app.models.Work
             }
         }
         item { NovelLoadState(state.shelf, state.shelfItems.isEmpty(), if (state.shelfFilter == "all") "书架还是空的" else "这个分类下暂无作品", vm::refresh) }
-        item {
-            NovelRule()
-            Row(Modifier.fillMaxWidth().padding(vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(NovelIcons.Library, null, tint = NovelTheme.colors.primary, modifier = Modifier.size(20.dp))
-                Text("本机与云端私人书库", color = NovelTheme.colors.textSecondary, fontSize = 12.sp, modifier = Modifier.weight(1f).padding(horizontal = 10.dp))
-                NovelLink("进入  ›", onPrivateLibrary)
-            }
-        }
     }
 }

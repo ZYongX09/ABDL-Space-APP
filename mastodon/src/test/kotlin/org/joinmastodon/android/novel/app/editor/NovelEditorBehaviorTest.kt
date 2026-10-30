@@ -181,6 +181,79 @@ class NovelEditorBehaviorTest {
         assertEquals("pending", repo.local { it.appSubmission(id).state() })
     }
 
+    @Test fun originalAuthorValidationAndWorkProjectionNeverUseTheUploaderAsTheRepostAuthor() {
+        val repost = NovelMetadata("转载", "简介", type = "repost", source = "来源", authorization = "已授权", accepted = true)
+        assertThrows(IllegalArgumentException::class.java) { repost.validate() }
+        assertThrows(IllegalArgumentException::class.java) { repost.copy(originalAuthor = "   ").validate() }
+        assertThrows(IllegalArgumentException::class.java) { repost.copy(originalAuthor = "作".repeat(121)).validate() }
+        repost.copy(originalAuthor = "作".repeat(120)).validate()
+        val work = org.joinmastodon.android.novel.app.NovelAppTestFixtures.work(type = "repost").copy(originalAuthor = "真正原作者")
+        val projected = NovelMetadata.fromWork(work)
+        assertEquals("真正原作者", projected.originalAuthor)
+        assertNotEquals(work.author.name, projected.originalAuthor)
+        assertEquals(projected, NovelMetadata.from(JSONObject(projected.json().toString())))
+        assertFalse(projected.coverPending)
+    }
+
+    @Test fun legacyCoverPendingInfersOnlyAnUnuploadedLocalFileAndExplicitFlagsRoundTrip() {
+        val base = NovelMetadata("旧稿", "简介", accepted = true).json().apply { remove("local_cover_pending"); remove("original_author") }
+        assertFalse(NovelMetadata.from(base).coverPending)
+        assertEquals("", NovelMetadata.from(base).originalAuthor)
+        base.put("local_cover", "/private/cover.jpg")
+        assertTrue(NovelMetadata.from(base).coverPending)
+        base.put("cover_url", "https://media.example.test/old.jpg")
+        assertFalse(NovelMetadata.from(base).coverPending)
+        base.put("local_cover_pending", true)
+        assertTrue(NovelMetadata.from(base).coverPending)
+        val roundTrip = NovelMetadata.from(JSONObject(NovelMetadata.from(base).json().toString()))
+        assertTrue(roundTrip.coverPending)
+        assertEquals("https://media.example.test/old.jpg", roundTrip.coverUrl)
+    }
+
+    @Test fun sqliteMetadataFreezeOmitsLocalFieldsAndOnlyOmitsEmptyOriginalAndAiAuthors() = runTest {
+        val repo = NovelEditorRepository(app, account, api, StandardTestDispatcher(testScheduler))
+        for ((type, author) in listOf("original" to "", "ai" to "", "repost" to "原作者", "original" to "保留署名")) {
+            val metadata = NovelMetadata("测试$type", "简介", type = type, originalAuthor = author,
+                source = "来源", authorization = "授权", accepted = true, coverUrl = "https://media.example.test/cover.png",
+                localCover = "/private/cover.png", coverPending = false)
+            val id = repo.create(metadata)
+            val restarted = NovelEditorRepository(app, account, api, StandardTestDispatcher(testScheduler))
+            assertEquals(metadata, restarted.directory(id).metadata)
+            val selected = restarted.directory(id).structure.chapters().first().id()
+            restarted.local { it.checkpoint(selected, "供元资料冻结回归使用的真实正文", 1, 3, 17, true) }
+            val frozen = restarted.prepare(id, listOf(selected))
+            val payload = JSONObject(restarted.local { it.appSubmission(frozen).metadata() })
+            assertFalse(payload.has("accepted"))
+            assertFalse(payload.has("local_cover")); assertFalse(payload.has("local_cover_pending"))
+            assertTrue(payload.keys().asSequence().none { it.startsWith("local_") })
+            assertEquals(type == "repost" || author.isNotEmpty(), payload.has("original_author"))
+            if (payload.has("original_author")) assertEquals(author, payload.getString("original_author"))
+            assertEquals("https://media.example.test/cover.png", payload.getString("cover_url"))
+        }
+        assertTrue(api.requests.isEmpty())
+    }
+
+    @Test fun pendingReplacementWithOldRemoteUrlBlocksFreezingAndCoverOnlySavePreservesOtherMetadata() = runTest {
+        val repo = NovelEditorRepository(app, account, api, StandardTestDispatcher(testScheduler))
+        val metadata = NovelMetadata("旧转载", "简介", type = "repost", originalAuthor = "旧作者", source = "来源", authorization = "授权", accepted = true,
+            localCover = "/private/old.png", coverUrl = "https://media.example.test/old.png", coverPending = false)
+        val id = repo.create(metadata)
+        repo.saveCover(id, metadata.copy(title = "不可偷存的未完成表单", originalAuthor = "", localCover = "/private/new.jpg", coverPending = true))
+        val saved = repo.directory(id).metadata
+        assertEquals(metadata.title, saved.title); assertEquals("旧作者", saved.originalAuthor)
+        assertEquals("https://media.example.test/old.png", saved.coverUrl); assertTrue(saved.coverPending)
+        val chapter = repo.directory(id).structure.chapters().single().id()
+        repo.local { it.checkpoint(chapter, "封面待上传时也不可提交的完整正文", 2, 5, 31, true) }
+        val blocked = runCatching { repo.prepare(id, listOf(chapter)) }.exceptionOrNull()
+        assertTrue(blocked is IllegalArgumentException)
+        assertTrue(requireNotNull(blocked).message.orEmpty().contains("封面"))
+        assertNull(repo.local { it.pendingAppSubmission(id) })
+        repo.saveCover(id, saved.copy(coverUrl = "https://media.example.test/new.jpg", coverPending = false))
+        val frozen = repo.prepare(id, listOf(chapter))
+        assertEquals("https://media.example.test/new.jpg", JSONObject(repo.local { it.appSubmission(frozen).metadata() }).getString("cover_url"))
+        assertTrue(api.requests.isEmpty())
+    }
+
     @Test fun logoutInvalidatesExistingEditorRepositoryInsteadOfRecreatingAccountData() = runTest {
         val repo = NovelEditorRepository(app, account, api, StandardTestDispatcher(testScheduler)); val work = work()
         NovelAccountDataCleaner.invalidate(account); app.deleteDatabase(NovelEditorStorage.databaseName(account))

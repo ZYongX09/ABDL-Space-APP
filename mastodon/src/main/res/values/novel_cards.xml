@@ -6,8 +6,8 @@
     <string name="novel_card_update">章节更新</string>
     <string name="novel_card_unavailable">作品暂不可用</string>
     <string name="novel_card_my_work">我的小说</string>
-    <string name="novel_card_read_new">开始阅读</string>
-    <string name="novel_card_read_update">阅读新章节</string>
+    <string name="novel_card_read_new">查看作品</string>
+    <string name="novel_card_read_update">查看更新</string>
     <string name="novel_card_read_link">阅读作品</string>
     <string name="novel_card_shelf_add">加入书架</string>
     <string name="novel_card_shelf_remove">移出书架</string>

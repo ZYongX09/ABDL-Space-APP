@@ -17,6 +17,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -34,17 +42,32 @@ internal fun NovelCreationScreen(state: NovelEditorState, controller: NovelEdito
     var conflictConfirm by remember { mutableStateOf(false) }
     var submitSelected by remember { mutableStateOf(setOf<String>()) }
     val export = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { it?.let(controller::exportTo) }
+    var bodyFocused by remember(state.page, state.chapterId, state.editToken) { mutableStateOf(false) }
+    var manuscriptView by remember(state.page, state.chapterId, state.editToken) { mutableStateOf<NovelManuscriptView?>(null) }
+    val keyboard = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
+    val compact = state.page == "editor" && (bodyFocused || WindowInsets.ime.getBottom(LocalDensity.current) > 0)
     val title = when (state.page) { "metadata" -> if (state.workId == null) "新建作品" else "作品资料"; "editor" -> "小说编辑"; "import" -> "上传文稿"; "importPreview" -> "解析预览"; "adjust" -> "调整章节"; else -> "作品管理" }
     Scaffold(
         containerColor = NovelTheme.colors.background,
-        topBar = { Row(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 20.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+        modifier = Modifier.imePadding(),
+        topBar = { Row(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = if (compact) 8.dp else 20.dp, vertical = if (compact) 0.dp else 12.dp), verticalAlignment = Alignment.CenterVertically) {
             FilledTonalIconButton(onClick = onBack, enabled = !state.busy) { Icon(NovelIcons.ArrowLeft, "返回") }
-            Text(title, fontFamily = NovelTypography.serif, fontSize = 25.sp, modifier = Modifier.weight(1f).padding(start = 12.dp))
+            Text(if (compact) state.frame?.title().orEmpty() else title, fontFamily = NovelTypography.serif, fontSize = if (compact) 16.sp else 25.sp, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f).padding(start = 12.dp))
+            if (compact) TextButton(onClick = { keyboard?.hide(); focusManager.clearFocus(force = true); manuscriptView?.clearBodyFocus(); bodyFocused = false }) { Text("完成", maxLines = 1) }
             if (state.workId != null) IconButton(onClick = { more = true }) { Icon(NovelIcons.MoreHorizontal, "更多操作") }
         } },
         bottomBar = {
             when (state.page) {
-                "editor" -> Column(Modifier.fillMaxWidth().background(NovelTheme.colors.background).navigationBarsPadding().imePadding().padding(horizontal = 20.dp, vertical = 8.dp)) {
+                "editor" -> if (compact) {
+                    Row(Modifier.fillMaxWidth().background(NovelTheme.colors.background).navigationBarsPadding().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = controller::undo, enabled = state.canUndo && !state.busy) { Icon(NovelIcons.Undo2, "撤销") }
+                        IconButton(onClick = controller::redo, enabled = state.canRedo && !state.busy) { Icon(NovelIcons.Redo2, "重做") }
+                        IconButton(onClick = { controller.insert("\n\n　　") }, enabled = !state.busy) { Icon(NovelIcons.Pilcrow, "新段落并缩进") }
+                        Text(if (state.saving) "保存中" else if (state.dirty) "10秒本机保存" else "已存本机", maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis, fontSize = 11.sp, color = NovelTheme.colors.textSecondary, modifier = Modifier.weight(1f))
+                        IconButton(onClick = controller::saveExplicit, enabled = !state.busy) { Icon(NovelIcons.CheckCheck, "保存草稿") }
+                    }
+                } else Column(Modifier.fillMaxWidth().background(NovelTheme.colors.background).navigationBarsPadding().padding(horizontal = 20.dp, vertical = 8.dp)) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Text(if (state.saving) "正在保存本机…" else if (state.dirty) "有未保存修改 · 每 10 秒本地保存" else "已保存到本机", fontSize = 11.sp, color = NovelTheme.colors.textSecondary, modifier = Modifier.weight(1f))
                         TextButton(onClick = { controller.preview(onPreview) }, enabled = !state.busy) { Icon(NovelIcons.Eye, null, Modifier.size(17.dp)); Text(" 预览") }
@@ -73,7 +96,7 @@ internal fun NovelCreationScreen(state: NovelEditorState, controller: NovelEdito
             when (state.page) {
                 "loading" -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
                 "metadata" -> NovelMetadataForm(state.metadata, controller::metadata, state.busy, controller)
-                "editor" -> ManuscriptScreen(state, controller)
+                "editor" -> ManuscriptScreen(state, controller, compact, { bodyFocused = it }, { manuscriptView = it })
                 "manage" -> WorkManagement(state, controller, onPreview, { confirmation = "chapter:$it" })
                 else -> NovelImportScreen(state, controller)
             }
@@ -108,7 +131,7 @@ internal fun NovelCreationScreen(state: NovelEditorState, controller: NovelEdito
 }
 
 @Composable
-private fun ManuscriptScreen(state: NovelEditorState, controller: NovelEditorController) {
+private fun ManuscriptScreen(state: NovelEditorState, controller: NovelEditorController, compact: Boolean, focusChanged: (Boolean) -> Unit, attach: (NovelManuscriptView) -> Unit) {
     val frame = state.frame ?: return
     var directory by remember { mutableStateOf(false) }
     var tools by remember { mutableStateOf(false) }
@@ -116,16 +139,21 @@ private fun ManuscriptScreen(state: NovelEditorState, controller: NovelEditorCon
     var font by remember { mutableFloatStateOf(14f) }
     val chapters = state.directory?.structure?.chapters().orEmpty()
     val index = chapters.indexOfFirst { it.id() == state.chapterId }
-    Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
-        Surface(shape = RoundedCornerShape(14.dp), color = NovelTheme.colors.primaryContainer, modifier = Modifier.fillMaxWidth().clickable { directory = true }) { Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) { Icon(NovelIcons.List, null, tint = NovelTheme.colors.primary); Text("第 ${index + 1} 章 · ${frame.title()}", color = NovelTheme.colors.primary, fontSize = 12.sp, modifier = Modifier.weight(1f).padding(horizontal = 10.dp)); Text("目录", fontSize = 12.sp); Icon(NovelIcons.ChevronDown, null, Modifier.size(18.dp)) } }
-        Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.SpaceBetween) { Text("第 ${index + 1} 章 · 本地草稿", color = NovelTheme.colors.primary, fontSize = 12.sp); Text("${frame.title().length} / 40", color = NovelTheme.colors.textSecondary, fontSize = 11.sp) }
-        TextField(value = frame.title(), onValueChange = { if (it.length <= 40) controller.frame(requireNotNull(state.chapterId), state.editToken, EditorSession.Frame(it, frame.body(), frame.start(), frame.end(), frame.scroll())) }, enabled = !state.busy, singleLine = true, textStyle = LocalTextStyle.current.copy(fontFamily = NovelTypography.serif, fontSize = 25.sp), modifier = Modifier.fillMaxWidth(), colors = TextFieldDefaults.colors(focusedContainerColor = NovelTheme.colors.background, unfocusedContainerColor = NovelTheme.colors.background))
-        Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), horizontalArrangement = Arrangement.SpaceBetween) { Text("正文编辑", fontSize = 12.sp); Text("正文模式 · 自动换行", color = NovelTheme.colors.textSecondary, fontSize = 10.sp) }
+    Column(Modifier.fillMaxSize().padding(horizontal = if (compact) 8.dp else 20.dp)) {
+        Surface(shape = RoundedCornerShape(14.dp), color = NovelTheme.colors.primaryContainer, modifier = Modifier.fillMaxWidth().clickable { directory = true }) { Row(Modifier.padding(horizontal = 12.dp, vertical = if (compact) 4.dp else 12.dp), verticalAlignment = Alignment.CenterVertically) { Icon(NovelIcons.List, null, tint = NovelTheme.colors.primary, modifier = Modifier.size(if (compact) 18.dp else 24.dp)); Text("第 ${index + 1} 章 · ${frame.title()}", color = NovelTheme.colors.primary, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f).padding(horizontal = 10.dp)); Text("目录", fontSize = 12.sp, maxLines = 1); Icon(NovelIcons.ChevronDown, null, Modifier.size(18.dp)) } }
+        if (!compact) {
+            Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.SpaceBetween) { Text("第 ${index + 1} 章 · 本地草稿", color = NovelTheme.colors.primary, fontSize = 12.sp); Text("${frame.title().length} / 40", color = NovelTheme.colors.textSecondary, fontSize = 11.sp) }
+            TextField(value = frame.title(), onValueChange = { if (it.length <= 40) controller.frame(requireNotNull(state.chapterId), state.editToken, EditorSession.Frame(it, frame.body(), frame.start(), frame.end(), frame.scroll())) }, enabled = !state.busy, singleLine = true, textStyle = LocalTextStyle.current.copy(fontFamily = NovelTypography.serif, fontSize = 25.sp), modifier = Modifier.fillMaxWidth(), colors = TextFieldDefaults.colors(focusedContainerColor = NovelTheme.colors.background, unfocusedContainerColor = NovelTheme.colors.background))
+        }
         val colors = NovelTheme.colors
         key(state.chapterId, state.editToken) {
             // A new chapter gets a new InputConnection; a queued old IME event keeps its old callback token.
-            AndroidView(factory = { NovelManuscriptView(it) }, modifier = Modifier.fillMaxWidth().weight(1f).border(1.dp, colors.outline, RoundedCornerShape(14.dp)), update = { it.bind(requireNotNull(state.chapterId), frame, !state.busy, colors.text.toArgb(), colors.textSecondary.toArgb(), colors.primary.toArgb(), lines, font) { controller.frame(requireNotNull(state.chapterId), state.editToken, it) } })
+            AndroidView(factory = { NovelManuscriptView(it).also(attach) }, modifier = Modifier.fillMaxWidth().weight(1f).testTag("novel-manuscript").border(1.dp, colors.outline, RoundedCornerShape(14.dp)), update = { view ->
+                view.onBodyFocusChanged(focusChanged)
+                view.bind(requireNotNull(state.chapterId), frame, !state.busy, colors.text.toArgb(), colors.textSecondary.toArgb(), colors.primary.toArgb(), lines, font) { controller.frame(requireNotNull(state.chapterId), state.editToken, it) }
+            })
         }
+        if (!compact) {
         val offset = frame.start().coerceIn(0, frame.body().length)
         val row = frame.body().take(offset).count { it == '\n' } + 1
         val col = offset - frame.body().lastIndexOf('\n', offset - 1)
@@ -138,6 +166,7 @@ private fun ManuscriptScreen(state: NovelEditorState, controller: NovelEditorCon
             IconButton(onClick = { tools = true }) { Icon(NovelIcons.Settings, "编辑设置") }
         } }
         Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), horizontalArrangement = Arrangement.SpaceBetween) { Text("本章 ${frame.body().length} 字 · 预计阅读 ${(frame.body().length / 400 + 1)} 分钟", color = colors.textSecondary, fontSize = 10.sp); Text("全书 ${state.directory?.structure?.work()?.characterCount() ?: 0} 字", color = colors.textSecondary, fontSize = 10.sp) }
+        }
     }
     if (directory) ModalBottomSheet(onDismissRequest = { directory = false }) {
         LazyColumn(Modifier.fillMaxWidth().heightIn(max = 500.dp)) { itemsIndexed(chapters, key = { _, c -> c.id() }) { i, c -> ListItem(headlineContent = { Text("${i + 1} · ${c.title()}") }, modifier = Modifier.clickable { directory = false; controller.openChapter(c.id()) }) } }
@@ -150,9 +179,16 @@ private fun WorkManagement(state: NovelEditorState, controller: NovelEditorContr
     val directory = state.directory ?: return
     var filter by remember { mutableStateOf("all") }; var reverse by remember { mutableStateOf(false) }
     val chapters = directory.structure.chapters()
+    val numberStyle = LocalTextStyle.current.copy(fontSize = 20.sp, fontFamily = FontFamily.Monospace)
+    val measurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val numberWidth = with(density) {
+        // Measure actual labels, including scaled fonts; 32dp clips three digits on narrow screens.
+        (chapters.indices.maxOfOrNull { measurer.measure("${it + 1}", numberStyle, maxLines = 1, softWrap = false).size.width } ?: 0).toDp() + 12.dp
+    }
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item { Row(Modifier.padding(vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-            Surface(color = NovelTheme.colors.primaryContainer, shape = RoundedCornerShape(6.dp), modifier = Modifier.width(86.dp).height(118.dp)) { Box(contentAlignment = Alignment.Center) { Text(directory.metadata.title, fontFamily = NovelTypography.serif, fontSize = 15.sp, modifier = Modifier.padding(10.dp)) } }
+            NovelEditorCover(directory.metadata, Modifier.width(86.dp).height(118.dp))
             Column { Text(directory.metadata.title, fontFamily = NovelTypography.serif, fontSize = 25.sp); Text("${when (directory.metadata.type) { "repost" -> "授权转载"; "ai" -> "AI辅助"; else -> "原创" }} · ${if (directory.metadata.completed) "已完结" else "连载中"}", color = NovelTheme.colors.primary, modifier = Modifier.padding(vertical = 8.dp)); Text("${chapters.size} 章 · ${directory.structure.work().characterCount()} 字", color = NovelTheme.colors.textSecondary, fontSize = 12.sp); Row { TextButton(onClick = controller::showMetadata) { Text("编辑资料") }; TextButton(onClick = { controller.preview(onPreview) }) { Text("本地预览") } } }
         } }
         directory.server?.let { server -> item { HorizontalDivider(); Row(Modifier.fillMaxWidth().padding(vertical = 18.dp), horizontalArrangement = Arrangement.SpaceBetween) { listOf("reads" to "累计阅读", "collections" to "收藏", "comments" to "评论").forEach { (key, label) -> Column { Text(label, color = NovelTheme.colors.textSecondary, fontSize = 11.sp); Text(server.optLong(key).toString(), fontSize = 25.sp) } } }; HorizontalDivider() } }
@@ -163,7 +199,7 @@ private fun WorkManagement(state: NovelEditorState, controller: NovelEditorContr
             val index = chapters.indexOf(chapter); val remote = directory.remote[chapter.id()]
             Column {
                 Row(Modifier.fillMaxWidth().clickable(enabled = !state.busy) { controller.openChapter(chapter.id()) }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("${index + 1}", fontSize = 20.sp, color = NovelTheme.colors.textSecondary, modifier = Modifier.width(32.dp))
+                    Text(AnnotatedString("${index + 1}"), style = numberStyle, maxLines = 1, softWrap = false, color = NovelTheme.colors.textSecondary, modifier = Modifier.width(numberWidth).testTag("chapter-number-${index + 1}"))
                     Column(Modifier.weight(1f)) { Text(chapter.title(), fontWeight = FontWeight.SemiBold, fontSize = 15.sp); Text("${when (remote?.status()) { "published" -> "已发布"; "pending", "reviewing" -> "审核中"; "rejected" -> "已驳回"; else -> "草稿" }} · ${chapter.contentLength()} 字", color = NovelTheme.colors.textSecondary, fontSize = 11.sp); remote?.reason()?.takeIf { it.isNotBlank() }?.let { Text(it, color = NovelTheme.colors.error, fontSize = 11.sp) } }
                     IconButton(onClick = { if (index > 0) { val ids = chapters.map { it.id() }.toMutableList(); java.util.Collections.swap(ids, index, index - 1); controller.reorder(ids) } }, enabled = index > 0 && !state.busy) { Icon(NovelIcons.ChevronUp, "上移章节", Modifier.size(18.dp)) }
                     IconButton(onClick = { onDeleteChapter(chapter.id()) }, enabled = !state.busy) { Icon(NovelIcons.Trash, "移除本地章节", Modifier.size(18.dp)) }

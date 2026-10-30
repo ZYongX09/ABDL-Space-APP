@@ -41,7 +41,6 @@ class NovelAppScreenshotTest {
     private var sharedWork: String? = null
     private var sharedAuthor: Long? = null
     private var openedMessage: String? = null
-    private var privateLibrary = 0
     private var verifications = 0
     private var posts = 0
     private var back = 0
@@ -64,7 +63,7 @@ class NovelAppScreenshotTest {
             NovelAppContent(state, vm, liquid = false, onBack = { back++ },
                 onRead = { work, chapter -> read = work.id to chapter },
                 onCreate = { work, local, mode -> created = Triple(work, local, mode) },
-                onPrivateLibrary = { privateLibrary++ }, onVerify = { verifications++ }, onPost = { posts++ },
+                onVerify = { verifications++ }, onPost = { posts++ },
                 onShareWork = { sharedWork = it.id }, onShareAuthor = { sharedAuthor = it.author.id },
                 onMessage = { openedMessage = it.id })
         }
@@ -76,6 +75,7 @@ class NovelAppScreenshotTest {
     @Test fun storeVariantsRenderAndRealTabsRequestTheirOwnTypes() {
         show()
         compose.onNodeWithText("小说").assertIsDisplayed()
+        compose.onNodeWithText("18+ ABDL 社群 · 用户上传小说").assertDoesNotExist()
         compose.onNodeWithContentDescription("小说消息").assertHasClickAction()
         title(NovelAppTestFixtures.work().title)
         shot(21, "store-featured")
@@ -153,9 +153,12 @@ class NovelAppScreenshotTest {
         compose.onAllNodesWithText("已读完")[0].performClick(); fixture.settle(compose)
         assertEquals(1, vm.state.value.shelfItems.size)
         assertTrue(vm.state.value.shelfItems.single().progress!!.completed)
+        compose.onNodeWithText("本机与云端私人书库").assertDoesNotExist()
         compose.onNodeWithContentDescription("书架更多").performClick()
-        click("私人书库")
-        assertEquals(1, privateLibrary)
+        compose.onNodeWithText("私人书库").assertDoesNotExist()
+        val requestsBeforeRefresh = transport.requests.size
+        click("刷新书架")
+        assertTrue(transport.requests.drop(requestsBeforeRefresh).any { it.path == "/shelf" })
     }
 
     @Test fun detailAndAuthorUseProductionActionsAndKeepPublicBodiesOutOfTheListFixture() {
@@ -225,8 +228,13 @@ class NovelAppScreenshotTest {
         compose.runOnUiThread { vm.openWork("fixture-work-0") }; fixture.settle(compose)
         compose.onNodeWithText("作品详情").assertIsDisplayed()
         compose.onNodeWithText("开始阅读").assertIsDisplayed().assertIsEnabled()
-        compose.onNodeWithText("加入书架").assertIsDisplayed().assertIsEnabled()
+        compose.onNodeWithContentDescription("加入书架").assertIsDisplayed().assertIsEnabled().assertHasClickAction()
         fixture.capture(compose, "detail-dark-320x640", 11)
+        compose.onNodeWithContentDescription("加入书架").performClick(); fixture.settle(compose)
+        assertTrue(vm.state.value.work.value!!.inShelf)
+        compose.onNodeWithContentDescription("移出书架").assertIsDisplayed().assertIsEnabled().performClick(); fixture.settle(compose)
+        assertFalse(vm.state.value.work.value!!.inShelf)
+        compose.onNodeWithContentDescription("加入书架").assertIsDisplayed().assertIsEnabled()
         click("开始阅读"); assertEquals("fixture-work-0" to null, read)
     }
 }

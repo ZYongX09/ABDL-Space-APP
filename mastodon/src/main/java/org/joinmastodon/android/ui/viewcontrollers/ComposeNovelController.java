@@ -116,8 +116,8 @@ public final class ComposeNovelController{
 		preview.setVisibility(state.hasNovel() ? View.VISIBLE : View.GONE);coverGeneration++;
 		NovelAttachment data=state.preview;boolean valid=data!=null && data.isDisplayable() && Objects.equals(data.workId,state.selectedId);
 		title.setText(valid ? data.title : activity.getString(R.string.novel_compose_attached));
-		meta.setText(valid ? (data.author.displayName==null || data.author.displayName.isBlank() ? data.author.username : data.author.displayName)+" 著\n"+(data.completed ? "已完结" : "连载中")+" · "+data.chapterCount+" 章 · "+data.wordCount+" 字" : "");
-		String authorName=valid ? (TextUtils.isEmpty(data.author.displayName) ? data.author.username : data.author.displayName) : "";
+		meta.setText(valid ? data.getDisplayAuthorName()+" 著\n"+(data.completed ? "已完结" : "连载中")+" · "+data.chapterCount+" 章 · "+data.wordCount+" 字" : "");
+		String authorName=valid ? data.getDisplayAuthorName() : "";
 		loadCover(cover,valid ? data.coverUrl : null,coverGeneration,true,new NovelCoverDrawable(activity,state.selectedId,valid ? data.title : null,authorName));
 	}
 	private void loadCover(ImageView image,String url,int g,boolean previewImage,Drawable placeholder){
@@ -220,7 +220,7 @@ public final class ComposeNovelController{
 				if(!work.getTitle().toLowerCase(Locale.ROOT).contains(term))continue;matches++;
 				LinearLayout row=new LinearLayout(activity);row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(V.dp(12),V.dp(12),V.dp(12),V.dp(12));
 				ImageView thumb=new ImageView(activity);thumb.setScaleType(ImageView.ScaleType.CENTER_CROP);thumb.setOutlineProvider(OutlineProviders.roundedRect(3));thumb.setClipToOutline(true);thumb.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);row.addView(thumb,new LinearLayout.LayoutParams(V.dp(44),V.dp(64)));
-				String name=TextUtils.isEmpty(work.getAuthor().getDisplayName()) ? work.getAuthor().getUsername() : work.getAuthor().getDisplayName();loadCover(thumb,work.getCoverUrl(),generation,false,new NovelCoverDrawable(activity,work.getId(),work.getTitle(),name));
+				String name=work.getDisplayAuthorName();loadCover(thumb,work.getCoverUrl(),generation,false,new NovelCoverDrawable(activity,work.getId(),work.getTitle(),name));
 				RadioButton option=new RadioButton(activity);String label=work.getTitle()+"\n"+work.getStatusLabel()+" · "+work.getChapterCount()+" 章";SpannableString styled=new SpannableString(label);int end=work.getTitle().length();styled.setSpan(new StyleSpan(Typeface.BOLD),0,end,Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);styled.setSpan(new RelativeSizeSpan(.84f),end,label.length(),Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);styled.setSpan(new ForegroundColorSpan(UiUtils.getThemeColor(activity,R.attr.colorM3OnSurfaceVariant)),end,label.length(),Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
 				option.setText(styled);option.setContentDescription(label);option.setTextColor(UiUtils.getThemeColor(activity,R.attr.colorM3OnSurface));option.setTextSize(15);option.setGravity(Gravity.CENTER_VERTICAL);option.setMaxLines(3);option.setEllipsize(TextUtils.TruncateAt.END);option.setLineSpacing(V.dp(6),1);option.setButtonDrawable(null);option.setBackgroundColor(Color.TRANSPARENT);option.setPaddingRelative(V.dp(12),V.dp(4),0,V.dp(4));option.setCompoundDrawablePadding(V.dp(8));option.setMinHeight(V.dp(64));
 				row.addView(option,new LinearLayout.LayoutParams(0,-2,1));LinearLayout.LayoutParams rowParams=new LinearLayout.LayoutParams(-1,-2);if(matches>1)rowParams.topMargin=V.dp(12);rows.addView(row,rowParams);options.add(option);styleOption(row,option,work.getId().equals(selected));
@@ -251,7 +251,7 @@ public final class ComposeNovelController{
 		}).exec(accountID));
 	}
 	private static NovelAttachment attachment(Work work){
-		NovelAttachment d=new NovelAttachment();d.schemaVersion=1;d.mode="link";d.available=true;d.workId=work.getId();d.releaseId=work.getReleaseId();d.title=work.getTitle();d.coverUrl=work.getCoverUrl();d.completed=work.getCompleted();d.chapterCount=work.getChapterCount();d.wordCount=work.getWordCount();
+		NovelAttachment d=new NovelAttachment();d.schemaVersion=1;d.mode="link";d.available=true;d.workId=work.getId();d.releaseId=work.getReleaseId();d.title=work.getTitle();d.coverUrl=work.getCoverUrl();d.workType=work.getWorkType();d.originalAuthor=work.getOriginalAuthor();d.completed=work.getCompleted();d.chapterCount=work.getChapterCount();d.wordCount=work.getWordCount();
 		d.author=new NovelAttachment.Author();d.author.id=work.getAuthor().getId();d.author.username=work.getAuthor().getUsername();d.author.displayName=work.getAuthor().getDisplayName();return d;
 	}
 	public static void restore(NovelComposeState state,Bundle saved){

@@ -119,6 +119,17 @@ public class ComposeNovelControllerTest{
 		RadioButton first=options.stream().filter(o->o.getText().toString().startsWith("柔软日常")).findFirst().orElseThrow();first.performClick();replacement.getButton(AlertDialog.BUTTON_POSITIVE).performClick();success("/works/w-1",work("w-1","柔软日常","published",42));
 		assertEquals("w-1",state.selectedId);assertEquals(2,changes.get());findText(root,"移除作品").performClick();assertFalse(state.hasNovel());assertTrue(state.specified);assertEquals(3,changes.get());
 	}
+	@Test public void selectedRepostKeepsUploaderIdentityButRendersOriginalAuthorAndCover() throws Exception{
+		String repost=work("w-repost","授权转载作品","published",42).replace("\"work_type\":\"original\"","\"work_type\":\"repost\",\"original_author\":\"原作作者\"");
+		success("/creator","{\"active\":true}");success("/owner/works","{\"items\":["+repost+"]}");success("/works/w-repost",repost);
+		tool.performClick();ShadowLooper.idleMainLooper();AlertDialog picker=ShadowAlertDialog.getLatestAlertDialog();
+		ImageView jacket=findAll(picker.getWindow().getDecorView(),ImageView.class).stream().filter(v->v.getDrawable() instanceof org.joinmastodon.android.ui.drawables.NovelCoverDrawable).findFirst().orElseThrow();
+		Field byline=org.joinmastodon.android.ui.drawables.NovelCoverDrawable.class.getDeclaredField("author");byline.setAccessible(true);assertEquals("原作作者",byline.get(jacket.getDrawable()).toString());
+		findAll(picker.getWindow().getDecorView(),RadioButton.class).get(0).performClick();picker.getButton(AlertDialog.BUTTON_POSITIVE).performClick();success("/works/w-repost",repost);
+		assertEquals("原作作者",state.preview.getDisplayAuthorName());assertEquals(42,state.preview.author.id);assertEquals("owner",state.preview.author.username);
+		assertNotNull(findText(root,"原作作者 著\n连载中 · 13 章 · 32000 字"));
+		Bundle saved=new Bundle();ComposeNovelController.save(state,saved);NovelComposeState restored=new NovelComposeState();ComposeNovelController.restore(restored,saved);assertEquals("原作作者",restored.preview.originalAuthor);assertEquals(42,restored.preview.author.id);
+	}
 	@Test public void confirmationRevalidatesVisibilityAndDoesNotInventSuccessfulAttachment() throws Exception{
 		ready();tool.performClick();ShadowLooper.idleMainLooper();AlertDialog picker=ShadowAlertDialog.getLatestAlertDialog();findAll(picker.getWindow().getDecorView(),RadioButton.class).get(0).performClick();picker.getButton(AlertDialog.BUTTON_POSITIVE).performClick();
 		String end=last("/works/w-2").getURL().getPath(); // Find the last work request, regardless of owner-list order.

@@ -4,6 +4,9 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Color as AndroidColor
 import android.os.Bundle
+import android.view.View
+import android.view.ViewGroup
+import android.widget.FrameLayout
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
@@ -20,10 +23,22 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.navigationevent.NavigationEventDispatcher
@@ -41,14 +56,14 @@ import org.joinmastodon.android.novel.app.editor.NovelReaderActivity
 import org.joinmastodon.android.novel.app.editor.listLocalWorks
 import org.joinmastodon.android.novel.app.models.Author
 import org.joinmastodon.android.novel.app.models.Work
-import org.joinmastodon.android.novel.editor.NovelLibraryFragment
+import org.joinmastodon.android.ui.compose.navigation.ViewBitmapBackdrop
 import org.joinmastodon.android.ui.compose.navigation.liquid.IosLiquidGlassNavigationBar
+import org.joinmastodon.android.ui.views.BackdropCaptureFrameLayout
+import org.joinmastodon.android.ui.utils.LiquidGlassCompatibility
 import org.joinmastodon.android.ui.compose.ui.LocalColorMode
 import org.joinmastodon.android.ui.utils.UiUtils
 import top.yukonga.miuix.kmp.basic.NavigationItem
 import top.yukonga.miuix.kmp.blur.isRuntimeShaderSupported
-import top.yukonga.miuix.kmp.blur.layerBackdrop
-import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.theme.ColorSchemeMode
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.ThemeController
@@ -58,7 +73,7 @@ import top.yukonga.miuix.kmp.theme.lightColorScheme
 internal val LocalNovelAccount = staticCompositionLocalOf { "" }
 internal val LocalNovelBottomPadding = staticCompositionLocalOf { 0.dp }
 
-/** Only the rebuilt public app domain is used; the private library is an explicit separate destination. */
+/** Rebuilt public novel UI. Legacy private data and document compatibility stay in their own hosts. */
 class NovelAppActivity : ComponentActivity(), NavigationEventDispatcherOwner {
     private var model: NovelAppViewModel? = null
     private var accountId: String? = null
@@ -94,7 +109,7 @@ class NovelAppActivity : ComponentActivity(), NavigationEventDispatcherOwner {
                     NovelAppContent(state, vm, GlobalUserPreferences.isIosLiquidNavigationEnabled(), ::goBack,
                         onRead = { work, chapter -> startActivity(NovelReaderActivity.intent(this, account, work.id, chapter)) },
                         onCreate = { work, local, mode -> startActivity(NovelCreationActivity.intent(this, account, work, local, mode)) },
-                        onPrivateLibrary = { openAccountAction("library") }, onVerify = { openAccountAction("verify") }, onPost = { openAccountAction("post") },
+                        onVerify = { openAccountAction("verify") }, onPost = { openAccountAction("post") },
                         onShareWork = { shareWork(it) }, onShareAuthor = { shareText(listOf(it.author.name, "@${it.author.username}", it.author.url.takeIf { url -> url.startsWith("https://") }.orEmpty()).filter { part -> part.isNotBlank() }.joinToString("\n")) },
                         onMessage = { message -> message.workId?.let { id ->
                             if (message.category == "updates" && message.chapterId != null) startActivity(NovelReaderActivity.intent(this, account, id, message.chapterId))
@@ -118,7 +133,7 @@ class NovelAppActivity : ComponentActivity(), NavigationEventDispatcherOwner {
     }
     private fun goBack() { if (model?.back() != true) finish() }
     private fun openAccountAction(action: String) { accountId?.let { startActivity(NovelAccountActionActivity.intent(this, it, action)) } }
-    private fun shareWork(work: Work) { shareText(listOf("《${work.title}》 · ${work.author.name}", work.description, "ABDL Space 小说").filter { it.isNotBlank() }.joinToString("\n\n")) }
+    private fun shareWork(work: Work) { shareText(listOf("《${work.title}》 · ${work.displayAuthorName}", work.description, "ABDL Space 小说").filter { it.isNotBlank() }.joinToString("\n\n")) }
     private fun shareText(text: String) { startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text), "分享")) }
 
     companion object {
@@ -132,7 +147,7 @@ class NovelAppActivity : ComponentActivity(), NavigationEventDispatcherOwner {
     }
 }
 
-/** Native FragmentStack host: preserves the real verification, compose and private-library flows. */
+/** Private native FragmentStack host for the real verification and compose flows. */
 class NovelAccountActionActivity : FragmentStackActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         val account = intent.getStringExtra("account")?.takeIf { it.isNotBlank() }
@@ -145,14 +160,13 @@ class NovelAccountActionActivity : FragmentStackActivity() {
         val fragment = when (intent.getStringExtra("action")) {
             "verify" -> BabyVerificationFragment().apply { arguments = args }
             "post" -> ComposeFragment().apply { arguments = args }
-            "library" -> NovelLibraryFragment.newInstance(account)
             else -> { finish(); return }
         }
         showFragment(fragment)
     }
     companion object {
         internal fun intent(context: Context, accountId: String, action: String): Intent {
-            require(accountId.isNotBlank() && action in setOf("library", "verify", "post"))
+            require(accountId.isNotBlank() && action in setOf("verify", "post"))
             return Intent(context, NovelAccountActionActivity::class.java).putExtra("account", accountId).putExtra("action", action)
         }
     }
@@ -161,24 +175,27 @@ class NovelAccountActionActivity : FragmentStackActivity() {
 @Composable internal fun NovelAppContent(
     state: NovelAppState, vm: NovelAppViewModel, liquid: Boolean, onBack: () -> Unit,
     onRead: (Work, String?) -> Unit, onCreate: (String?, String?, String) -> Unit,
-    onPrivateLibrary: () -> Unit, onVerify: () -> Unit, onPost: () -> Unit,
+    onVerify: () -> Unit, onPost: () -> Unit,
     onShareWork: (Work) -> Unit, onShareAuthor: (org.joinmastodon.android.novel.app.models.AuthorPage) -> Unit,
     onMessage: (org.joinmastodon.android.novel.app.models.Message) -> Unit,
 ) {
     val roots = listOf(NovelPage.Store, NovelPage.Shelf, NovelPage.Creator)
     val root = state.page in roots
-    val backdrop = rememberLayerBackdrop()
+    val backdrop = remember { ViewBitmapBackdrop() }
+    val density = LocalDensity.current
+    var navigationHeight by remember { mutableIntStateOf(0) }
     val inset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    Box(Modifier.fillMaxSize().background(NovelTheme.colors.background)) {
-        // Record only page pixels, never the navigation itself. Scrolling content can pass behind glass.
-        Box(Modifier.fillMaxSize().then(if (liquid && root && isRuntimeShaderSupported()) Modifier.layerBackdrop(backdrop) else Modifier)
-            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
-            .then(if (!root) Modifier.navigationBarsPadding().imePadding() else Modifier)) {
-            CompositionLocalProvider(LocalNovelBottomPadding provides if (root) 96.dp + inset else 0.dp) {
+    // The outer host owns top/horizontal insets. The navigation owns its bottom inset once;
+    // page lists reserve the measured overlay, not an additional fixed 96dp plus system bars.
+    Box(Modifier.fillMaxSize().background(NovelTheme.colors.background)
+        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))) {
+        NovelCapturedPage(backdrop, liquid && root, if (root) navigationHeight + with(density) { 40.dp.roundToPx() } else 0,
+            Modifier.fillMaxSize().then(if (!root) Modifier.navigationBarsPadding().imePadding() else Modifier)) {
+            CompositionLocalProvider(LocalNovelBottomPadding provides if (root) with(density) { navigationHeight.toDp() } else 0.dp) {
                 key(state.page) {
                     when (val page = state.page) {
                         NovelPage.Store -> NovelStoreScreen(state, vm, onBack)
-                        NovelPage.Shelf -> NovelShelfScreen(state, vm, onBack, onRead, onPrivateLibrary)
+                        NovelPage.Shelf -> NovelShelfScreen(state, vm, onBack, onRead)
                         NovelPage.Creator -> NovelCreatorScreen(state, vm, onBack, onCreate, onVerify, onPost)
                         NovelPage.Search -> NovelSearchScreen(state, vm, onBack)
                         NovelPage.AllWorks -> NovelAllWorksScreen(state, vm, onBack)
@@ -193,10 +210,13 @@ class NovelAccountActionActivity : FragmentStackActivity() {
                 }
             }
         }
-        if (root) Box(Modifier.align(Alignment.BottomCenter)) { NovelBottomNavigation(roots.indexOf(state.page), liquid, backdrop) { vm.navigate(roots[it]) } }
+        if (root) Box(Modifier.align(Alignment.BottomCenter).testTag("novel-navigation")
+            .onSizeChanged { navigationHeight = it.height }.padding(bottom = inset)) {
+            NovelBottomNavigation(roots.indexOf(state.page), liquid, backdrop) { vm.navigate(roots[it]) }
+        }
         val notice = state.actionError ?: state.notice
         if (notice != null) Surface(color = if (state.actionError != null) NovelTheme.colors.surface else NovelTheme.colors.primaryContainer,
-            shape = CircleShape, modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(16.dp)) {
+            shape = CircleShape, modifier = Modifier.align(Alignment.TopCenter).padding(16.dp)) {
             Row(Modifier.padding(start = 18.dp, end = 5.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(notice, color = if (state.actionError != null) NovelTheme.colors.error else NovelTheme.colors.text, fontSize = 12.sp, modifier = Modifier.weight(1f, fill = false).padding(vertical = 12.dp))
                 NovelIconButton(NovelIcons.X, "关闭提示", vm::dismissNotice)
@@ -205,7 +225,96 @@ class NovelAccountActionActivity : FragmentStackActivity() {
     }
 }
 
-@Composable private fun NovelBottomNavigation(selected: Int, liquid: Boolean, backdrop: top.yukonga.miuix.kmp.blur.Backdrop, onSelect: (Int) -> Unit) {
+/** A sibling of the navigation: native ImageViews and Compose text are captured, never the glass. */
+@Composable internal fun NovelCapturedPage(backdrop: ViewBitmapBackdrop, enabled: Boolean, captureHeight: Int,
+    modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    val parent = rememberCompositionContext()
+    val latestContent by rememberUpdatedState(content)
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    var captureView by remember { mutableStateOf<BackdropCaptureFrameLayout?>(null) }
+    AndroidView(modifier = modifier, factory = { context ->
+        BackdropCaptureFrameLayout(context).apply {
+            addView(ComposeView(context).apply {
+                consumeWindowInsets = false // Insets have already been applied by the outer Compose host.
+                setParentCompositionContext(parent)
+                setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
+                setContent { latestContent() }
+            }, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+            captureView = this
+        }
+    })
+    DisposableEffect(captureView, lifecycle, backdrop, enabled, captureHeight) {
+        val binding = captureView?.let { NovelBackdropCaptureBinding(it, backdrop, lifecycle) }
+        binding?.update(enabled, captureHeight)
+        onDispose { binding?.dispose() }
+    }
+}
+
+/** Window-relative strip coordinates stay valid across resize, pause/resume and view reattachment. */
+internal class NovelBackdropCaptureBinding(
+    private val view: BackdropCaptureFrameLayout,
+    private val backdrop: ViewBitmapBackdrop,
+    private val lifecycle: Lifecycle,
+) {
+    private var enabled = false
+    private var height = 0
+    private var listening = false
+    private var disposed = false
+    private val location = IntArray(2)
+    private val layoutListener = View.OnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> refresh() }
+    private val attachListener = object : View.OnAttachStateChangeListener {
+        override fun onViewAttachedToWindow(v: View) = refresh()
+        override fun onViewDetachedFromWindow(v: View) = stop()
+    }
+    private val lifecycleObserver = LifecycleEventObserver { _, _ -> refresh() }
+    private val captureListener = BackdropCaptureFrameLayout.CaptureListener { _, bottom ->
+        if (listening && canCapture()) {
+            updateOrigin(bottom?.height ?: height.coerceAtMost(view.height))
+            backdrop.update(bottom)
+        }
+    }
+    init {
+        view.addOnLayoutChangeListener(layoutListener)
+        view.addOnAttachStateChangeListener(attachListener)
+        lifecycle.addObserver(lifecycleObserver)
+    }
+    fun update(enabled: Boolean, height: Int) {
+        this.enabled = enabled
+        this.height = height.coerceAtLeast(0)
+        refresh()
+    }
+    private fun canCapture() = !disposed && enabled && height > 0 && view.isAttachedToWindow &&
+        view.isHardwareAccelerated && lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) && LiquidGlassCompatibility.isSupported()
+    private fun refresh() {
+        if (!canCapture()) { stop(); return }
+        view.setCaptureHeights(0, height)
+        updateOrigin(height.coerceAtMost(view.height))
+        if (!listening) {
+            listening = true
+            view.setCaptureListener(captureListener)
+        }
+    }
+    private fun updateOrigin(stripHeight: Int) {
+        view.getLocationInWindow(location)
+        backdrop.updateOriginInWindow(Offset(location[0].toFloat(), (location[1] + view.height - stripHeight).toFloat()))
+    }
+    private fun stop() {
+        listening = false
+        view.setCaptureListener(null)
+        view.setCaptureHeights(0, 0)
+        backdrop.update(null)
+    }
+    fun dispose() {
+        if (disposed) return
+        disposed = true
+        lifecycle.removeObserver(lifecycleObserver)
+        view.removeOnLayoutChangeListener(layoutListener)
+        view.removeOnAttachStateChangeListener(attachListener)
+        stop()
+    }
+}
+
+@Composable internal fun NovelBottomNavigation(selected: Int, liquid: Boolean, backdrop: top.yukonga.miuix.kmp.blur.Backdrop, onSelect: (Int) -> Unit) {
     val items = listOf(NavigationItem("书城", NovelIcons.Compass), NavigationItem("书架", NovelIcons.Library), NavigationItem("创作", NovelIcons.PenLine))
     val c = NovelTheme.colors
     if (liquid) {
@@ -216,16 +325,22 @@ class NovelAccountActionActivity : FragmentStackActivity() {
                 darkColors = darkColorScheme(primary = c.primary, onPrimary = c.onPrimary, surfaceContainer = c.surface, onSurface = c.text))
         }
         CompositionLocalProvider(LocalColorMode provides if (dark) 2 else 1) {
-            MiuixTheme(controller = controller) { IosLiquidGlassNavigationBar(items, selected, onSelect, backdrop, isRuntimeShaderSupported(), bottomPaddingOverride = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 12.dp) }
+            MiuixTheme(controller = controller) { IosLiquidGlassNavigationBar(items, selected, onSelect, backdrop, isRuntimeShaderSupported(), bottomPaddingOverride = 12.dp) }
         }
     } else {
-        Surface(color = c.surface, shape = CircleShape, shadowElevation = 3.dp, modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 16.dp, vertical = 12.dp)) {
-            Row(Modifier.selectableGroup().padding(6.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                items.forEachIndexed { index, item ->
-                    Column(Modifier.weight(1f).background(if (selected == index) c.primaryContainer else c.surface, CircleShape)
-                        .selectable(selected == index, role = Role.Tab, onClick = { onSelect(index) }).padding(vertical = 10.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                        Icon(listOf(NovelIcons.Compass, NovelIcons.Library, NovelIcons.PenLine)[index], null, Modifier.size(23.dp), tint = if (selected == index) c.primary else c.textSecondary)
-                        Text(listOf("书城", "书架", "创作")[index], color = if (selected == index) c.primary else c.textSecondary, fontSize = 11.sp)
+        Box(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp), contentAlignment = Alignment.Center) {
+            Surface(color = c.surface, shape = CircleShape, shadowElevation = 3.dp,
+                modifier = Modifier.widthIn(max = 320.dp).fillMaxWidth().testTag("novel-navigation-pill")) {
+                Row(Modifier.selectableGroup().padding(4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    items.forEachIndexed { index, item ->
+                        Column(Modifier.weight(1f).background(if (selected == index) c.primaryContainer else c.surface, CircleShape)
+                            .selectable(selected == index, role = Role.Tab, onClick = { onSelect(index) })
+                            .heightIn(min = 48.dp).padding(vertical = 6.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterVertically)) {
+                            Icon(item.icon, null, Modifier.size(20.dp), tint = if (selected == index) c.primary else c.textSecondary)
+                            // AnnotatedString retains the canonical measured MultiParagraph for semantics,
+                            // avoiding the simple-string path rebuilding it with different width constraints.
+                            Text(AnnotatedString(item.label), color = if (selected == index) c.primary else c.textSecondary, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
                     }
                 }
             }

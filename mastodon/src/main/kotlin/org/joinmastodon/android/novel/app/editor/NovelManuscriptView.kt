@@ -23,6 +23,7 @@ internal class NovelManuscriptView(context: Context) : LinearLayout(context) {
     private var boundChapter: String? = null
     private var title = ""
     private var listener: (EditorSession.Frame) -> Unit = {}
+    private var focusListener: (Boolean) -> Unit = {}
     private val gutter = Gutter(context)
     private val input = object : EditText(context) {
         override fun onSelectionChanged(selStart: Int, selEnd: Int) { super.onSelectionChanged(selStart, selEnd); if (loaded && !applying) changed() }
@@ -44,12 +45,16 @@ internal class NovelManuscriptView(context: Context) : LinearLayout(context) {
         input.setLineSpacing(dp(7).toFloat(), 1f)
         input.filters = arrayOf(InputFilter.LengthFilter(EditorLimits.CHAPTER_CONTENT))
         input.isSaveEnabled = false // a 500k chapter must not enter an Activity Bundle
+        input.contentDescription = "小说正文输入"
+        input.setOnFocusChangeListener { _, focused -> focusListener(focused) }
         input.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { gutter.invalidate() }
             override fun afterTextChanged(s: Editable?) { if (!applying) changed() }
         })
     }
+    fun onBodyFocusChanged(listener: (Boolean) -> Unit) { focusListener = listener }
+    fun clearBodyFocus() { input.clearFocus() }
     private fun changed() { listener(EditorSession.Frame(title, input.text.toString(), input.selectionStart.coerceAtLeast(0), input.selectionEnd.coerceAtLeast(0), input.scrollY)) }
     fun bind(chapter: String, frame: EditorSession.Frame, enabled: Boolean, foreground: Int, muted: Int, accent: Int, showLines: Boolean, fontSize: Float, onChange: (EditorSession.Frame) -> Unit) {
         listener = onChange; title = frame.title()

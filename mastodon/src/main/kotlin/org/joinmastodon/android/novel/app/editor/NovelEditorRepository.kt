@@ -8,6 +8,9 @@ import org.json.JSONObject
 import org.joinmastodon.android.novel.NovelAccountDataCleaner
 import org.joinmastodon.android.novel.app.NovelAppApi
 import org.joinmastodon.android.novel.app.NovelAppTransport
+import org.joinmastodon.android.novel.app.NovelSessionRequests
+import org.joinmastodon.android.novel.app.models.Work
+import org.joinmastodon.android.api.session.AccountSessionManager
 import org.joinmastodon.noveleditor.EditorModels
 import org.joinmastodon.noveleditor.NovelEditorStorage
 import java.nio.charset.StandardCharsets
@@ -18,12 +21,15 @@ internal data class NovelMetadata(
     val coverUrl: String? = null, val localCover: String? = null, val tags: List<String> = emptyList(),
     val statements: List<String> = emptyList(), val source: String = "", val authorization: String = "",
     val completed: Boolean = false, val accepted: Boolean = false,
+    val originalAuthor: String = "", val coverPending: Boolean = localCover != null && coverUrl == null,
 ) {
     fun validate() {
         require(title.isNotBlank() && title.length <= 30) { "作品名称需为 1–30 字" }
         require(description.isNotBlank() && description.length <= 500) { "作品简介需为 1–500 字" }
         require(type in setOf("original", "repost", "ai")) { "请选择作品类型" }
         require(tags.size <= 3 && tags.all { it.isNotBlank() && it.length <= 30 }) { "最多 3 个标签，每个不超过 30 字" }
+        require(originalAuthor.length <= 120) { "原作者名不能超过 120 字" }
+        require(type != "repost" || originalAuthor.isNotBlank()) { "转载需填写原作者名" }
         require(type != "repost" || (source.isNotBlank() && authorization.isNotBlank())) { "转载需填写来源及授权说明" }
         require(source.length <= 2000 && authorization.length <= 2000) { "来源及授权说明过长" }
         require(accepted) { "请确认创作与发布规范" }
@@ -32,10 +38,24 @@ internal data class NovelMetadata(
         .put("cover_url", coverUrl ?: JSONObject.NULL).put("local_cover", localCover ?: JSONObject.NULL)
         .put("tags", JSONArray(tags)).put("statements", JSONArray(statements)).put("source", source)
         .put("authorization", authorization).put("completed", completed).put("accepted", accepted)
+        .put("original_author", originalAuthor).put("local_cover_pending", coverPending)
+    /** Local state is deliberately absent from the frozen wire metadata. */
+    fun submissionJson() = json().apply {
+        remove("accepted")
+        keys().asSequence().filter { it.startsWith("local_") }.toList().forEach { remove(it) }
+        // Older production allowlists do not accept even an empty original_author on original/AI work.
+        if (type != "repost" && originalAuthor.isEmpty()) remove("original_author")
+    }
     companion object {
+        fun fromWork(work: Work) = NovelMetadata(
+            title = work.title, description = work.description, type = work.workType, coverUrl = work.coverUrl,
+            tags = work.tags, statements = work.statements, source = work.source, authorization = work.authorization,
+            completed = work.completed, originalAuthor = work.originalAuthor,
+        )
         fun from(j: JSONObject) = NovelMetadata(j.optString("title"), j.optString("description"), j.optString("work_type", "original"),
             j.stringOrNull("cover_url"), j.stringOrNull("local_cover"), j.strings("tags"), j.strings("statements"),
-            j.optString("source"), j.optString("authorization"), j.optBoolean("completed"), j.optBoolean("accepted", false))
+            j.optString("source"), j.optString("authorization"), j.optBoolean("completed"), j.optBoolean("accepted", false),
+            j.stringOrNull("original_author").orEmpty(), j.optBoolean("local_cover_pending", j.stringOrNull("local_cover") != null && j.stringOrNull("cover_url") == null))
     }
 }
 internal fun JSONObject.stringOrNull(key: String): String? = if (isNull(key)) null else optString(key).takeIf { it.isNotBlank() }
@@ -49,6 +69,14 @@ internal class NovelEditorRepository(val context: Context, val accountId: String
     internal val io: kotlinx.coroutines.CoroutineDispatcher = Dispatchers.IO,
 ) {
     internal val generation = NovelAccountDataCleaner.captureGeneration(accountId)
+    /** Capture exactly once, under the logout gate and only while the repository's API is current. */
+    internal val coverSession: NovelCoverSession? = NovelAccountDataCleaner.withAccountLock {
+        if (api !is NovelAppApi || !NovelAccountDataCleaner.isGenerationValid(accountId, generation) || !api.isSessionActive()) null
+        else AccountSessionManager.getInstance().tryGetAccount(accountId)?.let { session ->
+            val token = session.token.accessToken
+            NovelCoverSession(session.domain, token, NovelSessionRequests.capture(session, token))
+        }
+    }
     suspend fun <T> local(block: (NovelEditorStorage) -> T): T = withContext(io) {
         val lease = checkNotNull(NovelAccountDataCleaner.enterOperation(accountId, generation)) { "账号已注销" }
         lease.use { NovelEditorStorage(context, accountId).use(block) }
@@ -74,6 +102,18 @@ internal class NovelEditorRepository(val context: Context, val accountId: String
         try { s.updateWorkInfo(id, metadata.title, metadata.description); s.putAppMetadata(id, metadata.json().toString(), old?.serverId(), old?.releaseId()); s.writableDatabase.setTransactionSuccessful() }
         finally { s.writableDatabase.endTransaction() }
     } }
+    /** Persist only cover changes immediately; unfinished form fields and old repost metadata stay editable. */
+    suspend fun saveCover(id: String, metadata: NovelMetadata) = local { storage ->
+        val old = storage.appMetadata(id)
+        val payload = old?.payload()?.let(::JSONObject) ?: directoryMetadata(storage, id).json()
+        payload.put("local_cover", metadata.localCover ?: JSONObject.NULL).put("cover_url", metadata.coverUrl ?: JSONObject.NULL)
+            .put("local_cover_pending", metadata.coverPending)
+        storage.putAppMetadata(id, payload.toString(), old?.serverId(), old?.releaseId())
+    }
+    private fun directoryMetadata(storage: NovelEditorStorage, id: String): NovelMetadata {
+        val work = storage.structure(id).work()
+        return NovelMetadata(title = work.title(), description = work.description())
+    }
     /** Mirror owner headers/status only. Never replace a local body, title, cursor or metadata draft. */
     suspend fun ownerWork(serverId: String): Pair<String, JSONObject> {
         requireActive()
@@ -128,7 +168,7 @@ internal class NovelEditorRepository(val context: Context, val accountId: String
         return id to remote
     }
     private fun ownerContent(owner: JSONObject): String {
-        val metadata = NovelMetadata.from(owner).copy(accepted = false, localCover = null).json()
+        val metadata = NovelMetadata.from(owner).copy(accepted = false, localCover = null, coverPending = false).json()
         val chapters = owner.optJSONArray("chapters") ?: JSONArray()
         return metadata.toString() + (0 until chapters.length()).map { i -> val c = chapters.getJSONObject(i); listOf(c.optString("id"), c.optString("title"), c.optInt("sort_order"), c.optLong("generation"), c.optString("body_sha256")) }.toString()
     }
@@ -164,9 +204,9 @@ internal class NovelEditorRepository(val context: Context, val accountId: String
             val meta = requireNotNull(s.appMetadata(workId)) { "请先完善作品资料" }
             meta.ownerConflict()?.let { throw NovelOwnerConflict(it) }
             val metadata = NovelMetadata.from(JSONObject(meta.payload())); metadata.validate()
-            require(metadata.localCover == null || metadata.coverUrl != null) { "请先明确上传所选封面，或移除本地封面" }
+            require(!metadata.coverPending && (metadata.localCover == null || metadata.coverUrl != null)) { "请先明确上传所选封面，或移除本地封面" }
             val clientId = if (meta.serverId() == null) workId else requireNotNull(meta.clientWorkId()) { "请先刷新服务端作品绑定" }
-            val payload = metadata.json().apply { remove("accepted"); remove("local_cover"); put("client_work_id", clientId); put("base_release_id", meta.releaseId() ?: JSONObject.NULL); meta.serverId()?.let { put("work_id", it) } }
+            val payload = metadata.submissionJson().apply { put("client_work_id", clientId); put("base_release_id", meta.releaseId() ?: JSONObject.NULL); meta.serverId()?.let { put("work_id", it) } }
             s.prepareAppSubmission(workId, payload.toString(), selected)
         }
     }

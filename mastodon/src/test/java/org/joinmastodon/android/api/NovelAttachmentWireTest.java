@@ -59,5 +59,12 @@ public class NovelAttachmentWireTest{
 		assertNotNull(n);assertTrue(n.isSupported());assertFalse(n.isDisplayable());assertFalse(n.available);
 		assertNull(n.title);assertNull(n.releaseId);assertNull(n.author);assertNull(n.coverUrl);assertNull(n.description);assertNull(n.excerpt);assertNull(n.chapters);
 	}
+	@Test public void repostBylineUsesOriginalAuthorWithoutChangingUploaderIdentity(){
+		JsonObject input=JsonParser.parseString(NOVEL).getAsJsonObject();input.addProperty("work_type","repost");input.addProperty("original_author","真正原作者");
+		NovelAttachment result=read(input.toString()).novel;assertNotNull(result);assertEquals("真正原作者",result.getDisplayAuthorName());assertEquals(42,result.author.id);assertEquals("owner",result.author.username);
+		input.remove("original_author");result=read(input.toString()).novel;assertEquals("原作者未填写",result.getDisplayAuthorName());
+		input.add("original_author",new JsonObject());assertNull(read(input.toString()).novel);
+		input.addProperty("available",false);result=read(input.toString()).novel;assertNotNull(result);assertNull(result.originalAuthor);
+	}
 	@Test public void ordinaryStatusHasNoSyntheticNovel(){assertNull(read("null").novel);assertNull(GSON.fromJson("{\"id\":\"p\"}",Envelope.class).novel);}
 }

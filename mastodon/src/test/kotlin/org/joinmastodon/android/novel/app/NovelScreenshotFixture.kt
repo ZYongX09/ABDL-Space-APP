@@ -256,6 +256,7 @@ internal class NovelScreenshotFixture(private val group: String) : ExternalResou
     private var testClass = ""
     private var testMethod = ""
     private var dark by mutableStateOf(false)
+    private var renderFontScale = 1f
     private val navigationOwner = object : NavigationEventDispatcherOwner { override val navigationEventDispatcher = NavigationEventDispatcher { } }
     override fun apply(base: Statement, description: Description): Statement {
         testClass = description.className; testMethod = description.methodName.orEmpty(); return super.apply(base, description)
@@ -287,9 +288,10 @@ internal class NovelScreenshotFixture(private val group: String) : ExternalResou
     fun setDark(compose: NovelComposeRule, value: Boolean) = compose.runOnUiThread {
         GlobalUserPreferences.theme = if (value) GlobalUserPreferences.ThemePreference.DARK else GlobalUserPreferences.ThemePreference.LIGHT; dark = value
     }
-    fun show(compose: NovelComposeRule, content: @Composable () -> Unit) {
+    fun show(compose: NovelComposeRule, fontScale: Float = 1f, content: @Composable () -> Unit) {
+        renderFontScale = fontScale
         compose.setContent {
-            key(dark) { CompositionLocalProvider(LocalDensity provides Density(1f, 1f), LocalNovelAccount provides ACCOUNT, LocalNavigationEventDispatcherOwner provides navigationOwner) {
+            key(dark) { CompositionLocalProvider(LocalDensity provides Density(1f, fontScale), LocalNovelAccount provides ACCOUNT, LocalNavigationEventDispatcherOwner provides navigationOwner) {
                 NovelTheme(ACCOUNT) { Box(Modifier.fillMaxSize().background(NovelTheme.colors.background)) { content() } }
             } }
         }
@@ -364,7 +366,7 @@ internal class NovelScreenshotFixture(private val group: String) : ExternalResou
         for (i in 0 until prior.length()) if (prior.getJSONObject(i).optString("file") != output.name) captures.put(prior.getJSONObject(i))
         captures.put(JSONObject().put("file", output.name).put("path", output.absolutePath).put("reference", reference?.let { "novel-ui$it" } ?: JSONObject.NULL)
             .put("width", width).put("height", height).put("theme", if (dark) "dark" else "light").put("test_class", testClass).put("test_method", testMethod)
-            .put("native_dialog_window", dialog).put("rendered_at_ms", System.currentTimeMillis()))
+            .put("font_scale", renderFontScale).put("native_dialog_window", dialog).put("rendered_at_ms", System.currentTimeMillis()))
         val mapping = JSONArray()
         references.filter { it.group == group }.forEach { entry -> mapping.put(JSONObject().put("reference", "novel-ui${entry.id}")
             .put("source", "/home/ZYongX/projects/novel-ui/${entry.id}.png").put("state", entry.state).put("file", "novel-ui${entry.id}-${entry.state}-light-393x852.png")) }

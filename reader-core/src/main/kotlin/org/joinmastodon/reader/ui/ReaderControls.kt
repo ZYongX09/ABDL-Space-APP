@@ -32,6 +32,7 @@ fun ReaderControls(
 	showChapterSlider: Boolean = true,
 	showAnnotations: Boolean = true,
 	modifier: Modifier = Modifier,
+	toolbarActions: @Composable () -> Unit = {},
 ) {
 	Column(modifier.fillMaxWidth().background(palette.background.copy(alpha = 0.96f)).padding(12.dp)) {
 		Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -41,6 +42,8 @@ fun ReaderControls(
 				Text(chapterTitle, color = palette.secondaryText, maxLines = 1)
 			}
 			TextButton(onClick = onSettings) { Text("设置", color = palette.text) }
+			// Owned by the visible toolbar, never a host overlay on the reading viewport.
+			toolbarActions()
 		}
 		if (showChapterSlider && chapterCount > 1) {
 			Slider(

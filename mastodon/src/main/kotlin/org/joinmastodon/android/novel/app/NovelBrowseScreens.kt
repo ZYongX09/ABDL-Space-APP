@@ -90,7 +90,7 @@ private val Sorts = listOf("featured" to "综合排序", "updated" to "最近更
                         Text("%02d".format(index + 1), color = NovelTheme.colors.primary, fontSize = 20.sp, fontWeight = FontWeight.Medium)
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
                             Text(work.title, color = NovelTheme.colors.text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                            Text("${work.author.name} · ${work.typeLabel}", color = NovelTheme.colors.textSecondary, fontSize = 11.sp)
+                            Text("${work.displayAuthorName} · ${work.typeLabel}", color = NovelTheme.colors.textSecondary, fontSize = 11.sp)
                         }
                         Icon(NovelIcons.ChevronRight, "打开作品", tint = NovelTheme.colors.textSecondary, modifier = Modifier.size(19.dp))
                     }

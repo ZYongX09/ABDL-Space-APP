@@ -21,6 +21,7 @@ public class NovelAttachment{
 	public Author author;
 	@SerializedName("cover_url") public String coverUrl;
 	@SerializedName("work_type") public String workType;
+	@SerializedName("original_author") public String originalAuthor;
 	public boolean completed;
 	@SerializedName("chapter_count") public long chapterCount;
 	@SerializedName("word_count") public long wordCount;
@@ -44,6 +45,10 @@ public class NovelAttachment{
 		return schemaVersion==1 && id(workId) && ("new_book".equals(mode) || "chapter_update".equals(mode) || "link".equals(mode));
 	}
 	public boolean isDisplayable(){ return isSupported() && available && text(title) && author!=null && author.id>0 && text(author.username); }
+	public String getDisplayAuthorName(){
+		if("repost".equals(workType)) return text(originalAuthor) ? originalAuthor : "原作者未填写";
+		return author==null ? "" : text(author.displayName) ? author.displayName : author.username;
+	}
 	private static boolean text(String s){ return s!=null && !s.isBlank(); }
 	private static boolean id(String s){ return s!=null && s.matches("[A-Za-z0-9_-]{1,128}"); }
 
@@ -61,7 +66,7 @@ public class NovelAttachment{
 					NovelAttachment unavailable=new NovelAttachment(); unavailable.schemaVersion=1; unavailable.mode=mode;
 					unavailable.workId=o.get("work_id").getAsString(); return unavailable;
 				}
-				for(String k:List.of("release_id","title","cover_url","work_type","description","excerpt","first_chapter_id"))
+				for(String k:List.of("release_id","title","cover_url","work_type","original_author","description","excerpt","first_chapter_id"))
 					if(!string(o,k,false)) return null;
 				for(String k:List.of("word_count","chapter_count")) if(!number(o,k,false)) return null;
 				if(!bool(o,"completed",false) || !string(o,"title",true)) return null;

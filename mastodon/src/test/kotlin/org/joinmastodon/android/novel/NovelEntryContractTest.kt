@@ -15,18 +15,19 @@ class NovelEntryContractTest {
 
 	@Test
 	fun exposesStableNovelMenuId() {
-		assertTrue(homeCustom.contains("android:id=\"@+id/novel\""))
+		assertFalse(homeCustom.contains("android:id=\"@+id/novel\""))
 		assertTrue(homeOverflow.contains("android:id=\"@+id/novel\""))
 	}
 
 	@Test
 	fun rebuiltNovelEntryIsVisibleInClassicAndLiquidMoreMenus() {
 		assertTrue(homeTabFragment.contains("new HomeToolbarMenuItem(R.id.novel"))
-		for (menu in listOf(homeCustom, homeOverflow)) {
-			val item = menu.substringAfter("@+id/novel").substringBefore("/>")
-			assertTrue(item.contains("android:visible=\"true\""))
-			assertTrue(item.contains("@drawable/ic_novel_rebuilt"))
-		}
+		val item = homeOverflow.substringAfter("@+id/novel").substringBefore("/>")
+		assertTrue(item.contains("android:visible=\"true\""))
+		assertTrue(item.contains("@drawable/ic_novel_rebuilt"))
+		assertFalse(homeCustom.contains("@+id/novel"))
+		assertTrue(homeCustom.contains("@+id/overflow"))
+		assertTrue(homeTabFragment.contains("menu.findItem(R.id.overflow).setActionView(overflowActionView)"))
 	}
 
 	@Test
@@ -39,7 +40,7 @@ class NovelEntryContractTest {
 
 	@Test
 	fun nonLiquidOverflowExposesNovelEntry() {
-		assertTrue(homeCustom.contains("android:id=\"@+id/novel\""))
+		assertFalse(homeCustom.contains("android:id=\"@+id/novel\""))
 		assertTrue(homeOverflow.contains("android:id=\"@+id/novel\""))
 		assertTrue(homeTabFragment.contains("id == R.id.novel"))
 	}

@@ -16,12 +16,6 @@
 		android:visible="false"
 		android:showAsAction="always" />
 	<item
-		android:id="@+id/novel"
-		android:icon="@drawable/ic_novel_rebuilt"
-		android:title="@string/novel"
-		android:visible="true"
-		android:showAsAction="never" />
-	<item
 		android:id="@+id/search_action"
 		android:icon="@drawable/ic_fluent_search_24_regular"
 		android:title="@string/search_hint"

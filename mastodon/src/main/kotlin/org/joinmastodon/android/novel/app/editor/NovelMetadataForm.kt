@@ -3,6 +3,9 @@ package org.joinmastodon.android.novel.app.editor
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -23,16 +26,15 @@ internal fun NovelMetadataForm(data: NovelMetadata, change: (NovelMetadata) -> U
     var coverConfirmation by remember { mutableStateOf(false) }
     var rules by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-        Row(Modifier.fillMaxWidth().padding(bottom = 4.dp), horizontalArrangement = Arrangement.spacedBy(18.dp)) { Text("① 作品信息", color = NovelTheme.colors.primary); Text("——", color = NovelTheme.colors.outline); Text("② 章节内容", color = NovelTheme.colors.textSecondary) }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-            FilledTonalButton(onClick = { coverPicker.launch(arrayOf("image/jpeg", "image/png")) }, enabled = !busy, shape = RoundedCornerShape(8.dp), contentPadding = PaddingValues(8.dp), modifier = Modifier.width(90.dp).height(120.dp)) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) { Icon(NovelIcons.ImagePlus, null, Modifier.size(30.dp)); Text(if (data.localCover == null) "选择封面" else "重新选择", fontSize = 11.sp, modifier = Modifier.padding(top = 8.dp)) }
+            NovelEditorCover(data, Modifier.width(90.dp).height(120.dp).semantics { contentDescription = "选择或更换封面" }.clickable(enabled = !busy) { coverPicker.launch(arrayOf("image/jpeg", "image/png")) }) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) { Icon(NovelIcons.ImagePlus, null, Modifier.size(30.dp)); Text(if (data.localCover == null && data.coverUrl == null) "选择封面" else "重新选择", fontSize = 11.sp, modifier = Modifier.padding(top = 8.dp)) }
             }
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { Text("为故事选一张封面", fontSize = 16.sp); Text("选填 · JPG / PNG，建议 3:4\n不超过 5 MB", fontSize = 11.sp, color = NovelTheme.colors.textSecondary); Text(if (data.coverUrl != null) "封面已上传" else if (data.localCover != null) "已选本地封面，尚未上传" else "若不上传，将使用默认文字封面", fontSize = 10.sp, color = NovelTheme.colors.textSecondary) }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) { Text("选填 · JPG / PNG，建议 3:4\n不超过 5 MB", fontSize = 11.sp, color = NovelTheme.colors.textSecondary); Text(if (data.coverPending) "本地预览 · 待明确上传" else if (data.coverUrl != null) "封面已上传" else "若不上传，将使用默认文字封面", fontSize = 10.sp, color = NovelTheme.colors.textSecondary) }
         }
         if (data.localCover != null || data.coverUrl != null) Row {
-            TextButton(onClick = { coverConfirmation = true }, enabled = data.localCover != null && data.coverUrl == null && !busy) { Text("明确上传封面") }
-            TextButton(onClick = { change(data.copy(localCover = null, coverUrl = null)) }, enabled = !busy) { Text("移除封面") }
+            TextButton(onClick = { coverConfirmation = true }, enabled = data.localCover != null && data.coverPending && !busy) { Text("明确上传封面") }
+            TextButton(onClick = controller::removeCover, enabled = !busy) { Text("移除封面") }
         }
         MetadataField("作品名称 *", data.title, 30, busy, { change(data.copy(title = it)) }, true, "给你的故事起一个名字")
         MetadataField("作品简介 *", data.description, 500, busy, { change(data.copy(description = it)) }, false, "介绍故事的背景、人物与看点，让读者更了解你的作品。")
@@ -40,6 +42,7 @@ internal fun NovelMetadataForm(data: NovelMetadata, change: (NovelMetadata) -> U
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { listOf("original" to "原创", "repost" to "授权转载", "ai" to "AI辅助").forEach { (value, label) -> FilterChip(selected = data.type == value, onClick = { change(data.copy(type = value)) }, enabled = !busy, label = { Text(label, fontSize = 12.sp) }) } }
         Text("选择转载需填写来源及授权；AI 辅助将明确标识。", fontSize = 10.sp, color = NovelTheme.colors.textSecondary)
         if (data.type == "repost") {
+            MetadataField("原作者名 *", data.originalAuthor, 120, busy, { change(data.copy(originalAuthor = it)) }, true, "填写作品原作者的名字")
             MetadataField("来源 *", data.source, 2000, busy, { change(data.copy(source = it)) })
             MetadataField("授权说明 *", data.authorization, 2000, busy, { change(data.copy(authorization = it)) })
         } else if (data.type == "ai") MetadataField("AI 辅助说明 / 来源", data.source, 2000, busy, { change(data.copy(source = it)) })

@@ -26,12 +26,13 @@ public class NovelStatusWireTest{
 	@Before public void setup(){MastodonApp.context=RuntimeEnvironment.getApplication();}
 	@Test public void statusAndSourceUseFieldAdapterWithBothGsonConfigsAndRealParcel(){
 		for(Gson gson:List.of(new Gson(),MastodonAPIController.gson)){
-			Status status=gson.fromJson("{\"id\":\"p-1\",\"content\":\"body\",\"novel\":"+NovelAttachmentWireTest.NOVEL+"}",Status.class);
-			assertEquals("work-1",status.novel.workId);assertEquals("chapter-12",status.novel.chapters.get(0).id);
+			JsonObject novel=JsonParser.parseString(NovelAttachmentWireTest.NOVEL).getAsJsonObject();novel.addProperty("work_type","repost");novel.addProperty("original_author","原作作者");
+			Status status=gson.fromJson("{\"id\":\"p-1\",\"content\":\"body\",\"novel\":"+novel+"}",Status.class);
+			assertEquals("work-1",status.novel.workId);assertEquals("chapter-12",status.novel.chapters.get(0).id);assertEquals("原作作者",status.novel.getDisplayAuthorName());
 			android.os.Parcel parcel=android.os.Parcel.obtain();
 			try{parcel.writeParcelable(org.parceler.Parcels.wrap(status),0);parcel.setDataPosition(0);
 				Status restored=org.parceler.Parcels.unwrap(parcel.readParcelable(getClass().getClassLoader()));
-				assertEquals("body",restored.content);assertEquals("release-2",restored.novel.releaseId);assertEquals(42,restored.novel.author.id);assertEquals("第13章",restored.novel.chapters.get(1).title);
+				assertEquals("body",restored.content);assertEquals("release-2",restored.novel.releaseId);assertEquals(42,restored.novel.author.id);assertEquals("第13章",restored.novel.chapters.get(1).title);assertEquals("repost",restored.novel.workType);assertEquals("原作作者",restored.novel.originalAuthor);assertEquals("原作作者",restored.novel.getDisplayAuthorName());
 			}finally{parcel.recycle();}
 		}
 		GetStatusSourceText.Response source=MastodonAPIController.gson.fromJson("{\"id\":\"p-1\",\"text\":\"clean user body\",\"spoiler_text\":\"\",\"novel_id\":\"work-1\",\"novel\":[]}",GetStatusSourceText.Response.class);

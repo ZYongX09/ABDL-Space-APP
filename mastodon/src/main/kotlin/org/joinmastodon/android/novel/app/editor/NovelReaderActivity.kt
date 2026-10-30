@@ -9,6 +9,14 @@ import androidx.compose.ui.platform.AbstractComposeView
 import com.squareup.otto.Subscribe
 import kotlinx.coroutines.cancel
 import org.joinmastodon.android.E
+import org.joinmastodon.android.GlobalUserPreferences
+import org.joinmastodon.android.ui.compose.navigation.MorphingGlassContainer
+import org.joinmastodon.android.ui.compose.navigation.WithIsolatedGlassShaderCache
+import org.joinmastodon.android.ui.compose.ui.LocalColorMode
+import top.yukonga.miuix.kmp.blur.Backdrop
+import top.yukonga.miuix.kmp.blur.isRuntimeShaderSupported
+import top.yukonga.miuix.kmp.blur.layerBackdrop
+import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import org.joinmastodon.android.events.AccountLoggedOutEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -23,6 +31,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
@@ -40,7 +54,7 @@ import org.joinmastodon.reader.domain.ReaderPalette
 import org.joinmastodon.reader.domain.ReaderPosition
 import org.joinmastodon.reader.ui.ReaderScreen
 
-/** Pure host for the unchanged reader-core ReaderScreen, with one lazily fetched chapter at a time. */
+/** Reader-core host with one lazily fetched chapter and toolbar-scoped host actions. */
 class NovelReaderActivity : ComponentActivity(), NavigationEventDispatcherOwner {
     private var controller: NovelReaderController? = null
     private var accountId: String? = null
@@ -103,8 +117,10 @@ class NovelReaderActivity : ComponentActivity(), NavigationEventDispatcherOwner 
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ReaderHostScreen(state: ReaderHostState, controller: NovelReaderController, back: () -> Unit) {
+internal fun ReaderHostScreen(state: ReaderHostState, controller: NovelReaderController, back: () -> Unit) {
     var directory by remember { mutableStateOf(false) }; var annotations by remember { mutableStateOf(false) }; var note by remember { mutableStateOf(false) }
+    val liquid = GlobalUserPreferences.isIosLiquidNavigationEnabled()
+    val backdrop = rememberLayerBackdrop()
     Box(Modifier.fillMaxSize()) {
         val book = state.book; val chapter = state.chapter
         if (book != null && chapter != null && !state.loading && state.error == null) {
@@ -115,11 +131,11 @@ private fun ReaderHostScreen(state: ReaderHostState, controller: NovelReaderCont
                     onPreviousChapter = if (state.index > 0) ({ controller.open(state.index - 1) }) else null,
                     onNextChapter = if (state.index < state.headers.lastIndex) ({ controller.open(state.index + 1) }) else null,
                     externalChapterIndex = state.index, externalChapterCount = state.headers.size,
-                    initialPalette = if (UiUtils.isDarkTheme()) ReaderPalette.NIGHT else ReaderPalette.PAPER, onBack = back)
-            }
-            Row(Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(8.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                FilledTonalIconButton(onClick = { annotations = true }) { Icon(NovelIcons.Bookmark, "书签与笔记") }
-                FilledTonalIconButton(onClick = { directory = true }) { Icon(NovelIcons.List, "章节目录") }
+                    initialPalette = if (UiUtils.isDarkTheme()) ReaderPalette.NIGHT else ReaderPalette.PAPER, onBack = back,
+                    toolbarActions = {
+                        ReaderHostToolbarActions(liquid, backdrop, onAnnotations = { annotations = true }, onDirectory = { directory = true })
+                    },
+                    contentBackdropModifier = if (liquid && isRuntimeShaderSupported()) Modifier.layerBackdrop(backdrop) else Modifier)
             }
         } else Column(Modifier.fillMaxSize().safeDrawingPadding().padding(24.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
             if (state.loading) CircularProgressIndicator() else { Text(state.error ?: "暂无正文"); Button(onClick = { controller.start() }, modifier = Modifier.padding(top = 20.dp)) { Text(if (state.changed) "重新加载当前版本" else "重试") } }
@@ -138,4 +154,31 @@ private fun ReaderHostScreen(state: ReaderHostState, controller: NovelReaderCont
         }
     }
     if (note) { var body by remember { mutableStateOf("") }; AlertDialog(onDismissRequest = { note = false }, title = { Text("添加阅读笔记") }, text = { OutlinedTextField(body, { body = it.take(2000) }, label = { Text("笔记（绑定当前章节与页码）") }) }, confirmButton = { TextButton(enabled = body.isNotBlank(), onClick = { controller.annotation(body); note = false }) { Text("保存") } }, dismissButton = { TextButton(onClick = { note = false }) { Text("取消") } }) }
+}
+
+/** Composed only by ReaderControls' action slot, so hiding tools also removes their hit targets. */
+@Composable
+internal fun ReaderHostToolbarActions(liquid: Boolean, backdrop: Backdrop, onAnnotations: () -> Unit, onDirectory: () -> Unit) {
+    val dark = NovelTheme.colors.background.luminance() < .5f
+    CompositionLocalProvider(LocalColorMode provides if (dark) 2 else 1) {
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+            ReaderHostToolbarButton(NovelIcons.Bookmark, "书签与笔记", liquid, backdrop, onAnnotations)
+            ReaderHostToolbarButton(NovelIcons.List, "章节目录", liquid, backdrop, onDirectory)
+        }
+    }
+}
+
+@Composable
+private fun ReaderHostToolbarButton(icon: ImageVector, label: String, liquid: Boolean, backdrop: Backdrop, onClick: () -> Unit) {
+    if (liquid) WithIsolatedGlassShaderCache {
+        MorphingGlassContainer(
+            expanded = false, closedWidth = 48.dp, closedHeight = 48.dp,
+            expandedWidth = 48.dp, expandedHeight = 48.dp, backdrop = backdrop,
+            anchorFractionX = 1f, selectionItemCount = 0, enableDragSelection = false,
+            shouldExpandFromClosed = { _, _ -> false }, onExpansionRequested = {}, onClick = onClick,
+            modifier = Modifier.semantics { contentDescription = label; role = Role.Button },
+            closedContent = { Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) { Icon(icon, null, tint = NovelTheme.colors.text) } },
+            expandedContent = {},
+        )
+    } else FilledTonalIconButton(onClick = onClick, modifier = Modifier.size(48.dp)) { Icon(icon, label) }
 }

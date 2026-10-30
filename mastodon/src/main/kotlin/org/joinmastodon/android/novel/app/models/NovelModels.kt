@@ -49,7 +49,9 @@ data class Work(
     val status: String, val author: Author, val wordCount: Long, val chapterCount: Int,
     val reads: Long, val collections: Long, val comments: Long, val publishedAt: Long?, val updatedAt: Long,
     val inShelf: Boolean = false, val progress: Progress? = null, val chapters: List<Chapter> = emptyList(),
+    val originalAuthor: String = "",
 ) {
+    val displayAuthorName: String get() = if (workType == "repost") originalAuthor.ifBlank { "原作者未填写" } else author.name
     val typeLabel: String get() = when (workType) { "original" -> "原创"; "repost" -> "授权转载"; "ai" -> "AI辅助"; else -> "作品" }
     val statusLabel: String get() = when (status) {
         "draft" -> "本地草稿"; "pending" -> "审核中"; "published" -> if (completed) "已完结" else "连载中"
@@ -89,6 +91,7 @@ object NovelJson {
         j.optString("status"), author(j.getJSONObject("author")), j.optLong("word_count"), j.optInt("chapter_count"),
         j.optLong("reads"), j.optLong("collections"), j.optLong("comments"), j.longOrNull("published_at"), j.optLong("updated_at"),
         j.optBoolean("in_shelf"), j.optJSONObject("progress")?.let(::progress), objects(j.optJSONArray("chapters"), ::chapter).sortedBy { it.sortOrder },
+        (j.opt("original_author") as? String).orEmpty(),
     )
     fun comment(j: JSONObject) = Comment(j.getString("id"), j.getString("body"), author(j.getJSONObject("author")), j.getLong("created_at"), j.optBoolean("can_delete"))
     fun message(j: JSONObject) = Message(j.getString("id"), j.getString("category"), j.getString("title"), j.optString("body"), j.stringOrNull("work_id"), j.stringOrNull("chapter_id"), j.getLong("created_at"), j.optBoolean("read"))

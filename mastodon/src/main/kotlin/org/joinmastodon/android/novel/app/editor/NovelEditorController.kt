@@ -36,6 +36,7 @@ internal data class NovelEditorState(
 )
 
 internal class NovelEditorController(application: Application, val repository: NovelEditorRepository,
+    private val coverUploader: NovelCoverUploader = NovelCoverUpload.forRepository(repository),
     private val now: () -> Long = SystemClock::elapsedRealtime,
 ) : AndroidViewModel(application) {
     private val mutable = MutableStateFlow(NovelEditorState())
@@ -107,26 +108,28 @@ internal class NovelEditorController(application: Application, val repository: N
     fun showMetadata() = operation { if (save()) update { it.copy(page = "metadata") } }
     fun showImport() = operation { if (save()) update { it.copy(page = "import") } }
     fun chooseCover(uri: Uri) = operation {
-        val path = repository.local {
-            val resolver = repository.context.contentResolver
-            require(resolver.getType(uri) in setOf("image/jpeg", "image/png")) { "封面仅支持 JPG / PNG" }
-            val folder = File(root, "covers").apply { mkdirs() }; val file = File(folder, "${UUID.randomUUID()}.image")
-            try { resolver.openInputStream(uri).use { input -> requireNotNull(input); file.outputStream().use { output -> val buffer = ByteArray(32768); var total = 0L; while (true) { val n = input.read(buffer); if (n < 0) break; total += n; require(total <= 5L * 1024 * 1024) { "封面不能超过 5 MB" }; output.write(buffer, 0, n) } } }; val options = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }; android.graphics.BitmapFactory.decodeFile(file.absolutePath, options); require(options.outWidth > 0 && options.outHeight > 0) { "图片无效" }; file.absolutePath }
-            catch (e: Exception) { file.delete(); throw e }
-        }
-        update { it.copy(metadata = it.metadata.copy(localCover = path, coverUrl = null)) }
+        val file = repository.local { NovelCoverImages.select(repository.context, uri, File(root, "covers")) }
+        val metadata = mutable.value.metadata.copy(localCover = file.absolutePath, coverPending = true)
+        // Publish the local preview before any optional network action. The old server URL remains intact.
+        update { it.copy(metadata = metadata, notice = null) }
+        mutable.value.workId?.let { repository.saveCover(it, metadata) }
+    }
+    fun removeCover() = operation {
+        val metadata = mutable.value.metadata.copy(localCover = null, coverUrl = null, coverPending = false)
+        mutable.value.workId?.let { repository.saveCover(it, metadata) }
+        update { it.copy(metadata = metadata) }
     }
     fun uploadCover() = operation {
         val path = requireNotNull(mutable.value.metadata.localCover) { "请先选择封面" }
-        val url = kotlinx.coroutines.suspendCancellableCoroutine<String> { continuation ->
-            val request = org.joinmastodon.android.api.requests.statuses.UploadAttachment(Uri.fromFile(File(path)), 2_073_600, "小说封面")
-            continuation.invokeOnCancellation { request.cancel() }
-            request.setCallback(object : me.grishka.appkit.api.Callback<org.joinmastodon.android.model.Attachment> {
-                override fun onSuccess(result: org.joinmastodon.android.model.Attachment) { if (continuation.isActive) { if (result.url.isNullOrBlank()) continuation.resumeWith(Result.failure(IllegalStateException("封面仍处理中，请稍后重试"))) else continuation.resumeWith(Result.success(result.url)) } }
-                override fun onError(error: me.grishka.appkit.api.ErrorResponse) { if (continuation.isActive) continuation.resumeWith(Result.failure(IllegalStateException("封面上传失败，请重试"))) }
-            }); request.exec(repository.accountId)
-        }
-        update { it.copy(metadata = it.metadata.copy(coverUrl = url), notice = "封面已上传；文稿仍仅在本地") }
+        repository.requireActive()
+        val url = coverUploader.upload(File(path))
+        repository.requireActive()
+        require(okhttp3.HttpUrl.parse(url)?.isHttps == true) { "封面服务未返回有效 HTTPS 地址" }
+        // Do not replace a newer selection with a late response.
+        if (mutable.value.metadata.localCover != path) return@operation
+        val metadata = mutable.value.metadata.copy(coverUrl = url, coverPending = false)
+        mutable.value.workId?.let { repository.saveCover(it, metadata) }
+        update { it.copy(metadata = metadata, notice = "封面已上传；文稿仍仅在本地") }
     }
     fun storeMetadata() = operation {
         val data = mutable.value.metadata

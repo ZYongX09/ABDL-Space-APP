@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
 package org.joinmastodon.android.novel.app
 
 import androidx.compose.foundation.background
@@ -12,6 +14,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -41,9 +47,10 @@ import org.joinmastodon.android.novel.app.models.Work
                         NovelBookCover(work, width = 98.dp)
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             NovelHeading(work.title, size = 27)
-                            Text("${work.author.name} 著", color = NovelTheme.colors.primary, fontSize = 13.sp, modifier = Modifier.clickable { vm.navigate(NovelPage.AuthorProfile(work.author.id)) })
-                            Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) { NovelTag(work.typeLabel); NovelTag(work.statusLabel) }
-                            Text("${work.wordCount.novelNumber()} 字 · ${work.chapterCount} 章", color = NovelTheme.colors.textSecondary, fontSize = 12.sp)
+                            Text("${work.displayAuthorName} 著", color = NovelTheme.colors.primary, fontSize = 13.sp)
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) { NovelTag(work.typeLabel); NovelTag(work.statusLabel) }
+                            NovelCompactValue(work.wordCount, "字", fontSize = 14, suffix = " 字")
+                            Text("${work.chapterCount} 章", color = NovelTheme.colors.textSecondary, fontSize = 12.sp)
                             Text("最近更新 ${work.updatedAt.novelDate()}", color = NovelTheme.colors.textSecondary, fontSize = 10.sp)
                         }
                     }
@@ -57,9 +64,9 @@ import org.joinmastodon.android.novel.app.models.Work
                     Row(Modifier.fillMaxWidth().clickable { vm.navigate(NovelPage.AuthorProfile(work.author.id)) }.padding(vertical = 20.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         NovelAvatar(work.author, 42.dp)
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text(work.author.name, color = NovelTheme.colors.text, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                            Text("上传者 · ${work.author.name}", color = NovelTheme.colors.text, fontSize = 14.sp, fontWeight = FontWeight.Medium)
                             val author = state.author.value?.takeIf { it.author.id == work.author.id }
-                            Text(author?.let { "${it.stats.works} 部作品 · ${it.stats.followers.novelNumber()} 位关注者" } ?: "查看作者主页", color = NovelTheme.colors.textSecondary, fontSize = 10.sp)
+                            Text(author?.let { "${it.stats.works} 部作品 · ${it.stats.followers.novelNumber()} 位关注者" } ?: "查看上传者主页", color = NovelTheme.colors.textSecondary, fontSize = 10.sp)
                         }
                         state.author.value?.takeIf { it.author.id == work.author.id && it.author.id != state.self?.id }?.let { author ->
                             NovelPill(if (author.following) "已关注" else "+ 关注", { vm.follow(author) }, enabled = "follow:${author.author.id}" !in state.pending, primary = false)
@@ -110,9 +117,24 @@ import org.joinmastodon.android.novel.app.models.Work
         }
         if (work != null) {
             NovelRule()
-            Row(Modifier.fillMaxWidth().background(NovelTheme.colors.background).padding(horizontal = 20.dp, vertical = 14.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                NovelPill(if (work.inShelf) "已在书架" else "加入书架", { vm.collect(work) }, Modifier.weight(1f), primary = false, enabled = "shelf:${work.id}" !in state.pending, icon = NovelIcons.Bookmark)
-                NovelPill(if (work.progress == null) "开始阅读" else "继续阅读", { onRead(work, null) }, Modifier.weight(1.5f), enabled = work.chapters.isNotEmpty(), icon = NovelIcons.BookOpen)
+            BoxWithConstraints(Modifier.fillMaxWidth().background(NovelTheme.colors.background)) {
+                val compactActions = maxWidth < 360.dp || LocalDensity.current.fontScale >= 1.3f
+                Row(Modifier.fillMaxWidth().testTag("novel-detail-actions").padding(horizontal = 20.dp, vertical = 14.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    if (compactActions) {
+                        IconToggleButton(checked = work.inShelf, onCheckedChange = { vm.collect(work) },
+                            enabled = "shelf:${work.id}" !in state.pending,
+                            modifier = Modifier.size(48.dp).testTag("novel-detail-shelf-action")
+                                .background(NovelTheme.colors.primaryContainer, RoundedCornerShape(24.dp))
+                                .semantics { contentDescription = if (work.inShelf) "移出书架" else "加入书架" }) {
+                            Icon(if (work.inShelf) NovelIcons.BookmarkCheck else NovelIcons.BookmarkPlus, null, tint = NovelTheme.colors.primary, modifier = Modifier.size(22.dp))
+                        }
+                    } else {
+                        NovelPill(if (work.inShelf) "已在书架" else "加入书架", { vm.collect(work) }, Modifier.weight(1f), primary = false, enabled = "shelf:${work.id}" !in state.pending, icon = NovelIcons.Bookmark)
+                    }
+                    NovelPill(if (work.progress == null) "开始阅读" else "继续阅读", { onRead(work, null) },
+                        Modifier.weight(if (compactActions) 1f else 1.5f).testTag("novel-detail-read-action"), enabled = work.chapters.isNotEmpty(), icon = NovelIcons.BookOpen)
+                }
             }
         }
     }
@@ -150,7 +172,7 @@ import org.joinmastodon.android.novel.app.models.Work
                     NovelAvatar(author.author, 64.dp)
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         NovelHeading(author.author.name, size = 28)
-                        Text("@${author.author.username}", color = NovelTheme.colors.textSecondary, fontSize = 12.sp)
+                        Text("上传者账号 · @${author.author.username}", color = NovelTheme.colors.textSecondary, fontSize = 12.sp)
                     }
                     if (author.author.id != state.self?.id) NovelPill(if (author.following) "已关注" else "+ 关注", { vm.follow(author) }, enabled = "follow:${author.author.id}" !in state.pending)
                 }

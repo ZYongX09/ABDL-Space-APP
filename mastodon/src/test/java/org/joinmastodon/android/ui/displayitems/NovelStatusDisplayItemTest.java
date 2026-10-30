@@ -103,9 +103,19 @@ public class NovelStatusDisplayItemTest{
 			Activity a=life.get();a.setTheme(R.style.Theme_Mastodon_Light);life.setup();Status s=post();NovelStatusDisplayItem.Holder h=new NovelStatusDisplayItem.Holder(a,new FrameLayout(a));h.bind(item(a,s,false));
 			assertNotNull(findText(h.itemView,"章节更新"));assertNotNull(findText(h.itemView,"第12章 — 第13章（2 章）"));assertNotNull(findText(h.itemView,"本次新增 3460 字"));assertNotNull(findText(h.itemView,"章节摘录"));
 			findText(h.itemView,"柔软日常").performClick();Intent detail=((org.robolectric.shadows.ShadowActivity) org.robolectric.shadow.api.Shadow.extract(a)).getNextStartedActivity();assertEquals("org.joinmastodon.android.novel.app.NovelAppActivity",detail.getComponent().getClassName());assertEquals("work-1",detail.getStringExtra("work_id"));assertFalse(detail.hasExtra("chapter_id"));
-			findText(h.itemView,"阅读新章节").performClick();Intent read=((org.robolectric.shadows.ShadowActivity) org.robolectric.shadow.api.Shadow.extract(a)).getNextStartedActivity();assertEquals("org.joinmastodon.android.novel.app.editor.NovelReaderActivity",read.getComponent().getClassName());assertEquals("chapter-12",read.getStringExtra("chapter_id"));assertEquals("offline",read.getStringExtra("account"));
+			findText(h.itemView,"查看更新").performClick();Intent read=((org.robolectric.shadows.ShadowActivity) org.robolectric.shadow.api.Shadow.extract(a)).getNextStartedActivity();assertEquals("org.joinmastodon.android.novel.app.NovelAppActivity",read.getComponent().getClassName());assertEquals("work-1",read.getStringExtra("work_id"));assertFalse(read.hasExtra("chapter_id"));assertEquals("offline",read.getStringExtra("account"));
 			s.novel.mode="link";h.bind(item(a,s,false));assertNull(findText(h.itemView,"章节更新"));assertNull(findDescription(h.itemView,"加入书架"));assertNotNull(findText(h.itemView,"我的小说"));findText(h.itemView,"阅读作品").performClick();Intent resume=((org.robolectric.shadows.ShadowActivity) org.robolectric.shadow.api.Shadow.extract(a)).getNextStartedActivity();assertFalse(resume.hasExtra("chapter_id"));
 			s.novel.mode="new_book";h.bind(item(a,s,false));assertNotNull(findText(h.itemView,"新书上架"));assertNotNull(findText(h.itemView,"A description"));assertNotNull(findDescription(h.itemView,"加入书架"));
+		}
+	}
+	@Test public void repostBylineAndTypographicCoverRenderOriginalAuthorWithoutChangingPostAccount() throws Exception{
+		try(ActivityController<Activity> life=Robolectric.buildActivity(Activity.class)){
+			Activity a=life.get();a.setTheme(R.style.Theme_Mastodon_Light);life.setup();Status s=post();s.novel.mode="link";s.novel.workType="repost";s.novel.originalAuthor="原作作者";
+			NovelStatusDisplayItem.Holder holder=new NovelStatusDisplayItem.Holder(a,new FrameLayout(a));holder.bind(item(a,s,false));
+			assertNotNull(findText(holder.itemView,"原作作者 著"));assertEquals("42",s.account.id);assertEquals(42,s.novel.author.id);
+			ImageView jacket=images(holder.itemView).stream().filter(v->v.getDrawable() instanceof org.joinmastodon.android.ui.drawables.NovelCoverDrawable).findFirst().orElseThrow();
+			Field byline=org.joinmastodon.android.ui.drawables.NovelCoverDrawable.class.getDeclaredField("author");byline.setAccessible(true);assertEquals("原作作者",byline.get(jacket.getDrawable()).toString());
+			s.novel.originalAuthor=null;holder.bind(item(a,s,false));assertNotNull(findText(holder.itemView,"原作者未填写 著"));
 		}
 	}
 	@Test public void protectedRowsRequestNoImagesAndClearLateOrRecycledBitmaps(){
@@ -116,7 +126,7 @@ public class NovelStatusDisplayItemTest{
 			s.sensitive=true;NovelStatusDisplayItem hidden=item(a,s,false);assertEquals(0,hidden.getImageCount());h.bind(hidden);h.setImage(0,image);assertFalse(images(h.itemView).stream().anyMatch(v->v.getDrawable()==image));
 			s.sensitive=false;s.spoilerText="CW";s.revealedSpoilers.clear();assertEquals(0,item(a,s,false).getImageCount());s.revealedSpoilers.add(Status.SpoilerType.CONTENT_WARNING);assertEquals(1,item(a,s,false).getImageCount());
 			assertEquals(0,item(a,s,true).getImageCount());s.visibility=StatusPrivacy.PRIVATE;assertEquals(0,item(a,s,false).getImageCount());s.visibility=StatusPrivacy.DIRECT;assertEquals(0,item(a,s,false).getImageCount());
-			s.visibility=StatusPrivacy.PUBLIC;s.novel.available=false;h.bind(item(a,s,false));h.setImage(0,image);assertFalse(images(h.itemView).stream().anyMatch(v->v.getDrawable()==image));assertNotNull(findText(h.itemView,"作品暂不可用"));assertNull(findText(h.itemView,"柔软日常"));assertNull(findText(h.itemView,"阅读新章节"));
+			s.visibility=StatusPrivacy.PUBLIC;s.novel.available=false;h.bind(item(a,s,false));h.setImage(0,image);assertFalse(images(h.itemView).stream().anyMatch(v->v.getDrawable()==image));assertNotNull(findText(h.itemView,"作品暂不可用"));assertNull(findText(h.itemView,"柔软日常"));assertNull(findText(h.itemView,"查看更新"));
 		}
 	}
 	@Test @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -154,8 +164,8 @@ public class NovelStatusDisplayItemTest{
 						String readLabel=a.getString(mode.equals("new_book") ? R.string.novel_card_read_new : mode.equals("chapter_update") ? R.string.novel_card_read_update : R.string.novel_card_read_link);
 						TextView read=findText(root,readLabel);assertNotNull(read);assertTrue(read.getWidth()>0);assertTrue(read.getHeight()>=V.dp(48));
 						if(mode.equals("chapter_update"))assertEquals(ResourcesCompat.getFont(a,R.font.noto_serif_sc_regular),findText(root,s.novel.excerpt).getTypeface());
-						assertTrue(read.performClick());Intent intent=((org.robolectric.shadows.ShadowActivity) org.robolectric.shadow.api.Shadow.extract(a)).getNextStartedActivity();assertEquals("org.joinmastodon.android.novel.app.editor.NovelReaderActivity",intent.getComponent().getClassName());assertEquals("work-1",intent.getStringExtra("work_id"));
-						assertEquals(mode.equals("link") ? null : "chapter-12",intent.getStringExtra("chapter_id"));
+						assertTrue(read.performClick());Intent intent=((org.robolectric.shadows.ShadowActivity) org.robolectric.shadow.api.Shadow.extract(a)).getNextStartedActivity();assertEquals(mode.equals("link") ? "org.joinmastodon.android.novel.app.editor.NovelReaderActivity" : "org.joinmastodon.android.novel.app.NovelAppActivity",intent.getComponent().getClassName());assertEquals("work-1",intent.getStringExtra("work_id"));
+						assertFalse(intent.hasExtra("chapter_id"));
 						assertTrue(heading.performClick());assertEquals("org.joinmastodon.android.novel.app.NovelAppActivity",((org.robolectric.shadows.ShadowActivity) org.robolectric.shadow.api.Shadow.extract(a)).getNextStartedActivity().getComponent().getClassName());
 					}
 				}finally{cache.clearTopLevel();}

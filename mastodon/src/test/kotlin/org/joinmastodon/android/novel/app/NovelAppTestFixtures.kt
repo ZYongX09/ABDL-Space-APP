@@ -44,7 +44,7 @@ internal object NovelAppTestFixtures {
     }
     fun workJson(value: Work = work()): JSONObject = JSONObject()
         .put("id", value.id).put("client_work_id", value.clientWorkId).put("release_id", value.releaseId).put("title", value.title)
-        .put("description", value.description).put("work_type", value.workType).put("cover_url", value.coverUrl ?: JSONObject.NULL)
+        .put("description", value.description).put("work_type", value.workType).put("original_author", value.originalAuthor).put("cover_url", value.coverUrl ?: JSONObject.NULL)
         .put("tags", JSONArray(value.tags)).put("statements", JSONArray(value.statements)).put("source", value.source).put("authorization", value.authorization)
         .put("completed", value.completed).put("status", value.status).put("author", authorJson(value.author)).put("word_count", value.wordCount)
         .put("chapter_count", value.chapterCount).put("reads", value.reads).put("collections", value.collections).put("comments", value.comments)

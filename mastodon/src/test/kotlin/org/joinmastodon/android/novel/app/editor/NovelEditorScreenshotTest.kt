@@ -5,8 +5,21 @@ import android.net.Uri
 import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.view.inputmethod.BaseInputConnection
+import android.view.inputmethod.EditorInfo
+import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.*
 import androidx.lifecycle.ViewModelStore
 import kotlinx.coroutines.Dispatchers
@@ -124,13 +137,19 @@ class NovelEditorScreenshotTest {
         compose.onNodeWithText("AI辅助").performScrollTo().performClick()
         assertEquals("ai", controller.state.value.metadata.type)
         compose.onNodeWithText("AI 辅助说明 / 来源").assertExists()
+        compose.onNodeWithText("授权转载").performScrollTo().performClick()
+        compose.runOnUiThread { controller.metadata(controller.state.value.metadata.copy(originalAuthor = "待填写原作者")) }
+        fixture.settle(compose)
+        compose.onNode(hasSetTextAction() and hasText("待填写原作者")).performScrollTo().performTextReplacement("示例原作者")
+        assertEquals("示例原作者", controller.state.value.metadata.originalAuthor)
+        fixture.capture(compose, "metadata-repost-original-author")
         assertNoUpload()
     }
 
     @Test fun manuscriptRendersTheRealAttachedEditTextAndSaveDoesNotUpload() {
         openWork(editor = true); show()
         compose.onNodeWithText("小说编辑").assertIsDisplayed()
-        compose.onNodeWithText("正文编辑").assertIsDisplayed()
+        compose.onNodeWithText("正文编辑").assertDoesNotExist()
         compose.onNodeWithText("提交章节审核").assertIsEnabled()
         compose.onNodeWithContentDescription("新段落并缩进").assertHasClickAction()
         compose.runOnUiThread {
@@ -226,6 +245,7 @@ class NovelEditorScreenshotTest {
     fun narrowDarkManuscriptKeepsTheActualTextWidgetAndPinnedSaveSubmitActionsVisible() {
         openWork(editor = true); show(dark = true)
         compose.onNodeWithText("小说编辑").assertIsDisplayed()
+        compose.onNodeWithText("正文编辑").assertDoesNotExist()
         compose.onNodeWithText("保存草稿").assertIsDisplayed().assertIsEnabled()
         compose.onNodeWithText("提交章节审核").assertIsDisplayed().assertIsEnabled()
         compose.runOnUiThread {
@@ -235,6 +255,150 @@ class NovelEditorScreenshotTest {
         }
         fixture.capture(compose, "manuscript-dark-320x640", 13)
         assertNoUpload()
+    }
+
+    @Test fun nativeBodyFocusCompactsWithoutReplacingEditTextOrComposingAndDoneRestoresActions() {
+        openWork(editor = true); show()
+        val native = requireNotNull(findManuscript(compose.activity.window.decorView))
+        val input = native.getChildAt(1) as EditText
+        val beforeHeight = input.height
+        fixture.capture(compose, "editing-before-focus")
+        compose.runOnUiThread {
+            assertTrue(input.requestFocus())
+            val connection = requireNotNull(input.onCreateInputConnection(EditorInfo()))
+            assertTrue(connection.setComposingText("正在组合", 1))
+        }
+        val editable = input.text
+        fixture.settle(compose)
+        assertSame(native, findManuscript(compose.activity.window.decorView))
+        assertSame(input, requireNotNull(findManuscript(compose.activity.window.decorView)).getChildAt(1))
+        assertSame(editable, input.text)
+        assertTrue(input.hasFocus()); assertTrue(BaseInputConnection.getComposingSpanStart(input.text) >= 0)
+        assertTrue("Compact mode must increase the real native writing area", input.height > beforeHeight)
+        compose.onNodeWithText("提交章节审核").assertDoesNotExist()
+        compose.onNodeWithText("完成").assertIsDisplayed().assertIsEnabled()
+        fixture.capture(compose, "editor-focus-compact")
+        controller.saveExplicit(); fixture.settle(compose)
+        assertSame(editable, input.text); assertTrue(BaseInputConnection.getComposingSpanStart(input.text) >= 0)
+        NovelEditorStorage(app, account).use { assertEquals(input.text.toString(), it.loadDraft(work!!.chapterId()).content()) }
+        click("完成")
+        assertSame(native, findManuscript(compose.activity.window.decorView))
+        assertFalse(input.hasFocus())
+        compose.onNodeWithText("提交章节审核").assertIsDisplayed().assertIsEnabled()
+        fixture.capture(compose, "editor-focus-done")
+        assertNoUpload()
+    }
+
+    @Test
+    @Config(qualifiers = "zh-rCN-w320dp-h640dp-notnight-mdpi")
+    fun threeDigitChapterNumbersHaveOneUnclippedMeasuredLineAtScaledFonts() {
+        compose.runOnUiThread {
+            val created = NovelEditorStorage(app, account).use { storage ->
+                storage.createWork("百章目录", "真实数字测量", "fiction").also { created ->
+                    storage.putAppMetadata(created.workId(), metadata.json().toString(), null, null)
+                    repeat(102) { storage.addChapter(created.workId(), created.volumeId(), "章节${it + 2}") }
+                }
+            }
+            work = created; controller.open(created.workId(), null, "edit")
+        }
+        fixture.show(compose) {
+            CompositionLocalProvider(LocalDensity provides Density(1f, 1.5f)) {
+                val state by controller.state.collectAsState()
+                NovelCreationScreen(state, controller, {}, {}, { _, _ -> })
+            }
+        }
+        compose.onNodeWithText("倒序").performClick(); fixture.settle(compose)
+        for (number in listOf(103, 102, 100)) {
+            compose.onNodeWithText(number.toString()).performScrollTo()
+            // The merged clickable row can be visible while its centered number is still clipped.
+            // Center the actual unmerged Text using its unclipped position, not the row's bounds.
+            for (attempt in 0 until 8) {
+                val target = compose.nodes(unmerged = true).single { it.config.getOrNull(SemanticsProperties.TestTag) == "chapter-number-$number" }
+                val scroller = generateSequence(target) { it.parent }.first { it.config.getOrNull(SemanticsActions.ScrollBy)?.action != null }
+                val viewport = scroller.boundsInWindow
+                val top = target.positionInWindow.y
+                val bottom = top + target.size.height
+                if (top >= viewport.top + 8f && bottom <= viewport.bottom - 8f && target.boundsInWindow.height >= target.size.height) break
+                val distance = (top + bottom - viewport.top - viewport.bottom) / 2f
+                if (!requireNotNull(scroller.config.getOrNull(SemanticsActions.ScrollBy)?.action).invoke(0f, distance)) break
+                fixture.settle(compose)
+            }
+            fixture.settle(compose)
+            fixture.capture(compose, "chapter-number-$number-scaled")
+            val node = compose.nodes(unmerged = true).single { it.config.getOrNull(SemanticsProperties.TestTag) == "chapter-number-$number" }
+            val layouts = mutableListOf<TextLayoutResult>()
+            assertTrue(requireNotNull(node.config.getOrNull(SemanticsActions.GetTextLayoutResult)?.action).invoke(layouts))
+            val layout = layouts.single()
+            assertEquals(number.toString(), layout.layoutInput.text.text)
+            assertEquals(1.5f, layout.layoutInput.density.fontScale, 0f)
+            assertEquals(1, layout.lineCount); assertFalse(layout.layoutInput.softWrap); assertEquals(1, layout.layoutInput.maxLines)
+            assertFalse("Canonical layout overflows for $number: size=${layout.size}, bounds=${node.boundsInWindow}", layout.hasVisualOverflow)
+            assertFalse(layout.isLineEllipsized(0))
+            assertEquals(number.toString().length, layout.getLineEnd(0, visibleEnd = true))
+            val bounds = node.boundsInWindow
+            assertTrue("Measured number $number must have visible height: bounds=$bounds, position=${node.positionInWindow}, size=${node.size}, layout=${layout.size}", bounds.height >= layout.size.height)
+            assertTrue("Actual measured column must contain all three digits", bounds.width >= layout.getLineRight(0) - layout.getLineLeft(0))
+            assertTrue("Number column must remain wholly inside the narrow viewport", bounds.left >= 0f && bounds.right <= compose.viewport().first)
+            for (offset in number.toString().indices) {
+                val glyph = layout.getBoundingBox(offset)
+                assertTrue("Digit $offset of $number must fit horizontally: $glyph in $bounds", glyph.left >= 0f && glyph.right <= bounds.width)
+                assertTrue("Digit $offset of $number must fit vertically: $glyph in $bounds", glyph.top >= 0f && glyph.bottom <= bounds.height)
+            }
+        }
+        assertNoUpload()
+    }
+
+    @Test fun localCoverNativeCanvasPreviewSwitchRemoveAndRestoreNeverDrawsARecycledOrStaleBitmap() {
+        val first = File(app.cacheDir, "preview-${UUID.randomUUID()}.png")
+        val second = File(app.cacheDir, "preview-${UUID.randomUUID()}.png")
+        fun create(file: File, color: Int) {
+            val image = Bitmap.createBitmap(30, 40, Bitmap.Config.ARGB_8888)
+            try { image.eraseColor(color); file.outputStream().use { assertTrue(image.compress(Bitmap.CompressFormat.PNG, 100, it)) } }
+            finally { image.recycle() }
+        }
+        create(first, Color.RED); create(second, Color.BLUE)
+        var data by mutableStateOf(metadata.copy(localCover = first.path, coverUrl = "https://media.example.test/old.png", coverPending = true))
+        try {
+            fixture.show(compose) { NovelEditorCover(data, Modifier.size(90.dp, 120.dp)) }
+            fun center(): Int {
+                val (width, height) = compose.viewport()
+                val image = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                return try { compose.attachedComposeView.draw(Canvas(image)); image.getPixel(45, 60) }
+                finally { image.recycle() }
+            }
+            fun awaitPixel(expected: Int) {
+                val deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5)
+                while (System.nanoTime() < deadline) {
+                    fixture.settle(compose)
+                    if (center() == expected) return
+                    Thread.yield()
+                }
+                assertEquals("Actual decoded cover must render on the native Canvas", expected, center())
+            }
+            awaitPixel(Color.RED)
+            compose.onNodeWithContentDescription("本地封面预览").assertIsDisplayed()
+            repeat(3) {
+                compose.runOnUiThread { data = data.copy(localCover = second.path) }
+                awaitPixel(Color.BLUE)
+                compose.runOnUiThread { data = data.copy(localCover = first.path) }
+                awaitPixel(Color.RED)
+                compose.runOnUiThread { data = data.copy(localCover = null, coverUrl = null, coverPending = false) }
+                fixture.settle(compose)
+                compose.onNodeWithContentDescription("本地封面预览").assertDoesNotExist()
+                center() // A retired Compose draw frame must never contain a recycled bitmap.
+                compose.runOnUiThread { data = data.copy(localCover = first.path, coverPending = true) }
+                awaitPixel(Color.RED)
+            }
+            compose.runOnUiThread { controller.open(null, null, "create"); controller.metadata(data) }
+            show()
+            val deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5)
+            while (System.nanoTime() < deadline && compose.nodes().none { it.config.getOrNull(SemanticsProperties.ContentDescription)?.contains("本地封面预览") == true }) {
+                fixture.settle(compose); Thread.yield()
+            }
+            compose.onNodeWithContentDescription("本地封面预览").assertIsDisplayed()
+            fixture.capture(compose, "local-cover-selected")
+            assertNoUpload()
+        } finally { first.delete(); second.delete() }
     }
 
     private fun findManuscript(view: View): NovelManuscriptView? {
