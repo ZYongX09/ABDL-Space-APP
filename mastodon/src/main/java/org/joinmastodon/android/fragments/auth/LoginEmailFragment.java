@@ -101,9 +101,9 @@ public class LoginEmailFragment extends AppKitFragment {
         // 标题彩色文字
         TextView titleView = view.findViewById(R.id.title);
         if (isDark) {
-            titleView.setText(android.text.Html.fromHtml("<font color='#FFFFFF'>欢迎登录 </font><font color='#A1D9F7'>ABDL Space</font>"));
+            titleView.setText(android.text.Html.fromHtml("<font color='#FFFFFF'>"+getString(R.string.general_welcome)+"</font><font color='#A1D9F7'>ABDL Space</font>"));
         } else {
-            titleView.setText(android.text.Html.fromHtml("<font color='#333333'>欢迎登录 </font><font color='#A1D9F7'>ABDL Space</font>"));
+            titleView.setText(android.text.Html.fromHtml("<font color='#333333'>"+getString(R.string.general_welcome)+"</font><font color='#A1D9F7'>ABDL Space</font>"));
         }
 
         // 浅色/深色模式适配
@@ -140,7 +140,7 @@ public class LoginEmailFragment extends AppKitFragment {
         btnSendCode.setOnClickListener(v -> {
             String email = emailEdit.getText().toString().trim();
             if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
-                Toast.makeText(getActivity(), "请输入有效的邮箱地址", Toast.LENGTH_SHORT).show();
+                Toast.makeText(getActivity(), getString(R.string.signup_email_invalid), Toast.LENGTH_SHORT).show();
                 return;
             }
             sendCode(email);

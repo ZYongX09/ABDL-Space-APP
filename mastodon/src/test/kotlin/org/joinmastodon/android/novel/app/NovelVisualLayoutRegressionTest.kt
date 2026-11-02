@@ -243,13 +243,13 @@ class NovelVisualLayoutRegressionTest {
     }
 
     @Test fun compactFormatterHandlesThresholdsAndLongEdgesWithoutFloatRounding() {
-        assertEquals("9999".toLong().novelNumber(), 9999L.novelCompactNumber())
-        assertEquals("1万", 10_000L.novelCompactNumber())
-        assertEquals("3.2万", 32_000L.novelCompactNumber())
-        assertEquals("1亿", 100_000_000L.novelCompactNumber())
-        assertEquals("1万亿", 1_000_000_000_000L.novelCompactNumber())
-        assertEquals("9223372万亿", Long.MAX_VALUE.novelCompactNumber())
-        assertEquals("-9223372万亿", Long.MIN_VALUE.novelCompactNumber())
+        assertEquals("9999".toLong().novelNumber(java.util.Locale.SIMPLIFIED_CHINESE), 9999L.novelCompactNumber(java.util.Locale.SIMPLIFIED_CHINESE))
+        assertEquals("1万", 10_000L.novelCompactNumber(java.util.Locale.SIMPLIFIED_CHINESE))
+        assertEquals("3.2万", 32_000L.novelCompactNumber(java.util.Locale.SIMPLIFIED_CHINESE))
+        assertEquals("1亿", 100_000_000L.novelCompactNumber(java.util.Locale.SIMPLIFIED_CHINESE))
+        assertEquals("1万亿", 1_000_000_000_000L.novelCompactNumber(java.util.Locale.SIMPLIFIED_CHINESE))
+        assertEquals("9223372万亿", Long.MAX_VALUE.novelCompactNumber(java.util.Locale.SIMPLIFIED_CHINESE))
+        assertEquals("-9223372万亿", Long.MIN_VALUE.novelCompactNumber(java.util.Locale.SIMPLIFIED_CHINESE))
     }
 
     private fun descendants(view: View): List<View> = listOf(view) + if (view is ViewGroup) (0 until view.childCount).flatMap { descendants(view.getChildAt(it)) } else emptyList()

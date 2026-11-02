@@ -158,7 +158,7 @@ class NovelAppApi private constructor(
         if (source.request(MAX_RESPONSE_BYTES + 1L) && source.buffer().size() > MAX_RESPONSE_BYTES) throw IOException("Novel response exceeds 10 MiB")
         val text = source.readUtf8()
         val parsed = runCatching { JSONObject(text) }.getOrNull()
-        if (!it.isSuccessful) throw NovelAppApiException(it.code(), parsed?.optString("code")?.ifBlank { "http_${it.code()}" } ?: "http_${it.code()}", parsed, parsed?.optString("error")?.ifBlank { null } ?: "请求失败（${it.code()}）")
+        if (!it.isSuccessful) throw NovelAppApiException(it.code(), parsed?.optString("code")?.ifBlank { "http_${it.code()}" } ?: "http_${it.code()}", parsed, parsed?.optString("error")?.ifBlank { null } ?: "Novel request failed (${it.code()})")
         return parsed ?: throw IOException("Novel API returned invalid JSON")
     }
 

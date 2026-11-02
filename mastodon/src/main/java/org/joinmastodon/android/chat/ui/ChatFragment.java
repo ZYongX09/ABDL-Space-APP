@@ -101,7 +101,7 @@ public class ChatFragment extends Fragment implements WindowInsetsAwareFragment 
 		backBtn.setImageTintList(ColorStateList.valueOf(UiUtils.getThemeColor(getActivity(), R.attr.colorM3OnSurface)));
 		backBtn.setOnClickListener(v -> getActivity().onBackPressed());
 		TextView peerNameView = view.findViewById(R.id.peer_name);
-		peerNameView.setText(peerName == null || peerName.isEmpty() ? "私信" : peerName);
+		peerNameView.setText(peerName == null || peerName.isEmpty() ? getString(org.joinmastodon.android.R.string.messages) : peerName);
 		ImageView peerAvatarView = view.findViewById(R.id.peer_avatar);
 		if (peerAvatar != null && !peerAvatar.isEmpty()) {
 			ViewImageLoader.load(new ViewImageLoader.Target() {

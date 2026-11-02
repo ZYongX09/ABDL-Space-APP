@@ -54,7 +54,7 @@ import me.grishka.appkit.Nav;
 import me.grishka.appkit.utils.V;
 
 @RunWith(RobolectricTestRunner.class)
-@Config(sdk=28, application=CompatibilityTestApplication.class)
+@Config(qualifiers="zh", sdk=28, application=CompatibilityTestApplication.class)
 public class FriendCardStatusDisplayItemTest{
 	@Before public void setup(){
 		MastodonApp.context=RuntimeEnvironment.getApplication(); V.setApplicationContext(MastodonApp.context);
@@ -336,7 +336,7 @@ public class FriendCardStatusDisplayItemTest{
 	}
 
 	@Test @GraphicsMode(GraphicsMode.Mode.NATIVE)
-	@Config(qualifiers="w393dp-h852dp-mdpi")
+	@Config(qualifiers="zh-w393dp-h852dp-mdpi")
 	public void rotatedLinkReservesAllCornersAndAntialiasGutterWithoutGrowingThePortrait(){
 		assertEquals(1f,MastodonApp.context.getResources().getDisplayMetrics().density,.001f);
 		for(boolean dark:new boolean[]{false,true}){
@@ -459,7 +459,7 @@ public class FriendCardStatusDisplayItemTest{
 
 	// Wrapping and ellipsis require native text metrics; legacy graphics reports a synthetic single line.
 	@Test @GraphicsMode(GraphicsMode.Mode.NATIVE)
-	@Config(qualifiers="w393dp-h852dp-mdpi")
+	@Config(qualifiers="zh-w393dp-h852dp-mdpi")
 	public void unavailableLinkDoesNotRetainOwnerDeclarationOrChevronAndLongTextIsBounded(){
 		try(ActivityController<Activity> lifecycle=Robolectric.buildActivity(Activity.class)){
 			Activity activity=lifecycle.get(); activity.setTheme(R.style.Theme_Mastodon_Light); lifecycle.setup();

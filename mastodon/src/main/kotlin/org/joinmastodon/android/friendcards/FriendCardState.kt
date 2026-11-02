@@ -1,5 +1,6 @@
 package org.joinmastodon.android.friendcards
 
+import org.joinmastodon.android.R
 import com.google.gson.GsonBuilder
 import org.joinmastodon.android.api.requests.friendcards.FriendCardInput
 import org.joinmastodon.android.api.requests.friendcards.FriendCardResponses
@@ -9,35 +10,38 @@ import java.util.UUID
 /** Pure editor rules. Placeholders never enter the input and optional fields stay optional. */
 object FriendCardRules {
     val gson = GsonBuilder().serializeNulls().create()
-    val fields = linkedMapOf("gender" to "性别", "age" to "年龄展示", "zodiac" to "星座", "region" to "地区", "school" to "学校", "mbti" to "MBTI", "interaction_habits" to "互动习惯", "interests" to "我喜欢", "games" to "我在玩", "diapers" to "我穿过", "looking_for" to "我想找", "boundaries" to "边界声明")
+    // Stable wire keys and their order never depend on the display language.
+    val fields = linkedMapOf("gender" to R.string.fc_field_gender, "age" to R.string.fc_field_age, "zodiac" to R.string.fc_field_zodiac, "region" to R.string.fc_field_region, "school" to R.string.fc_field_school, "mbti" to R.string.fc_field_mbti, "interaction_habits" to R.string.fc_field_habits, "interests" to R.string.fc_field_interests, "games" to R.string.fc_field_games, "diapers" to R.string.fc_field_diapers, "looking_for" to R.string.fc_field_looking_for, "boundaries" to R.string.fc_field_boundaries)
+    @androidx.annotation.StringRes fun fieldLabel(key: String): Int = fields.getValue(key)
     fun copy(input: FriendCardInput): FriendCardInput = gson.fromJson(gson.toJson(input), FriendCardInput::class.java)
     fun length(value: String) = value.codePointCount(0, value.length)
     fun validate(input: FriendCardInput): String? {
-        val strings = listOf(Triple(input.title, 40, "宣言"), Triple(input.gender, 24, "性别"), Triple(input.age, 12, "年龄展示"), Triple(input.zodiac, 12, "星座"), Triple(input.region, 60, "地区"), Triple(input.school, 60, "学校"), Triple(input.mbti, 16, "MBTI"), Triple(input.interactionHabits, 120, "互动习惯"), Triple(input.lookingFor, 300, "我想找"), Triple(input.boundaries, 200, "边界声明"))
-        if (input.title.isNullOrBlank()) return "请填写宣言"
-        if (input.lookingFor.isNullOrBlank()) return "请填写我想找"
-        strings.forEach { (value, max, label) -> if (length(value.orEmpty()) > max) return "$label 最多 $max 字" }
-        if (input.interests.size > 12 || input.interests.any { it.isBlank() || length(it) > 16 }) return "兴趣最多12项，每项1–16字"
-        if (input.games.size > 8 || input.games.any { it.isBlank() || length(it) > 30 }) return "游戏最多8项，每项1–30字"
-        if (input.diaperIds.size > 8 || input.diaperIds.any { it <= 0 } || input.diaperIds.distinct().size != input.diaperIds.size) return "请选择最多8款库内商品"
+        val strings = listOf(Triple(input.title, 40, R.string.fc_field_title), Triple(input.gender, 24, fieldLabel("gender")), Triple(input.age, 12, fieldLabel("age")), Triple(input.zodiac, 12, fieldLabel("zodiac")), Triple(input.region, 60, fieldLabel("region")), Triple(input.school, 60, fieldLabel("school")), Triple(input.mbti, 16, fieldLabel("mbti")), Triple(input.interactionHabits, 120, fieldLabel("interaction_habits")), Triple(input.lookingFor, 300, fieldLabel("looking_for")), Triple(input.boundaries, 200, fieldLabel("boundaries")))
+        if (input.title.isNullOrBlank()) return FriendCardText.get(R.string.fc_title_required)
+        if (input.lookingFor.isNullOrBlank()) return FriendCardText.get(R.string.fc_looking_for_required)
+        strings.forEach { (value, max, label) -> if (length(value.orEmpty()) > max) return FriendCardText.get(R.string.fc_field_length, FriendCardText.get(label), max) }
+        if (input.interests.size > 12 || input.interests.any { it.isBlank() || length(it) > 16 }) return FriendCardText.get(R.string.fc_interests_invalid)
+        if (input.games.size > 8 || input.games.any { it.isBlank() || length(it) > 30 }) return FriendCardText.get(R.string.fc_games_invalid)
+        if (input.diaperIds.size > 8 || input.diaperIds.any { it <= 0 } || input.diaperIds.distinct().size != input.diaperIds.size) return FriendCardText.get(R.string.fc_diapers_invalid)
         FriendCardSocialRules.validate(input.socialAccounts)?.let { return it }
-        if (input.publicFields.any { it !in fields }) return "公开字段无效"
-        if (!input.coverFocusX.isFinite() || !input.coverFocusY.isFinite() || input.coverFocusX !in 0f..1f || input.coverFocusY !in 0f..1f) return "封面焦点无效"
+        if (input.publicFields.any { it !in fields }) return FriendCardText.get(R.string.fc_public_fields_invalid)
+        if (!input.coverFocusX.isFinite() || !input.coverFocusY.isFinite() || input.coverFocusX !in 0f..1f || input.coverFocusY !in 0f..1f) return FriendCardText.get(R.string.fc_cover_focus_invalid)
         return null
     }
     data class TagResult(val values: List<String>, val remainingInput: String, val error: String? = null)
     fun addTag(values: List<String>, raw: String, maximum: Int, maxLength: Int): TagResult {
         val tag = raw.trim()
         val error = when {
-            tag.isEmpty() -> "请输入标签"
-            length(tag) > maxLength -> "每项最多${maxLength}字"
-            values.any { it.trim().equals(tag, ignoreCase = true) } -> "已经添加过了"
-            values.size >= maximum -> "最多添加${maximum}项"
+            tag.isEmpty() -> FriendCardText.get(R.string.fc_tag_required)
+            length(tag) > maxLength -> FriendCardText.get(R.string.fc_tag_length, maxLength)
+            values.any { it.trim().equals(tag, ignoreCase = true) } -> FriendCardText.get(R.string.fc_tag_duplicate)
+            values.size >= maximum -> FriendCardText.get(R.string.fc_tag_limit, maximum)
             else -> null
         }
         return if (error == null) TagResult(values + tag, "") else TagResult(values, raw, error)
     }
-    fun gameName(value: String, games: List<FriendCardResponses.Game>) = games.firstOrNull { it.id == value }?.name ?: FriendCardGames.gameName(value)
+    fun gameName(value: String, games: List<FriendCardResponses.Game>, context: android.content.Context = org.joinmastodon.android.MastodonApp.context): String =
+        FriendCardGames.gameName(value, games.firstOrNull { it.id == value }?.name, context)
     fun gameKey(value: String, games: List<FriendCardResponses.Game>): String {
         val text = value.trim()
         return games.firstOrNull { it.id.equals(text, true) || it.name.equals(text, true) }?.id ?: FriendCardGames.gameKey(text)
@@ -56,13 +60,13 @@ object FriendCardRules {
         socialAccounts = input.socialAccounts.orEmpty().filter { it.isPublic }.map(FriendCardSocialRules::copy)
         this.coverUrl = coverUrl; coverFocusX = input.coverFocusX; coverFocusY = input.coverFocusY
     }
-    fun legacyText(card: FriendCard, games: List<FriendCardResponses.Game>): String = buildList {
-        add("扩列 · ${card.title}")
-        fun line(key: String, value: String?) { if (card.isPublic(key) && !value.isNullOrBlank()) add("${fields[key]}：$value") }
+    fun legacyText(card: FriendCard, games: List<FriendCardResponses.Game>, context: android.content.Context = org.joinmastodon.android.MastodonApp.context): String = buildList {
+        add(context.getString(R.string.fc_legacy_heading, card.title))
+        fun line(key: String, value: String?) { if (card.isPublic(key) && !value.isNullOrBlank()) add(context.getString(R.string.fc_legacy_line, context.getString(fieldLabel(key)), value)) }
         line("gender", card.gender); line("age", card.age); line("zodiac", card.zodiac); line("region", card.region); line("school", card.school); line("mbti", card.mbti); line("interaction_habits", card.interactionHabits)
-        line("interests", card.interests.orEmpty().joinToString("、")); line("games", card.games.orEmpty().joinToString("、") { gameName(it, games) }); line("diapers", card.diapers.orEmpty().joinToString("、") { it.name.orEmpty() })
+        line("interests", card.interests.orEmpty().joinToString(context.getString(R.string.fc_list_separator))); line("games", card.games.orEmpty().joinToString(context.getString(R.string.fc_list_separator)) { gameName(it, games, context) }); line("diapers", card.diapers.orEmpty().joinToString(context.getString(R.string.fc_list_separator)) { it.name.orEmpty() })
         line("looking_for", card.lookingFor); line("boundaries", card.boundaries)
-        card.socialAccounts.orEmpty().filter { it.isPublic }.forEach { add("${FriendCardSocialRules.platformName(it)}：${it.account.orEmpty()}") }
+        card.socialAccounts.orEmpty().filter { it.isPublic }.forEach { add(context.getString(R.string.fc_legacy_line, FriendCardSocialRules.platformName(it, context), it.account.orEmpty())) }
     }.joinToString("\n")
 }
 
@@ -117,7 +121,7 @@ class FriendCardPages {
     }
     fun accept(ticket: Ticket, values: List<FriendCard>, next: String?): Boolean {
         if (ticket.generation != generation || ticket.cursor != nextCursor || !loading) return false
-        if (values.any { !it.isSupported }) { loading = false; error = "扩列卡格式暂不受支持，请稍后重试"; return false }
+        if (values.any { !it.isSupported }) { loading = false; error = FriendCardText.get(R.string.fc_unsupported_format); return false }
         cards = (cards + values).distinctBy { it.id }
         ticket.cursor?.let { seenCursors.add(it) }
         nextCursor = next?.takeIf { it.isNotBlank() && it != ticket.cursor && it !in seenCursors }
@@ -154,8 +158,8 @@ class FriendCardDiaperSelection(val account: String, val draftId: String, select
     fun interrupt() { generation++; loading = false }
     fun toggle(id: Int): String? {
         if (selected.remove(id)) return null
-        if (selected.size >= 8) return "最多选择8款纸尿裤"
-        if (id <= 0) return "商品无效"
+        if (selected.size >= 8) return FriendCardText.get(R.string.fc_diapers_limit)
+        if (id <= 0) return FriendCardText.get(R.string.fc_product_invalid)
         selected.add(id); return null
     }
     fun resultMatches(account: String?, draft: String?) = this.account == account && draftId == draft

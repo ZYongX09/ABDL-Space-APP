@@ -32,7 +32,7 @@ import org.robolectric.annotation.Config
 import java.util.UUID
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [32])
+@Config(sdk = [32], qualifiers = "zh-rCN")
 class NovelReaderBehaviorTest {
     private val app = ApplicationProvider.getApplicationContext<Application>()
     private val account = "reader-behavior-${UUID.randomUUID()}"

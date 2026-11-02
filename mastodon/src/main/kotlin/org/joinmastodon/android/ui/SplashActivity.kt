@@ -192,7 +192,7 @@ private fun SkipButton(secondsLeft: Int, onClick: () -> Unit, modifier: Modifier
             .padding(horizontal = 14.dp, vertical = 8.dp),
     ) {
         Text(
-            text = "跳过(${secondsLeft}s)",
+            text = androidx.compose.ui.res.stringResource(R.string.general_skip_seconds, secondsLeft),
             color = MiuixTheme.colorScheme.onSurface,
             fontSize = 14.sp,
             fontWeight = FontWeight.Medium,

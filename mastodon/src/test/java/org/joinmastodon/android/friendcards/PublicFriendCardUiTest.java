@@ -55,7 +55,7 @@ import me.grishka.appkit.utils.V;
 
 /** Real native Views/Canvas, with no HTTP, Compose painter, fixture images or generated UI. */
 @RunWith(RobolectricTestRunner.class)
-@Config(sdk=28, qualifiers="w393dp-h852dp-mdpi", application=CompatibilityTestApplication.class,
+@Config(sdk=28, qualifiers="zh-w393dp-h852dp-mdpi", application=CompatibilityTestApplication.class,
 		shadows=PublicFriendCardUiTest.NoNetwork.class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 public class PublicFriendCardUiTest{
@@ -174,7 +174,7 @@ public class PublicFriendCardUiTest{
 		}
 	}
 
-	@Test @Config(sdk={26,28,32})
+	@Test @Config(qualifiers="zh", sdk={26,28,32})
 	public void actualProfileLayoutMiniStartsGoneAndClearsPausedEditedUnknownAndReboundState() throws Exception{
 		for(boolean dark:new boolean[]{false,true}) try(ActivityController<Activity> lifecycle=host(dark)){
 			Activity activity=lifecycle.get(); View profile=LayoutInflater.from(activity).inflate(R.layout.fragment_profile,null,false);
@@ -226,7 +226,7 @@ public class PublicFriendCardUiTest{
 		}
 	}
 
-	@Test @Config(sdk={26,28,32},qualifiers="w280dp-h640dp-mdpi")
+	@Test @Config(sdk={26,28,32},qualifiers="zh-w280dp-h640dp-mdpi")
 	public void narrowProfileKeepsFollowingAndCardTogetherWithoutClippingAtLargeFontScale() throws Exception{
 		RuntimeEnvironment.setFontScale(2f);
 		for(boolean dark:new boolean[]{false,true}) try(ActivityController<Activity> lifecycle=host(dark)){

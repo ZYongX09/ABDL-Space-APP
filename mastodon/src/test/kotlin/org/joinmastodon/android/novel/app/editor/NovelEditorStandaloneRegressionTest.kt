@@ -215,7 +215,7 @@ class NovelEditorStandaloneRegressionTest {
         }
         val error = runCatching { NovelSubmissionSender(repo(testScheduler)).send(id) }.exceptionOrNull()
         assertTrue("Expected total-byte validation, got $error", error is IllegalArgumentException)
-        assertTrue(requireNotNull(error).message!!.contains("20 MiB")); assertTrue(api.requests.isEmpty()); storage { assertEquals("首发正文", it.loadDraft(work.chapterId()).content()) }
+        assertTrue(org.joinmastodon.android.novel.app.novelMessage(app, requireNotNull(error).message!!).contains("20 MiB")); assertTrue(api.requests.isEmpty()); storage { assertEquals("首发正文", it.loadDraft(work.chapterId()).content()) }
     }
 
     @Test fun explicitCancellationFailureKeepsFrozenKeyAndSuccessfulReplayDoesNotLoseDraft() = runTest {

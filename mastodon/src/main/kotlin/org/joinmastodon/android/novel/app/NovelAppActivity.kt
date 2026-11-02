@@ -1,5 +1,8 @@
 package org.joinmastodon.android.novel.app
 
+import org.joinmastodon.android.R
+import androidx.compose.ui.res.stringResource
+
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color as AndroidColor
@@ -133,8 +136,8 @@ class NovelAppActivity : ComponentActivity(), NavigationEventDispatcherOwner {
     }
     private fun goBack() { if (model?.back() != true) finish() }
     private fun openAccountAction(action: String) { accountId?.let { startActivity(NovelAccountActionActivity.intent(this, it, action)) } }
-    private fun shareWork(work: Work) { shareText(listOf("《${work.title}》 · ${work.displayAuthorName}", work.description, "ABDL Space 小说").filter { it.isNotBlank() }.joinToString("\n\n")) }
-    private fun shareText(text: String) { startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text), "分享")) }
+    private fun shareWork(work: Work) { shareText(listOf("《${work.title}》 · ${work.displayAuthorName(this)}", work.description, getString(R.string.novel_en_share_signature)).filter { it.isNotBlank() }.joinToString("\n\n")) }
+    private fun shareText(text: String) { startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text), getString(R.string.novel_en_share))) }
 
     companion object {
         const val EXTRA_ACCOUNT = "account"
@@ -218,8 +221,8 @@ class NovelAccountActionActivity : FragmentStackActivity() {
         if (notice != null) Surface(color = if (state.actionError != null) NovelTheme.colors.surface else NovelTheme.colors.primaryContainer,
             shape = CircleShape, modifier = Modifier.align(Alignment.TopCenter).padding(16.dp)) {
             Row(Modifier.padding(start = 18.dp, end = 5.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(notice, color = if (state.actionError != null) NovelTheme.colors.error else NovelTheme.colors.text, fontSize = 12.sp, modifier = Modifier.weight(1f, fill = false).padding(vertical = 12.dp))
-                NovelIconButton(NovelIcons.X, "关闭提示", vm::dismissNotice)
+                Text(novelMessage(notice), color = if (state.actionError != null) NovelTheme.colors.error else NovelTheme.colors.text, fontSize = 12.sp, modifier = Modifier.weight(1f, fill = false).padding(vertical = 12.dp))
+                NovelIconButton(NovelIcons.X, stringResource(R.string.novel_en_dismiss_notice), vm::dismissNotice)
             }
         }
     }
@@ -319,7 +322,7 @@ internal class NovelBackdropCaptureBinding(
 }
 
 @Composable internal fun NovelBottomNavigation(selected: Int, liquid: Boolean, backdrop: top.yukonga.miuix.kmp.blur.Backdrop, onSelect: (Int) -> Unit) {
-    val items = listOf(NavigationItem("书城", NovelIcons.Compass), NavigationItem("书架", NovelIcons.Library), NavigationItem("创作", NovelIcons.PenLine))
+    val items = listOf(NavigationItem(stringResource(R.string.novel_en_store), NovelIcons.Compass), NavigationItem(stringResource(R.string.novel_en_shelf), NovelIcons.Library), NavigationItem(stringResource(R.string.novel_en_create), NovelIcons.PenLine))
     val c = NovelTheme.colors
     if (liquid) {
         val dark = c.background.luminance() < .5f

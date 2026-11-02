@@ -46,7 +46,7 @@ import me.grishka.appkit.api.Callback;
 import me.grishka.appkit.utils.V;
 
 @RunWith(RobolectricTestRunner.class)
-@Config(sdk=28, application=CompatibilityTestApplication.class,
+@Config(qualifiers="zh", sdk=28, application=CompatibilityTestApplication.class,
 		shadows={FriendCardEntryRoutingTest.LocalNavigation.class, FriendCardEntryRoutingTest.LocalRequests.class})
 public class FriendCardEntryRoutingTest{
 	@Implements(Nav.class) public static class LocalNavigation{

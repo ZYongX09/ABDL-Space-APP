@@ -10,10 +10,14 @@
         android:layout_height="match_parent" />
 
     <!-- 登录 UI 层 -->
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true">
     <LinearLayout
         android:id="@+id/content_container"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="wrap_content"
         android:orientation="vertical"
         android:gravity="center_horizontal">
 
@@ -30,7 +34,7 @@
             android:tint="?colorM3OnSurface"
             android:background="?android:attr/selectableItemBackgroundBorderless"
             android:visibility="gone"
-            android:contentDescription="返回" />
+            android:contentDescription="@string/back" />
 
         <View
             android:layout_width="0dp"
@@ -64,7 +68,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginBottom="36dp"
-            android:text="探索全新世界"
+            android:text="@string/general_explore_world"
             android:textSize="13sp"
             android:textColor="?colorM3OnSurfaceVariant" />
 
@@ -79,9 +83,10 @@
             <EditText
                 android:id="@+id/email_edit"
                 android:layout_width="match_parent"
-                android:layout_height="56dp"
+                android:layout_height="wrap_content"
+                android:minHeight="56dp"
                 android:background="@drawable/bg_glass_light"
-                android:hint="请输入邮箱"
+                android:hint="@string/general_email_hint"
                 android:inputType="textEmailAddress"
                 android:autofillHints="emailAddress"
                 android:singleLine="true"
@@ -100,7 +105,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:layout_marginBottom="16dp"
-                android:text="未注册的邮箱验证后自动创建ABDL Space账号"
+                android:text="@string/general_email_signup_hint"
                 android:textSize="12sp"
                 android:textColor="?colorM3OnSurfaceVariant"
                 android:gravity="center" />
@@ -134,13 +139,14 @@
             <Button
                 android:id="@+id/btn_send_code"
                 android:layout_width="match_parent"
-                android:layout_height="56dp"
+                android:layout_height="wrap_content"
+                android:minHeight="56dp"
                 android:background="@drawable/bg_btn_gradient_purple"
-                android:text="获取验证码"
+                android:text="@string/general_get_code"
                 android:textSize="17sp"
                 android:textAllCaps="false"
                 android:enabled="false"
-                android:textColor="#FFFFFF" />
+                android:textColor="#FFFFFF" android:singleLine="false" />
 
             <!-- 分隔线 -->
             <LinearLayout
@@ -160,7 +166,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="  或使用其他方式登录  "
+                android:text="@string/general_other_login"
                 android:textSize="12sp"
                 android:textColor="?colorM3OnSurfaceVariant" />
 
@@ -186,7 +192,7 @@
                     android:background="@drawable/bg_circle_gray"
                     android:clickable="true"
                     android:focusable="true"
-                    android:contentDescription="宝宝新天地">
+                    android:contentDescription="@string/nbw_third_party_nbw">
                     <ImageView
                         android:layout_width="30dp"
                         android:layout_height="30dp"
@@ -241,11 +247,12 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginBottom="32dp"
-            android:text="账号密码登录"
+            android:text="@string/general_password_login"
             android:textSize="15sp"
             android:textColor="#88AAFF"
             android:padding="8dp" />
 
     </LinearLayout>
+    </ScrollView>
 
 </FrameLayout>

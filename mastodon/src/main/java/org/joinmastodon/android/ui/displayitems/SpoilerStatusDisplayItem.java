@@ -27,13 +27,14 @@ public class SpoilerStatusDisplayItem extends StatusDisplayItem{
 	public final ArrayList<StatusDisplayItem> contentItems=new ArrayList<>();
 	public final Status.SpoilerType spoilerType;
 	private final CharSequence parsedTitle;
-	private CharSequence translatedTitle;
+	public final Status contentStatus;
 	private final CustomEmojiHelper emojiHelper;
 	public final Type type;
 
 	public SpoilerStatusDisplayItem(String parentID, Callbacks callbacks, Context context, String title, Status status, Status statusForContent, Type type, Status.SpoilerType spoilerType){
 		super(parentID, callbacks, context);
 		this.status=status;
+		this.contentStatus=statusForContent;
 		this.type=type;
 		this.spoilerType=spoilerType;
 		if(TextUtils.isEmpty(title)){
@@ -89,11 +90,9 @@ public class SpoilerStatusDisplayItem extends StatusDisplayItem{
 		@Override
 		public void onBind(SpoilerStatusDisplayItem item){
 			itemView.setPaddingRelative(V.dp(item.fullWidth ? 16 : 64), itemView.getPaddingTop(), itemView.getPaddingEnd(), itemView.getPaddingBottom());
-			if(item.status.translationState==Status.TranslationState.SHOWN){
-				if(item.translatedTitle==null){
-					item.translatedTitle=item.status.translation.spoilerText;
-				}
-				title.setText(item.translatedTitle);
+			if(item.spoilerType==Status.SpoilerType.CONTENT_WARNING && item.contentStatus.translationState==Status.TranslationState.SHOWN
+					&& item.contentStatus.translation!=null && item.contentStatus.translation.spoilerText!=null){
+				title.setText(item.contentStatus.translation.spoilerText);
 			}else{
 				title.setText(item.parsedTitle);
 			}

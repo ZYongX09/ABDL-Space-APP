@@ -70,7 +70,7 @@ public class DiaperRatingFragment extends MastodonToolbarFragment{
 	@Override
 	public void onAttach(Activity activity){
 		super.onAttach(activity);
-		setTitle("纸尿裤评分");
+		setTitle(getString(R.string.general_diaper_rating_title));
 	}
 
 	@Override
@@ -94,7 +94,7 @@ public class DiaperRatingFragment extends MastodonToolbarFragment{
 
 		TextView subtitle=new TextView(getContext());
 		subtitle.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-		subtitle.setText(productType==null || productType.isEmpty() ? "纸尿裤" : productType);
+		subtitle.setText(productType==null || productType.isEmpty() ? getString(R.string.diaper) : productType);
 		subtitle.setTextSize(16);
 		subtitle.setTextColor(getSecondaryTextColor());
 		subtitle.setPadding(0, V.dp(8), 0, V.dp(18));
@@ -108,7 +108,7 @@ public class DiaperRatingFragment extends MastodonToolbarFragment{
 		LinearLayout.LayoutParams submitParams=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
 		submitParams.topMargin=V.dp(26);
 		submitButton.setLayoutParams(submitParams);
-		submitButton.setText("提交评分");
+		submitButton.setText(getString(R.string.general_submit_rating));
 		submitButton.setTextSize(20);
 		submitButton.setTypeface(null, Typeface.BOLD);
 		submitButton.setTextColor(UiUtils.getThemeColor(getActivity(), R.attr.colorM3OnPrimary));
@@ -128,7 +128,7 @@ public class DiaperRatingFragment extends MastodonToolbarFragment{
 		card.setPadding(V.dp(18), V.dp(18), V.dp(18), V.dp(18));
 
 		TextView label=new TextView(getContext());
-		label.setText("综合评分");
+		label.setText(getString(R.string.general_overall_rating));
 		label.setTextSize(14);
 		label.setTextColor(getPrimaryTextColor());
 		card.addView(label);
@@ -148,7 +148,7 @@ public class DiaperRatingFragment extends MastodonToolbarFragment{
 		card.addView(stars);
 
 		TextView count=new TextView(getContext());
-		count.setText(ratingCount + " 人参与评分");
+		count.setText(getString(R.string.general_rating_participants, ratingCount));
 		count.setTextSize(14);
 		count.setTextColor(getSecondaryTextColor());
 		count.setPadding(0, V.dp(8), 0, 0);
@@ -158,21 +158,21 @@ public class DiaperRatingFragment extends MastodonToolbarFragment{
 	}
 
 	private View createScoreCard(){
-		LinearLayout card=createSectionCard("详细评分");
-		addScoreRow(card, "◇", "吸收性", "absorption");
-		addScoreRow(card, "☁", "舒适度", "comfort");
-		addScoreRow(card, "▤", "厚度", "thickness");
-		addScoreRow(card, "✧", "外观", "appearance");
-		addScoreRow(card, "◇", "性价比", "value");
+		LinearLayout card=createSectionCard(getString(R.string.general_detailed_ratings));
+		addScoreRow(card, "◇", getString(R.string.general_absorption), "absorption");
+		addScoreRow(card, "☁", getString(R.string.general_comfort), "comfort");
+		addScoreRow(card, "▤", getString(R.string.general_thickness), "thickness");
+		addScoreRow(card, "✧", getString(R.string.general_appearance), "appearance");
+		addScoreRow(card, "◇", getString(R.string.general_value), "value");
 		return card;
 	}
 
 	private View createReviewCard(){
-		LinearLayout card=createSectionCard("使用感受");
+		LinearLayout card=createSectionCard(getString(R.string.general_experience));
 		reviewInput=new EditText(getContext());
 		reviewInput.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, V.dp(130)));
 		reviewInput.setGravity(android.view.Gravity.TOP | android.view.Gravity.START);
-		reviewInput.setHint("分享你的使用体验...\n例如：\n吸收速度不错，夜间使用也比较安心，整体很舒适...");
+		reviewInput.setHint(getString(R.string.general_review_hint));
 		reviewInput.setTextSize(15);
 		reviewInput.setTextColor(getPrimaryTextColor());
 		reviewInput.setHintTextColor(UiUtils.getThemeColor(getActivity(), R.attr.colorM3OnSurfaceVariant));
@@ -323,7 +323,7 @@ public class DiaperRatingFragment extends MastodonToolbarFragment{
 		submitting=true;
 		submitButton.setEnabled(false);
 		submitButton.setAlpha(0.7f);
-		submitButton.setText("提交中...");
+		submitButton.setText(getString(R.string.general_submitting));
 
 		new SubmitDiaperRating(
 			diaperId,
@@ -337,7 +337,7 @@ public class DiaperRatingFragment extends MastodonToolbarFragment{
 			@Override
 			public void onSuccess(Map<String, Object> result){
 				if(getActivity()==null) return;
-				Toast.makeText(getContext(), "评分成功", Toast.LENGTH_SHORT).show();
+				Toast.makeText(getContext(), getString(R.string.general_rating_saved), Toast.LENGTH_SHORT).show();
 				setResult(true, null);
 				Nav.finish(DiaperRatingFragment.this);
 			}
@@ -348,9 +348,9 @@ public class DiaperRatingFragment extends MastodonToolbarFragment{
 				submitting=false;
 				submitButton.setEnabled(true);
 				submitButton.setAlpha(1f);
-				submitButton.setText("提交评分");
+				submitButton.setText(getString(R.string.general_submit_rating));
 				if(error instanceof MastodonErrorResponse mastodonError && mastodonError.httpStatus==409){
-					Toast.makeText(getContext(), "你已经评价过这款纸尿裤", Toast.LENGTH_SHORT).show();
+					Toast.makeText(getContext(), getString(R.string.general_already_reviewed), Toast.LENGTH_SHORT).show();
 				}else{
 					error.showToast(getContext());
 				}

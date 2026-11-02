@@ -99,7 +99,7 @@
 				android:background="@drawable/bg_tabbar_badge"
 				android:gravity="center"
 				android:includeFontPadding="false"
-				android:text="新功能"
+				android:text="@string/general_new_feature"
 				android:textAppearance="@style/m3_label_small"
 				android:textColor="?colorM3OnPrimary"
 				android:visibility="gone"

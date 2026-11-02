@@ -5,8 +5,21 @@ import org.joinmastodon.android.api.requests.friendcards.FriendCardResponses
 import org.joinmastodon.android.model.FriendCard
 import org.junit.Assert.*
 import org.junit.Test
+import org.junit.Before
+import org.junit.runner.RunWith
+import org.joinmastodon.android.CompatibilityTestApplication
+import org.joinmastodon.android.MastodonApp
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.annotation.Config
 
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [28], qualifiers = "zh", application = CompatibilityTestApplication::class)
 class FriendCardStateTest {
+    @Before fun localizedContext() {
+        MastodonApp.context = RuntimeEnvironment.getApplication()
+        FriendCardGames.updateOptions(emptyList())
+    }
     private fun card(id: String) = FriendCard().apply { this.id = id; schemaVersion = 1; title = "宣言" }
     @Test fun freeInteractionHabitsStartsEmptyAndIsCopiedVerbatim() {
         val input = FriendCardInput()

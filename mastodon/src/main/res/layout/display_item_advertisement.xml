@@ -11,7 +11,7 @@
 		android:id="@+id/ad_label"
 		android:layout_width="wrap_content"
 		android:layout_height="wrap_content"
-		android:text="广告"
+		android:text="@string/general_advertisement"
 		android:textAppearance="@style/m3_label_medium"
 		android:textColor="?colorM3Primary" />
 

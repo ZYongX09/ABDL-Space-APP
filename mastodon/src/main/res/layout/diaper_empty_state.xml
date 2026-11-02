@@ -27,7 +27,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="6dp"
-        android:text="换个关键词或品牌试试"
+        android:text="@string/general_diaper_empty_hint"
         android:textSize="13sp"
         android:textColor="?android:textColorSecondary" />
 </LinearLayout>

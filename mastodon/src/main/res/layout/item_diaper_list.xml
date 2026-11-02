@@ -18,7 +18,7 @@
         android:scaleType="centerCrop"
         android:clipToOutline="true"
         android:background="@drawable/bg_diaper_logo"
-        android:contentDescription="纸尿裤图片" />
+        android:contentDescription="@string/general_diaper_image" />
 
     <!-- 信息区域 -->
     <LinearLayout
@@ -52,7 +52,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="6dp"
-        android:text="儿童款"
+        android:text="@string/diaper_baby"
                 android:textSize="10sp"
                 android:textColor="#FF6B6B"
                 android:background="@drawable/bg_tag_red"
@@ -75,7 +75,7 @@
                 android:layout_height="12dp"
                 android:src="@drawable/ic_fluent_star_24_filled"
                 android:tint="#FFB300"
-                android:contentDescription="评分" />
+                android:contentDescription="@string/general_rating" />
 
             <TextView
                 android:id="@+id/avg_score"
@@ -114,6 +114,6 @@
         android:layout_marginStart="8dp"
         android:src="@drawable/ic_fluent_chevron_right_24_regular"
         android:tint="?android:textColorTertiary"
-        android:contentDescription="详情" />
+        android:contentDescription="@string/general_details" />
 
 </LinearLayout>

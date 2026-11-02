@@ -80,7 +80,7 @@ import top.yukonga.miuix.kmp.theme.lightColorScheme
 
 /** Real production components, synthetic contacts, native Skia captures; no network or copied UI. */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [28], qualifiers = "w393dp-h852dp-mdpi", application = CompatibilityTestApplication::class)
+@Config(sdk = [28], qualifiers = "zh-w393dp-h852dp-mdpi", application = CompatibilityTestApplication::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @LooperMode(LooperMode.Mode.PAUSED)
 class FriendCardSocialUiTest {
@@ -88,6 +88,8 @@ class FriendCardSocialUiTest {
 
     @Before
     fun fullscreen() {
+        org.joinmastodon.android.MastodonApp.context = org.robolectric.RuntimeEnvironment.getApplication()
+        org.joinmastodon.android.friendcards.FriendCardGames.updateOptions(emptyList())
         compose.activityRule.scenario.onActivity { activity ->
             activity.window.setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN)
             activity.window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or

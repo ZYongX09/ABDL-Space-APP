@@ -2,6 +2,7 @@
 
 package org.joinmastodon.android.ui.compose.friendcards
 
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -23,6 +24,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
@@ -128,26 +130,28 @@ private fun RestoreAndTrack(
 
 @Composable
 private fun MyCards(state: FriendCardHubState, actions: FriendCardHubActions, scroll: LazyListState) {
+    val context = LocalContext.current
     LazyColumn(Modifier.fillMaxSize().testTag("friend-card-hub-my-list"), state = scroll,
         contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 10.dp, bottom = 16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        item("heading") { HubHeading("我的扩列卡", "让同频的人，先认识你。", !state.busy && !state.loading, actions.back, actions.refresh) }
-        state.error?.let { text -> item("error") { FriendCardNotice(text, "重试", actions.refresh) } }
-        if (state.loading) item("loading") { FriendCardNotice("正在读取我的扩列卡…", null, null) }
+        item("heading") { HubHeading(stringResource(R.string.fc_my_cards_heading), stringResource(R.string.fc_my_cards_subtitle), !state.busy && !state.loading, actions.back, actions.refresh) }
+        state.error?.let { text -> item("error") { FriendCardNotice(text, stringResource(R.string.fc_retry), actions.refresh) } }
+        if (state.loading) item("loading") { FriendCardNotice(stringResource(R.string.fc_loading_my_card), null, null) }
         if (state.loaded && state.card == null) item("empty") {
             HubPanel {
-                Text("还没有当前卡", fontWeight = FontWeight.SemiBold, color = MiuixTheme.colorScheme.onSurface)
-                Text("可以先浏览。创建新卡需要当前有效宝宝认证，浏览与管理不设此门槛。", fontSize = 13.sp,
+                Text(stringResource(R.string.fc_no_current_card), fontWeight = FontWeight.SemiBold, color = MiuixTheme.colorScheme.onSurface)
+                Text(stringResource(R.string.fc_no_current_card_help), fontSize = 13.sp,
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
             }
         }
         state.card?.let { value ->
             item("current") {
+                val currentStateLabel = stringResource(R.string.fc_current_card_state, friendCardHubStateName(value.state, context))
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp),
                     modifier = Modifier.padding(top = 4.dp).semantics(mergeDescendants = true) {
-                        contentDescription = "当前卡 · ${friendCardHubStateName(value.state)}"
+                        contentDescription = currentStateLabel
                     }) {
-                    Text("当前卡片", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = MiuixTheme.colorScheme.onSurface,
+                    Text(stringResource(R.string.fc_current_card), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = MiuixTheme.colorScheme.onSurface,
                         modifier = Modifier.padding(vertical = 4.dp))
                     HubStateBadge(value.state)
                 }
@@ -155,43 +159,43 @@ private fun MyCards(state: FriendCardHubState, actions: FriendCardHubActions, sc
             item("card:${value.id}") { CurrentCard(value, !state.busy, { actions.profile(value) }) }
             item("primary") {
                 HubPrimaryActions(
-                    { HubButton("编辑卡片", R.drawable.ic_fluent_edit_24_regular, !state.busy, Modifier.fillMaxWidth(), primary = true) { actions.edit(value) } },
-                    { HubButton("查看详情", R.drawable.ic_fluent_arrow_up_right_24_regular, !state.busy, Modifier.fillMaxWidth()) { actions.detail(value) } },
+                    { HubButton(stringResource(R.string.fc_edit_card), R.drawable.ic_fluent_edit_24_regular, !state.busy, Modifier.fillMaxWidth(), primary = true) { actions.edit(value) } },
+                    { HubButton(stringResource(R.string.fc_view_details), R.drawable.ic_fluent_arrow_up_right_24_regular, !state.busy, Modifier.fillMaxWidth()) { actions.detail(value) } },
                 )
             }
             item("secondary") {
                 FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     if (value.state == "active" || value.state == "paused") HubTextAction(
-                        if (value.state == "paused") "恢复展示" else "暂停展示",
+                        if (value.state == "paused") stringResource(R.string.fc_resume) else stringResource(R.string.fc_pause),
                         if (value.state == "paused") R.drawable.ic_fluent_play_24_regular else R.drawable.ic_fluent_pause_24_regular,
                         !state.busy,
                     ) { actions.state(value) }
-                    HubTextAction("发布帖", R.drawable.ic_fluent_send_24_regular, !state.busy) { actions.post(value) }
-                    HubTextAction("删除", R.drawable.ic_fluent_delete_24_regular, !state.busy, destructive = true) { actions.delete(value) }
+                    HubTextAction(stringResource(R.string.fc_publication_post), R.drawable.ic_fluent_send_24_regular, !state.busy) { actions.post(value) }
+                    HubTextAction(stringResource(R.string.fc_delete), R.drawable.ic_fluent_delete_24_regular, !state.busy, destructive = true) { actions.delete(value) }
                 }
             }
         }
         item("create") {
-            HubButton("创建新卡", R.drawable.ic_fluent_add_24_regular, !state.busy, Modifier.fillMaxWidth().padding(top = 8.dp), primary = true, onClick = actions.create)
+            HubButton(stringResource(R.string.fc_create_new), R.drawable.ic_fluent_add_24_regular, !state.busy, Modifier.fillMaxWidth().padding(top = 8.dp), primary = true, onClick = actions.create)
         }
         if (state.loaded) item("history") {
             FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("历史卡", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = MiuixTheme.colorScheme.onSurface, modifier = Modifier.semantics { heading() })
+                Text(stringResource(R.string.fc_history), fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = MiuixTheme.colorScheme.onSurface, modifier = Modifier.semantics { heading() })
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                     HubIcon(R.drawable.ic_fluent_lock_closed_24_regular, null, Modifier.size(14.dp), MiuixTheme.colorScheme.onSurfaceVariantSummary)
-                    Text("仅自己可见", fontSize = 12.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
+                    Text(stringResource(R.string.fc_private), fontSize = 12.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
                 }
             }
         }
         items(state.historyCards, key = { "card:${it.id}" }) { value ->
             HubPanel {
                 Text(value.title, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = MiuixTheme.colorScheme.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Text(friendCardHubStateName(value.state), fontSize = 12.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
+                Text(friendCardHubStateName(value.state, context), fontSize = 12.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    HubTextAction("查看", R.drawable.ic_fluent_arrow_up_right_24_regular, !state.busy) { actions.detail(value) }
-                    HubTextAction("编辑", R.drawable.ic_fluent_edit_24_regular, !state.busy) { actions.edit(value) }
-                    HubTextAction("发布帖", R.drawable.ic_fluent_send_24_regular, !state.busy) { actions.post(value) }
-                    HubTextAction("删除", R.drawable.ic_fluent_delete_24_regular, !state.busy, destructive = true) { actions.delete(value) }
+                    HubTextAction(stringResource(R.string.fc_view), R.drawable.ic_fluent_arrow_up_right_24_regular, !state.busy) { actions.detail(value) }
+                    HubTextAction(stringResource(R.string.fc_edit), R.drawable.ic_fluent_edit_24_regular, !state.busy) { actions.edit(value) }
+                    HubTextAction(stringResource(R.string.fc_publication_post), R.drawable.ic_fluent_send_24_regular, !state.busy) { actions.post(value) }
+                    HubTextAction(stringResource(R.string.fc_delete), R.drawable.ic_fluent_delete_24_regular, !state.busy, destructive = true) { actions.delete(value) }
                 }
             }
         }
@@ -200,16 +204,16 @@ private fun MyCards(state: FriendCardHubState, actions: FriendCardHubActions, sc
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     HubIcon(R.drawable.ic_fluent_archive_24_regular, null, Modifier.size(28.dp), MiuixTheme.colorScheme.onSurfaceVariantSummary)
                     Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                        Text("还没有历史卡片", fontSize = 14.sp, color = MiuixTheme.colorScheme.onSurface)
-                        Text("替换后的卡片会收纳在这里", fontSize = 12.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
+                        Text(stringResource(R.string.fc_no_history), fontSize = 14.sp, color = MiuixTheme.colorScheme.onSurface)
+                        Text(stringResource(R.string.fc_no_history_help), fontSize = 12.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
                     }
                 }
             }
         }
-        state.historyError?.let { text -> item("history-error") { FriendCardNotice(text, "重试加载历史", actions.history) } }
-        if (state.historyLoading) item("history-loading") { FriendCardNotice("正在加载历史…", null, null) }
+        state.historyError?.let { text -> item("history-error") { FriendCardNotice(text, stringResource(R.string.fc_retry_history), actions.history) } }
+        if (state.historyLoading) item("history-loading") { FriendCardNotice(stringResource(R.string.fc_loading_history), null, null) }
         if (state.historyLoaded && state.historyCursor != null && !state.historyLoading && state.historyError == null) item("history-next:${state.historyCards.size}") {
-            HubButton("加载更多历史", R.drawable.ic_fluent_archive_24_regular, !state.busy, Modifier.fillMaxWidth(), onClick = actions.history)
+            HubButton(stringResource(R.string.fc_more_history), R.drawable.ic_fluent_archive_24_regular, !state.busy, Modifier.fillMaxWidth(), onClick = actions.history)
         }
     }
 }
@@ -219,13 +223,13 @@ private fun Plaza(state: FriendCardHubState, actions: FriendCardHubActions, visi
     LazyColumn(Modifier.fillMaxSize().testTag("friend-card-hub-plaza-list"), state = scroll,
         contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 10.dp, bottom = 16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        item("heading") { HubHeading("扩列广场", "发现今天也想认识新朋友的人", !state.busy && !state.feedLoading, actions.back, actions.refresh) }
+        item("heading") { HubHeading(stringResource(R.string.fc_plaza_heading), stringResource(R.string.fc_plaza_subtitle), !state.busy && !state.feedLoading, actions.back, actions.refresh) }
         item("search") { HubSearch(state.query, !state.busy, actions.query) }
         item("filters") {
             FlowRow(Modifier.selectableGroup(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 FriendCardHubFilter.entries.forEach { filter ->
                     val selected = state.filter == filter
-                    Text(filter.label, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                    Text(stringResource(filter.labelRes), fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
                         color = if (selected) MiuixTheme.colorScheme.onPrimary else MiuixTheme.colorScheme.onSurfaceVariantSummary,
                         modifier = Modifier.clip(CircleShape).background(if (selected) MiuixTheme.colorScheme.primary else hubSurface())
                             .selectable(selected, enabled = !state.busy, role = Role.RadioButton) { actions.filter(filter) }
@@ -234,37 +238,37 @@ private fun Plaza(state: FriendCardHubState, actions: FriendCardHubActions, visi
             }
         }
         item("scope") {
-            Text("已加载卡片筛选 · ${state.cards.size} 张已加载", fontSize = 12.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
+            Text(stringResource(R.string.fc_loaded_scope, state.cards.size), fontSize = 12.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
         }
         if (state.filter == FriendCardHubFilter.SameCity) item("city") {
             val helper = when {
-                state.loading -> "正在读取当前卡片的公开地区…"
+                state.loading -> stringResource(R.string.fc_loading_public_region)
                 !state.loaded && state.error != null -> state.error
-                ownRegion == null -> "同城仅匹配你当前卡片的公开地区。请先在卡片中填写并公开地区；不会使用定位。"
-                else -> "同城按公开地区「$ownRegion」精确匹配，不使用定位。"
+                ownRegion == null -> stringResource(R.string.fc_same_city_help)
+                else -> stringResource(R.string.fc_same_city_region, ownRegion.orEmpty())
             }
-            FriendCardNotice(helper, if (!state.loaded && state.error != null) "重新读取地区" else null,
+            FriendCardNotice(helper, if (!state.loaded && state.error != null) stringResource(R.string.fc_retry_region) else null,
                 if (!state.loaded && state.error != null) actions.refresh else null)
         }
-        if (state.feedLoading && state.cards.isEmpty()) item("loading") { FriendCardNotice("正在读取扩列推荐…", null, null) }
+        if (state.feedLoading && state.cards.isEmpty()) item("loading") { FriendCardNotice(stringResource(R.string.fc_loading_recommendations), null, null) }
         if (state.feedLoaded && visible.isEmpty() && !state.feedLoading) item("empty") {
             HubPanel {
-                Text(if (state.cards.isEmpty()) "暂时没有可推荐的卡" else "已加载的卡片中没有匹配项", color = MiuixTheme.colorScheme.onSurface)
-                Text(if (state.feedCursor != null) "可以调整筛选，或继续加载下一批。" else "可以调整筛选，或稍后刷新再来看看。",
+                Text(if (state.cards.isEmpty()) stringResource(R.string.fc_no_recommendations) else stringResource(R.string.fc_no_filter_matches), color = MiuixTheme.colorScheme.onSurface)
+                Text(if (state.feedCursor != null) stringResource(R.string.fc_no_matches_more) else stringResource(R.string.fc_no_matches_end),
                     fontSize = 13.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
             }
         }
         if (!state.restoringFeed) items(visible, key = { "card:${it.id}" }) { value ->
             PlazaCard(value, !state.busy, { actions.detail(value) }, { actions.profile(value) })
         }
-        state.feedError?.let { text -> item("error") { FriendCardNotice(text, "重试下一页", actions.next) } }
-        if (state.feedLoading && state.cards.isNotEmpty()) item("more-loading") { FriendCardNotice("正在加载更多…", null, null) }
+        state.feedError?.let { text -> item("error") { FriendCardNotice(text, stringResource(R.string.fc_retry_page), actions.next) } }
+        if (state.feedLoading && state.cards.isNotEmpty()) item("more-loading") { FriendCardNotice(stringResource(R.string.fc_loading_more), null, null) }
         if (state.feedLoaded && state.feedCursor != null && state.feedError == null) item("next:${state.cards.size}") {
-            HubButton("换一批，遇见新朋友", R.drawable.ic_fluent_arrow_shuffle_24_regular, !state.busy && !state.feedLoading,
+            HubButton(stringResource(R.string.fc_next_batch), R.drawable.ic_fluent_arrow_shuffle_24_regular, !state.busy && !state.feedLoading,
                 Modifier.fillMaxWidth(), plain = true, onClick = actions.next)
         }
         if (state.feedLoaded && state.feedCursor == null && !state.feedLoading && state.feedError == null && visible.isNotEmpty()) item("end") {
-            Text("已看完本次推荐，稍后再来看看", fontSize = 12.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+            Text(stringResource(R.string.fc_recommendations_end), fontSize = 12.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp))
         }
     }
@@ -274,10 +278,10 @@ private fun Plaza(state: FriendCardHubState, actions: FriendCardHubActions, visi
 private fun HubHeading(title: String, subtitle: String, enabled: Boolean, back: () -> Unit, refresh: () -> Unit) {
     Column(Modifier.padding(bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-            HubIconButton(R.drawable.ic_arrow_back_24, "返回", true, back)
+            HubIconButton(R.drawable.ic_arrow_back_24, stringResource(R.string.fc_back), true, back)
             Text(title, fontSize = 26.sp, fontWeight = FontWeight.Bold, color = MiuixTheme.colorScheme.onSurface,
                 modifier = Modifier.weight(1f).semantics { heading() })
-            HubIconButton(R.drawable.ic_fluent_arrow_clockwise_24_regular, "刷新", enabled, refresh)
+            HubIconButton(R.drawable.ic_fluent_arrow_clockwise_24_regular, stringResource(R.string.fc_refresh), enabled, refresh)
         }
         Text(subtitle, fontSize = 13.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
     }
@@ -286,6 +290,7 @@ private fun HubHeading(title: String, subtitle: String, enabled: Boolean, back: 
 @Composable
 private fun HubSearch(value: String, enabled: Boolean, onChange: (String) -> Unit) {
     val keyboard = LocalSoftwareKeyboardController.current
+    val searchLabel = stringResource(R.string.fc_filter_public_cards)
     Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(hubSurface())
         .heightIn(min = 48.dp).padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
@@ -295,9 +300,9 @@ private fun HubSearch(value: String, enabled: Boolean, onChange: (String) -> Uni
             cursorBrush = SolidColor(MiuixTheme.colorScheme.primary),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
             keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
-            modifier = Modifier.weight(1f).testTag("friend-card-hub-search").semantics { contentDescription = "筛选已加载的公开卡片" },
+            modifier = Modifier.weight(1f).testTag("friend-card-hub-search").semantics { contentDescription = searchLabel },
             decorationBox = { inner -> Box {
-                if (value.isEmpty()) Text("搜索兴趣、城市或关键词", fontSize = 14.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
+                if (value.isEmpty()) Text(stringResource(R.string.fc_search_hint), fontSize = 14.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
                 inner()
             } })
     }
@@ -319,7 +324,7 @@ private fun HubTabs(tab: FriendCardHubTab, enabled: Boolean, onSelect: (FriendCa
                 verticalArrangement = Arrangement.spacedBy(3.dp, Alignment.CenterVertically)) {
                 HubIcon(if (destination == FriendCardHubTab.MyCards) R.drawable.ic_fluent_contact_card_24_regular else R.drawable.ic_fluent_compass_northwest_24_regular,
                     null, Modifier.size(20.dp), color)
-                Text(if (destination == FriendCardHubTab.MyCards) "我的卡片" else "扩列广场", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = color)
+                Text(if (destination == FriendCardHubTab.MyCards) stringResource(R.string.fc_my_cards_tab) else stringResource(R.string.fc_plaza_heading), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = color)
             }
         }
     }
@@ -337,7 +342,7 @@ private fun HubPanel(modifier: Modifier = Modifier, content: @Composable ColumnS
 @Composable
 private fun HubStateBadge(state: String?) {
     val active = state == "active"
-    Text(friendCardHubStateName(state), fontSize = 12.sp, fontWeight = FontWeight.Medium,
+    Text(friendCardHubStateName(state, LocalContext.current), fontSize = 12.sp, fontWeight = FontWeight.Medium,
         color = if (active) MiuixTheme.colorScheme.onTertiaryContainer else MiuixTheme.colorScheme.onSurfaceVariantSummary,
         modifier = Modifier.clip(CircleShape).background(if (active) MiuixTheme.colorScheme.tertiaryContainer else MiuixTheme.colorScheme.surface)
             .padding(horizontal = 10.dp, vertical = 5.dp))
@@ -345,6 +350,7 @@ private fun HubStateBadge(state: String?) {
 
 @Composable
 private fun CurrentCard(value: FriendCard, enabled: Boolean, profile: () -> Unit) {
+    val profileLabel = stringResource(R.string.fc_profile)
     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(hubSurface())) {
         FriendCardHubCover(value, ratio = 1.86f)
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -357,7 +363,7 @@ private fun CurrentCard(value: FriendCard, enabled: Boolean, profile: () -> Unit
                 val name = owner.displayName?.takeIf { it.isNotBlank() } ?: owner.username
                 name?.takeIf { it.isNotBlank() }?.let {
                     Text(it, fontSize = 12.sp, color = MiuixTheme.colorScheme.primary,
-                        modifier = Modifier.heightIn(min = 44.dp).clip(RoundedCornerShape(8.dp)).clickable(enabled, role = Role.Button, onClickLabel = "用户主页", onClick = profile)
+                        modifier = Modifier.heightIn(min = 44.dp).clip(RoundedCornerShape(8.dp)).clickable(enabled, role = Role.Button, onClickLabel = profileLabel, onClick = profile)
                             .padding(vertical = 12.dp))
                 }
             }
@@ -371,23 +377,24 @@ private fun PlazaCard(value: FriendCard, enabled: Boolean, detail: () -> Unit, p
         FriendCardHubCover(value, ratio = 2f, modifier = Modifier.clip(RoundedCornerShape(12.dp)))
         Text(value.title, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = MiuixTheme.colorScheme.onSurface,
             maxLines = 2, overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.fillMaxWidth().clickable(enabled, role = Role.Button, onClickLabel = "查看详情", onClick = detail))
+            modifier = Modifier.fillMaxWidth().clickable(enabled, role = Role.Button, onClickLabel = stringResource(R.string.fc_view_details), onClick = detail))
         if (value.isPublic("looking_for")) value.lookingFor?.takeIf { it.isNotBlank() }?.let {
             Text(it, fontSize = 13.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary, maxLines = 3, overflow = TextOverflow.Ellipsis)
         }
         HubTags(value)
         FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            HubButton("认识一下", R.drawable.ic_fluent_arrow_up_right_24_regular, enabled, onClick = detail)
-            if (!value.ownerId.isNullOrBlank()) HubTextAction("用户主页", R.drawable.ic_fluent_person_24_regular, enabled, onClick = profile)
+            HubButton(stringResource(R.string.fc_say_hello), R.drawable.ic_fluent_arrow_up_right_24_regular, enabled, onClick = detail)
+            if (!value.ownerId.isNullOrBlank()) HubTextAction(stringResource(R.string.fc_profile), R.drawable.ic_fluent_person_24_regular, enabled, onClick = profile)
         }
     }
 }
 
 @Composable
 private fun HubTags(value: FriendCard) {
+    val context = LocalContext.current
     val tags = buildList {
         if (value.isPublic("interests")) addAll(value.interests.orEmpty())
-        if (value.isPublic("games")) addAll(value.games.orEmpty().map(FriendCardGames::gameName))
+        if (value.isPublic("games")) addAll(value.games.orEmpty().map { FriendCardGames.gameName(it, context) })
         FriendCardHubFilters.publicRegion(value)?.let { add(it) }
     }.filter(String::isNotBlank).distinct().take(5)
     if (tags.isNotEmpty()) FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -417,7 +424,7 @@ private fun HubButton(text: String, icon: Int, enabled: Boolean, modifier: Modif
         .clickable(enabled, role = Role.Button, onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)) {
         HubIcon(icon, null, Modifier.size(18.dp), foreground.copy(alpha = if (enabled) 1f else .5f))
-        Text(text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = foreground.copy(alpha = if (enabled) 1f else .5f))
+        Text(text, modifier = Modifier.weight(1f, fill = false), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = foreground.copy(alpha = if (enabled) 1f else .5f))
     }
 }
 
@@ -427,7 +434,7 @@ private fun HubTextAction(text: String, icon: Int, enabled: Boolean, destructive
     Row(Modifier.heightIn(min = 44.dp).clip(RoundedCornerShape(10.dp)).clickable(enabled, role = Role.Button, onClick = onClick)
         .padding(horizontal = 8.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         HubIcon(icon, null, Modifier.size(16.dp), color.copy(alpha = if (enabled) 1f else .5f))
-        Text(text, fontSize = 12.sp, color = color.copy(alpha = if (enabled) 1f else .5f))
+        Text(text, modifier = Modifier.weight(1f, fill = false), fontSize = 12.sp, color = color.copy(alpha = if (enabled) 1f else .5f))
     }
 }
 

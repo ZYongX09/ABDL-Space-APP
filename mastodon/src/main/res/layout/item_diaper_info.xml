@@ -12,7 +12,7 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="产品信息"
+        android:text="@string/diaper_product_info"
         android:textSize="16sp"
         android:textStyle="bold"
         android:textColor="?android:textColorPrimary"
@@ -31,7 +31,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="品牌"
+            android:text="@string/general_brand"
             android:textSize="14sp"
             android:textColor="?android:textColorSecondary"
             android:includeFontPadding="false" />
@@ -66,7 +66,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="型号"
+            android:text="@string/general_model"
             android:textSize="14sp"
             android:textColor="?android:textColorSecondary"
             android:includeFontPadding="false" />
@@ -95,7 +95,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="类型"
+            android:text="@string/general_product_type"
             android:textSize="14sp"
             android:textColor="?android:textColorSecondary"
             android:includeFontPadding="false" />
@@ -123,7 +123,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="厚度"
+            android:text="@string/general_thickness"
             android:textSize="14sp"
             android:textColor="?android:textColorSecondary"
             android:includeFontPadding="false" />
@@ -151,7 +151,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="成人实际吸收"
+            android:text="@string/general_adult_absorbency"
             android:textSize="14sp"
             android:textColor="?android:textColorSecondary"
             android:includeFontPadding="false" />
@@ -179,7 +179,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="厂家标称吸收"
+            android:text="@string/general_manufacturer_absorbency"
             android:textSize="14sp"
             android:textColor="?android:textColorSecondary"
             android:includeFontPadding="false" />
@@ -207,7 +207,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="参考价"
+            android:text="@string/general_reference_price"
             android:textSize="14sp"
             android:textColor="?android:textColorSecondary"
             android:includeFontPadding="false" />
@@ -235,7 +235,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="官网"
+            android:text="@string/general_official_site"
             android:textSize="14sp"
             android:textColor="?android:textColorSecondary"
             android:includeFontPadding="false" />
@@ -245,7 +245,7 @@
         android:layout_width="wrap_content"
         android:layout_height="48dp"
         android:gravity="center"
-            android:text="访问官网"
+            android:text="@string/general_visit_site"
             android:textSize="12sp"
             android:textColor="#1976D2"
             android:background="@drawable/bg_diaper_chip"

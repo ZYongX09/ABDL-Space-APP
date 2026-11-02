@@ -95,7 +95,7 @@ import java.util.concurrent.TimeUnit
 @RunWith(RobolectricTestRunner::class)
 @Config(
     sdk = [28],
-    qualifiers = "w393dp-h852dp-mdpi",
+    qualifiers = "zh-w393dp-h852dp-mdpi",
     application = CompatibilityTestApplication::class,
     shadows = [
         FriendCardCompositionBehaviorTest.LocalRequests::class,
@@ -503,7 +503,7 @@ class FriendCardCompositionBehaviorTest {
     }
 
     @Test
-    @Config(sdk = [28, 30], qualifiers = "w393dp-h852dp-hdpi")
+    @Config(sdk = [28, 30], qualifiers = "zh-w393dp-h852dp-hdpi")
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
     fun detailBackgroundStartsAtNativeZeroWhileCutoutsProtectControlsAndAllContentStates() {
         val fragment = mount(FriendCardDetailFragment(), Bundle().apply { putString("card_id", "edge_card") })

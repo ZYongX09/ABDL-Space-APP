@@ -65,7 +65,7 @@ public class SettingsServerAboutFragment extends LoaderFragment{
 		if(instance==null){
 			InstanceV1 fake=new InstanceV1();
 			fake.uri=fake.title="ABDL Space";
-			fake.description="纸尿裤评分社区";
+			fake.description=getString(R.string.diaper_reviews);
 			fake.version="1.0";
 			fake.registrations=true;
 			instance=fake;

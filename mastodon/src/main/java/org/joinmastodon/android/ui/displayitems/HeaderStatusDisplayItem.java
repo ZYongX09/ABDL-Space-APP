@@ -393,14 +393,16 @@ public class HeaderStatusDisplayItem extends StatusDisplayItem{
 			Relationship relationship=item.callbacks.getRelationship(account.id);
 			Menu menu=optionsMenu.getMenu();
 			boolean isOwnPost=AccountSessionManager.getInstance().isSelf(item.accountID, account);
-			boolean canTranslate=item.status!=null && item.status.getContentStatus().isEligibleForTranslation();
+			boolean canTranslate=item.status!=null && item.callbacks.supportsPostTranslation()
+					&& org.joinmastodon.android.translation.PostTranslationSupport.eligible(item.status,
+							org.joinmastodon.android.translation.PostTranslationSupport.target(item.context));
 			MenuItem translate=menu.findItem(R.id.translate);
 			translate.setVisible(canTranslate);
 			if(canTranslate){
-				if(item.status.translationState==Status.TranslationState.SHOWN)
-					translate.setTitle(R.string.translation_show_original);
+				if(item.status.getContentStatus().translationState==Status.TranslationState.SHOWN)
+					translate.setTitle(R.string.post_translation_show_original);
 				else
-					translate.setTitle(item.context.getString(R.string.translate_post, Locale.forLanguageTag(item.status.getContentStatus().language).getDisplayLanguage()));
+					translate.setTitle(R.string.post_translation_translate);
 			}
 			menu.findItem(R.id.edit).setVisible(item.status!=null && isOwnPost);
 			menu.findItem(R.id.delete).setVisible(item.status!=null && isOwnPost);

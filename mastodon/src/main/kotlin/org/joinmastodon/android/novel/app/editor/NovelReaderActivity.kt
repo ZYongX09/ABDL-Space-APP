@@ -1,5 +1,10 @@
 package org.joinmastodon.android.novel.app.editor
 
+import org.joinmastodon.android.novel.app.novelMessage
+
+import org.joinmastodon.android.R
+import androidx.compose.ui.res.stringResource
+
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
@@ -139,22 +144,22 @@ internal fun ReaderHostScreen(state: ReaderHostState, controller: NovelReaderCon
                     contentBackdropModifier = if (liquid && isRuntimeShaderSupported()) Modifier.layerBackdrop(backdrop) else Modifier)
             }
         } else Column(Modifier.fillMaxSize().safeDrawingPadding().padding(24.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-            if (state.loading) CircularProgressIndicator() else { Text(state.error ?: "暂无正文"); Button(onClick = { controller.start() }, modifier = Modifier.padding(top = 20.dp)) { Text(if (state.changed) "重新加载当前版本" else "重试") } }
-            TextButton(onClick = back) { Text("返回") }
+            if (state.loading) CircularProgressIndicator() else { Text(state.error?.let { novelMessage(it) } ?: stringResource(R.string.novel_en_no_body)); Button(onClick = { controller.start() }, modifier = Modifier.padding(top = 20.dp)) { Text(if (state.changed) stringResource(R.string.novel_en_reload_current_version) else stringResource(R.string.novel_en_retry)) } }
+            TextButton(onClick = back) { Text(stringResource(R.string.novel_en_back)) }
         }
-        state.notice?.let { notice -> Surface(color = NovelTheme.colors.primaryContainer, modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(12.dp).clickable { controller.clearNotice() }) { Text(notice, fontSize = 12.sp, modifier = Modifier.padding(12.dp)) } }
+        state.notice?.let { notice -> Surface(color = NovelTheme.colors.primaryContainer, modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(12.dp).clickable { controller.clearNotice() }) { Text(novelMessage(notice), fontSize = 12.sp, modifier = Modifier.padding(12.dp)) } }
     }
     if (directory || annotations) ModalBottomSheet(onDismissRequest = { directory = false; annotations = false }) {
-        Text(if (directory) "章节目录" else "书签与笔记（本机）", modifier = Modifier.padding(20.dp), fontSize = 21.sp)
+        Text(if (directory) stringResource(R.string.novel_en_chapter_directory) else stringResource(R.string.novel_en_annotations_local), modifier = Modifier.padding(20.dp), fontSize = 21.sp)
         LazyColumn(Modifier.fillMaxWidth().heightIn(max = 500.dp)) {
             if (directory) itemsIndexed(state.headers, key = { _, h -> h.id }) { i, header -> ListItem(headlineContent = { Text("${i + 1} · ${header.title}") }, modifier = Modifier.clickable { directory = false; controller.open(i) }) }
             else {
-                if (state.annotations.isEmpty()) item { Text("暂无书签与笔记", modifier = Modifier.padding(20.dp)) }
-                itemsIndexed(state.annotations, key = { _, item -> item.id }) { _, item -> ListItem(headlineContent = { Text(item.note ?: "书签") }, supportingContent = { Text("${state.headers.firstOrNull { it.id == item.chapterId }?.title ?: "章节已移除"} · 第 ${item.page + 1} 页") }, modifier = Modifier.clickable { val index = state.headers.indexOfFirst { it.id == item.chapterId }; if (index >= 0) { annotations = false; controller.open(index, item.page) } }) }
+                if (state.annotations.isEmpty()) item { Text(stringResource(R.string.novel_en_no_annotations), modifier = Modifier.padding(20.dp)) }
+                itemsIndexed(state.annotations, key = { _, item -> item.id }) { _, item -> ListItem(headlineContent = { Text(item.note ?: stringResource(R.string.novel_en_bookmark)) }, supportingContent = { Text(stringResource(R.string.novel_en_annotation_location, state.headers.firstOrNull { it.id == item.chapterId }?.title ?: stringResource(R.string.novel_en_chapter_removed), item.page + 1)) }, modifier = Modifier.clickable { val index = state.headers.indexOfFirst { it.id == item.chapterId }; if (index >= 0) { annotations = false; controller.open(index, item.page) } }) }
             }
         }
     }
-    if (note) { var body by remember { mutableStateOf("") }; AlertDialog(onDismissRequest = { note = false }, title = { Text("添加阅读笔记") }, text = { OutlinedTextField(body, { body = it.take(2000) }, label = { Text("笔记（绑定当前章节与页码）") }) }, confirmButton = { TextButton(enabled = body.isNotBlank(), onClick = { controller.annotation(body); note = false }) { Text("保存") } }, dismissButton = { TextButton(onClick = { note = false }) { Text("取消") } }) }
+    if (note) { var body by remember { mutableStateOf("") }; AlertDialog(onDismissRequest = { note = false }, title = { Text(stringResource(R.string.novel_en_add_reading_note)) }, text = { OutlinedTextField(body, { body = it.take(2000) }, label = { Text(stringResource(R.string.novel_en_reading_note_label)) }) }, confirmButton = { TextButton(enabled = body.isNotBlank(), onClick = { controller.annotation(body); note = false }) { Text(stringResource(R.string.novel_en_save)) } }, dismissButton = { TextButton(onClick = { note = false }) { Text(stringResource(R.string.novel_en_cancel)) } }) }
 }
 
 /** ReaderScreen composes this original bottom-end overlay only while its controls are visible. */
@@ -163,8 +168,8 @@ internal fun ReaderHostToolbarActions(liquid: Boolean, backdrop: Backdrop, onAnn
     val dark = NovelTheme.colors.background.luminance() < .5f
     CompositionLocalProvider(LocalColorMode provides if (dark) 2 else 1) {
         Row(modifier, horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-            ReaderHostToolbarButton(NovelIcons.Bookmark, "书签与笔记", liquid, backdrop, onAnnotations)
-            ReaderHostToolbarButton(NovelIcons.List, "章节目录", liquid, backdrop, onDirectory)
+            ReaderHostToolbarButton(NovelIcons.Bookmark, stringResource(R.string.novel_en_annotations), liquid, backdrop, onAnnotations)
+            ReaderHostToolbarButton(NovelIcons.List, stringResource(R.string.novel_en_chapter_directory), liquid, backdrop, onDirectory)
         }
     }
 }

@@ -1,5 +1,8 @@
 package org.joinmastodon.android.novel.app
 
+import org.joinmastodon.android.R
+import androidx.compose.ui.res.stringResource
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -23,8 +26,8 @@ import org.joinmastodon.android.novel.app.models.Message
     val messages = state.messages.value
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(horizontal = 20.dp, vertical = 4.dp)) {
         item {
-            NovelHeader("消息", onBack) { NovelLink("全部已读", { vm.markRead() }) }
-            NovelTabs(listOf("all" to "全部 ${messages?.unread ?: 0}", "updates" to "作品更新", "interactions" to "互动", "system" to "系统"), state.messageCategory, vm::setMessageCategory)
+            NovelHeader(stringResource(R.string.novel_en_messages), onBack) { NovelLink(stringResource(R.string.novel_en_mark_all_read), { vm.markRead() }) }
+            NovelTabs(listOf("all" to stringResource(R.string.novel_en_all_count, messages?.unread ?: 0), "updates" to stringResource(R.string.novel_en_work_updates), "interactions" to stringResource(R.string.novel_en_interactions), "system" to stringResource(R.string.novel_en_system)), state.messageCategory, vm::setMessageCategory)
             Spacer(Modifier.height(12.dp))
         }
         items(messages?.items.orEmpty(), key = { it.id }) { message ->
@@ -42,7 +45,7 @@ import org.joinmastodon.android.novel.app.models.Message
                         Text(message.body, color = NovelTheme.colors.textSecondary, fontSize = 13.sp, lineHeight = 23.sp)
                         if (message.workId != null) Row(Modifier.fillMaxWidth().background(NovelTheme.colors.surfaceVariant.copy(alpha = .4f), RoundedCornerShape(12.dp)).padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
                             Icon(NovelIcons.BookOpen, null, Modifier.size(18.dp), tint = NovelTheme.colors.primary)
-                            Text(if (message.chapterId != null) "阅读更新章节" else "查看关联作品", color = NovelTheme.colors.primary, fontSize = 11.sp, modifier = Modifier.weight(1f))
+                            Text(if (message.chapterId != null) stringResource(R.string.novel_en_read_update) else stringResource(R.string.novel_en_view_related_work), color = NovelTheme.colors.primary, fontSize = 11.sp, modifier = Modifier.weight(1f))
                             Icon(NovelIcons.ChevronRight, null, Modifier.size(18.dp), tint = NovelTheme.colors.textSecondary)
                         }
                     }
@@ -50,10 +53,10 @@ import org.joinmastodon.android.novel.app.models.Message
                 Spacer(Modifier.height(22.dp)); NovelRule()
             }
         }
-        item { NovelLoadState(state.messages, messages?.items.isNullOrEmpty(), "暂无消息", vm::refresh) }
+        item { NovelLoadState(state.messages, messages?.items.isNullOrEmpty(), stringResource(R.string.novel_en_no_messages), vm::refresh) }
         item {
-            if (messages?.nextCursor != null) NovelLink("加载更多消息", vm::loadMoreMessages, Modifier.fillMaxWidth())
-            else if (messages?.items?.isNotEmpty() == true) Text("已显示全部消息", color = NovelTheme.colors.textSecondary, fontSize = 11.sp, modifier = Modifier.padding(vertical = 24.dp))
+            if (messages?.nextCursor != null) NovelLink(stringResource(R.string.novel_en_more_messages), vm::loadMoreMessages, Modifier.fillMaxWidth())
+            else if (messages?.items?.isNotEmpty() == true) Text(stringResource(R.string.novel_en_all_messages_shown), color = NovelTheme.colors.textSecondary, fontSize = 11.sp, modifier = Modifier.padding(vertical = 24.dp))
         }
     }
 }
@@ -63,7 +66,7 @@ import org.joinmastodon.android.novel.app.models.Message
     var deleting by remember { mutableStateOf<Comment?>(null) }
     Column(Modifier.fillMaxSize()) {
         LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 20.dp, vertical = 4.dp)) {
-            item { NovelHeader("读者评论", onBack, state.work.value?.title) }
+            item { NovelHeader(stringResource(R.string.novel_en_reader_comments), onBack, state.work.value?.title) }
             items(state.comments.value?.items.orEmpty(), key = { it.id }) { comment ->
                 Column {
                     Row(Modifier.fillMaxWidth().padding(top = 20.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -73,34 +76,34 @@ import org.joinmastodon.android.novel.app.models.Message
                             Text(comment.createdAt.novelDate(), color = NovelTheme.colors.textSecondary, fontSize = 10.sp)
                         }
                         var menu by remember(comment.id) { mutableStateOf(false) }
-                        Box { NovelIconButton(NovelIcons.MoreHorizontal, "评论操作", { menu = true }); DropdownMenu(menu, { menu = false }) {
-                            if (comment.canDelete) DropdownMenuItem(text = { Text("删除评论") }, onClick = { menu = false; deleting = comment })
-                            DropdownMenuItem(text = { Text("举报评论") }, onClick = { menu = false; reporting = comment })
+                        Box { NovelIconButton(NovelIcons.MoreHorizontal, stringResource(R.string.novel_en_comment_actions), { menu = true }); DropdownMenu(menu, { menu = false }) {
+                            if (comment.canDelete) DropdownMenuItem(text = { Text(stringResource(R.string.novel_en_delete_comment)) }, onClick = { menu = false; deleting = comment })
+                            DropdownMenuItem(text = { Text(stringResource(R.string.novel_en_report_comment)) }, onClick = { menu = false; reporting = comment })
                         } }
                     }
                     Text(comment.body, color = NovelTheme.colors.text, fontSize = 14.sp, lineHeight = 25.sp, modifier = Modifier.padding(start = 47.dp, top = 12.dp, bottom = 23.dp))
                     NovelRule()
                 }
             }
-            item { NovelLoadState(state.comments, state.comments.value?.items.isNullOrEmpty(), "还没有读者评论", vm::refresh) }
-            item { if (state.comments.value?.nextCursor != null) NovelLink("加载更多评论", { vm.loadMoreComments(workId) }, Modifier.fillMaxWidth()) }
+            item { NovelLoadState(state.comments, state.comments.value?.items.isNullOrEmpty(), stringResource(R.string.novel_en_no_reader_comments), vm::refresh) }
+            item { if (state.comments.value?.nextCursor != null) NovelLink(stringResource(R.string.novel_en_more_comments), { vm.loadMoreComments(workId) }, Modifier.fillMaxWidth()) }
         }
         NovelRule()
         Row(Modifier.fillMaxWidth().background(NovelTheme.colors.background).padding(14.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            OutlinedTextField(state.commentDraft, vm::setCommentDraft, Modifier.weight(1f), placeholder = { Text("聊聊这个故事……", fontSize = 13.sp) }, maxLines = 5, shape = RoundedCornerShape(22.dp), textStyle = androidx.compose.ui.text.TextStyle(fontSize = 14.sp, color = NovelTheme.colors.text))
-            NovelPill("发布", { vm.postComment(workId) }, enabled = state.commentDraft.isNotBlank() && "comment:$workId" !in state.pending)
+            OutlinedTextField(state.commentDraft, vm::setCommentDraft, Modifier.weight(1f), placeholder = { Text(stringResource(R.string.novel_en_comment_hint), fontSize = 13.sp) }, maxLines = 5, shape = RoundedCornerShape(22.dp), textStyle = androidx.compose.ui.text.TextStyle(fontSize = 14.sp, color = NovelTheme.colors.text))
+            NovelPill(stringResource(R.string.novel_en_post), { vm.postComment(workId) }, enabled = state.commentDraft.isNotBlank() && "comment:$workId" !in state.pending)
         }
     }
     reporting?.let { comment -> NovelReportDialog({ reporting = null }, { reason -> reporting = null; vm.report(null, comment.id, reason) }) }
-    deleting?.let { comment -> AlertDialog(onDismissRequest = { deleting = null }, title = { Text("删除这条评论？") }, text = { Text("删除后无法恢复。") }, confirmButton = { TextButton({ deleting = null; vm.deleteComment(comment) }) { Text("删除") } }, dismissButton = { TextButton({ deleting = null }) { Text("取消") } }) }
+    deleting?.let { comment -> AlertDialog(onDismissRequest = { deleting = null }, title = { Text(stringResource(R.string.novel_en_delete_comment_question)) }, text = { Text(stringResource(R.string.novel_en_cannot_undo)) }, confirmButton = { TextButton({ deleting = null; vm.deleteComment(comment) }) { Text(stringResource(R.string.novel_en_delete)) } }, dismissButton = { TextButton({ deleting = null }) { Text(stringResource(R.string.novel_en_cancel)) } }) }
 }
 
 @Composable internal fun NovelReportDialog(onDismiss: () -> Unit, onSubmit: (String) -> Unit) {
     var reason by remember { mutableStateOf("") }
-    AlertDialog(onDismissRequest = onDismiss, title = { NovelHeading("举报内容", size = 21) }, text = {
+    AlertDialog(onDismissRequest = onDismiss, title = { NovelHeading(stringResource(R.string.novel_en_report_content), size = 21) }, text = {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("请说明具体问题，举报将交由人工审核。", fontSize = 13.sp)
-            OutlinedTextField(reason, { reason = it.take(1000) }, label = { Text("举报原因") }, minLines = 3, maxLines = 6)
+            Text(stringResource(R.string.novel_en_report_explanation), fontSize = 13.sp)
+            OutlinedTextField(reason, { reason = it.take(1000) }, label = { Text(stringResource(R.string.novel_en_report_reason)) }, minLines = 3, maxLines = 6)
         }
-    }, confirmButton = { TextButton({ onSubmit(reason.trim()) }, enabled = reason.trim().isNotEmpty()) { Text("提交举报") } }, dismissButton = { TextButton(onDismiss) { Text("取消") } })
+    }, confirmButton = { TextButton({ onSubmit(reason.trim()) }, enabled = reason.trim().isNotEmpty()) { Text(stringResource(R.string.novel_en_submit_report)) } }, dismissButton = { TextButton(onDismiss) { Text(stringResource(R.string.novel_en_cancel)) } })
 }

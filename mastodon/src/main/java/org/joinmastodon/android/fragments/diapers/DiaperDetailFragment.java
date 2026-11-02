@@ -104,7 +104,7 @@ public class DiaperDetailFragment extends LoaderFragment {
 		sizesTitleText = new TextView(getContext());
 		sizesTitleText.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 		sizesTitleText.setPadding(V.dp(16), V.dp(16), V.dp(16), V.dp(8));
-		sizesTitleText.setText("尺码");
+		sizesTitleText.setText(getString(R.string.diaper_sizes));
 		sizesTitleText.setTextSize(17);
 		sizesTitleText.setTextColor(UiUtils.getThemeColor(getActivity(), R.attr.colorM3OnSurface));
 		sizesTitleText.setTypeface(null, android.graphics.Typeface.BOLD);
@@ -152,7 +152,7 @@ public class DiaperDetailFragment extends LoaderFragment {
 		TextView rateBtn = new TextView(getContext());
 		LinearLayout.LayoutParams rateParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
 		rateBtn.setLayoutParams(rateParams);
-		rateBtn.setText("★ 写评分");
+		rateBtn.setText(getString(R.string.general_diaper_write_review));
 		rateBtn.setTextSize(14);
 		rateBtn.setTextColor(getResources().getColor(R.color.diaper_accent_text));
 		rateBtn.setGravity(android.view.Gravity.CENTER);
@@ -168,7 +168,7 @@ public class DiaperDetailFragment extends LoaderFragment {
 		LinearLayout.LayoutParams compareParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
 		compareParams.setMarginStart(V.dp(10));
 		compareBtn.setLayoutParams(compareParams);
-		compareBtn.setText("⚖ 加入对比");
+		compareBtn.setText(getString(R.string.general_diaper_compare));
 		compareBtn.setTextSize(14);
 		compareBtn.setTextColor(UiUtils.getThemeColor(getActivity(), R.attr.colorM3OnSurfaceVariant));
 		compareBtn.setGravity(android.view.Gravity.CENTER);
@@ -177,7 +177,7 @@ public class DiaperDetailFragment extends LoaderFragment {
 		compareBtn.setEnabled(true);
 		compareBtn.setAlpha(0.6f);
 		compareBtn.setOnClickListener(v -> {
-			android.widget.Toast.makeText(getContext(), "即将开放，敬请期待", android.widget.Toast.LENGTH_SHORT).show();
+			android.widget.Toast.makeText(getContext(), getString(R.string.general_coming_soon), android.widget.Toast.LENGTH_SHORT).show();
 		});
 		bottomBar.addView(compareBtn);
 
@@ -419,7 +419,7 @@ public class DiaperDetailFragment extends LoaderFragment {
 			int waistMax = ((Number) size.getOrDefault("waist_max", 0)).intValue();
 			int hipMin = ((Number) size.getOrDefault("hip_min", 0)).intValue();
 			int hipMax = ((Number) size.getOrDefault("hip_max", 0)).intValue();
-			info.setText(String.format("腰围 %d-%dcm · 臀围 %d-%dcm", waistMin, waistMax, hipMin, hipMax));
+			info.setText(getString(R.string.general_diaper_sizes, waistMin, waistMax, hipMin, hipMax));
 
 			sizesContainer.addView(sizeView);
 		}
@@ -430,14 +430,14 @@ public class DiaperDetailFragment extends LoaderFragment {
 
 		// 更新评价标题
 		if (reviewsTitleText != null) {
-			reviewsTitleText.setText(String.format("用户评价 (%d)", reviews.size()));
+			reviewsTitleText.setText(getString(R.string.general_reviews_count, reviews.size()));
 		}
 
 		if (reviews.isEmpty()) {
 			TextView emptyText = new TextView(getContext());
 			emptyText.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 			emptyText.setPadding(V.dp(16), V.dp(24), V.dp(16), V.dp(24));
-			emptyText.setText("暂无评价");
+			emptyText.setText(getString(R.string.general_no_reviews));
 			emptyText.setTextSize(14);
 			emptyText.setGravity(android.view.Gravity.CENTER);
 			emptyText.setTextColor(UiUtils.getThemeColor(getActivity(), R.attr.colorM3OnSurfaceVariant));
@@ -472,11 +472,11 @@ public class DiaperDetailFragment extends LoaderFragment {
 			}
 
 			// 5维度评分标签
-			addScoreTag(scoresContainer, "吸收性", review.absorption_score, "#1976D2");
-			addScoreTag(scoresContainer, "舒适度", review.comfort_score, "#4CAF50");
-			addScoreTag(scoresContainer, "厚度", review.thickness_score, "#FF9800");
-			addScoreTag(scoresContainer, "外观", review.appearance_score, "#9C27B0");
-			addScoreTag(scoresContainer, "性价比", review.value_score, "#F44336");
+			addScoreTag(scoresContainer, getString(R.string.general_absorption), review.absorption_score, "#1976D2");
+			addScoreTag(scoresContainer, getString(R.string.general_comfort), review.comfort_score, "#4CAF50");
+			addScoreTag(scoresContainer, getString(R.string.general_thickness), review.thickness_score, "#FF9800");
+			addScoreTag(scoresContainer, getString(R.string.general_appearance), review.appearance_score, "#9C27B0");
+			addScoreTag(scoresContainer, getString(R.string.general_value), review.value_score, "#F44336");
 
 			reviewListContainer.addView(reviewView);
 		}
@@ -503,7 +503,7 @@ public class DiaperDetailFragment extends LoaderFragment {
 
 	private void openRatingPage() {
 		if (diaperData == null || dataLoading) {
-			android.widget.Toast.makeText(getContext(), "请稍候，产品信息加载中", android.widget.Toast.LENGTH_SHORT).show();
+			android.widget.Toast.makeText(getContext(), getString(R.string.general_product_loading), android.widget.Toast.LENGTH_SHORT).show();
 			return;
 		}
 		if(checkingOwnRating)
@@ -517,7 +517,7 @@ public class DiaperDetailFragment extends LoaderFragment {
 					if(getActivity()==null)
 						return;
 					if(result.get("rating")!=null){
-						android.widget.Toast.makeText(getContext(), "你已经评价过这款纸尿裤", android.widget.Toast.LENGTH_SHORT).show();
+						android.widget.Toast.makeText(getContext(), getString(R.string.general_already_reviewed), android.widget.Toast.LENGTH_SHORT).show();
 						return;
 					}
 					openRatingForm();

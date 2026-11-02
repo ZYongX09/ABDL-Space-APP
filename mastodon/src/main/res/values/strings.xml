@@ -1,60 +1,60 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
 		<string name="app_name" translatable="false">ABDL Space</string>
-	<string name="sponsor_thanks_entry">感谢赞助者</string>
-	<string name="sponsor_thanks_title">赞助者感谢页</string>
-	<string name="sponsor_thanks_sort">按累计赞助排序 · 感谢每一份支持</string>
-	<string name="sponsor_thanks_support">我也想支持</string>
-	<string name="sponsor_thanks_voluntary">支持秉持自愿原则，仅部分高成本功能赞助者专享</string>
-	<string name="sponsor_thanks_loading">正在更新感谢榜…</string>
-	<string name="sponsor_thanks_empty">暂时还没有赞助记录，感谢每一份心意</string>
-	<string name="sponsor_thanks_error">感谢榜暂不可用，请重试</string>
-	<string name="sponsor_thanks_retry">重试刷新</string>
-	<string name="sponsor_thanks_more">加载更多赞助者</string>
-	<string name="sponsor_thanks_accessibility">第 %1$d 名，%2$s</string>
+
+
+
+
+
+
+
+
+
+
+
 <string name="oauth_redirect_uri" translatable="false">abdl-space://callback</string>
-<string name="oauth_login">使用网页端授权登录</string>
-	<string name="password_login">使用账号密码登录</string>
-	<string name="consent_title">确认同意协议</string>
-		<string name="consent_message">登录前请仔细阅读&lt;a href="https://abdl-space.top/terms">《用户协议》&lt;/a>和&lt;a href="https://abdl-space.top/privacy">《隐私政策》&lt;/a>，若您同意以上协议请点击确认按钮。</string>
-		<string name="login_agreement_text">我已阅读并同意&lt;a href="https://abdl-space.top/terms">《用户协议》&lt;/a>和&lt;a href="https://abdl-space.top/privacy">《隐私政策》&lt;/a></string>
-		<string name="legacy_login_agreement_text">在登录前您需要仔细阅读&lt;a href="https://abdl-space.top/terms">《用户协议》&lt;/a>和&lt;a href="https://abdl-space.top/privacy">《隐私政策》&lt;/a></string>
-		<string name="qq_login">腾讯 QQ 登录</string>
-		<string name="qq_consent_title">使用腾讯 QQ 登录</string>
-		<string name="qq_consent_message">继续后将启动腾讯 QQ 应用程序进行授权登录流程。ABDL Space将会从腾讯 QQ 获取您的用户ID、用户昵称、头像和用于兼容性诊断的设备型号。详细说明请访问本平台的官方网站查看&lt;a href="https://abdl-space.top/terms">《用户协议》&lt;/a>和&lt;a href="https://abdl-space.top/privacy">《隐私政策》&lt;/a>，点击“确认”按钮继续，继续即表示您同意本平台的&lt;a href="https://abdl-space.top/terms">《用户协议》&lt;/a>和&lt;a href="https://abdl-space.top/privacy">《隐私政策》&lt;/a></string>
-	<string name="qq_authorizing">正在请求 QQ 授权…</string>
-	<string name="qq_finishing_auth">正在完成 QQ 登录…</string>
-	<string name="qq_login_invalid_response">QQ 授权结果无效，请重试</string>
-	<string name="qq_login_failed">QQ 登录失败，请稍后重试</string>
-	<string name="qq_login_cancelled">已取消 QQ 登录</string>
-	<string name="qq_login_unavailable">QQ 登录暂不可用</string>
-	<string name="qq_network_error">网络错误，请稍后重试</string>
-	<string name="qq_not_bound">此 QQ 尚未绑定 ABDL Space 账户，请先使用邮箱或密码登录后在账户设置中绑定。</string>
-	<string name="qq_unionid_required">无法取得 QQ UnionID，请确认 QQ 互联应用配置后重试。</string>
-	<string name="qq_account_session_missing">找不到当前 ABDL Space 账户，请返回后重试</string>
-	<string name="qq_account_title">腾讯 QQ</string>
-	<string name="qq_account_description">授权绑定腾讯QQ账户</string>
-	<string name="qq_bind_consent_title">绑定腾讯 QQ 账号</string>
-		<string name="qq_bind_consent_message">继续后将启动腾讯 QQ 应用程序进行授权流程。ABDL Space将会从腾讯 QQ 获取您的用户ID、用户昵称、头像和用于兼容性诊断的设备型号。详细说明请访问本平台的官方网站查看&lt;a href="https://abdl-space.top/terms">《用户协议》&lt;/a>和&lt;a href="https://abdl-space.top/privacy">《隐私政策》&lt;/a>，点击“确认”按钮继续，继续即表示您同意本平台的&lt;a href="https://abdl-space.top/terms">《用户协议》&lt;/a>和&lt;a href="https://abdl-space.top/privacy">《隐私政策》&lt;/a></string>
-	<string name="qq_status_loading">正在查询绑定状态…</string>
-	<string name="qq_status_bound">已绑定</string>
-	<string name="qq_status_unbound">未绑定</string>
-	<string name="qq_status_unavailable">暂时无法查询</string>
-		<string name="qq_bind_success">QQ 绑定成功</string>
-		<string name="qq_bind_failed">QQ 绑定失败，请稍后重试</string>
-		<string name="qq_bind_session_expired">当前登录状态已失效，请重新登录后再绑定 QQ</string>
-		<string name="qq_binding_exists">当前账户已绑定其他 QQ，请先解绑后重试</string>
-		<string name="qq_already_bound">此 QQ 已绑定其他 ABDL Space 账户</string>
-		<string name="qq_credential_invalid">QQ 授权凭据无效或已过期，请重新授权</string>
-		<string name="qq_service_unavailable">QQ 服务暂不可用，请稍后重试</string>
-		<string name="qq_too_many_requests">操作过于频繁，请稍后重试</string>
-		<string name="qq_unbind_title">解绑腾讯 QQ</string>
-	<string name="qq_unbind_message">解绑后将无法使用此 QQ 登录当前 ABDL Space 账户，确定继续吗？</string>
-	<string name="qq_unbind">解绑</string>
-	<string name="qq_unbind_success">QQ 解绑成功</string>
-	<string name="qq_unbind_failed">QQ 解绑失败，请稍后重试</string>
-	<string name="qq_unbind_would_lock_account">请先设置密码、验证邮箱、添加 Passkey 或绑定其他登录方式，再解绑 QQ。</string>
-	<string name="qq_sdk_disclosure">腾讯 QQ 互联 SDK：仅在您主动选择 QQ 登录或绑定并确认说明后启动，处理 QQ 授权标识、昵称和头像，用于账户识别、登录与绑定。</string>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 	<string name="log_in">Log in</string>
@@ -282,7 +282,7 @@
 	<string name="settings_app_version">ABDL Space for Android v%1$s (%2$d)</string>
 	<string name="media_cache_cleared">Media cache cleared</string>
 	<string name="confirm_log_out">Log out of %s?</string>
-	<string name="sensitive_content_explain">系统检测到本内容可能有敏感嫌疑</string>
+
 	<string name="avatar_description">Go to %s’s profile</string>
 	<string name="more_options">More options</string>
 	<string name="new_post">New post</string>
@@ -393,7 +393,7 @@
 	<string name="file_size_gb">%.2f GB</string>
 	<string name="upload_processing">Processing…</string>
 	<!-- %s is file size -->
-	<string name="download_update">下载 (%s)</string>
+
 	<string name="install_update">Install</string>
 	<string name="privacy_policy_title">Your privacy</string>
 	<string name="privacy_policy_subtitle">Although the ABDL Space app does not collect any data, the server you sign up through may have a different policy.\n\nIf you disagree with the policy for %s, you can go back and pick a different server.</string>
@@ -637,22 +637,22 @@
 	<string name="filter_word_already_in_list">Already in the list</string>
 	<string name="app_update_ready">App update ready</string>
 	<string name="app_update_version">Version %s</string>
-	<string name="check_for_updates">检查更新</string>
-	<string name="update_allow_unknown_apps">请先允许 ABDL Space 安装未知来源应用，然后返回重试安装。</string>
-	<string name="no_updates_available">当前已是最新版本</string>
-	<string name="nbw_bind_guide_title">宝宝新天地账户</string>
-	<string name="nbw_bind_guide_desc">绑定宝宝新天地账户后，您可以在两个平台之间同步内容，并使用宝宝新天地账户一键登录 ABDL Space。\n\n绑定需要跳转浏览器进行授权登录，授权完成后将自动返回本应用完成绑定。</string>
-	<string name="nbw_bind_guide_button">前往浏览器授权登录</string>
-	<string name="nbw_bind_loading">正在绑定</string>
-	<string name="nbw_bind_success">绑定成功</string>
-	<string name="nbw_bind_done">完成</string>
-	<string name="nbw_third_party_account">第三方账户</string>
-	<string name="nbw_third_party_nbw">宝宝新天地</string>
-	<string name="sponsor_section">赞助支持</string>
-	<string name="sponsor_center">赞助者中心</string>
-	<string name="map_presence_title">交友地图</string>
-	<string name="map_presence_settings_summary">普通用户查看定位所在城市；赞助者可查看全国地图</string>
-	<string name="nbw_profile_source">此用户来自宝宝新天地</string>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 	<string name="nbw_forum_ai">AI recommendation</string>
 	<string name="nbw_forum_ai_subtitle">Automatically select the best NewBabyWorld forum</string>
 	<string name="nbw_forum_selfie">Selfies</string>
@@ -668,25 +668,25 @@
 	<string name="nbw_forum_friends">Friends</string>
 	<string name="nbw_forum_none">Do not sync</string>
 	<string name="nbw_forum_none_subtitle">Publish only to ABDL Space</string>
-	<string name="nbw_interaction_binding_required">Bind a 宝宝新天地 account to like or bookmark posts from 宝宝新天地.</string>
+
 	<string name="nbw_register_switch_account">Switch to this ABDL Space account before one-click registration, or bind an existing account above.</string>
-	<string name="nbw_reply_interaction_unsupported">Likes and bookmarks for 宝宝新天地 replies are not available yet.</string>
+
 	<string name="nbw_context_degraded">External replies are temporarily unavailable. Local comments are shown.</string>
 	<string name="nbw_context_degraded_empty">External replies are temporarily unavailable and have not been retrieved.</string>
 	<string name="compose_nbw_keep_existing">Keep existing sync settings</string>
-	<string name="compose_nbw_edit_preserve">Saving preserves your existing sync settings. Changes to posts already on 宝宝新天地 cannot be synchronized yet.</string>
-	<string name="compose_nbw_reply_local_only">This reply was saved only to ABDL Space. 宝宝新天地 reply synchronization is not available yet.</string>
-	<string name="compose_nbw_saved_not_synced">Saved to ABDL Space. 宝宝新天地 was not updated; synchronization is currently unavailable.</string>
-	<string name="nbw_unbind_title">解绑宝宝新天地</string>
-	<string name="nbw_unbind_message">确定解绑 %s？</string>
-	<string name="nbw_unbind">解绑</string>
-	<string name="nbw_unbound">未绑定</string>
-	<string name="nbw_unbind_success">解绑成功</string>
-	<string name="nbw_bound">已绑定</string>
-	<string name="compose_newbabyworld_title">宝宝新天地</string>
-	<string name="compose_newbabyworld_unbound">Bind a 宝宝新天地 account to sync, or select Do not sync to publish only to ABDL Space.</string>
-	<string name="compose_newbabyworld_bound">宝宝新天地 is an ABDL Space federation partner. After posting, we will try to sync it to 宝宝新天地 as @%s.</string>
-	<string name="compose_newbabyworld_checking">Checking your 宝宝新天地 binding…</string>
+
+
+
+
+
+
+
+
+
+
+
+
+
 	<string name="compose_newbabyworld_check_failed">Your binding could not be verified. Posting is disabled until verification succeeds.</string>
 	<string name="compose_crisis_title">You are not alone, we are here</string>
 	<string name="compose_crisis_message">The world may not be perfect, but there are people who care about you.\nYou can tap a button below to get help.</string>
@@ -804,7 +804,8 @@
 	<string name="discoverability">Discoverability</string>
 	<string name="discoverability_help">When you opt into discoverability on ABDL Space, your posts may appear in search results and trending.\n\nYour profile may be suggested to people with similar interests to you.\n\nOpting out does not hide your profile if someone searches for you by name.</string>
 	<string name="app_version_copied">Version number copied to clipboard</string>
-	<string name="onboarding_recommendations_intro">You curate your own home feed. The more people you follow, the more active and interesting it will be.</string>
+	<string name="onboarding_recommendations_intro">You curate your own home feed.
+The more people you follow, the more active and interesting it will be.</string>
 	<string name="onboarding_recommendations_title">Personalize your home feed</string>
 	<string name="article_by_author">By %s</string>
 	<string name="button_reblogged">Boosted</string>
@@ -1123,20 +1124,20 @@
 	<string name="friend_request_report_evidence">Upload evidence images (optional, max 3)</string>
 
 	<!-- Diaper module -->
-	<string name="diaper">纸尿裤</string>
-	<string name="diaper_list">纸尿裤列表</string>
-	<string name="diaper_detail">纸尿裤详情</string>
-	<string name="diaper_search">搜索纸尿裤...</string>
-	<string name="diaper_all_brands">全部</string>
-	<string name="diaper_no_data">暂无纸尿裤</string>
-	<string name="diaper_ratings_count">%d 评价</string>
-	<string name="diaper_baby">儿童款</string>
+
+
+
+
+
+
+
+
 	<string name="diaper_absorbency">%s</string>
-	<string name="diaper_rankings">排行榜</string>
-	<string name="diaper_rankings_info">评分经贝叶斯平均与置信区间修正，评分数越多越接近真实水平</string>
-	<string name="diaper_product_info">产品信息</string>
-	<string name="diaper_sizes">尺码</string>
-	<string name="diaper_reviews">用户评价</string>
+
+
+
+
+
 
 	<string name="location_permission_title">Location for Nearby Posts</string>
 	<string name="location_permission_description">Allow ABDL Space to access your location for features like nearby community posts and displaying your area on your posts. Your location is only stored when you post, and you can control what level of detail is shown (province, city, or district).</string>
@@ -1178,77 +1179,88 @@
 	<string name="new_badge_acknowledge">Awesome</string>
 	<string name="new_badge_default_description">A new badge has been added to your profile.</string>
 	<string name="new_badge_how_to_get">Badges are granted by admins or earned by meeting conditions. Pick one to show next to your name in your profile.</string>
-	<string name="verification_section">身份与认证</string>
-	<string name="verification_title">宝宝认证</string>
-			<string name="verification_description">认证宝宝身份 获得专属证书</string>
-			<string name="verification_account_approved">您已通过认证</string>
-		<string name="verification_account_active">证书有效 · 第%1$d代</string>
-		<string name="verification_account_revoked">证书已吊销</string>
-		<string name="verification_account_pending_sync">已通过 · 证书待同步</string>
-		<string name="verification_account_reviewing">审核中</string>
-		<string name="verification_account_draft">待完成提交</string>
-		<string name="verification_account_rejected">认证未通过</string>
-	<string name="verification_status_loading">正在查询认证状态…</string>
-	<string name="verification_status_not_started">未认证</string>
-	<string name="verification_status_draft">待完成拍摄</string>
-	<string name="verification_status_uploading">正在安全上传</string>
-	<string name="verification_status_review">审核中</string>
-	<string name="verification_status_approved">已认证</string>
-	<string name="verification_status_rejected">已驳回，点按查看</string>
-	<string name="verification_intro_title">开始宝宝认证</string>
-	<string name="verification_intro_body">请仅拍摄认证页面列出的本人照片。照片只用于身份审核，不会出现在公开相册或帖子中。认证相机禁止相册、视频、前摄和外部编辑。</string>
-	<string name="verification_adult_confirm">我已年满18周岁</string>
-	<string name="verification_start">开始认证</string>
-	<string name="verification_quota">本月可提交 %1$d 次，已使用 %2$d 次，剩余 %3$d 次</string>
-	<string name="verification_capture_title">认证拍摄</string>
-	<string name="verification_capture_countdown">请在 %1$d 秒内完成本张照片</string>
-	<string name="verification_capture_expired">拍摄要求已过期，请重新开始</string>
-	<string name="verification_capture_result_error">无法接收认证照片</string>
-	<string name="verification_capture_state_missing">无法恢复本次拍摄状态，请返回认证页面重试</string>
-	<string name="verification_capture_session_invalid">拍摄结果与本次认证不匹配，请重新拍摄</string>
-	<string name="verification_capture_slot_invalid">拍摄结果的照片编号无效，请重新拍摄</string>
-	<string name="verification_capture_path_invalid">拍摄结果的保存位置无效，请重新拍摄</string>
-	<string name="verification_capture_photo_missing">未找到完整的认证照片，请重新拍摄</string>
-	<string name="verification_capture_only">仅允许后置摄像头拍照；禁止翻拍屏幕、相册导入和任何编辑。</string>
-	<string name="verification_submit">安全上传并提交</string>
-	<string name="verification_retry">安全重试</string>
-	<string name="verification_unknown_result">上次操作结果未知。系统会使用同一操作编号安全重试，不会重复扣减额度。</string>
-	<string name="verification_rejected_title">认证未通过</string>
-	<string name="verification_review_title">认证审核中</string>
-	<string name="verification_review_body">材料已安全提交。审核完成后会更新此页面，并通过统一启动提示告知结果。</string>
-	<string name="verification_certificate_title">宝宝认证证书</string>
-	<string name="verification_certificate_number">证书编号：%1$s</string>
-	<string name="verification_certificate_issued">签发时间：%1$s</string>
-	<string name="verification_certificate_verify">验真地址：%1$s</string>
-	<string name="verification_certificate_save">保存 1080p PNG</string>
-	<string name="verification_certificate_share">分享证书</string>
-	<string name="verification_certificate_saved">证书已保存</string>
-	<string name="verification_certificate_invalid_link">这不是有效的 ABDL Space 认证链接</string>
-	<string name="verification_profile_item">宝宝认证</string>
-	<string name="verification_profile_verified">已通过原生验真</string>
-	<string name="verification_sponsor_quota">宝宝认证月额度</string>
-	<string name="verification_sponsor_quota_regular">普通用户每月 2 次提交机会</string>
-	<string name="verification_sponsor_quota_active">赞助者每月 3 次提交机会</string>
-	<string name="verification_passed_badge">宝宝认证已通过</string>
-	<string name="verification_passed_badge_description">认证审核已通过，证书现已可用。</string>
-	<string name="verification_qq_hint">审核联系 QQ（仅审核可见）</string>
-	<string name="verification_qq_invalid">请输入 5–20 位 QQ 号码</string>
-	<string name="verification_capture_requirement">请按画面要求使用后置摄像头拍摄本人认证照片</string>
-	<string name="verification_profile_item_value">已认证 · 点按原生验真</string>
-	<string name="verification_verify_title">宝宝认证验真</string>
-	<string name="verification_verify_valid">认证凭据有效</string>
-	<string name="verification_verify_invalid">认证凭据无效</string>
-	<string name="verification_verify_status_superseded">认证凭据已被替代</string>
-	<string name="verification_verify_status_revoked">认证凭据已吊销</string>
-	<string name="verification_verify_status_unknown">未找到认证凭据</string>
-	<string name="verification_verify_network_error">无法连接验真服务，尚未判定凭据状态。</string>
-	<string name="verification_verify_user">认证用户：%1$s</string>
-	<string name="verification_verify_issued">签发时间：%1$s</string>
-	<string name="verification_verify_generation">凭据代次：%1$d</string>
-	<string name="verification_verify_superseded">该二维码已被补发的新凭据替代，请让持有人提供最新证书。</string>
-	<string name="verification_verify_superseded_at">替代时间：%1$s</string>
-	<string name="verification_verify_revoked">该认证证书已被吊销。</string>
-	<string name="verification_verify_revoked_at">吊销时间：%1$s</string>
-	<string name="verification_verify_reason">原因：%1$s</string>
-	<string name="verification_verify_unknown">未找到该认证凭据，或链接格式无效。</string>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 </resources>

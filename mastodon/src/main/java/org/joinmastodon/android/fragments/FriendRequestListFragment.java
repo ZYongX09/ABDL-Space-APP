@@ -133,7 +133,7 @@ import static org.joinmastodon.android.ui.compose.navigation.FriendUniverseToolb
 	@Override
 	public boolean onOptionsItemSelected(MenuItem item) {
 		if (item.getItemId() == 1) {
-			Toast.makeText(getContext(), "搜索功能即将上线", Toast.LENGTH_SHORT).show();
+			Toast.makeText(getContext(), getString(R.string.general_search_coming_soon), Toast.LENGTH_SHORT).show();
 			return true;
 		}
 		return super.onOptionsItemSelected(item);
@@ -243,7 +243,7 @@ import static org.joinmastodon.android.ui.compose.navigation.FriendUniverseToolb
 			fab.setBackgroundResource(R.drawable.bg_fab);
 			fab.setScaleType(ImageView.ScaleType.CENTER);
 			fab.setElevation(V.dp(6));
-			fab.setContentDescription("发布交友请求");
+			fab.setContentDescription(getString(R.string.friend_request_create));
 			fab.setOnClickListener(v -> openCreateRequest());
 			wrapper.addView(fab);
 		}
@@ -600,7 +600,7 @@ import static org.joinmastodon.android.ui.compose.navigation.FriendUniverseToolb
 
 			void bind(FriendRequest item) {
 				username.setText(item.user != null ? item.user.username : "");
-				lookingForChip.setText(item.looking_for != null ? item.looking_for : "");
+				lookingForChip.setText(FriendRequestCreateFragment.localizedLookingFor(getContext(), item.looking_for));
 				requestTitle.setText(item.title);
 				requestTitle.setVisibility(item.title == null || item.title.isBlank() ? View.GONE : View.VISIBLE);
 				requestDescription.setText(item.description);
@@ -642,7 +642,7 @@ import static org.joinmastodon.android.ui.compose.navigation.FriendUniverseToolb
 							icon.setPadding(0, 0, V.dp(10), 0);
 							icon.setImageResource(iconRes);
 							icon.setColorFilter(UiUtils.getThemeColor(getActivity(), R.attr.colorM3OnSurfaceVariant));
-							icon.setContentDescription(f.field_key);
+							icon.setContentDescription(FriendRequestCreateFragment.localizedField(getContext(), f.field_key));
 							metadataContainer.addView(icon);
 						}
 					}
@@ -681,11 +681,11 @@ import static org.joinmastodon.android.ui.compose.navigation.FriendUniverseToolb
 					boolean isOwner = itemUserId.equals(myUserId);
 
 					if (isOwner) {
-						popup.getMenu().add(0, 1, 0, "编辑");
-						popup.getMenu().add(0, 2, 1, "删除");
+						popup.getMenu().add(0, 1, 0, getString(R.string.edit));
+						popup.getMenu().add(0, 2, 1, getString(R.string.delete));
 					}
 					// popup.getMenu().add(0, 3, 2, "发布帖子");
-					popup.getMenu().add(0, 4, 3, "举报");
+					popup.getMenu().add(0, 4, 3, getString(R.string.friend_request_report));
 
 					popup.setOnMenuItemClickListener(menuItem -> {
 						if (menuItem.getItemId() == 1) {
@@ -715,7 +715,7 @@ import static org.joinmastodon.android.ui.compose.navigation.FriendUniverseToolb
 										data.remove(item);
 										adapter.notifyDataSetChanged();
 										updateEmptyState();
-										Toast.makeText(getContext(), "已删除", Toast.LENGTH_SHORT).show();
+										Toast.makeText(getContext(), getString(R.string.friend_request_deleted), Toast.LENGTH_SHORT).show();
 									}
 
 									@Override

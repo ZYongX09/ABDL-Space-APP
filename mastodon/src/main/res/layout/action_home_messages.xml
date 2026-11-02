@@ -6,7 +6,7 @@
     android:clickable="true"
     android:focusable="true"
     android:background="?android:selectableItemBackgroundBorderless"
-    android:contentDescription="私信">
+    android:contentDescription="@string/messages">
 
     <ImageView
         android:layout_width="24dp"

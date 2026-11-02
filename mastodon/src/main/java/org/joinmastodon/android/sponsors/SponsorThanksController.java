@@ -72,7 +72,7 @@ public final class SponsorThanksController{
 		if(!visible || destroyed) return false;
 		if(sessionValid.getAsBoolean()) return true;
 		hide(); items.clear(); total=0; revision++;
-		error="登录状态已变化，请返回关于页后重试"; changed.run(); return false;
+		error=org.joinmastodon.android.MastodonApp.context.getString(org.joinmastodon.android.R.string.general_sponsor_session_changed); changed.run(); return false;
 	}
 	public void refresh(){
 		if(!ready()) return;
@@ -111,7 +111,7 @@ public final class SponsorThanksController{
 					}
 				}catch(Exception invalid){
 					retryRefresh=true;
-					fail("感谢榜已更新或响应无效，请重试刷新"); return;
+					fail(org.joinmastodon.android.MastodonApp.context.getString(org.joinmastodon.android.R.string.general_sponsor_list_changed)); return;
 				}
 				if(refreshing){
 					stagedTotal=page.total; staging.addAll(page.items);
@@ -132,7 +132,7 @@ public final class SponsorThanksController{
 	}
 	private void fail(String message){
 		loading=false; refreshing=false; staging.clear();
-		error=message==null || message.isBlank() ? "感谢榜暂不可用，请重试" : message;
+		error=message==null || message.isBlank() ? org.joinmastodon.android.MastodonApp.context.getString(org.joinmastodon.android.R.string.sponsor_thanks_error) : message;
 		changed.run();
 	}
 }

@@ -2,6 +2,9 @@
 
 package org.joinmastodon.android.ui.compose.friendcards
 
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import org.joinmastodon.android.R
 import android.content.Context
 import android.graphics.Matrix
 import android.graphics.drawable.Drawable
@@ -81,9 +84,9 @@ fun FriendCardField(label: String, value: String, limit: Int, enabled: Boolean =
 
 @Composable
 fun FriendCardPrivacy(field: String, visible: Boolean, enabled: Boolean, onChange: () -> Unit) {
-    Row(Modifier.fillMaxWidth().heightIn(min = 44.dp).clip(RoundedCornerShape(10.dp)).clickable(enabled = enabled, role = Role.Checkbox, onClick = onChange).padding(vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-        Text("${FriendCardRules.fields[field]}可见范围", fontSize = 13.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
-        Text(if (visible) "公开 · 点击设为仅自己" else "仅自己 · 点击设为公开", fontSize = 13.sp, color = MiuixTheme.colorScheme.primary)
+    FlowRow(Modifier.fillMaxWidth().heightIn(min = 44.dp).clip(RoundedCornerShape(10.dp)).clickable(enabled = enabled, role = Role.Checkbox, onClick = onChange).padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(stringResource(R.string.fc_visibility_label, stringResource(FriendCardRules.fieldLabel(field))), fontSize = 13.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
+        Text(if (visible) stringResource(R.string.fc_public_toggle) else stringResource(R.string.fc_private_toggle), fontSize = 13.sp, color = MiuixTheme.colorScheme.primary)
     }
 }
 
@@ -97,6 +100,7 @@ fun FriendCardChip(text: String, selected: Boolean = false, enabled: Boolean = t
 
 @Composable
 fun FriendCardTagInput(label: String, enabled: Boolean, onAdd: (String) -> String?) {
+    val addLabel = stringResource(R.string.fc_add_tag_label, label)
     var value by remember { mutableStateOf(TextFieldValue()) }
     var error by remember { mutableStateOf<String?>(null) }
     val add = {
@@ -114,7 +118,7 @@ fun FriendCardTagInput(label: String, enabled: Boolean, onAdd: (String) -> Strin
                 decorationBox = { inner -> Box { if (value.text.isEmpty()) Text(label, color = MiuixTheme.colorScheme.onSurfaceVariantSummary, fontSize = 15.sp); inner() } })
             val active = enabled && value.text.isNotBlank() && value.composition == null
             Box(Modifier.size(48.dp).clip(CircleShape).background(if (active) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.surfaceVariant)
-                .clickable(enabled = active, role = Role.Button, onClick = { add() }).semantics { contentDescription = "添加$label" }, contentAlignment = Alignment.Center) {
+                .clickable(enabled = active, role = Role.Button, onClick = { add() }).semantics { contentDescription = addLabel }, contentAlignment = Alignment.Center) {
                 Text("+", fontSize = 26.sp, color = if (active) MiuixTheme.colorScheme.onPrimary else MiuixTheme.colorScheme.onSurfaceVariantSummary)
             }
         }
@@ -175,34 +179,35 @@ fun FriendCardProduct(item: FriendCard.Diaper, onOpen: () -> Unit, onRemove: (()
     Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(MiuixTheme.colorScheme.surfaceVariant), verticalAlignment = Alignment.CenterVertically) {
         Row(Modifier.weight(1f).clickable(enabled = item.available, role = Role.Button, onClick = onOpen).padding(10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Box(Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)).background(MiuixTheme.colorScheme.surface), contentAlignment = Alignment.Center) {
-                Text("商品", fontSize = 11.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
+                Text(stringResource(R.string.fc_product), fontSize = 11.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
                 if (!item.imageUrl.isNullOrBlank()) key(item.imageUrl) {
                     AndroidView(factory = { context -> ImageView(context).apply { scaleType = ImageView.ScaleType.CENTER_CROP; ViewImageLoader.load(this, null, UrlImageLoaderRequest(item.imageUrl, 160, 160)) } }, modifier = Modifier.fillMaxSize())
                 }
             }
-            Column { Text(item.name?.takeIf { it.isNotBlank() } ?: "纸尿裤 #${item.id}", maxLines = 2, overflow = TextOverflow.Ellipsis); if (!item.available) Text("商品已下架 / 不可用", fontSize = 12.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary) }
+            Column { Text(item.name?.takeIf { it.isNotBlank() } ?: stringResource(R.string.fc_diaper_fallback, item.id), maxLines = 2, overflow = TextOverflow.Ellipsis); if (!item.available) Text(stringResource(R.string.fc_product_unavailable), fontSize = 12.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary) }
         }
-        if (onRemove != null) TextButton(text = "移除", onClick = onRemove)
+        if (onRemove != null) TextButton(text = stringResource(R.string.fc_remove), onClick = onRemove)
     }
 }
 
 @Composable
 fun FriendCardContents(card: FriendCard, games: Map<String, String> = emptyMap(), compact: Boolean = false, onDiaper: (FriendCard.Diaper) -> Unit = {}) {
+    val context = LocalContext.current
     val basics = listOf("gender" to card.gender, "age" to card.age, "zodiac" to card.zodiac, "region" to card.region, "school" to card.school, "mbti" to card.mbti).filter { card.isPublic(it.first) && !it.second.isNullOrBlank() }
     if (basics.isNotEmpty()) FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) { basics.take(if (compact) 4 else 6).forEach { FriendCardChip(it.second) } }
     if (card.isPublic("interaction_habits") && !card.interactionHabits.isNullOrBlank()) Text(card.interactionHabits, maxLines = if (compact) 2 else Int.MAX_VALUE, overflow = TextOverflow.Ellipsis, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
-    val tags = (if (card.isPublic("interests")) card.interests.orEmpty() else emptyList()) + (if (card.isPublic("games")) card.games.orEmpty().map { games[it] ?: FriendCardGames.gameName(it) } else emptyList())
+    val tags = (if (card.isPublic("interests")) card.interests.orEmpty() else emptyList()) + (if (card.isPublic("games")) card.games.orEmpty().map { FriendCardGames.gameName(it, games[it], context) } else emptyList())
     if (tags.isNotEmpty()) FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         tags.take(if (compact) 4 else tags.size).forEach { FriendCardChip(it) }
         if (compact && tags.size > 4) FriendCardChip("+${tags.size - 4}")
     }
     if (card.isPublic("looking_for") && !card.lookingFor.isNullOrBlank()) {
-        Text("我想找", fontWeight = FontWeight.SemiBold)
+        Text(stringResource(R.string.fc_looking_for), fontWeight = FontWeight.SemiBold)
         Text(card.lookingFor, maxLines = if (compact) 2 else Int.MAX_VALUE, overflow = TextOverflow.Ellipsis)
     }
-    if (card.isPublic("boundaries") && !card.boundaries.isNullOrBlank()) Text("边界 · ${card.boundaries}", maxLines = if (compact) 1 else Int.MAX_VALUE, overflow = TextOverflow.Ellipsis, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
+    if (card.isPublic("boundaries") && !card.boundaries.isNullOrBlank()) Text(stringResource(R.string.fc_boundaries_value, card.boundaries), maxLines = if (compact) 1 else Int.MAX_VALUE, overflow = TextOverflow.Ellipsis, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
     if (!compact && card.isPublic("diapers") && !card.diapers.isNullOrEmpty()) {
-        Text("我穿过", fontWeight = FontWeight.SemiBold)
+        Text(stringResource(R.string.fc_worn), fontWeight = FontWeight.SemiBold)
         card.diapers.forEach { item -> FriendCardProduct(item, { onDiaper(item) }) }
     }
 }

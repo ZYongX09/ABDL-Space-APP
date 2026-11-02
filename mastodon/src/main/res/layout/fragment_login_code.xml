@@ -8,10 +8,14 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true">
     <LinearLayout
         android:id="@+id/content_container"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="wrap_content"
         android:orientation="vertical">
 
         <!-- 返回按钮 -->
@@ -25,12 +29,12 @@
             android:src="@drawable/ic_arrow_back_24"
             android:tint="?colorM3OnSurface"
             android:background="?android:attr/selectableItemBackgroundBorderless"
-            android:contentDescription="返回" />
+            android:contentDescription="@string/back" />
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="输入验证码"
+            android:text="@string/general_code_title"
             android:textSize="28sp"
             android:textStyle="bold"
             android:textColor="?colorM3OnSurface"
@@ -43,7 +47,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="32dp"
-            android:text="验证码已发送至\nuser@example.com"
+            android:text="@string/human_check_sent"
             android:textSize="14sp"
             android:textColor="?colorM3OnSurfaceVariant"
             android:lineSpacingExtra="4dp"
@@ -61,15 +65,17 @@
         <!-- 打开邮箱APP 按钮（镂空圆角） -->
         <Button
             android:id="@+id/btn_open_email"
-            android:layout_width="320dp"
-            android:layout_height="48dp"
+            android:layout_width="match_parent"
+            android:layout_marginHorizontal="20dp"
+            android:layout_height="wrap_content"
+                android:minHeight="48dp"
             android:layout_gravity="center_horizontal"
             android:layout_marginBottom="12dp"
             android:background="@drawable/bg_btn_outline_blue_rounded"
-            android:text="打开邮箱APP"
+            android:text="@string/general_open_email"
             android:textSize="15sp"
             android:textAllCaps="false"
-            android:textColor="#A1D9F7" />
+            android:textColor="#A1D9F7" android:singleLine="false" />
 
         <!-- 重新发送倒计时 -->
         <TextView
@@ -112,12 +118,12 @@
                     android:layout_marginEnd="8dp"
                     android:src="@drawable/ic_info_24px"
                     android:tint="#A1D9F7"
-                    android:contentDescription="提示" />
+                    android:contentDescription="@string/general_hint" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="没有收到邮件？"
+                    android:text="@string/general_email_missing"
                     android:textSize="14sp"
                     android:textStyle="bold"
                     android:textColor="?colorM3OnSurface" />
@@ -126,7 +132,7 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="•  请检查垃圾邮件箱\n•  邮件可能需要 1～2 分钟送达\n•  确认邮箱地址填写正确"
+                android:text="@string/general_email_help"
                 android:textSize="13sp"
                 android:textColor="?colorM3OnSurfaceVariant"
                 android:lineSpacingExtra="4dp" />
@@ -142,4 +148,5 @@
             android:gravity="center"
             android:visibility="gone" />
     </LinearLayout>
+    </ScrollView>
 </FrameLayout>

@@ -56,7 +56,7 @@
 				android:layout_marginBottom="28dp"
 				android:textSize="14sp"
 				android:textColor="?colorM3OnSurfaceVariant"
-				android:text="使用您的 ABDL Space 账户登录"
+				android:text="@string/general_login_intro"
 				android:gravity="center"/>
 
 			<EditText
@@ -64,7 +64,7 @@
 				android:layout_width="match_parent"
 				android:layout_height="52dp"
 				android:layout_marginBottom="12dp"
-				android:hint="邮箱或用户名"
+				android:hint="@string/general_account_hint"
 				android:inputType="textEmailAddress"
 				android:autofillHints="emailAddress"
 				android:singleLine="true"
@@ -78,7 +78,7 @@
 				android:layout_width="match_parent"
 				android:layout_height="52dp"
 				android:layout_marginBottom="20dp"
-				android:hint="密码"
+				android:hint="@string/password"
 				android:inputType="textPassword"
 				android:autofillHints="password"
 				android:singleLine="true"
@@ -110,7 +110,7 @@
 			android:layout_height="wrap_content"
 			android:layout_marginTop="24dp"
 			android:layout_marginBottom="16dp"
-			android:text="或使用第三方授权登录"
+			android:text="@string/general_third_party_login"
 			android:textColor="?colorM3OnSurfaceVariant"
 			android:textSize="12sp"
 			android:gravity="center"/>
@@ -122,7 +122,7 @@
 				style="@style/Widget.Mastodon.M3.Button.Outlined"
 				android:drawableStart="@drawable/ic_abdl_icon"
 				android:drawablePadding="8dp"
-				android:text="使用网页版 ABDL Space 授权登录"
+				android:text="@string/general_web_login"
 				android:textAllCaps="false"
 				android:textSize="13sp"/>
 
@@ -134,7 +134,7 @@
 				style="@style/Widget.Mastodon.M3.Button.Outlined"
 				android:drawableStart="@drawable/ic_nbw"
 				android:drawablePadding="8dp"
-				android:text="使用网页版 宝宝新天地 授权登录"
+				android:text="@string/general_nbw_web_login"
 				android:textAllCaps="false"
 				android:textSize="13sp"/>
 

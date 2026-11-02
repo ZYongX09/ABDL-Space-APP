@@ -50,7 +50,7 @@ import org.robolectric.annotation.RealObject;
 
 /** Executes production Fragment lifecycle and callbacks; view rendering and remote services are replaced. */
 @RunWith(RobolectricTestRunner.class)
-@Config(sdk=28, application=CompatibilityTestApplication.class, shadows={FriendCardFragmentBehaviorTest.LocalRequests.class, FriendCardFragmentBehaviorTest.LocalNavigation.class, FriendCardFragmentBehaviorTest.LocalViews.class})
+@Config(qualifiers="zh", sdk=28, application=CompatibilityTestApplication.class, shadows={FriendCardFragmentBehaviorTest.LocalRequests.class, FriendCardFragmentBehaviorTest.LocalNavigation.class, FriendCardFragmentBehaviorTest.LocalViews.class})
 public class FriendCardFragmentBehaviorTest {
     private Activity activity;
     private FriendCardCreateFragment fragment;

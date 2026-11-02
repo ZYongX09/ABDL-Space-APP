@@ -31,7 +31,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="扫描二维码"
+            android:text="@string/scan_qr_code"
             android:textColor="#FFFFFF"
             android:textSize="18sp"
 			android:textStyle="bold"
@@ -60,7 +60,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="将二维码放入框内，即可自动扫描"
+            android:text="@string/general_scanner_instructions"
             android:textColor="#CCFFFFFF"
             android:textSize="14sp"
             android:gravity="center" />
@@ -69,7 +69,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:text="支持 Mastodon / ABDL Space 二维码"
+            android:text="@string/general_scanner_formats"
             android:textColor="#80FFFFFF"
             android:textSize="12sp"
             android:gravity="center" />
@@ -91,14 +91,14 @@
                 android:background="@android:color/transparent"
                 android:src="@drawable/ic_fluent_flashlight_off_24_filled"
                 android:scaleType="centerInside"
-                android:contentDescription="手电筒" />
+                android:contentDescription="@string/general_flashlight" />
 
             <TextView
                 android:id="@+id/torch_label"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
-                android:text="打开手电筒"
+                android:text="@string/general_flashlight_on"
                 android:textColor="#FFFFFF"
                 android:textSize="12sp" />
         </LinearLayout>

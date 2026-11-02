@@ -55,7 +55,7 @@ import okhttp3.Response;
  * 账号密码登录页（美团风格）
  * - 邮箱 + 密码
  * - "登录" → POST /api/auth/login
- * - "验证码登录" → LoginEmailFragment
+ * - getString(R.string.general_code_login) → LoginEmailFragment
  * - 第三方登录
  */
 public class LoginPasswordFragment extends AppKitFragment {
@@ -89,7 +89,7 @@ public class LoginPasswordFragment extends AppKitFragment {
         spaceBg.setDarkMode(isDark);
 
         if (isDark) {
-            titleView.setText(android.text.Html.fromHtml("<font color='#FFFFFF'>欢迎登录 </font><font color='#A1D9F7'>ABDL Space</font>"));
+            titleView.setText(android.text.Html.fromHtml("<font color='#FFFFFF'>"+getString(R.string.general_welcome)+"</font><font color='#A1D9F7'>ABDL Space</font>"));
             emailEdit.setBackgroundResource(R.drawable.bg_input_dark);
             emailEdit.setTextColor(Color.WHITE);
             passwordEdit.setBackgroundResource(R.drawable.bg_input_dark);
@@ -98,7 +98,7 @@ public class LoginPasswordFragment extends AppKitFragment {
             btnQQ.setBackgroundResource(R.drawable.bg_social_dark);
             btnOAuth.setBackgroundResource(R.drawable.bg_social_dark);
         } else {
-            titleView.setText(android.text.Html.fromHtml("<font color='#333333'>欢迎登录 </font><font color='#A1D9F7'>ABDL Space</font>"));
+            titleView.setText(android.text.Html.fromHtml("<font color='#333333'>"+getString(R.string.general_welcome)+"</font><font color='#A1D9F7'>ABDL Space</font>"));
             emailEdit.setBackgroundResource(R.drawable.bg_input_light);
             emailEdit.setTextColor(Color.BLACK);
             passwordEdit.setBackgroundResource(R.drawable.bg_input_light);
@@ -196,7 +196,7 @@ public class LoginPasswordFragment extends AppKitFragment {
                     getActivity().runOnUiThread(() -> {
                         progress.dismiss();
                         if (btnLogin != null) btnLogin.setEnabled(true);
-                        Toast.makeText(getActivity(), "网络错误: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                        Toast.makeText(getActivity(), getString(R.string.general_network_error, e.getMessage()), Toast.LENGTH_SHORT).show();
                     });
                 }
 
@@ -254,12 +254,12 @@ public class LoginPasswordFragment extends AppKitFragment {
                             } else {
                                 progress.dismiss();
                                 if (btnLogin != null) btnLogin.setEnabled(true);
-                                Toast.makeText(getActivity(), "登录失败: " + responseBody, Toast.LENGTH_SHORT).show();
+                                Toast.makeText(getActivity(), getString(R.string.general_login_failed, responseBody), Toast.LENGTH_SHORT).show();
                             }
                         } else {
                             progress.dismiss();
                             if (btnLogin != null) btnLogin.setEnabled(true);
-                            Toast.makeText(getActivity(), "登录失败: " + responseBody, Toast.LENGTH_SHORT).show();
+                            Toast.makeText(getActivity(), getString(R.string.general_login_failed, responseBody), Toast.LENGTH_SHORT).show();
                         }
                     });
                 }

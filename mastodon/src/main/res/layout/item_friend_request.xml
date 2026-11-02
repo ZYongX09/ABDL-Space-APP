@@ -22,7 +22,7 @@
             android:layout_height="64dp"
             android:scaleType="centerCrop"
             android:clipToOutline="true"
-            android:contentDescription="头像" />
+            android:contentDescription="@string/profile_picture" />
 
         <LinearLayout
             android:layout_width="0dp"
@@ -61,7 +61,7 @@
             android:background="?android:selectableItemBackgroundBorderless"
             android:src="@drawable/ic_fluent_more_vertical_24_regular"
             android:tint="?android:textColorTertiary"
-            android:contentDescription="菜单"
+            android:contentDescription="@string/general_menu"
             android:scaleType="centerInside" />
 
     </LinearLayout>
@@ -123,7 +123,7 @@
             android:layout_marginEnd="4dp"
                 android:src="@drawable/ic_fluent_clock_24_regular"
                 android:tint="?android:textColorTertiary"
-            android:contentDescription="时间" />
+            android:contentDescription="@string/general_time" />
 
         <TextView
             android:id="@+id/publish_time"

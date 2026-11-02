@@ -48,7 +48,7 @@ internal class EditorTestTransport : NovelAppTransport {
 }
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [32])
+@Config(sdk = [32], qualifiers = "zh-rCN")
 class NovelEditorBehaviorTest {
     private val app = ApplicationProvider.getApplicationContext<Application>()
     private val account = "editor-behavior-${UUID.randomUUID()}"
@@ -265,7 +265,7 @@ class NovelEditorBehaviorTest {
         repo.local { it.checkpoint(chapter, "封面待上传时也不可提交的完整正文", 2, 5, 31, true) }
         val blocked = runCatching { repo.prepare(id, listOf(chapter)) }.exceptionOrNull()
         assertTrue(blocked is IllegalArgumentException)
-        assertTrue(requireNotNull(blocked).message.orEmpty().contains("封面"))
+        assertTrue(org.joinmastodon.android.novel.app.novelMessage(app, requireNotNull(blocked).message.orEmpty()).contains("封面"))
         assertNull(repo.local { it.pendingAppSubmission(id) })
         repo.saveCover(id, saved.copy(coverUrl = "https://media.example.test/new.jpg", coverPending = false))
         val frozen = repo.prepare(id, listOf(chapter))

@@ -6,4 +6,5 @@ public final class ImportException extends RuntimeException{
 	public ImportException(String code, String message){ super(message); this.code=code; }
 	public ImportException(String code, String message, Throwable cause){ super(message, cause); this.code=code; }
 	public String code(){ return code; }
+	public String userMessage(android.content.Context context){ return EditorMessages.forCode(context,code); }
 }

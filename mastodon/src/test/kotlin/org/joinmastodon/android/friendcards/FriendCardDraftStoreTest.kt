@@ -3,9 +3,22 @@ package org.joinmastodon.android.friendcards
 import org.joinmastodon.android.api.requests.friendcards.FriendCardInput
 import org.junit.Assert.*
 import org.junit.Test
+import org.junit.Before
+import org.junit.runner.RunWith
+import org.joinmastodon.android.CompatibilityTestApplication
+import org.joinmastodon.android.MastodonApp
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.annotation.Config
 import java.io.IOException
 
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [28], qualifiers = "zh", application = CompatibilityTestApplication::class)
 class FriendCardDraftStoreTest {
+    @Before fun localizedContext() {
+        MastodonApp.context = RuntimeEnvironment.getApplication()
+        FriendCardGames.updateOptions(emptyList())
+    }
     private class Memory : FriendCardDraftStorage {
         val entries = linkedMapOf<String, String>()
         var fail = false

@@ -149,7 +149,7 @@ class NovelAppViewModel(
             val updated = work.copy(inShelf = collected, collections = (work.collections + if (collected) 1 else -1).coerceAtLeast(0))
             copy(work = if (this.work.value?.id == work.id) this.work.copy(value = updated) else this.work,
                 shelf = shelf.copy(value = shelf.value?.let { old -> old.copy(items = if (collected) (old.items + updated).distinctBy { it.id } else old.items.filterNot { it.id == work.id }, continueWork = old.continueWork?.takeUnless { !collected && it.id == work.id }) }),
-                notice = if (collected) "已加入书架" else "已从书架移除")
+                notice = if (collected) "novel_i18n_added_to_shelf" else "novel_i18n_removed_from_shelf")
         }
     }
     fun follow(author: AuthorPage) = mutation("follow:${author.author.id}") { publish ->
@@ -161,7 +161,7 @@ class NovelAppViewModel(
         if (current.active || !current.eligible || current.completedConditions != 3) return
         mutation("apply") { publish ->
             val creator = apply()
-            publish { copy(creator = NovelLoad(creator), notice = if (creator.active) "创作者身份已开通" else "资格已更新，请检查开通条件") }
+            publish { copy(creator = NovelLoad(creator), notice = if (creator.active) "novel_i18n_creator_activated" else "novel_i18n_eligibility_updated") }
         }
     }
     fun setCommentDraft(text: String) { update { copy(commentDraft = text.take(2000)) } }
@@ -175,14 +175,14 @@ class NovelAppViewModel(
                 commentOperation = null
                 copy(commentDraft = if (commentDraft.trim() == body) "" else commentDraft,
                 comments = NovelLoad(Page((listOf(comment) + comments.value?.items.orEmpty()).distinctBy { it.id }, comments.value?.nextCursor)),
-                work = work.copy(value = work.value?.let { if (it.id == workId) it.copy(comments = it.comments + 1) else it }), notice = "评论已发布") }
+                work = work.copy(value = work.value?.let { if (it.id == workId) it.copy(comments = it.comments + 1) else it }), notice = "novel_i18n_comment_posted") }
         }
     }
     fun deleteComment(comment: Comment) {
         if (!comment.canDelete) return
         mutation("delete:${comment.id}") { publish ->
             deleteComment(comment.id)
-            publish { copy(comments = comments.copy(value = comments.value?.let { it.copy(items = it.items.filterNot { item -> item.id == comment.id }) }), work = work.copy(value = work.value?.let { it.copy(comments = (it.comments - 1).coerceAtLeast(0)) }), notice = "评论已删除") }
+            publish { copy(comments = comments.copy(value = comments.value?.let { it.copy(items = it.items.filterNot { item -> item.id == comment.id }) }), work = work.copy(value = work.value?.let { it.copy(comments = (it.comments - 1).coerceAtLeast(0)) }), notice = "novel_i18n_comment_deleted") }
         }
     }
     fun loadMoreComments(workId: String) {
@@ -193,7 +193,7 @@ class NovelAppViewModel(
     }
     fun report(workId: String?, commentId: String?, reason: String) = mutation("report") { publish ->
         if (commentId != null) reportComment(commentId, reason) else if (workId != null) reportWork(workId, reason)
-        publish { copy(notice = "举报已提交，等待人工处理") }
+        publish { copy(notice = "novel_i18n_report_sent") }
     }
     fun markRead(message: Message? = null) = mutation("readMessages") { publish ->
         markRead(message?.let { listOf(it.id) })
@@ -208,7 +208,7 @@ class NovelAppViewModel(
     }
     fun ownerAction(workId: String, action: String) = mutation("owner:$workId") { publish ->
         ownerAction(workId, action)
-        publish { loadCreator(); loadOwnerWorks(); copy(notice = "操作已提交") }
+        publish { loadCreator(); loadOwnerWorks(); copy(notice = "novel_i18n_action_sent") }
     }
     fun dismissNotice() { update { copy(notice = null, actionError = null) } }
 
@@ -275,9 +275,9 @@ class NovelAppViewModel(
 
 private fun Exception.userMessage(): String = when (this) {
     is NovelAppApiException -> when (status) {
-        401 -> "登录已失效，请重新登录"; 403 -> "当前账号无权进行此操作"; 404 -> "作品已不可见或已被移除"
-        409 -> "作品版本已更新，请刷新后重试"; 429 -> "操作过于频繁，请稍后再试"
-        else -> message ?: "请求未完成，请重试"
+        401 -> "novel_i18n_session_expired"; 403 -> "novel_i18n_action_forbidden"; 404 -> "novel_i18n_work_unavailable"
+        409 -> "novel_i18n_version_updated"; 429 -> "novel_i18n_rate_limited"
+        else -> "novel_i18n_request_incomplete"
     }
-    else -> "连接失败，请检查网络后重试"
+    else -> "novel_i18n_connection_failed"
 }

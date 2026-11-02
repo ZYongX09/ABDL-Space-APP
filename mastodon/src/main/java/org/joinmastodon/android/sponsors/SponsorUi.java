@@ -228,7 +228,7 @@ public final class SponsorUi{
 	}
 	public static String date(Long seconds){
 		if(seconds==null) return "—";
-		try{ return DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.of("Asia/Shanghai")).format(Instant.ofEpochSecond(seconds))+"（北京时间）"; }
+		try{ return org.joinmastodon.android.MastodonApp.context.getString(R.string.general_shanghai_time, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.of("Asia/Shanghai")).format(Instant.ofEpochSecond(seconds))); }
 		catch(RuntimeException ignored){ return "—"; }
 	}
 	public static String price(Plan plan){
@@ -247,12 +247,12 @@ public final class SponsorUi{
 		};
 	}
 	public static String plan(Plan plan){
-		String duration=switch(plan.durationUnit){ case "day" -> plan.durationCount+" 天"; case "month" -> plan.durationCount+" 个月"; default -> "永久"; };
+		String duration=duration(org.joinmastodon.android.MastodonApp.context, plan);
 		return plan.name+" · "+price(plan)+" / "+duration;
 	}
 	public static String render(String template, Config config, Quota quota){
 		return template.replace("{x}", String.valueOf(config.freeDailyLimit)).replace("{y}", String.valueOf(config.sponsorDailyLimit))
 				.replace("{a}", String.valueOf(quota.remaining)).replace("{reset}", date(quota.resetsAt));
 	}
-	public static String quota(Quota quota){ return "今日原图：已用 "+quota.used+" / "+quota.limit+"，剩余 "+quota.remaining+"\n重置时间："+date(quota.resetsAt); }
+	public static String quota(Quota quota){ return org.joinmastodon.android.MastodonApp.context.getString(R.string.general_sponsor_quota, quota.used, quota.limit, quota.remaining, date(quota.resetsAt)); }
 }

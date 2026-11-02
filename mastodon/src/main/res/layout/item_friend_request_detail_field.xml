@@ -12,7 +12,7 @@
         android:layout_height="24dp"
         android:layout_marginEnd="12dp"
         android:visibility="gone"
-        android:contentDescription="图标" />
+        android:contentDescription="@string/sk_timeline_icon" />
 
     <LinearLayout
         android:layout_width="0dp"

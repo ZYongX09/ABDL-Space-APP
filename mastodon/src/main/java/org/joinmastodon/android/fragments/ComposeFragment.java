@@ -145,7 +145,18 @@ import me.grishka.appkit.imageloader.requests.UrlImageLoaderRequest;
 import me.grishka.appkit.utils.CubicBezierInterpolator;
 import me.grishka.appkit.utils.V;
 
-public class ComposeFragment extends MastodonToolbarFragment implements ComposeEditText.SelectionListener, CustomTransitionsFragment{
+public class ComposeFragment extends MastodonToolbarFragment implements ComposeEditText.SelectionListener, CustomTransitionsFragment, org.joinmastodon.android.ui.utils.AppLanguageManager.DraftOwner{
+	private Bundle languageChangeDraft;
+
+	@Override
+	public boolean prepareForAppLanguageChange(){
+		if(localPublishInFlight) return false;
+		if(mainEditText!=null){
+			languageChangeDraft=new Bundle();
+			onSaveInstanceState(languageChangeDraft);
+		}
+		return true;
+	}
 
 	private static final int MEDIA_RESULT=717;
 	private static final int MEDIA_PERMISSION_RESULT=718;
@@ -697,6 +708,12 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	@Override
 	public void onSaveInstanceState(Bundle outState){
 		super.onSaveInstanceState(outState);
+		if(mainEditText!=null){
+			outState.putString("appLanguageDraftText", mainEditText.getText().toString());
+			outState.putString("appLanguageDraftSpoiler", spoilerEdit.getText().toString());
+			outState.putInt("appLanguageDraftSelection", mainEditText.getSelectionStart());
+			outState.putString("appLanguageDraftVisibility", statusVisibility.name());
+		}
 		pollViewController.onSaveInstanceState(outState);
 		mediaViewController.onSaveInstanceState(outState);
 		outState.putBoolean("hasSpoiler", hasSpoiler);
@@ -1032,6 +1049,17 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	@Override
 	public void onViewStateRestored(Bundle savedInstanceState){
 		super.onViewStateRestored(savedInstanceState);
+		Bundle draft=savedInstanceState!=null && savedInstanceState.containsKey("appLanguageDraftText") ? savedInstanceState : languageChangeDraft;
+		if(draft!=null && draft.containsKey("appLanguageDraftText")){
+			mainEditText.setText(draft.getString("appLanguageDraftText", ""));
+			spoilerEdit.setText(draft.getString("appLanguageDraftSpoiler", ""));
+			int selection=Math.max(0, Math.min(mainEditText.length(), draft.getInt("appLanguageDraftSelection", mainEditText.length())));
+			mainEditText.setSelection(selection);
+			try{ statusVisibility=StatusPrivacy.valueOf(draft.getString("appLanguageDraftVisibility", "PUBLIC")); }catch(IllegalArgumentException ignored){}
+			updateCharCounter();
+			updateDraftState();
+		}
+		languageChangeDraft=null;
 		if(savedInstanceState!=null && savedInstanceState.containsKey("autocompleteStart")){
 			int start=savedInstanceState.getInt("autocompleteStart"), end=savedInstanceState.getInt("autocompleteEnd");
 			currentAutocompleteSpan=new ComposeAutocompleteSpan();
@@ -1262,7 +1290,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 		if(!req.sensitive && mediaViewController.hasNsfwAttachments()){
 			req.sensitive=true;
 			if(!hasSpoiler && spoilerEdit.length()==0){
-				spoilerEdit.setText("包含敏感图片");
+				spoilerEdit.setText(R.string.general_sensitive_media_warning);
 				hasSpoiler=true;
 				spoilerEdit.setVisibility(View.VISIBLE);
 			}
@@ -1351,7 +1379,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 			String message=me.error;
 			String mediaDebugInfo=mediaViewController.getUploadedAttachmentDebugInfo();
 			if(!TextUtils.isEmpty(mediaDebugInfo))
-				message+="\n\n上传图片返回 URL：\n"+mediaDebugInfo;
+				message+="\n\n"+getString(R.string.general_upload_debug)+"\n"+mediaDebugInfo;
 			new M3AlertDialogBuilder(getActivity())
 					.setTitle(R.string.post_failed)
 					.setMessage(message)

@@ -15,7 +15,7 @@
         android:padding="12dp"
         android:src="@drawable/ic_arrow_back_24"
         android:background="?android:attr/selectableItemBackgroundBorderless"
-        android:contentDescription="返回"
+        android:contentDescription="@string/back"
         android:tint="?android:attr/textColorPrimary" />
 
     <!-- 标题 -->
@@ -24,7 +24,7 @@
         android:layout_height="wrap_content"
         android:layout_marginStart="24dp"
         android:layout_marginTop="16dp"
-        android:text="宝宝新天地账户"
+        android:text="@string/nbw_bind_guide_title"
         android:textSize="28sp"
         android:textStyle="bold"
         android:textColor="?android:attr/textColorPrimary" />
@@ -46,7 +46,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
-            android:text="正在绑定"
+            android:text="@string/nbw_bind_loading"
             android:textSize="18sp"
             android:textColor="?android:attr/textColorPrimary" />
 
@@ -73,7 +73,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
-            android:text="绑定成功"
+            android:text="@string/nbw_bind_success"
             android:textSize="20sp"
             android:textStyle="bold"
             android:textColor="?android:attr/textColorPrimary" />
@@ -96,7 +96,7 @@
         android:layout_marginHorizontal="24dp"
         android:layout_marginBottom="32dp"
         style="@style/Widget.Mastodon.M3.Button.Filled"
-        android:text="完成"
+        android:text="@string/done"
         android:textAllCaps="false"
         android:textSize="14sp"
         android:visibility="gone" />

@@ -57,7 +57,7 @@ import me.grishka.appkit.utils.V;
 
 /** Exercises production mini binding/click/onShown and account refresh failures without a server. */
 @RunWith(RobolectricTestRunner.class)
-@Config(sdk=28, application=CompatibilityTestApplication.class,
+@Config(qualifiers="zh", sdk=28, application=CompatibilityTestApplication.class,
 		shadows={PublicFriendCardProfileTest.LocalRequests.class,PublicFriendCardProfileTest.LocalNavigation.class,
 				PublicFriendCardProfileTest.UnmountedLoader.class})
 public class PublicFriendCardProfileTest{

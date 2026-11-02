@@ -42,7 +42,7 @@ public class ConversationCell extends android.widget.FrameLayout {
 
 	public void bind(Conversation c) {
 		this.conversation = c;
-		nameView.setText(c.username != null ? c.username : "未知用户");
+		nameView.setText(c.username != null ? c.username : getContext().getString(R.string.general_unknown_user));
 		timeView.setText(formatTime(c.lastMessageAt));
 		previewView.setText(getPreviewText());
 		boolean unread = c.unreadCount > 0;
@@ -78,7 +78,7 @@ public class ConversationCell extends android.widget.FrameLayout {
 	}
 
 	private String getPreviewText() {
-		if (conversation.draft != null && !conversation.draft.isEmpty()) return "草稿：" + conversation.draft;
+		if (conversation.draft != null && !conversation.draft.isEmpty()) return getContext().getString(R.string.general_draft_prefix, conversation.draft);
 		if (conversation.lastMessage == null || conversation.lastMessage.isEmpty()) return "";
 		String prefix = "";
 		if (conversation.lastOutState == SendState.SENDING) prefix = "\u23F3 ";
@@ -92,10 +92,10 @@ public class ConversationCell extends android.widget.FrameLayout {
 		if (millis == 0) return "";
 		long now = System.currentTimeMillis();
 		long diff = now - millis;
-		if (diff < 60_000) return "刚刚";
-		if (diff < 3_600_000) return (diff / 60_000) + "分钟前";
-		if (diff < 86_400_000) return (diff / 3_600_000) + "小时前";
-		if (diff < 7 * 86_400_000) return (diff / 86_400_000) + "天前";
+		if (diff < 60_000) return getContext().getString(R.string.time_just_now);
+		if (diff < 3_600_000) return getContext().getString(R.string.time_minutes_ago_short, diff / 60_000);
+		if (diff < 86_400_000) return getContext().getString(R.string.time_hours_ago_short, diff / 3_600_000);
+		if (diff < 7 * 86_400_000) return getContext().getString(R.string.time_days_ago_short, diff / 86_400_000);
 		java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("MM/dd", java.util.Locale.getDefault());
 		return sdf.format(new java.util.Date(millis));
 	}

@@ -1,5 +1,6 @@
 package org.joinmastodon.android.friendcards
 
+import org.joinmastodon.android.R
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -23,7 +24,7 @@ class FriendCardCoverUpload(private val context: Context, private val account: S
     @Volatile private var call: Call? = null
     fun cancel() { cancelled.set(true); call?.cancel() }
     private fun check() {
-        if (cancelled.get() || AccountSessionManager.getInstance().lastActiveAccountID != account || AccountSessionManager.getInstance().tryGetAccount(account) == null) throw IOException("封面上传已取消，请重新选择")
+        if (cancelled.get() || AccountSessionManager.getInstance().lastActiveAccountID != account || AccountSessionManager.getInstance().tryGetAccount(account) == null) throw IOException(FriendCardText.get(R.string.fc_cover_cancelled))
     }
     fun upload(uri: Uri): Pair<String, String> {
         val source = File.createTempFile("friend_cover_source", ".tmp", context.cacheDir)
@@ -32,17 +33,17 @@ class FriendCardCoverUpload(private val context: Context, private val account: S
         try {
             context.contentResolver.openInputStream(uri)?.use { input -> source.outputStream().use { output ->
                 val buffer = ByteArray(32768); var total = 0L
-                while (true) { check(); val n = input.read(buffer); if (n < 0) break; total += n; if (total > MAX_BYTES) throw IOException("封面图片不能超过10 MiB"); output.write(buffer, 0, n) }
-            } } ?: throw IOException("无法读取封面图片")
+                while (true) { check(); val n = input.read(buffer); if (n < 0) break; total += n; if (total > MAX_BYTES) throw IOException(FriendCardText.get(R.string.friend_cards_cover_limit)); output.write(buffer, 0, n) }
+            } } ?: throw IOException(FriendCardText.get(R.string.fc_cover_unreadable))
             check()
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             BitmapFactory.decodeFile(source.path, bounds)
-            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) throw IOException("请选择有效图片")
+            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) throw IOException(FriendCardText.get(R.string.fc_image_invalid))
             val options = BitmapFactory.Options().apply {
                 inSampleSize = 1
                 while (maxOf(bounds.outWidth, bounds.outHeight) / inSampleSize > 4096) inSampleSize *= 2
             }
-            var image = BitmapFactory.decodeFile(source.path, options) ?: throw IOException("图片解码失败")
+            var image = BitmapFactory.decodeFile(source.path, options) ?: throw IOException(FriendCardText.get(R.string.fc_image_decode_failed))
             bitmap = image; check()
             val transform = Matrix()
             when (ExifInterface(source.path).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)) {
@@ -63,10 +64,10 @@ class FriendCardCoverUpload(private val context: Context, private val account: S
                 val next = Bitmap.createScaledBitmap(image, maxOf(1, (image.width * scale).toInt()), maxOf(1, (image.height * scale).toInt()), true)
                 if (next !== image) image.recycle(); image = next; bitmap = next
             }
-            clean.outputStream().use { if (!image.compress(Bitmap.CompressFormat.JPEG, 88, it)) throw IOException("图片压缩失败") }
-            if (clean.length() !in 1..MAX_BYTES) throw IOException("压缩后的封面超过10 MiB")
+            clean.outputStream().use { if (!image.compress(Bitmap.CompressFormat.JPEG, 88, it)) throw IOException(FriendCardText.get(R.string.fc_image_compress_failed)) }
+            if (clean.length() !in 1..MAX_BYTES) throw IOException(FriendCardText.get(R.string.fc_cover_compressed_limit))
             check()
-            val session = AccountSessionManager.getInstance().tryGetAccount(account) ?: throw IOException("账号已退出")
+            val session = AccountSessionManager.getInstance().tryGetAccount(account) ?: throw IOException(FriendCardText.get(R.string.fc_signed_out))
             val client = MastodonAPIController.getHttpClient().newBuilder().cache(null).followRedirects(false).followSslRedirects(false).build()
             val body = RequestBody.create(MediaType.get("image/jpeg"), clean)
             val listener = CosMediaUpload.CallListener { call = it; check() }
@@ -74,7 +75,7 @@ class FriendCardCoverUpload(private val context: Context, private val account: S
             check(); CosMediaUpload.put(client, auth, body, listener); check()
             val attachment = CosMediaUpload.complete(client, session.domain, session.token.accessToken, auth.uploadId, null, listener)
             val url = attachment.url ?: auth.publicUrl
-            if (auth.uploadId.isNullOrBlank() || url.isNullOrBlank()) throw IOException("封面上传响应不完整")
+            if (auth.uploadId.isNullOrBlank() || url.isNullOrBlank()) throw IOException(FriendCardText.get(R.string.fc_cover_response_incomplete))
             return auth.uploadId to url
         } finally { bitmap?.takeUnless { it.isRecycled }?.recycle(); source.delete(); clean.delete(); call = null }
     }

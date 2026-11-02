@@ -33,7 +33,7 @@ public class OAuthWebViewFragment extends LoaderFragment {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         url = getArguments().getString(ARG_URL);
-        setTitle("授权登录");
+        setTitle(getString(org.joinmastodon.android.R.string.oauth_login));
     }
 
     @Override

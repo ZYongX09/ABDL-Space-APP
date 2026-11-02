@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="novel_reader_unsupported_format">Unsupported file format.</string>
+    <string name="novel_reader_epub_container_missing">EPUB is missing META-INF/container.xml.</string>
+    <string name="novel_reader_epub_opf_invalid">EPUB package path is invalid.</string>
+    <string name="novel_reader_epub_opf_missing">EPUB package content is missing.</string>
+    <string name="novel_reader_epub_no_chapters">EPUB contains no readable chapters.</string>
+    <string name="novel_reader_docx_document_missing">DOCX is missing word/document.xml.</string>
+    <string name="novel_reader_docx_no_body">DOCX contains no readable text.</string>
+    <string name="novel_reader_no_body">No text yet</string>
+    <string name="novel_reader_back">Back</string>
+    <string name="novel_reader_settings">Settings</string>
+    <string name="novel_reader_previous_chapter">Previous</string>
+    <string name="novel_reader_next_chapter">Next</string>
+    <string name="novel_reader_add_bookmark">Add bookmark</string>
+    <string name="novel_reader_add_note">Add note</string>
+    <string name="novel_reader_chapter_progress">Chapter %1$d / %2$d</string>
+    <string name="novel_reader_reading_settings">Reading settings</string>
+    <string name="novel_reader_font_size">Font size %1$d sp</string>
+    <string name="novel_reader_line_height">Line spacing %1$s</string>
+    <string name="novel_reader_palette_paper">Paper</string>
+    <string name="novel_reader_palette_white">White</string>
+    <string name="novel_reader_palette_night">Night</string>
+</resources>

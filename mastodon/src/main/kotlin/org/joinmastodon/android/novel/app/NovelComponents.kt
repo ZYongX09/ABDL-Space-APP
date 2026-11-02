@@ -2,10 +2,15 @@
 
 package org.joinmastodon.android.novel.app
 
+import org.joinmastodon.android.R
+import androidx.compose.ui.res.stringResource
+
 import android.widget.ImageView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -34,9 +39,6 @@ import androidx.compose.ui.viewinterop.AndroidView
 import java.text.NumberFormat
 import java.math.BigDecimal
 import java.math.RoundingMode
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import me.grishka.appkit.imageloader.ViewImageLoader
 import me.grishka.appkit.imageloader.requests.UrlImageLoaderRequest
 import org.joinmastodon.android.novel.app.design.NovelIcons
@@ -59,7 +61,7 @@ import org.joinmastodon.android.novel.app.models.Work
 @Suppress("UNUSED_PARAMETER")
 @Composable internal fun NovelHeader(title: String, onBack: () -> Unit, subtitle: String? = null, actions: @Composable RowScope.() -> Unit = {}) {
     Row(Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        NovelIconButton(NovelIcons.ChevronLeft, "返回", onBack, circular = true)
+        NovelIconButton(NovelIcons.ChevronLeft, stringResource(R.string.novel_en_back), onBack, circular = true)
         NovelHeading(title, Modifier.weight(1f), size = 26)
         actions()
     }
@@ -71,7 +73,23 @@ import org.joinmastodon.android.novel.app.models.Work
         colors = ButtonDefaults.buttonColors(containerColor = if (primary) c.primary else c.primaryContainer, contentColor = if (primary) c.onPrimary else c.primary),
         contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp)) {
         icon?.let { Icon(it, null, Modifier.size(19.dp)); Spacer(Modifier.width(8.dp)) }
-        Text(AnnotatedString(text), fontSize = 14.sp, fontWeight = FontWeight.Medium, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
+        NovelActionLabel(text, Modifier.weight(1f, fill = false))
+    }
+}
+
+/** Keep translated action labels complete within the existing touch target and scaled font bounds. */
+@Composable internal fun NovelActionLabel(text: String, modifier: Modifier = Modifier, size: Int = 14, minimum: Int = 9) {
+    val density = LocalDensity.current
+    val measurer = rememberTextMeasurer()
+    val inherited = LocalTextStyle.current
+    BoxWithConstraints(modifier) {
+        val width = with(density) { maxWidth.toPx() }
+        val style = remember(text, width, density, inherited, size, minimum) {
+            (size downTo minimum).map { inherited.copy(fontSize = it.sp, fontWeight = FontWeight.Medium) }
+                .firstOrNull { measurer.measure(text, it, softWrap = false, maxLines = 1).size.width <= width }
+                ?: inherited.copy(fontSize = minimum.sp, fontWeight = FontWeight.Medium)
+        }
+        Text(AnnotatedString(text), style = style, maxLines = 1, softWrap = false)
     }
 }
 
@@ -86,13 +104,34 @@ import org.joinmastodon.android.novel.app.models.Work
 }
 
 @Composable internal fun NovelTabs(items: List<Pair<String, String>>, selected: String, onSelect: (String) -> Unit, underline: Boolean = false) {
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    if (configuration.locales[0].language == "en" && LocalDensity.current.fontScale >= 1.3f) {
+        // Large translated labels retain their full 13sp font and natural width. Scroll the tabs,
+        // rather than squeezing four labels into equal-width columns or shrinking accessibility text.
+        Row(Modifier.fillMaxWidth().padding(vertical = 10.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            items.forEach { (id, title) ->
+                val active = id == selected
+                val c = NovelTheme.colors
+                Column(Modifier.widthIn(min = 64.dp).clip(RoundedCornerShape(24.dp))
+                    .then(if (!underline) Modifier.background(if (active) c.primaryContainer else c.surfaceVariant.copy(alpha = .35f)) else Modifier)
+                    .clickable { onSelect(id) }.padding(horizontal = 12.dp, vertical = if (underline) 12.dp else 11.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(AnnotatedString(title), color = if (active) c.primary else c.textSecondary, fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium, maxLines = 1, softWrap = false)
+                    if (underline) { Spacer(Modifier.height(11.dp)); Box(Modifier.size(24.dp, 3.dp).background(if (active) c.primary else Color.Transparent, RoundedCornerShape(2.dp))) }
+                }
+            }
+        }
+        return
+    }
     Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         items.forEach { (id, title) ->
             val active = id == selected
             val c = NovelTheme.colors
             Column(Modifier.weight(1f).clip(RoundedCornerShape(24.dp)).then(if (!underline) Modifier.background(if (active) c.primaryContainer else c.surfaceVariant.copy(alpha = .35f)) else Modifier)
                 .clickable { onSelect(id) }.padding(vertical = if (underline) 12.dp else 11.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(title, color = if (active) c.primary else c.textSecondary, fontSize = 13.sp, fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1)
+                androidx.compose.runtime.CompositionLocalProvider(LocalContentColor provides if (active) c.primary else c.textSecondary) {
+                    NovelActionLabel(title, size = 13)
+                }
                 if (underline) { Spacer(Modifier.height(11.dp)); Box(Modifier.size(24.dp, 3.dp).background(if (active) c.primary else Color.Transparent, RoundedCornerShape(2.dp))) }
             }
         }
@@ -103,10 +142,11 @@ import org.joinmastodon.android.novel.app.models.Work
 @Composable internal fun NovelBookCover(work: Work, modifier: Modifier = Modifier, width: Dp = 76.dp) {
     val paper = listOf(Color(0xFFA64D34) to Color(0xFFFFF4DF), Color(0xFFDADDCA) to Color(0xFF384D36), Color(0xFF2D4854) to Color(0xFFEADFC4), Color(0xFFD8BFA0) to Color(0xFF543F31), Color(0xFF697460) to Color(0xFFF6F0E0))
     val (background, foreground) = paper[(work.id.hashCode().toLong().let { if (it < 0) -it else it } % paper.size).toInt()]
-    Box(modifier.width(width).aspectRatio(.72f).clip(RoundedCornerShape(3.dp)).background(background).semantics { contentDescription = "${work.title}，封面" }) {
+    val coverDescription = stringResource(R.string.novel_en_cover_description, work.title)
+    Box(modifier.width(width).aspectRatio(.72f).clip(RoundedCornerShape(3.dp)).background(background).semantics { contentDescription = coverDescription }) {
         Column(Modifier.fillMaxSize().padding(horizontal = 9.dp, vertical = 12.dp), verticalArrangement = Arrangement.SpaceBetween) {
             Text(work.title, color = foreground, fontFamily = NovelTypography.serif, fontSize = if (width > 100.dp) 21.sp else 15.sp, lineHeight = if (width > 100.dp) 29.sp else 21.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
-            Text(work.displayAuthorName, color = foreground, fontSize = 8.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(work.displayAuthorName(androidx.compose.ui.platform.LocalContext.current), color = foreground, fontSize = 8.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         val url = work.coverUrl?.takeIf { it.startsWith("https://") }
         if (url != null) key(url) {
@@ -129,7 +169,7 @@ import org.joinmastodon.android.novel.app.models.Work
             NovelBookCover(work)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(9.dp)) {
                 Text(work.title, color = NovelTheme.colors.text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Text("${work.displayAuthorName} / ${work.typeLabel}", color = NovelTheme.colors.textSecondary, fontSize = 11.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text("${work.displayAuthorName(androidx.compose.ui.platform.LocalContext.current)} / ${stringResource(work.typeLabelRes)}", color = NovelTheme.colors.textSecondary, fontSize = 11.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Text(work.description, color = NovelTheme.colors.textSecondary, fontSize = 11.sp, lineHeight = 18.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) { work.tags.take(3).forEach { NovelTag(it) } }
                 trailing?.invoke()
@@ -150,11 +190,11 @@ import org.joinmastodon.android.novel.app.models.Work
     val c = NovelTheme.colors
     if (load.loading) Row(Modifier.fillMaxWidth().padding(32.dp), horizontalArrangement = Arrangement.Center) { CircularProgressIndicator(Modifier.size(25.dp), color = c.primary, strokeWidth = 2.dp) }
     if (load.error != null) Column(Modifier.fillMaxWidth().padding(vertical = 28.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(load.error, color = c.error, fontSize = 13.sp); NovelPill("重新加载", onRetry, primary = false)
+        Text(novelMessage(load.error), color = c.error, fontSize = 13.sp); NovelPill(stringResource(R.string.novel_en_reload), onRetry, primary = false)
     } else if (!load.loading && empty) Column(Modifier.fillMaxWidth().padding(vertical = 52.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Icon(NovelIcons.BookOpen, null, Modifier.size(34.dp), tint = c.textSecondary)
         NovelHeading(emptyTitle, size = 19)
-        Text("新的故事，正在路上", color = c.textSecondary, fontSize = 12.sp)
+        Text(stringResource(R.string.novel_en_stories_on_the_way), color = c.textSecondary, fontSize = 12.sp)
     }
 }
 
@@ -162,7 +202,7 @@ import org.joinmastodon.android.novel.app.models.Work
     Column(modifier.padding(end = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         NovelCompactValue(value, label)
         Text(label, color = NovelTheme.colors.textSecondary, fontSize = 12.sp)
-        if (delta != null) Text("较上周 ${if (delta > 0) "+" else ""}${delta.novelDelta()}%", color = NovelTheme.colors.primary, fontSize = 11.sp)
+        if (delta != null) Text(stringResource(R.string.novel_en_weekly_delta, if (delta > 0) "+" else "", delta.novelDelta()), color = NovelTheme.colors.primary, fontSize = 11.sp)
     }
 }
 
@@ -185,18 +225,21 @@ import org.joinmastodon.android.novel.app.models.Work
     }
 }
 
-internal fun Long.novelCompactNumber(): String {
+internal fun novelLocale(): java.util.Locale = org.joinmastodon.android.MastodonApp.context?.resources?.configuration?.locales?.get(0) ?: java.util.Locale.getDefault()
+
+internal fun Long.novelCompactNumber(locale: java.util.Locale = novelLocale()): String {
     val number = BigDecimal.valueOf(this)
     val magnitude = number.abs()
-    val unit = when {
-        magnitude >= BigDecimal("1000000000000") -> 1_000_000_000_000L to "万亿"
-        magnitude >= BigDecimal("100000000") -> 100_000_000L to "亿"
-        magnitude >= BigDecimal("10000") -> 10_000L to "万"
-        else -> return novelNumber()
-    }
-    return number.divide(BigDecimal.valueOf(unit.first), 1, RoundingMode.DOWN).stripTrailingZeros().toPlainString() + unit.second
+    val units = if (locale.language == "zh") listOf(
+        1_000_000_000_000L to "万亿", 100_000_000L to "亿", 10_000L to "万",
+    ) else listOf(1_000_000_000L to "B", 1_000_000L to "M", 1_000L to "K")
+    val unit = units.firstOrNull { magnitude >= BigDecimal.valueOf(it.first) } ?: return novelNumber(locale)
+    val compact = number.divide(BigDecimal.valueOf(unit.first), 1, RoundingMode.DOWN).stripTrailingZeros()
+    return NumberFormat.getNumberInstance(locale).apply { isGroupingUsed = false; maximumFractionDigits = 1 }.format(compact) + unit.second
 }
 
-internal fun Long.novelNumber(): String = NumberFormat.getIntegerInstance().format(this)
-private fun Double.novelDelta(): String = if (this % 1.0 == 0.0) toLong().toString() else "%.1f".format(this)
-internal fun Long.novelDate(): String = if (this <= 0) "" else DateTimeFormatter.ofPattern("MM-dd HH:mm").withZone(ZoneId.systemDefault()).format(Instant.ofEpochSecond(this))
+internal fun Long.novelNumber(locale: java.util.Locale = novelLocale()): String = NumberFormat.getIntegerInstance(locale).format(this)
+private fun Double.novelDelta(): String = NumberFormat.getNumberInstance(novelLocale()).apply { isGroupingUsed = false; maximumFractionDigits = 1 }.format(this)
+internal fun Long.novelDate(locale: java.util.Locale = novelLocale()): String = if (this <= 0) "" else java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.SHORT, locale).format(java.util.Date(this * 1000))
+
+internal fun String.novelRegistrationDate(): String = runCatching { java.time.Instant.parse(this).epochSecond.novelDate() }.getOrDefault(this)

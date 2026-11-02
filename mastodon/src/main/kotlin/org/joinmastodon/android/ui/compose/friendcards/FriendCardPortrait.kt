@@ -2,6 +2,7 @@
 
 package org.joinmastodon.android.ui.compose.friendcards
 
+import androidx.compose.ui.res.stringResource
 import android.widget.ImageView
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -20,6 +21,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import org.joinmastodon.android.R
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -70,7 +72,7 @@ fun FriendCardPrimaryButton(text: String, onClick: () -> Unit, modifier: Modifie
 
 @Composable
 fun FriendCardIdentity(card: FriendCard, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null, light: Boolean = true) {
-    val name = card.owner?.displayName?.takeIf { it.isNotBlank() } ?: card.owner?.username?.takeIf { it.isNotBlank() } ?: "扩列用户"
+    val name = card.owner?.displayName?.takeIf { it.isNotBlank() } ?: card.owner?.username?.takeIf { it.isNotBlank() } ?: stringResource(R.string.fc_friend_card_user)
     val foreground = if (light) Color.White else MiuixTheme.colorScheme.onSurface
     Row(modifier.then(if (onClick != null) Modifier.clip(RoundedCornerShape(14.dp)).clickable(role = Role.Button, onClick = onClick) else Modifier)
         .padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -96,8 +98,9 @@ fun FriendCardIdentity(card: FriendCard, modifier: Modifier = Modifier, onClick:
 
 @Composable
 fun FriendCardHello(enabled: Boolean = true, onClick: () -> Unit) {
+    val messageLabel = stringResource(R.string.fc_message)
     Box(Modifier.size(54.dp).clip(CircleShape).background(Color.White.copy(alpha = if (enabled) 1f else .5f))
-        .clickable(enabled = enabled, role = Role.Button, onClick = onClick).semantics { contentDescription = "发私信" }, contentAlignment = Alignment.Center) {
+        .clickable(enabled = enabled, role = Role.Button, onClick = onClick).semantics { contentDescription = messageLabel }, contentAlignment = Alignment.Center) {
         FriendCardResourceIcon(R.drawable.ic_friend_card_chat, tint = Color(0xFF233036), modifier = Modifier.size(29.dp))
     }
 }
@@ -178,12 +181,13 @@ internal fun FriendCardQuotation(modifier: Modifier = Modifier) {
 
 @Composable
 private fun PortraitContents(card: FriendCard, games: Map<String, String>, compact: Boolean, roomy: Boolean, palette: FriendCardPalette, onDiaper: (FriendCard.Diaper) -> Unit, room: Float = Float.POSITIVE_INFINITY) {
+    val context = LocalContext.current
     val basics = listOf("gender" to card.gender, "age" to card.age, "region" to card.region, "mbti" to card.mbti, "zodiac" to card.zodiac,
         "school" to card.school, "interaction_habits" to card.interactionHabits)
         .filter { card.isPublic(it.first) && !it.second.isNullOrBlank() }
     if (basics.isNotEmpty() && (!compact || roomy)) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            PortraitLabel("👤", "关于我", palette.accent)
+            PortraitLabel("👤", stringResource(R.string.fc_about_me), palette.accent)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(7.dp), verticalArrangement = Arrangement.spacedBy(8.dp), maxLines = if (!compact) Int.MAX_VALUE else if (room >= 540) 2 else 1) {
                 val count = if (!compact) basics.size else if (room >= 540) 5 else 3
                 basics.take(count).forEach { (_, text) ->
@@ -194,12 +198,12 @@ private fun PortraitContents(card: FriendCard, games: Map<String, String>, compa
         }
     }
     val interests = if (card.isPublic("interests")) card.interests.orEmpty() else emptyList()
-    val gameNames = if (card.isPublic("games")) card.games.orEmpty().map { games[it] ?: FriendCardGames.gameName(it) } else emptyList()
+    val gameNames = if (card.isPublic("games")) card.games.orEmpty().map { FriendCardGames.gameName(it, games[it], context) } else emptyList()
     val liked = if (compact) (interests + gameNames).distinct() else interests
-    if (liked.isNotEmpty() && (!compact || room >= 320)) PortraitTextSection("💖", "我喜欢", liked.joinToString(" | "), palette, if (!compact) Int.MAX_VALUE else if (room >= 540) 2 else 1)
+    if (liked.isNotEmpty() && (!compact || room >= 320)) PortraitTextSection("💖", stringResource(R.string.fc_interests), liked.joinToString(" | "), palette, if (!compact) Int.MAX_VALUE else if (room >= 540) 2 else 1)
     if (!compact && gameNames.isNotEmpty()) {
         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            PortraitLabel("🎮", "我在玩", palette.accent)
+            PortraitLabel("🎮", stringResource(R.string.fc_field_games), palette.accent)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 gameNames.forEach { name ->
                     Box(Modifier.widthIn(min = 120.dp, max = 240.dp).clip(RoundedCornerShape(16.dp))
@@ -210,11 +214,11 @@ private fun PortraitContents(card: FriendCard, games: Map<String, String>, compa
             }
         }
     }
-    if (card.isPublic("looking_for") && !card.lookingFor.isNullOrBlank()) PortraitTextSection("🔎", "我想找", card.lookingFor, palette, if (compact) 2 else Int.MAX_VALUE)
-    if ((!compact || room >= 560) && card.isPublic("boundaries") && !card.boundaries.isNullOrBlank()) PortraitTextSection("💔", "我的雷区", card.boundaries, palette, if (compact) 2 else Int.MAX_VALUE)
+    if (card.isPublic("looking_for") && !card.lookingFor.isNullOrBlank()) PortraitTextSection("🔎", stringResource(R.string.fc_looking_for), card.lookingFor, palette, if (compact) 2 else Int.MAX_VALUE)
+    if ((!compact || room >= 560) && card.isPublic("boundaries") && !card.boundaries.isNullOrBlank()) PortraitTextSection("💔", stringResource(R.string.fc_my_boundaries), card.boundaries, palette, if (compact) 2 else Int.MAX_VALUE)
     if (!compact && card.isPublic("diapers") && !card.diapers.isNullOrEmpty()) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            PortraitLabel("🧷", "我穿过", palette.accent)
+            PortraitLabel("🧷", stringResource(R.string.fc_worn), palette.accent)
             card.diapers.forEach { item -> FriendCardProduct(item, { onDiaper(item) }) }
         }
     }

@@ -1,5 +1,6 @@
 package org.joinmastodon.android.fragments.friendcards
 
+import org.joinmastodon.android.R
 import android.os.Bundle
 import android.view.View
 import androidx.compose.runtime.Composable
@@ -66,7 +67,7 @@ open class MyFriendCardsFragment : FriendCardBaseFragment() {
     // AppKit/Base continue owning native system/keyboard insets. Only the duplicate toolbar goes.
     override fun onViewCreated(view: View, state: Bundle?) { super.onViewCreated(view, state); toolbar?.visibility = View.GONE }
     override fun onUpdateToolbar() { super.onUpdateToolbar(); toolbar?.visibility = View.GONE }
-    private fun updateTitle() { setTitle(if (tab == FriendCardHubTab.MyCards) "我的扩列卡" else "扩列广场") }
+    private fun updateTitle() { setTitle(if (tab == FriendCardHubTab.MyCards) getString(R.string.fc_my_cards_heading) else getString(R.string.fc_plaza_heading)) }
 
     override fun refresh() {
         if (busy || !shown || !accountValid()) return
@@ -84,7 +85,7 @@ open class MyFriendCardsFragment : FriendCardBaseFragment() {
         execute(FriendCardRequest.me(), { result ->
             loading = false
             if (result.card != null && !result.card.isSupported) {
-                globalError = "扩列卡格式暂不受支持，请稍后重试"
+                globalError = getString(R.string.fc_unsupported_format)
                 restoringMy = false
             } else {
                 card = result.card; loaded = true
@@ -101,7 +102,7 @@ open class MyFriendCardsFragment : FriendCardBaseFragment() {
         changed()
         execute(FriendCardRequest.history(ticket.cursor), { result ->
             val accepted = if (result.cards == null) {
-                history.fail(ticket, "历史卡响应不完整，请重试"); false
+                history.fail(ticket, getString(R.string.fc_history_incomplete)); false
             } else history.accept(ticket, result.cards, result.nextCursor)
             if (accepted && reconcileHistoryOverlap(result.cards.orEmpty())) return@execute
             if (accepted && restoringMy && myPosition.cardId != null && myPosition.cardId != card?.id &&
@@ -125,7 +126,7 @@ open class MyFriendCardsFragment : FriendCardBaseFragment() {
         } else {
             // Retry once per explicit refresh/lifecycle cycle, not an unbounded /me/history loop.
             mineInvalidated = true
-            globalError = "当前卡片在其他位置发生变化，请刷新后再管理"
+            globalError = getString(R.string.fc_current_changed)
             changed()
         }
         return true
@@ -139,7 +140,7 @@ open class MyFriendCardsFragment : FriendCardBaseFragment() {
         execute(FriendCardRequest.feed(ticket.cursor, 20), { result ->
             val previousCount = pages.cards.size
             val accepted = if (result.cards == null) {
-                pages.fail(ticket, "扩列推荐响应不完整，请重试"); false
+                pages.fail(ticket, getString(R.string.fc_feed_incomplete)); false
             } else pages.accept(ticket, result.cards, result.nextCursor)
             if (!accepted) { restoringFeed = false; changed(); return@execute }
             val missingAnchor = restoringFeed && feedPosition.cardId != null && pages.cards.none { it.id == feedPosition.cardId }
@@ -192,26 +193,26 @@ open class MyFriendCardsFragment : FriendCardBaseFragment() {
         val fresh = managed(value) ?: return
         if (busy || !shown || !accountValid() || fresh.state !in listOf("active", "paused")) return
         val next = if (fresh.state == "paused") "active" else "paused"
-        confirm(if (next == "paused") "暂停展示" else "恢复展示", "只更新原卡与原发布帖，不会重复发帖。", "确认") {
+        confirm(if (next == "paused") getString(R.string.fc_pause) else getString(R.string.fc_resume), getString(R.string.fc_state_change_help), getString(R.string.fc_confirm)) {
             val confirmed = managed(fresh) ?: return@confirm
             if (busy) return@confirm
             busy = true; changed()
             execute(FriendCardRequest.state(confirmed.id, confirmed.version, next), { result ->
                 busy = false
                 if (result.card?.isSupported == true && result.card.id == confirmed.id && result.card.state == next) reload()
-                else { globalError = "服务端未确认状态变更，请刷新核实"; changed() }
+                else { globalError = getString(R.string.fc_state_unconfirmed); changed() }
             }, { busy = false; globalError = message(it); changed() })
         }
     }
     private fun delete(value: FriendCard) {
         if (busy || !shown || !accountValid() || managed(value) == null) return
-        confirm("删除扩列卡", "公开资料及关联扩列帖将撤回，历史链接会显示不可用。此操作不可撤销。", "删除") {
+        confirm(getString(R.string.fc_delete_card), getString(R.string.fc_delete_help), getString(R.string.fc_delete)) {
             val confirmed = managed(value) ?: return@confirm
             if (busy) return@confirm
             busy = true; changed()
             execute(FriendCardRequest.delete(confirmed.id, confirmed.version), { result ->
                 busy = false
-                if (result.deleted) reload() else { globalError = "服务端未确认删除，请刷新核实"; changed() }
+                if (result.deleted) reload() else { globalError = getString(R.string.fc_delete_unconfirmed); changed() }
             }, { busy = false; globalError = message(it); changed() })
         }
     }

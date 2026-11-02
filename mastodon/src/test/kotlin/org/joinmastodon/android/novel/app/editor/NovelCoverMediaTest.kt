@@ -63,7 +63,7 @@ import org.robolectric.shadows.ShadowContentResolver
 /** Real pixels, private files, SQLite and loopback HTTP. HTTPS production requests are routed only
  * to MockWebServer by an injected test interceptor; no production endpoint is ever contacted. */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [28], application = CompatibilityTestApplication::class)
+@Config(sdk = [28], qualifiers = "zh-rCN", application = CompatibilityTestApplication::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @LooperMode(LooperMode.Mode.PAUSED)
 class NovelCoverMediaTest {
@@ -218,7 +218,7 @@ class NovelCoverMediaTest {
             if (putStage) server.enqueue(MockResponse().setBody(authorization().toString()))
             server.enqueue(MockResponse().setResponseCode(status).setBody("""{"error":"private-token private-signature private-response"}"""))
             val error = runCatching { uploader().upload(file) }.exceptionOrNull()
-            assertTrue(error is NovelCoverUploadException); assertTrue(error!!.message!!.contains(status.toString()))
+            assertTrue(error is NovelCoverUploadException); assertTrue(coverFailureMessage(app, (error as NovelCoverUploadException).failure).contains(status.toString()))
             val structured = (error as NovelCoverUploadException).failure
             assertEquals(if (putStage) CosMediaUpload.Stage.PUT else CosMediaUpload.Stage.AUTHORIZE, structured.stage)
             assertEquals(status, structured.status); assertSame(structured, error.cause)
@@ -246,7 +246,7 @@ class NovelCoverMediaTest {
             val failure = (error as NovelCoverUploadException).failure
             assertEquals(stage, failure.stage); assertEquals(status, failure.status); assertSame(failure, error.cause)
             val label = when (stage) { CosMediaUpload.Stage.AUTHORIZE -> "授权阶段"; CosMediaUpload.Stage.PUT -> "传输阶段"; CosMediaUpload.Stage.COMPLETE -> "完成校验阶段" }
-            assertTrue(error.message!!.contains(label)); assertTrue(error.message!!.contains("HTTP $status"))
+            assertTrue(coverFailureMessage(app, failure).contains(label)); assertTrue(coverFailureMessage(app, failure).contains("HTTP $status"))
             assertFalse(error.toString().contains("private-token")); assertFalse(error.message!!.contains("https://"))
             if (status == 403) { assertEquals("SignatureDoesNotMatch", failure.cosCode); assertEquals("xml-request_42", failure.requestId) }
             assertTrue(file.isFile); assertNotNull(NovelCoverImages.decode(file).also { it.recycle() })
@@ -269,7 +269,7 @@ class NovelCoverMediaTest {
             val error = runCatching { uploader().upload(file) }.exceptionOrNull() as NovelCoverUploadException
             assertEquals(CosMediaUpload.Stage.COMPLETE, error.failure.stage); assertEquals(status, error.failure.status)
             assertEquals(code, error.failure.code); assertEquals(category, error.failure.category); assertNull(error.failure.requestId)
-            assertTrue(error.message!!.contains("完成校验阶段")); assertTrue(error.message!!.contains("本地图片已保留"))
+            assertTrue(coverFailureMessage(app, error.failure).contains("完成校验阶段")); assertTrue(coverFailureMessage(app, error.failure).contains("本地图片已保留"))
             assertFalse(error.toString().contains("private-token")); assertFalse(error.message!!.contains("https://")); assertTrue(file.isFile)
         }
     }

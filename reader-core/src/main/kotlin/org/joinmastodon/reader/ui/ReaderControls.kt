@@ -1,5 +1,8 @@
 package org.joinmastodon.reader.ui
 
+import androidx.compose.ui.res.stringResource
+import org.joinmastodon.reader.R
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -36,12 +39,12 @@ fun ReaderControls(
 ) {
 	Column(modifier.fillMaxWidth().background(palette.background.copy(alpha = 0.96f)).padding(12.dp)) {
 		Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-			TextButton(onClick = onBack) { Text("返回", color = palette.text) }
+			TextButton(onClick = onBack) { Text(stringResource(R.string.novel_reader_back), color = palette.text) }
 			Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
 				Text(bookTitle, color = palette.text, maxLines = 1)
 				Text(chapterTitle, color = palette.secondaryText, maxLines = 1)
 			}
-			TextButton(onClick = onSettings) { Text("设置", color = palette.text) }
+			TextButton(onClick = onSettings) { Text(stringResource(R.string.novel_reader_settings), color = palette.text) }
 		}
 		if (showChapterSlider && chapterCount > 1) {
 			Slider(
@@ -53,17 +56,17 @@ fun ReaderControls(
 		}
 		if (onPreviousChapter != null || onNextChapter != null) {
 			Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-				if (onPreviousChapter != null) TextButton(onClick = onPreviousChapter) { Text("上一章", color = palette.text) }
-				if (onNextChapter != null) TextButton(onClick = onNextChapter) { Text("下一章", color = palette.text) }
+				if (onPreviousChapter != null) TextButton(onClick = onPreviousChapter) { Text(stringResource(R.string.novel_reader_previous_chapter), color = palette.text) }
+				if (onNextChapter != null) TextButton(onClick = onNextChapter) { Text(stringResource(R.string.novel_reader_next_chapter), color = palette.text) }
 			}
 		}
 		if (showAnnotations) {
 			Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-				TextButton(onClick = onBookmark) { Text("添加书签", color = palette.text) }
-				TextButton(onClick = onNote) { Text("添加笔记", color = palette.text) }
+				TextButton(onClick = onBookmark) { Text(stringResource(R.string.novel_reader_add_bookmark), color = palette.text) }
+				TextButton(onClick = onNote) { Text(stringResource(R.string.novel_reader_add_note), color = palette.text) }
 			}
 		}
-		Text("第 ${chapterIndex + 1} / $chapterCount 章", color = palette.secondaryText, modifier = Modifier.align(Alignment.CenterHorizontally))
+		Text(stringResource(R.string.novel_reader_chapter_progress, chapterIndex + 1, chapterCount), color = palette.secondaryText, modifier = Modifier.align(Alignment.CenterHorizontally))
 		// Retain the optional legacy slot without crowding the original title/settings row.
 		// Window-positioned host actions use ReaderScreen's BoxScope slot instead.
 		toolbarActions()

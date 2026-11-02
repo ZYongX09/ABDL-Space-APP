@@ -55,7 +55,7 @@ import java.lang.reflect.Field
 
 /** Real hub Fragment, ComposeView, local tab/list UI and production callbacks; no replacement Screen. */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [28], qualifiers = "w393dp-h852dp-mdpi", application = CompatibilityTestApplication::class,
+@Config(sdk = [28], qualifiers = "zh-w393dp-h852dp-mdpi", application = CompatibilityTestApplication::class,
     shadows = [FriendCardHubUiTest.LocalRequests::class, FriendCardHubUiTest.LocalNavigation::class])
 @LooperMode(LooperMode.Mode.PAUSED)
 class FriendCardHubUiTest {
@@ -209,7 +209,7 @@ class FriendCardHubUiTest {
         compose.onNodeWithText("当前卡片在其他位置发生变化，请刷新后再管理").assertIsDisplayed()
     }
 
-    @Test @Config(qualifiers = "w393dp-h180dp-mdpi")
+    @Test @Config(qualifiers = "zh-w393dp-h180dp-mdpi")
     fun laterPageFooterPersistsPrecedingCardAnchorAndRevalidatesUntilItReturns() {
         mount(FriendCardFeedFragment())
         success(request("/feed"), page("second", card("first", "第一页卡片")))

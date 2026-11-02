@@ -62,7 +62,7 @@ abstract class FriendCardBaseFragment : ToolbarFragment() {
                 val redraw = revision
                 MiuixAppTheme {
                     Box(Modifier.fillMaxSize().background(MiuixTheme.colorScheme.background)) {
-                        if (!accountValid()) FriendCardNotice("当前账号不可用，请返回并切换到原账号", null, null)
+                        if (!accountValid()) FriendCardNotice(getString(R.string.fc_account_unavailable_help), null, null)
                         else Screen(redraw)
                     }
                 }
@@ -79,7 +79,7 @@ abstract class FriendCardBaseFragment : ToolbarFragment() {
     override fun onDestroyView() { activeDialog?.dismiss(); activeDialog = null; cancelRequests(); contentView = null; super.onDestroyView() }
     protected fun cancelRequests() { generation++; requests.toList().forEach { it.cancel() }; requests.clear(); changed() }
     protected fun <T> execute(request: MastodonAPIRequest<T>, success: (T) -> Unit, failure: (ErrorResponse) -> Unit = { globalError = message(it); changed() }) {
-        if (!accountValid()) { globalError = "当前账号不可用"; changed(); return }
+        if (!accountValid()) { globalError = getString(R.string.fc_account_unavailable); changed(); return }
         val token = generation
         requests.add(request)
         request.setCallback(object : Callback<T> {
@@ -89,8 +89,8 @@ abstract class FriendCardBaseFragment : ToolbarFragment() {
         request.exec(account)
     }
     protected fun message(error: ErrorResponse): String = when (error) {
-        is MastodonErrorResponse -> if (error.httpStatus == 404 || error.httpStatus == 501) activity?.getString(R.string.friend_cards_unavailable) ?: "扩列服务或此卡暂不可用，请稍后重试" else error.error?.takeIf { it.isNotBlank() } ?: "网络请求失败，请重试"
-        else -> "网络请求失败，请重试"
+        is MastodonErrorResponse -> if (error.httpStatus == 404 || error.httpStatus == 501) getString(R.string.friend_cards_unavailable) else error.error?.takeIf { it.isNotBlank() } ?: getString(R.string.fc_request_failed)
+        else -> getString(R.string.fc_request_failed)
     }
     protected fun definitive(error: ErrorResponse) = error is MastodonErrorResponse && error.httpStatus in 400..499 && error.httpStatus !in listOf(408, 425, 429)
     protected fun args(cardId: String? = null) = Bundle().apply { putString("account", account); cardId?.let { putString("card_id", it) } }
@@ -98,24 +98,24 @@ abstract class FriendCardBaseFragment : ToolbarFragment() {
     protected fun finish() { Nav.finish(this) }
     protected fun detail(card: FriendCard) { go(FriendCardDetailFragment::class.java, args(card.id)) }
     protected fun diaper(item: FriendCard.Diaper) {
-        if (!item.available) { toast("商品已下架或不可用"); return }
+        if (!item.available) { toast(getString(R.string.fc_product_not_available)); return }
         go(DiaperDetailFragment::class.java, args().apply { putInt("diaper_id", item.id) })
     }
     protected fun profile(card: FriendCard) { if (accountValid()) UiUtils.openProfileByID(activity, account, card.ownerId) }
     protected fun chat(card: FriendCard) {
         val peer = card.ownerId?.toLongOrNull()
-        if (peer == null || peer <= 0) { toast("无法打开此用户的私信"); return }
+        if (peer == null || peer <= 0) { toast(getString(R.string.fc_message_unavailable)); return }
         go(ChatFragment::class.java, args().apply { putLong("peer_id", peer); putString("peer_name", card.owner?.displayName?.takeIf { it.isNotBlank() } ?: card.owner?.username); putString("peer_avatar", card.owner?.avatar) })
     }
     protected fun post(card: FriendCard) {
-        val id = card.postId?.takeIf { it.matches(Regex("[0-9]+")) } ?: run { toast("发布帖暂不可用"); return }
+        val id = card.postId?.takeIf { it.matches(Regex("[0-9]+")) } ?: run { toast(getString(R.string.fc_post_unavailable)); return }
         execute(GetStatusByID("p_$id"), { status -> go(ThreadFragment::class.java, args().apply { putParcelable("status", Parcels.wrap(status)) }) })
     }
     protected fun owner(card: FriendCard) = !card.ownerId.isNullOrBlank() && card.ownerId == AccountSessionManager.getInstance().tryGetAccount(account)?.self?.id
     protected fun confirm(title: String, body: String, action: String, run: () -> Unit) {
         if (!accountValid()) return
         activeDialog?.dismiss()
-        activeDialog = M3AlertDialogBuilder(activity).setTitle(title).setMessage(body).setPositiveButton(action) { _, _ -> if (shown && accountValid()) run() }.setNegativeButton("取消", null).show()
+        activeDialog = M3AlertDialogBuilder(activity).setTitle(title).setMessage(body).setPositiveButton(action) { _, _ -> if (shown && accountValid()) run() }.setNegativeButton(getString(R.string.fc_cancel), null).show()
     }
     protected fun toast(text: String) { activity?.let { Toast.makeText(it, text, Toast.LENGTH_LONG).show() } }
     override fun wantsLightStatusBar() = !UiUtils.isDarkTheme()

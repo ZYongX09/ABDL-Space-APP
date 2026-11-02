@@ -1,5 +1,8 @@
 package org.joinmastodon.android.novel.app.editor
 
+import org.joinmastodon.android.R
+import androidx.compose.ui.res.stringResource
+
 import android.graphics.Bitmap
 import android.widget.ImageView
 import androidx.compose.foundation.Image
@@ -45,13 +48,13 @@ internal fun NovelEditorCover(data: NovelMetadata, modifier: Modifier = Modifier
             if (placeholder != null) placeholder()
             else Text(data.title, fontFamily = NovelTypography.serif, fontSize = 15.sp, modifier = Modifier.padding(10.dp))
         }
-        bitmap?.let { Image(it.asImageBitmap(), "本地封面预览", Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
+        bitmap?.let { Image(it.asImageBitmap(), stringResource(R.string.novel_en_local_cover_preview), Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
         // A pending local replacement always wins over the previously published remote cover.
         val url = data.coverUrl?.takeIf { !data.coverPending && okhttp3.HttpUrl.parse(it)?.isHttps == true }
         if (url != null) key(url) {
             AndroidView(factory = { context -> ImageView(context).apply {
                 scaleType = ImageView.ScaleType.CENTER_CROP
-                contentDescription = "已上传封面预览"
+                contentDescription = context.getString(R.string.novel_en_uploaded_cover_preview)
                 ViewImageLoader.load(this, null, UrlImageLoaderRequest(url, 500, 700))
             } }, modifier = Modifier.fillMaxSize(), onRelease = { it.setImageDrawable(null) })
         }

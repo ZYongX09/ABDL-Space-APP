@@ -18,7 +18,7 @@
 			android:layout_width="48dp"
 			android:layout_height="48dp"
 			android:background="?android:attr/selectableItemBackgroundBorderless"
-			android:contentDescription="返回"
+			android:contentDescription="@string/back"
 			android:src="@drawable/ic_arrow_back_24" />
 
 		<TextView
@@ -27,7 +27,7 @@
 			android:layout_weight="1"
 			android:gravity="center_vertical"
 			android:fontFamily="sans-serif-medium"
-			android:text="私信"
+			android:text="@string/messages"
 			android:textColor="?attr/colorM3OnSurface"
 			android:textSize="20sp" />
 	</LinearLayout>
@@ -61,7 +61,7 @@
 				<TextView
 					android:layout_width="wrap_content"
 					android:layout_height="wrap_content"
-					android:text="暂无私信"
+					android:text="@string/conversations_empty_title"
 					android:textSize="16sp"
 					android:textColor="?attr/colorM3OnSurfaceVariant" />
 
@@ -69,7 +69,7 @@
 					android:layout_width="wrap_content"
 					android:layout_height="wrap_content"
 					android:layout_marginTop="8dp"
-					android:text="可从用户主页发起私信"
+					android:text="@string/conversations_empty_hint"
 					android:textSize="14sp"
 					android:textColor="?attr/colorM3OnSurfaceVariant" />
 			</LinearLayout>

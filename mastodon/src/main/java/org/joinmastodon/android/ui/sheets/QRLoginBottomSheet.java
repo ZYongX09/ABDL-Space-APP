@@ -53,15 +53,15 @@ public class QRLoginBottomSheet extends BottomSheet {
 		AccountSession session = AccountSessionManager.getInstance().getLastActiveAccount();
 
 		if(isLanMode){
-			title.setText("内网设备登录确认");
+			title.setText(context.getString(R.string.general_lan_login_title));
 			if(session != null && session.self != null){
-				sessionInfo.setText("用户 " + session.self.username + " 通过内网设备请求登录电脑端\n\n点击「授权」后，电脑端将自动完成登录。");
+				sessionInfo.setText(context.getString(R.string.general_lan_login_user, session.self.username));
 			}
 			// LAN 模式不需要 scan，直接等待授权
 		}else{
-			title.setText("扫码登录确认");
+			title.setText(context.getString(R.string.general_qr_login_title));
 			if(session != null && session.self != null){
-				sessionInfo.setText("用户 " + session.self.username + " 请求登录电脑端\n\n点击「授权」后，电脑端将自动完成登录。");
+				sessionInfo.setText(context.getString(R.string.general_qr_login_user, session.self.username));
 			}
 			// QR 模式需要 scan
 			scanSession();
@@ -104,13 +104,13 @@ public class QRLoginBottomSheet extends BottomSheet {
 	private void authorize(){
 		AccountSession session = AccountSessionManager.getInstance().getLastActiveAccount();
 		if(session == null || !session.activated){
-			Toast.makeText(getContext(), "请先登录", Toast.LENGTH_SHORT).show();
+			Toast.makeText(getContext(), getContext().getString(R.string.err_not_logged_in), Toast.LENGTH_SHORT).show();
 			dismiss();
 			return;
 		}
 
 		ProgressDialog progress = new ProgressDialog(getContext());
-		progress.setMessage("正在授权...");
+		progress.setMessage(getContext().getString(R.string.preparing_auth));
 		progress.setCancelable(false);
 		progress.show();
 
@@ -126,7 +126,7 @@ public class QRLoginBottomSheet extends BottomSheet {
 				public void onFailure(Call call, IOException e){
 					androidx.core.content.ContextCompat.getMainExecutor(getContext()).execute(() -> {
 						try{ progress.dismiss(); }catch(Exception ignored){}
-						Toast.makeText(getContext(), "授权失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+						Toast.makeText(getContext(), getContext().getString(R.string.general_authorization_failed, e.getMessage()), Toast.LENGTH_SHORT).show();
 					});
 				}
 
@@ -137,9 +137,9 @@ public class QRLoginBottomSheet extends BottomSheet {
 						try{ progress.dismiss(); }catch(Exception ignored){}
 						dismiss();
 						if(response.isSuccessful()){
-							Toast.makeText(getContext(), "授权成功！电脑端已登录", Toast.LENGTH_SHORT).show();
+							Toast.makeText(getContext(), getContext().getString(R.string.general_authorization_success), Toast.LENGTH_SHORT).show();
 						}else{
-							Toast.makeText(getContext(), "授权失败: " + body, Toast.LENGTH_SHORT).show();
+							Toast.makeText(getContext(), getContext().getString(R.string.general_authorization_failed, body), Toast.LENGTH_SHORT).show();
 						}
 					});
 				}

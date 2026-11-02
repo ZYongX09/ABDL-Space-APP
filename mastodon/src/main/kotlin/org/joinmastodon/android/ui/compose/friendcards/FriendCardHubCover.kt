@@ -12,6 +12,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import org.joinmastodon.android.R
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.semantics.contentDescription
@@ -26,11 +28,12 @@ import org.joinmastodon.android.model.FriendCard
 @Composable
 fun FriendCardHubCover(card: FriendCard, ratio: Float, modifier: Modifier = Modifier) {
     val url = card.coverUrl?.takeIf { it.isNotBlank() } ?: return
+    val coverDescription = stringResource(R.string.fc_cover_description, card.title.orEmpty())
     var loaded by remember(url) { mutableStateOf(false) }
     Box(modifier.fillMaxWidth()
         .then(if (loaded) Modifier.aspectRatio(ratio) else Modifier.height(0.dp))
         .clipToBounds().alpha(if (loaded) 1f else 0f)
-        .then(if (loaded) Modifier.semantics { contentDescription = "${card.title}的封面" } else Modifier)) {
+        .then(if (loaded) Modifier.semantics { contentDescription = coverDescription } else Modifier)) {
         key(url) {
             AndroidView(factory = { context ->
                 FocusImage(context).apply {

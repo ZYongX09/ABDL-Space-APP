@@ -108,7 +108,7 @@ public class LoginCodeFragment extends AppKitFragment {
         tvError = view.findViewById(R.id.tv_error);
         cardHelp = view.findViewById(R.id.card_help);
 
-        tvEmailHint.setText("验证码已发送至\n" + email);
+        tvEmailHint.setText(getString(R.string.general_email_sent_to, email));
 
         // 深色模式卡片背景
         if (isDark) {
@@ -121,7 +121,7 @@ public class LoginCodeFragment extends AppKitFragment {
             Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse("mailto:"));
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_MULTIPLE_TASK);
             try { startActivity(intent); } catch (Exception e) {
-                Toast.makeText(getActivity(), "未找到邮件应用", Toast.LENGTH_SHORT).show();
+                Toast.makeText(getActivity(), getString(R.string.general_no_email_app), Toast.LENGTH_SHORT).show();
             }
         });
 
@@ -147,7 +147,7 @@ public class LoginCodeFragment extends AppKitFragment {
         tvError.setVisibility(View.GONE);
 
         ProgressDialog progress = new ProgressDialog(getActivity());
-        progress.setMessage("正在验证...");
+        progress.setMessage(getString(R.string.human_check_verifying));
         progress.setCancelable(false);
         progress.show();
 
@@ -165,7 +165,7 @@ public class LoginCodeFragment extends AppKitFragment {
                         progress.dismiss();
                         verifying = false;
                         pinView.clearPin();
-                        Toast.makeText(getActivity(), "网络错误: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                        Toast.makeText(getActivity(), getString(R.string.general_network_error, e.getMessage()), Toast.LENGTH_SHORT).show();
                     });
                 }
 
@@ -227,13 +227,13 @@ public class LoginCodeFragment extends AppKitFragment {
                             } else {
                                 verifying = false;
                                 pinView.clearPin();
-                                Toast.makeText(getActivity(), "验证失败: " + responseBody, Toast.LENGTH_SHORT).show();
+                                Toast.makeText(getActivity(), getString(R.string.general_verification_failed, responseBody), Toast.LENGTH_SHORT).show();
                             }
                         } else {
                             verifying = false;
                             pinView.clearPin();
                             String errorMsg = verifyResp != null && verifyResp.error != null
-                                ? verifyResp.error : "验证码错误";
+                                ? verifyResp.error : getString(R.string.general_code_invalid);
                             Toast.makeText(getActivity(), errorMsg, Toast.LENGTH_SHORT).show();
                         }
                     });
@@ -290,7 +290,7 @@ public class LoginCodeFragment extends AppKitFragment {
     private void clearHumanCheck() {
         if (humanCheckProgress != null) { humanCheckProgress.dismiss(); humanCheckProgress = null; }
         humanCheckHandle = null; humanCheckLaunched = false;
-        if (tvResend != null) tvResend.setText("重新发送验证码");
+        if (tvResend != null) tvResend.setText(getString(R.string.general_resend_code));
     }
 
     @Override public void onActivityResult(int requestCode, int resultCode, Intent data) {
@@ -314,7 +314,7 @@ public class LoginCodeFragment extends AppKitFragment {
             @Override
             public void onTick(long millisUntilFinished) {
                 long seconds = millisUntilFinished / 1000;
-                String text = seconds + "秒后可重新发送";
+                String text = getString(R.string.general_resend_seconds, seconds);
                 SpannableString spannable = new SpannableString(text);
                 spannable.setSpan(new ForegroundColorSpan(BLUE), 0, String.valueOf(seconds).length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
                 tvResend.setText(spannable);
@@ -323,7 +323,7 @@ public class LoginCodeFragment extends AppKitFragment {
             @Override
             public void onFinish() {
                 tvResend.setEnabled(true);
-                tvResend.setText("重新发送验证码");
+                tvResend.setText(getString(R.string.general_resend_code));
                 tvResend.setTextColor(BLUE);
             }
         }.start();

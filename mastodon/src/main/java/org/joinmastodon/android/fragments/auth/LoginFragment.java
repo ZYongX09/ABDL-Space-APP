@@ -54,7 +54,7 @@ public class LoginFragment extends ToolbarFragment {
 	public void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		domain = getArguments() != null ? getArguments().getString("domain", "abdl-space.top") : "abdl-space.top";
-		setTitle("登录");
+		setTitle(R.string.log_in);
 	}
 
 	@Nullable
@@ -132,7 +132,7 @@ public class LoginFragment extends ToolbarFragment {
 					getActivity().runOnUiThread(() -> {
 						progress.dismiss();
 						if (loginButton != null) loginButton.setEnabled(true);
-						Toast.makeText(getActivity(), "网络错误: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+						Toast.makeText(getActivity(), getString(R.string.general_network_error, e.getMessage()), Toast.LENGTH_SHORT).show();
 					});
 				}
 
@@ -186,12 +186,12 @@ public class LoginFragment extends ToolbarFragment {
 							} else {
 								progress.dismiss();
 								if (loginButton != null) loginButton.setEnabled(true);
-								Toast.makeText(getActivity(), "登录失败: " + responseBody, Toast.LENGTH_SHORT).show();
+								Toast.makeText(getActivity(), getString(R.string.general_login_failed, responseBody), Toast.LENGTH_SHORT).show();
 							}
 						} else {
 							progress.dismiss();
 							if (loginButton != null) loginButton.setEnabled(true);
-							Toast.makeText(getActivity(), "登录失败: " + responseBody, Toast.LENGTH_SHORT).show();
+							Toast.makeText(getActivity(), getString(R.string.general_login_failed, responseBody), Toast.LENGTH_SHORT).show();
 						}
 					});
 				}
@@ -254,10 +254,10 @@ public class LoginFragment extends ToolbarFragment {
 				sessionInfo.setText(android.text.Html.fromHtml(getString(R.string.consent_message)));
 			sessionInfo.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());
 
-			// 改"授权"按钮为"确认"
+			// 改getString(R.string.general_authorize)按钮为"确认"
 			TextView authorizeBtn = sheetView.findViewById(R.id.btn_authorize);
 			if (authorizeBtn != null) {
-				authorizeBtn.setText("确认");
+				authorizeBtn.setText(R.string.confirm);
 			}
 
 			sheetView.findViewById(R.id.btn_cancel).setOnClickListener(v -> dismiss());
@@ -273,7 +273,7 @@ public class LoginFragment extends ToolbarFragment {
 		if (getActivity() == null) return;
 
 		ProgressDialog progress = new ProgressDialog(getActivity());
-		progress.setMessage("正在准备授权...");
+		progress.setMessage(getString(R.string.preparing_auth));
 		progress.setCancelable(false);
 		progress.show();
 

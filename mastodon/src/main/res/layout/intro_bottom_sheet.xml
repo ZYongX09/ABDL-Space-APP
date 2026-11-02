@@ -8,7 +8,7 @@
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="ABDL Space 是专为 ABDL 群体打造的安全私密社区客户端。"
+        android:text="@string/general_intro"
         android:textSize="15sp"
         android:lineSpacingExtra="4dp"
         android:textColor="?android:textColorPrimary" />

@@ -167,7 +167,7 @@ class FriendUniverseLiquidToolbarController(
 				horizontalPaddingDp = 16,
 			) {
 				Text(
-					text = "交友宇宙",
+					text = androidx.compose.ui.res.stringResource(R.string.general_friend_universe),
 					fontSize = titleSize.sp,
 					fontWeight = FontWeight.Bold,
 					color = MiuixTheme.colorScheme.onSurface,
@@ -205,7 +205,7 @@ class FriendUniverseLiquidToolbarController(
 					singleLine = true,
 					decorationBox = { input ->
 						Box(contentAlignment = Alignment.CenterStart) {
-							if(searchTextState.isEmpty()) Text("搜索交友请求", color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.55f), fontSize = 16.sp)
+							if(searchTextState.isEmpty()) Text(androidx.compose.ui.res.stringResource(R.string.general_friend_search), color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.55f), fontSize = 16.sp)
 							input()
 						}
 					},

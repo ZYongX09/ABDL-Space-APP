@@ -32,7 +32,7 @@
                 android:src="@drawable/ic_arrow_back_24"
                 android:tint="?colorM3OnSurface"
                 android:background="?android:attr/selectableItemBackgroundBorderless"
-                android:contentDescription="返回" />
+                android:contentDescription="@string/back" />
 
             <View
                 android:layout_width="0dp"
@@ -49,7 +49,7 @@
                 android:src="@drawable/ic_refresh_24"
                 android:tint="?colorM3OnSurface"
                 android:background="?android:attr/selectableItemBackgroundBorderless"
-                android:contentDescription="刷新" />
+                android:contentDescription="@string/album_refresh" />
         </LinearLayout>
 
         <!-- 标题 -->
@@ -59,7 +59,7 @@
             android:layout_marginStart="20dp"
             android:layout_marginEnd="20dp"
             android:layout_marginBottom="12dp"
-            android:text="一键注册"
+            android:text="@string/general_one_click_register"
             android:textSize="28sp"
             android:textStyle="bold"
             android:textColor="?colorM3OnSurface"
@@ -84,7 +84,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="正在向宝宝新天地获取注册链接..."
+                android:text="@string/general_nbw_register_loading"
                 android:textSize="14sp"
                 android:textColor="?colorM3OnSurfaceVariant" />
 
@@ -100,14 +100,15 @@
             <Button
                 android:id="@+id/btn_retry"
                 android:layout_width="wrap_content"
-                android:layout_height="40dp"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp"
                 android:layout_marginTop="16dp"
                 android:background="@drawable/bg_btn_gradient_purple"
-                android:text="重试"
+                android:text="@string/retry"
                 android:textSize="13sp"
                 android:textAllCaps="false"
                 android:textColor="#FFFFFF"
-                android:visibility="gone" />
+                android:visibility="gone" android:singleLine="false" />
         </LinearLayout>
 
         <!-- 阶段2：第一步已完成 -->
@@ -130,12 +131,12 @@
                 android:scaleType="fitCenter"
                 android:background="@drawable/bg_circle_gray"
                 android:padding="16dp"
-                android:contentDescription="宝宝新天地" />
+                android:contentDescription="@string/nbw_third_party_nbw" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="第一步已完成"
+                android:text="@string/general_first_step_complete"
                 android:textSize="20sp"
                 android:textStyle="bold"
                 android:textColor="?colorM3OnSurface"
@@ -144,7 +145,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="但您需要前往宝宝新天地补充个人信息"
+                android:text="@string/general_nbw_complete_note"
                 android:textSize="14sp"
                 android:textColor="?colorM3OnSurfaceVariant"
                 android:layout_marginBottom="32dp" />
@@ -152,12 +153,13 @@
             <Button
                 android:id="@+id/btn_go_web"
                 android:layout_width="match_parent"
-                android:layout_height="52dp"
+                android:layout_height="wrap_content"
+                android:minHeight="52dp"
                 android:background="@drawable/bg_btn_gradient_purple"
-                android:text="去宝宝新天地补充信息"
+                android:text="@string/general_nbw_complete_action"
                 android:textSize="15sp"
                 android:textAllCaps="false"
-                android:textColor="#FFFFFF" />
+                android:textColor="#FFFFFF" android:singleLine="false" />
         </LinearLayout>
 
         <!-- 阶段3：WebView + 底部横幅 -->
@@ -197,7 +199,7 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                android:text="请完成宝宝新天地注册，完成后请点击右边按钮，或等待系统自动检测"
+                android:text="@string/general_nbw_registration_wait"
                 android:textSize="12sp"
                 android:textColor="?colorM3OnSurfaceVariant"
                     android:layout_marginEnd="12dp" />
@@ -205,12 +207,13 @@
                 <Button
                     android:id="@+id/btn_complete"
                     android:layout_width="wrap_content"
-                    android:layout_height="40dp"
+                    android:layout_height="wrap_content"
+                android:minHeight="48dp"
                     android:background="@drawable/bg_btn_gradient_purple"
-                    android:text="已完成注册"
+                    android:text="@string/general_registration_complete"
                     android:textSize="13sp"
                     android:textAllCaps="false"
-                    android:textColor="?colorM3OnSurface" />
+                    android:textColor="?colorM3OnSurface" android:singleLine="false" />
             </LinearLayout>
         </LinearLayout>
     </LinearLayout>

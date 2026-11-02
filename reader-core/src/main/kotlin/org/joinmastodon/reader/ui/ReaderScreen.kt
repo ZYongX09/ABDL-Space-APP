@@ -1,5 +1,8 @@
 package org.joinmastodon.reader.ui
 
+import androidx.compose.ui.res.stringResource
+import org.joinmastodon.reader.R
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
@@ -64,7 +67,7 @@ fun ReaderScreen(
 			// Record only the unchanged reading surface, never the overlaid controls or host actions.
 			Box(Modifier.fillMaxSize().then(contentBackdropModifier).background(settings.palette.background)) {
 				if (chapter == null) {
-					Text("暂无正文", color = settings.palette.secondaryText, modifier = Modifier.align(Alignment.Center))
+					Text(stringResource(R.string.novel_reader_no_body), color = settings.palette.secondaryText, modifier = Modifier.align(Alignment.Center))
 				} else if (settings.paged) {
 					PagedReader(
 						chapter = chapter,

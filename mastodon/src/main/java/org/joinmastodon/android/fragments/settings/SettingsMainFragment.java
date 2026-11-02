@@ -58,6 +58,7 @@ public class SettingsMainFragment extends BaseSettingsFragment<Object>{
 	@Override
 	public void onCreate(Bundle savedInstanceState){
 		super.onCreate(savedInstanceState);
+		setRetainInstance(false); // Rebuild resolved row titles/subtitles after an app-language change.
 		setTitle(R.string.settings);
 		items.add(new SectionHeaderListItem(R.string.settings_accounts));
 		for(AccountSession session:AccountSessionManager.getInstance().getLoggedInAccounts()){
@@ -75,6 +76,7 @@ public class SettingsMainFragment extends BaseSettingsFragment<Object>{
 					new SectionHeaderListItem(R.string.settings_app_settings),
 					new ListItem<>(R.string.settings_behavior, 0, R.drawable.ic_tune_24px, this::onBehaviorClick),
 					new ListItem<>(R.string.settings_display, 0, R.drawable.ic_style_24px, this::onDisplayClick),
+					new ListItem<>(getString(R.string.app_language_settings), getAppLanguageName(), R.drawable.ic_fluent_translate_24_regular, this::onAppLanguageClick),
 					new ListItem<>(R.string.settings__security, 0, R.drawable.ic_fluent_lock_shield_24_regular, this::onSecurityClick)
 
 
@@ -161,6 +163,32 @@ public class SettingsMainFragment extends BaseSettingsFragment<Object>{
 
 	private void onDisplayClick(ListItem<?> item_){
 		Nav.go(getActivity(), SettingsDisplayFragment.class, makeFragmentArgs());
+	}
+
+	private String getAppLanguageName(){
+		String selected=org.joinmastodon.android.ui.utils.AppLanguageManager.getSelectedLanguage(getActivity());
+		return getString(selected.isEmpty() ? R.string.app_language_system : selected.startsWith("zh") ? R.string.app_language_chinese : R.string.app_language_english);
+	}
+
+	private void onAppLanguageClick(ListItem<?> item_){
+		String[] tags={"", "zh-CN", "en"};
+		String[] names={getString(R.string.app_language_system), getString(R.string.app_language_chinese), getString(R.string.app_language_english)};
+		String selected=org.joinmastodon.android.ui.utils.AppLanguageManager.getSelectedLanguage(getActivity());
+		int checked=selected.isEmpty() ? 0 : selected.startsWith("zh") ? 1 : 2;
+		new org.joinmastodon.android.ui.M3AlertDialogBuilder(getActivity())
+				.setTitle(R.string.app_language_settings)
+				.setSingleChoiceItems(names, checked, (dialog, which)->{
+					dialog.dismiss();
+					if(which==checked) return;
+					new org.joinmastodon.android.ui.M3AlertDialogBuilder(getActivity())
+							.setTitle(R.string.app_language_change_title)
+							.setMessage(R.string.app_language_change_message)
+							.setNegativeButton(R.string.cancel, null)
+							.setPositiveButton(R.string.confirm, (confirmation, button)->{
+								if(!org.joinmastodon.android.ui.utils.AppLanguageManager.setLanguage(getActivity(), tags[which]))
+									android.widget.Toast.makeText(getActivity(), R.string.app_language_change_busy, android.widget.Toast.LENGTH_LONG).show();
+							}).show();
+				}).setNegativeButton(R.string.cancel, null).show();
 	}
 
 	private void onSecurityClick(ListItem<?> item_){

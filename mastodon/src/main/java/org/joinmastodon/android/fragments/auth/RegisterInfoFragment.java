@@ -43,7 +43,7 @@ import okhttp3.Response;
  * 注册信息页
  * - 邮箱（只读）
  * - 用户名 + 密码 + 确认密码
- * - "注册" → POST /api/auth/register
+ * - getString(R.string.general_register) → POST /api/auth/register
  * - 注册成功 → NBWPostRegisterActivity
  */
 public class RegisterInfoFragment extends AppKitFragment {
@@ -191,25 +191,25 @@ public class RegisterInfoFragment extends AppKitFragment {
 
         if (TextUtils.isEmpty(emailValue) || TextUtils.isEmpty(username) || TextUtils.isEmpty(password)) return;
         if (fromNBWOAuthRegister && TextUtils.isEmpty(nbwToken)) {
-            Toast.makeText(getActivity(), "宝宝新天地授权信息缺失，请重新授权", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getActivity(), getString(R.string.general_nbw_auth_missing), Toast.LENGTH_SHORT).show();
             return;
         }
         if (!password.equals(confirm)) {
-            Toast.makeText(getActivity(), "两次密码不一致", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getActivity(), getString(R.string.signup_passwords_dont_match), Toast.LENGTH_SHORT).show();
             return;
         }
         if (password.length() < 8) {
-            Toast.makeText(getActivity(), "密码至少8位", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getActivity(), getString(R.string.signup_password_too_short), Toast.LENGTH_SHORT).show();
             return;
         }
         if (!password.matches(".*[a-z].*") || !password.matches(".*[A-Z].*") || !password.matches(".*\\d.*")) {
-            Toast.makeText(getActivity(), "密码需包含大小写字母和数字", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getActivity(), getString(R.string.general_password_complexity), Toast.LENGTH_SHORT).show();
             return;
         }
 
         btnRegister.setEnabled(false);
         ProgressDialog progress = new ProgressDialog(getActivity());
-        progress.setMessage("正在注册...");
+        progress.setMessage(getString(R.string.general_registering));
         progress.setCancelable(false);
         progress.show();
 
@@ -227,7 +227,7 @@ public class RegisterInfoFragment extends AppKitFragment {
                     getActivity().runOnUiThread(() -> {
                         progress.dismiss();
                         if (btnRegister != null) btnRegister.setEnabled(true);
-                        Toast.makeText(getActivity(), "网络错误: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                        Toast.makeText(getActivity(), getString(R.string.general_network_error, e.getMessage()), Toast.LENGTH_SHORT).show();
                     });
                 }
 
@@ -269,7 +269,7 @@ public class RegisterInfoFragment extends AppKitFragment {
 
                                             getActivity().runOnUiThread(() -> {
                                                 if(fromNBWOAuthRegister){
-                                                    Toast.makeText(getActivity(), "宝宝新天地账号已绑定", Toast.LENGTH_LONG).show();
+                                                    Toast.makeText(getActivity(), getString(R.string.nbw_bind_success), Toast.LENGTH_LONG).show();
                                                     if (getActivity() instanceof MainActivity mainActivity) {
                                                         mainActivity.restartHomeFragment();
                                                     }
@@ -294,11 +294,11 @@ public class RegisterInfoFragment extends AppKitFragment {
                                     .exec("abdl-space.top", token);
                             } else {
                                 if (btnRegister != null) btnRegister.setEnabled(true);
-                                Toast.makeText(getActivity(), "注册失败: " + responseBody, Toast.LENGTH_SHORT).show();
+                                Toast.makeText(getActivity(), getString(R.string.general_registration_failed, responseBody), Toast.LENGTH_SHORT).show();
                             }
                         } else {
                             if (btnRegister != null) btnRegister.setEnabled(true);
-                            Toast.makeText(getActivity(), "注册失败: " + responseBody, Toast.LENGTH_SHORT).show();
+                            Toast.makeText(getActivity(), getString(R.string.general_registration_failed, responseBody), Toast.LENGTH_SHORT).show();
                         }
                     });
                 }

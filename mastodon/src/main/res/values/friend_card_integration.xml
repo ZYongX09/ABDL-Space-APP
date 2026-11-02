@@ -1,21 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-	<string name="friend_card_post_about">关于我</string>
-	<string name="friend_card_post_interests">兴趣 / 游戏</string>
-	<string name="friend_card_post_looking_for">我想找</string>
-	<string name="friend_card_post_details">查看完整扩列卡</string>
-	<string name="friend_card_post_unavailable">扩列卡暂不可用</string>
-	<string name="friend_card_feed_entry">扩列卡推荐</string>
-	<string name="friend_card_my_entry">我的扩列卡</string>
-	<string name="compose_menu_friend_card">扩列卡</string>
-	<string name="friend_card_compose_insert">插入我的扩列卡</string>
-	<string name="friend_card_compose_replace">更换为我的当前扩列卡</string>
-	<string name="friend_card_compose_remove">移除扩列卡</string>
-	<string name="friend_card_compose_attached">已附加扩列卡</string>
-	<string name="friend_card_compose_no_nbw">含扩列卡的帖子仅发布到本站，不同步宝宝新天地。</string>
-	<string name="friend_card_compose_no_current">你还没有可插入的当前扩列卡。可前往我的扩列卡创建或恢复。</string>
-	<string name="friend_card_promotion_title">全新扩列卡上线</string>
-	<string name="friend_card_promotion_message">更完整的资料，更好看的展示。来制作你的专属扩列卡，认识新朋友。</string>
-	<string name="friend_card_promotion_action">去看看</string>
-	<string name="friend_card_promotion_close">关闭</string>
+    <string name="friend_card_post_about">"About me"</string>
+    <string name="friend_card_post_interests">"Interests / games"</string>
+    <string name="friend_card_post_looking_for">"Looking for"</string>
+    <string name="friend_card_post_details">"View full friend card"</string>
+    <string name="friend_card_post_unavailable">"Friend card unavailable"</string>
+    <string name="friend_card_feed_entry">"Recommended friend cards"</string>
+    <string name="friend_card_my_entry">"My friend cards"</string>
+    <string name="compose_menu_friend_card">"Friend card"</string>
+    <string name="friend_card_compose_insert">"Insert my friend card"</string>
+    <string name="friend_card_compose_replace">"Replace with my current friend card"</string>
+    <string name="friend_card_compose_remove">"Remove friend card"</string>
+    <string name="friend_card_compose_attached">"Friend card attached"</string>
+    <string name="friend_card_compose_no_nbw">"Posts with friend cards are published only on this site, not synced to Baby New World."</string>
+    <string name="friend_card_compose_no_current">"You have no current friend card to insert. Create or restore one in My friend cards."</string>
+    <string name="friend_card_promotion_title">"New friend cards are here"</string>
+    <string name="friend_card_promotion_message">"More details, a better look. Make your own friend card and meet new friends."</string>
+    <string name="friend_card_promotion_action">"Take a look"</string>
+    <string name="friend_card_promotion_close">"Close"</string>
 </resources>

@@ -29,7 +29,6 @@ import me.grishka.appkit.utils.V;
 
 public class PollOptionStatusDisplayItem extends StatusDisplayItem{
 	private CharSequence text;
-	private CharSequence translatedText;
 	public final Poll.Option option;
 	private CustomEmojiHelper emojiHelper=new CustomEmojiHelper();
 	public boolean showResults;
@@ -110,12 +109,10 @@ public class PollOptionStatusDisplayItem extends StatusDisplayItem{
 		@Override
 		public void onBind(PollOptionStatusDisplayItem item){
 			itemView.setPaddingRelative(V.dp(item.fullWidth ? 16 : 64), itemView.getPaddingTop(), itemView.getPaddingEnd(), itemView.getPaddingBottom());
-			if (item.status.translation != null && item.status.translationState == Status.TranslationState.SHOWN) {
-				if(item.translatedText==null){
-					item.translatedText=item.status.translation.poll.options[item.optionIndex].title;
-				}
-				text.setText(item.translatedText);
-			} else {
+			if(item.status.translation!=null && item.status.translationState==Status.TranslationState.SHOWN){
+				String translated=item.status.translation.pollOptionTitle(item.poll.id, item.optionIndex, null);
+				text.setText(translated==null ? item.text : translated);
+			}else{
 				text.setText(item.text);
 			}
 			percent.setVisibility(item.showResults ? View.VISIBLE : View.GONE);

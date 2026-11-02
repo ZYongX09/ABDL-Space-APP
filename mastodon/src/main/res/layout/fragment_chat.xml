@@ -20,7 +20,7 @@
 			android:layout_width="48dp"
 			android:layout_height="48dp"
 			android:background="?android:attr/selectableItemBackgroundBorderless"
-			android:contentDescription="返回"
+			android:contentDescription="@string/back"
 			android:src="@drawable/ic_arrow_back_24" />
 
 		<ImageView
@@ -50,7 +50,7 @@
 				android:layout_width="match_parent"
 				android:layout_height="wrap_content"
 				android:layout_marginTop="1dp"
-				android:text="私密对话"
+				android:text="@string/general_private_chat"
 				android:textColor="?attr/colorM3OnSurfaceVariant"
 				android:textSize="12sp" />
 		</LinearLayout>
@@ -96,7 +96,7 @@
 				android:layout_width="match_parent"
 				android:layout_height="wrap_content"
 				android:background="@null"
-				android:hint="输入消息"
+				android:hint="@string/general_message_hint"
 				android:inputType="textCapSentences|textMultiLine"
 				android:maxLines="5"
 				android:minHeight="48dp"
@@ -114,6 +114,6 @@
 			android:layout_marginStart="8dp"
 			android:background="@drawable/bg_chat_send"
 			android:src="@drawable/ic_send_24px"
-			android:contentDescription="发送" />
+			android:contentDescription="@string/general_send" />
 	</LinearLayout>
 </LinearLayout>

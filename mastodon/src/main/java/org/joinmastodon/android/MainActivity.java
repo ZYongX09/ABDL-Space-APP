@@ -113,6 +113,11 @@ public class MainActivity extends FragmentStackActivity implements LifecycleOwne
 	}
 
 	@Override
+	protected void attachBaseContext(android.content.Context base){
+		super.attachBaseContext(org.joinmastodon.android.ui.utils.AppLanguageManager.wrap(base));
+	}
+
+	@Override
 	protected void onCreate(@Nullable Bundle savedInstanceState){
 		savedStateController.performRestore(savedInstanceState);
 		lifecycleRegistry.setCurrentState(Lifecycle.State.CREATED);
@@ -552,7 +557,7 @@ public class MainActivity extends FragmentStackActivity implements LifecycleOwne
 		// 检查是否已登录
 		AccountSession session=AccountSessionManager.getInstance().getLastActiveAccount();
 		if(session==null || !session.activated){
-			Toast.makeText(this, "请先登录后再授权", Toast.LENGTH_SHORT).show();
+			Toast.makeText(this, getString(R.string.err_not_logged_in), Toast.LENGTH_SHORT).show();
 			return;
 		}
 		new org.joinmastodon.android.ui.sheets.QRLoginBottomSheet(this, sessionId, isLanMode).show();

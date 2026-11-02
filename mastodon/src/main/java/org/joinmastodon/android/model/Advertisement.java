@@ -31,7 +31,7 @@ public class Advertisement {
 	public String targetUrl;
 
 	public String getLabel(){
-		return Boolean.TRUE.equals(official) || "official".equalsIgnoreCase(type) ? "官方广告" : "商家广告";
+		return Boolean.TRUE.equals(official) || "official".equalsIgnoreCase(type) ? org.joinmastodon.android.MastodonApp.context.getString(org.joinmastodon.android.R.string.general_official_ad) : org.joinmastodon.android.MastodonApp.context.getString(org.joinmastodon.android.R.string.general_merchant_ad);
 	}
 
 	public String getDisplayName(Account fallback){

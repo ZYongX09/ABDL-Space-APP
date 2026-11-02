@@ -175,7 +175,7 @@ public class ComposeMediaViewController{
 			// 显示检测中状态
 			fragment.getActivity().runOnUiThread(() -> {
 				if(d.nsfwBadge!=null){
-					d.nsfwBadge.setText("检测中...");
+					d.nsfwBadge.setText(fragment.getString(R.string.general_nsfw_checking));
 					d.nsfwBadge.setBackgroundColor(0xFF888888);
 					d.nsfwBadge.setVisibility(View.VISIBLE);
 				}
@@ -189,11 +189,11 @@ public class ComposeMediaViewController{
 						if(d.nsfwBadge!=null){
 							if(blocked){
 								// 禁止上传
-								d.nsfwBadge.setText("禁止上传");
+								d.nsfwBadge.setText(fragment.getString(R.string.general_nsfw_blocked));
 								d.nsfwBadge.setBackgroundColor(0xFFD32F2F);
 								d.nsfwBadge.setVisibility(View.VISIBLE);
 								Toast.makeText(fragment.getActivity(),
-									"图片包含敏感内容（评分 "+String.format("%.2f", nsfwScore)+"），禁止上传",
+									fragment.getString(R.string.general_nsfw_blocked_message, String.format("%.2f", nsfwScore)),
 									Toast.LENGTH_LONG).show();
 								attachments.remove(d);
 								int idx=attachments.indexOf(d);
@@ -204,7 +204,7 @@ public class ComposeMediaViewController{
 								fragment.updatePublishButtonState();
 							}else if(org.joinmastodon.android.nsfw.NsfwDetector.isNsfw(nsfwScore)){
 								// 标记为疑似敏感
-								d.nsfwBadge.setText("疑似敏感");
+								d.nsfwBadge.setText(fragment.getString(R.string.general_sensitive_suspected));
 								d.nsfwBadge.setBackgroundColor(0xFFFF6B35);
 								d.nsfwBadge.setVisibility(View.VISIBLE);
 								if(d.nsfwScoreView!=null){

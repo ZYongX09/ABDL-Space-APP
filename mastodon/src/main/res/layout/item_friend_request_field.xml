@@ -37,7 +37,7 @@
         android:layout_height="32dp"
         android:background="?android:selectableItemBackgroundBorderless"
         android:src="@drawable/ic_fluent_dismiss_24_regular"
-        android:contentDescription="删除"
+        android:contentDescription="@string/delete"
         android:scaleType="centerInside" />
 
 </LinearLayout>

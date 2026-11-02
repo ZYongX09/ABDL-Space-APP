@@ -19,7 +19,7 @@ class BookParser {
 		"txt" -> parseTxt(file)
 		"epub" -> parseEpub(file)
 		"docx" -> parseDocx(file)
-		else -> throw IllegalArgumentException("不支持的文件格式: ${file.extension}")
+		else -> throw BookParseException(BookParseError.UNSUPPORTED_FORMAT)
 	}
 
 	private fun parseTxt(file: File): ParsedBook {
@@ -36,12 +36,12 @@ class BookParser {
 	private fun parseEpub(file: File): ParsedBook = ZipFile(file).use { zip ->
 		val containerPath = "META-INF/container.xml"
 		val containerEntry = zip.getEntry(containerPath)
-			?: throw IllegalArgumentException("EPUB 缺少 $containerPath")
+			?: throw BookParseException(BookParseError.EPUB_CONTAINER_MISSING)
 		val container = zip.getInputStream(containerEntry).bufferedReader(Charsets.UTF_8).use { it.readText() }
 		val containerDocument = Jsoup.parse(container, "", Parser.xmlParser())
 		val opfPath = safeArchivePath(null, containerDocument.selectFirst("rootfile")?.attr("full-path"))
-			?: throw IllegalArgumentException("EPUB container.xml 中的 OPF 路径无效")
-		val opfEntry = zip.getEntry(opfPath) ?: throw IllegalArgumentException("EPUB 缺少 OPF: $opfPath")
+			?: throw BookParseException(BookParseError.EPUB_OPF_INVALID)
+		val opfEntry = zip.getEntry(opfPath) ?: throw BookParseException(BookParseError.EPUB_OPF_MISSING)
 		val opf = zip.getInputStream(opfEntry).bufferedReader(Charsets.UTF_8).use { it.readText() }
 		val opfDocument = Jsoup.parse(opf, "", Parser.xmlParser())
 		val metadata = opfDocument.selectFirst("metadata")
@@ -60,13 +60,13 @@ class BookParser {
 			val markup = zip.getInputStream(entry).bufferedReader(Charsets.UTF_8).use { it.readText() }
 			parseXhtml(markup)
 		}
-		if (drafts.isEmpty()) throw IllegalArgumentException("EPUB 没有可读取的 spine 章节")
+		if (drafts.isEmpty()) throw BookParseException(BookParseError.EPUB_NO_CHAPTERS)
 		buildParsedBook(title, author, BookFormat.EPUB, drafts)
 	}
 
 	private fun parseDocx(file: File): ParsedBook = ZipFile(file).use { zip ->
 		val documentEntry = zip.getEntry("word/document.xml")
-			?: throw IllegalArgumentException("DOCX 缺少 word/document.xml")
+			?: throw BookParseException(BookParseError.DOCX_DOCUMENT_MISSING)
 		val document = Jsoup.parse(zip.getInputStream(documentEntry).bufferedReader(Charsets.UTF_8).use { it.readText() }, "", Parser.xmlParser())
 		val coreProps = readDocxCoreProps(zip)
 		val title = coreProps?.first?.takeIf { it.isNotBlank() } ?: file.nameWithoutExtension
@@ -77,7 +77,7 @@ class BookParser {
 			SourceParagraph(isDocxHeading(style), text)
 		}
 		val drafts = splitDocxChapters(paragraphs)
-		if (drafts.isEmpty()) throw IllegalArgumentException("DOCX 没有可读取的正文")
+		if (drafts.isEmpty()) throw BookParseException(BookParseError.DOCX_NO_BODY)
 		buildParsedBook(title, author, BookFormat.DOCX, drafts)
 	}
 

@@ -27,7 +27,7 @@
         android:layout_marginStart="8dp"
         android:background="?android:selectableItemBackgroundBorderless"
         android:src="@drawable/ic_fluent_search_24_regular"
-        android:contentDescription="搜索"
+        android:contentDescription="@string/search_hint"
         android:scaleType="centerInside" />
 
 </LinearLayout>

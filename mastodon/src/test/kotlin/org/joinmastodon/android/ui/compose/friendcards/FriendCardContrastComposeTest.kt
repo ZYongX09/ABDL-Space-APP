@@ -35,7 +35,7 @@ import top.yukonga.miuix.kmp.theme.lightColorScheme
 
 /** Software fallback/animation tests, NOT a substitute for actual GPU-layer readback verification. */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [28], qualifiers = "w393dp-h852dp-mdpi", application = CompatibilityTestApplication::class)
+@Config(sdk = [28], qualifiers = "zh-w393dp-h852dp-mdpi", application = CompatibilityTestApplication::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @LooperMode(LooperMode.Mode.PAUSED)
 class FriendCardContrastComposeTest {

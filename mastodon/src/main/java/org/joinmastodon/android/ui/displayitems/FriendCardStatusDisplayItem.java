@@ -114,11 +114,15 @@ public class FriendCardStatusDisplayItem extends StatusDisplayItem{
 	}
 
 	public static List<String> interestTags(FriendCard card){
+		return interestTags(card, org.joinmastodon.android.MastodonApp.context);
+	}
+
+	public static List<String> interestTags(FriendCard card, Context context){
 		List<String> values=new ArrayList<>();
 		if(isPublic(card, "interests") && card.interests!=null)
 			for(String value:card.interests) if(hasText(value)) values.add(value);
 		if(isPublic(card, "games") && card.games!=null)
-			for(String value:new java.util.LinkedHashSet<>(card.games)) if(hasText(value)) values.add(FriendCardGames.gameName(value));
+			for(String value:new java.util.LinkedHashSet<>(card.games)) if(hasText(value)) values.add(FriendCardGames.gameName(value, context));
 		return values;
 	}
 
@@ -216,7 +220,7 @@ public class FriendCardStatusDisplayItem extends StatusDisplayItem{
 			details.addView(interestChips, new LinearLayout.LayoutParams(-1, -2));
 			lookingFor=text(activity, 14, R.attr.colorM3OnSurface, 2);
 			details.addView(lookingFor);
-			action=text(activity, 13, R.attr.colorM3Primary, 1);
+			action=text(activity, 13, R.attr.colorM3Primary, Integer.MAX_VALUE);
 			action.setPadding(V.dp(14), V.dp(10), V.dp(14), V.dp(12));
 			action.setMinHeight(V.dp(48));
 			action.setGravity(Gravity.CENTER_VERTICAL);
@@ -334,7 +338,7 @@ public class FriendCardStatusDisplayItem extends StatusDisplayItem{
 			lookingFor.setTextColor(publication ? Color.WHITE : UiUtils.getThemeColor(wrapper.getContext(), R.attr.colorM3OnSurface));
 			action.setTextColor(publication ? 0xE6FFFFFF : UiUtils.getThemeColor(wrapper.getContext(), R.attr.colorM3Primary));
 			bindTags(about, aboutChips, publication ? aboutTags(data) : List.of());
-			bindTags(interests, interestChips, publication ? interestTags(data) : List.of());
+			bindTags(interests, interestChips, publication ? interestTags(data, wrapper.getContext()) : List.of());
 			bindRow(lookingFor, publication && isPublic(data, "looking_for") ? data.lookingFor : "", R.string.friend_card_post_looking_for);
 			details.setPadding(V.dp(14), V.dp(publication ? 12 : 8), V.dp(14), V.dp(publication ? 6 : 2));
 			action.setVisibility(publication ? View.VISIBLE : View.GONE);
@@ -351,7 +355,9 @@ public class FriendCardStatusDisplayItem extends StatusDisplayItem{
 			card.setContentDescription(heading);
 			// A LINK uses only the bounded public preview, never fields from attachment.card.
 			FriendCardAttachment.LinkPreview preview=item.presentation==Presentation.LINK ? item.attachment.linkPreview : null;
-			String ownership=preview!=null && hasText(preview.ownerName) ? preview.ownerName+"的扩列卡" : "Ta 的扩列卡";
+			String ownership=preview!=null && hasText(preview.ownerName)
+					? wrapper.getContext().getString(R.string.fc_link_owner, preview.ownerName)
+					: wrapper.getContext().getString(R.string.fc_link_someone);
 			if(!available) ownership=wrapper.getContext().getString(R.string.friend_cards_detail_title);
 			linkLabel.setText(ownership);
 			linkTitle.setText(link ? heading : "");
@@ -360,7 +366,7 @@ public class FriendCardStatusDisplayItem extends StatusDisplayItem{
 			linkContainer.setClickable(link && available);
 			linkContainer.setFocusable(link && available);
 			linkContainer.setEnabled(available);
-			linkContainer.setContentDescription(link ? ownership+"，"+heading : null);
+			linkContainer.setContentDescription(link ? wrapper.getContext().getString(R.string.fc_link_description, ownership, heading) : null);
 			Drawable image=coverBinding.bind(wrapper.getContext(), item.coverKey(), item.permittedCoverRequest());
 			if(image!=null) showCover(image);
 			else clearImage(0); // Failed/missing covers keep the original compact title or LINK icon.

@@ -95,34 +95,59 @@ public class PinView extends EditText {
     @Override
     protected void onDraw(Canvas canvas) {
         int length = getText().length();
-        int totalWidth = PIN_LENGTH * charSize + (PIN_LENGTH - 1) * charGap;
-        float startX = (getWidth() - totalWidth) / 2f;
-        float centerY = getHeight() / 2f;
+        float contentWidth = Math.max(0, getWidth() - getPaddingLeft() - getPaddingRight());
+        float contentHeight = Math.max(0, getHeight() - getPaddingTop() - getPaddingBottom());
+        float stroke = boxStrokePaint.getStrokeWidth();
+        float availableWidth = Math.max(0, contentWidth - stroke);
+        float availableHeight = Math.max(0, contentHeight - stroke);
+        if (availableWidth == 0 || availableHeight == 0) return;
+
+        // MeasureSpec can make the view narrower than its preferred 346dp. Fit the entire row,
+        // including gaps and the outer half-strokes, inside the actual padded viewport.
+        float preferredRowWidth = PIN_LENGTH * charSize + (PIN_LENGTH - 1) * charGap;
+        float scale = Math.min(1f, Math.min(availableWidth / preferredRowWidth, availableHeight / charSize));
+        float boxSize = charSize * scale;
+        float gap = charGap * scale;
+        float radius = charRadius * scale;
+        float totalWidth = PIN_LENGTH * boxSize + (PIN_LENGTH - 1) * gap;
+        float startX = getPaddingLeft() + (contentWidth - totalWidth) / 2f;
+        float centerY = getPaddingTop() + contentHeight / 2f;
+
+        // Honor the requested font scale, but fit real font metrics/advance widths to each box.
+        // Reset the preferred size on every draw so resizing never accumulates smaller text.
+        textPaint.setTextSize(22 * getResources().getDisplayMetrics().scaledDensity);
+        float widestDigit = 0;
+        for (int i = 0; i < 10; i++) widestDigit = Math.max(widestDigit, textPaint.measureText(Integer.toString(i)));
+        for (int i = 0; i < length; i++) widestDigit = Math.max(widestDigit, textPaint.measureText(getText(), i, i + 1));
+        Paint.FontMetrics metrics = textPaint.getFontMetrics();
+        float textSpace = Math.max(0, boxSize - dpToPx(8) * scale);
+        float textScale = Math.min(1f, Math.min(textSpace / Math.max(1f, widestDigit), textSpace / Math.max(1f, metrics.bottom - metrics.top)));
+        textPaint.setTextSize(textPaint.getTextSize() * textScale);
+        metrics = textPaint.getFontMetrics();
+        float textY = centerY - (metrics.top + metrics.bottom) / 2f;
 
         for (int i = 0; i < PIN_LENGTH; i++) {
-            float x = startX + i * (charSize + charGap);
-            RectF rect = new RectF(x, centerY - charSize / 2f, x + charSize, centerY + charSize / 2f);
+            float x = startX + i * (boxSize + gap);
+            RectF rect = new RectF(x, centerY - boxSize / 2f, x + boxSize, centerY + boxSize / 2f);
 
             boxPaint.setColor(i == length ? boxActiveColor : boxColor);
-            canvas.drawRoundRect(rect, charRadius, charRadius, boxPaint);
+            canvas.drawRoundRect(rect, radius, radius, boxPaint);
             // 蓝色描边
-            canvas.drawRoundRect(rect, charRadius, charRadius, boxStrokePaint);
+            canvas.drawRoundRect(rect, radius, radius, boxStrokePaint);
 
             // Cursor
             if (i == length && hasFocus()) {
-                float cw = dpToPx(2);
+                float cw = dpToPx(2) * scale;
                 canvas.drawRoundRect(
-                    new RectF(x + charSize / 2f - cw / 2, centerY - charSize / 3f,
-                              x + charSize / 2f + cw / 2, centerY + charSize / 3f),
+                    new RectF(x + boxSize / 2f - cw / 2, centerY - boxSize / 3f,
+                              x + boxSize / 2f + cw / 2, centerY + boxSize / 3f),
                     cw / 2, cw / 2, cursorPaint);
             }
 
             // Text
             if (i < length) {
                 String ch = String.valueOf(getText().charAt(i));
-                Paint.FontMetrics fm = textPaint.getFontMetrics();
-                float textY = centerY - (fm.ascent + fm.descent) / 2;
-                canvas.drawText(ch, x + charSize / 2f, textY, textPaint);
+                canvas.drawText(ch, x + boxSize / 2f, textY, textPaint);
             }
         }
     }
@@ -131,7 +156,7 @@ public class PinView extends EditText {
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         int totalWidth = PIN_LENGTH * charSize + (PIN_LENGTH - 1) * charGap + dpToPx(PADDING_DP) * 2;
         int height = charSize + dpToPx(PADDING_DP) * 2;
-        setMeasuredDimension(totalWidth, height);
+        setMeasuredDimension(resolveSize(totalWidth, widthMeasureSpec), resolveSize(height, heightMeasureSpec));
     }
 
     @Override

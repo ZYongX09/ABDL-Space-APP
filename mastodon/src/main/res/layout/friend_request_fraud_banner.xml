@@ -13,7 +13,7 @@
         android:layout_marginEnd="8dp"
         android:src="@drawable/ic_warning_red"
         android:tint="?colorM3OnErrorContainer"
-        android:contentDescription="警告" />
+        android:contentDescription="@string/general_warning" />
 
     <TextView
         android:layout_width="wrap_content"

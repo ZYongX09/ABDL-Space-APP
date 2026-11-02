@@ -75,6 +75,7 @@ public class SettingsAccountFragment extends BaseSettingsFragment<Void>{
 	@Override
 	public void onCreate(Bundle savedInstanceState){
 		super.onCreate(savedInstanceState);
+		setRetainInstance(false); // Account rows contain resolved strings; reload them in the new locale.
 			AccountSession account=AccountSessionManager.getInstance().tryGetAccount(accountID);
 			if(account==null){
 				if(getActivity()!=null) getActivity().finish();
@@ -89,7 +90,8 @@ public class SettingsAccountFragment extends BaseSettingsFragment<Void>{
 		items.add(new ListItem<>(R.string.settings_privacy, 0, R.drawable.ic_privacy_tip_24px, this::onPrivacyClick));
 		items.add(new ListItem<>(R.string.settings_filters, 0, R.drawable.ic_filter_alt_24px, this::onFiltersClick));
 		items.add(new ListItem<>(R.string.settings_notifications, 0, R.drawable.ic_notifications_24px, this::onNotificationsClick));
-			items.add(new ListItem<>(R.string.settings_posting_defaults, 0, R.drawable.ic_edit_square_24px, this::onPostingDefaultsClick));
+				items.add(new ListItem<>(R.string.settings_posting_defaults, 0, R.drawable.ic_edit_square_24px, this::onPostingDefaultsClick));
+				items.add(new ListItem<>(R.string.post_translation_settings, 0, R.drawable.ic_fluent_translate_24_regular, this::onTranslationClick));
 
 				items.add(new SectionHeaderListItem(R.string.verification_section));
 				verificationItem=new ListItem<>(getString(R.string.verification_title), getString(R.string.verification_description), R.drawable.ic_badge_24px, this::onVerificationClick);
@@ -215,6 +217,10 @@ public class SettingsAccountFragment extends BaseSettingsFragment<Void>{
 
 	private void onPostingDefaultsClick(ListItem<?> item_){
 		Nav.go(getActivity(), SettingsPostingDefaultsFragment.class, makeFragmentArgs());
+	}
+
+	private void onTranslationClick(ListItem<?> item_){
+		Nav.go(getActivity(), SettingsTranslationFragment.class, makeFragmentArgs());
 	}
 
 	private void onServerClick(ListItem<?> item_){

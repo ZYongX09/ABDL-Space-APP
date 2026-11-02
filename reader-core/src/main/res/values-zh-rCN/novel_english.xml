@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="novel_reader_unsupported_format">不支持的文件格式。</string>
+    <string name="novel_reader_epub_container_missing">EPUB 缺少 META-INF/container.xml。</string>
+    <string name="novel_reader_epub_opf_invalid">EPUB 的 OPF 路径无效。</string>
+    <string name="novel_reader_epub_opf_missing">EPUB 缺少 OPF 组件。</string>
+    <string name="novel_reader_epub_no_chapters">EPUB 没有可读取的章节。</string>
+    <string name="novel_reader_docx_document_missing">DOCX 缺少 word/document.xml。</string>
+    <string name="novel_reader_docx_no_body">DOCX 没有可读取的正文。</string>
+    <string name="novel_reader_no_body">暂无正文</string>
+    <string name="novel_reader_back">返回</string>
+    <string name="novel_reader_settings">设置</string>
+    <string name="novel_reader_previous_chapter">上一章</string>
+    <string name="novel_reader_next_chapter">下一章</string>
+    <string name="novel_reader_add_bookmark">添加书签</string>
+    <string name="novel_reader_add_note">添加笔记</string>
+    <string name="novel_reader_chapter_progress">第 %1$d / %2$d 章</string>
+    <string name="novel_reader_reading_settings">阅读设置</string>
+    <string name="novel_reader_font_size">字号 %1$dsp</string>
+    <string name="novel_reader_line_height">行距 %1$s</string>
+    <string name="novel_reader_palette_paper">纸张</string>
+    <string name="novel_reader_palette_white">白色</string>
+    <string name="novel_reader_palette_night">夜间</string>
+</resources>

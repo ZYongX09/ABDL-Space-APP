@@ -1,5 +1,9 @@
 package org.joinmastodon.android.novel.app.models
 
+import android.content.Context
+import androidx.annotation.StringRes
+import org.joinmastodon.android.MastodonApp
+import org.joinmastodon.android.R
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -51,12 +55,22 @@ data class Work(
     val inShelf: Boolean = false, val progress: Progress? = null, val chapters: List<Chapter> = emptyList(),
     val originalAuthor: String = "",
 ) {
-    val displayAuthorName: String get() = if (workType == "repost") originalAuthor.ifBlank { "原作者未填写" } else author.name
-    val typeLabel: String get() = when (workType) { "original" -> "原创"; "repost" -> "授权转载"; "ai" -> "AI辅助"; else -> "作品" }
-    val statusLabel: String get() = when (status) {
-        "draft" -> "本地草稿"; "pending" -> "审核中"; "published" -> if (completed) "已完结" else "连载中"
-        "rejected" -> "未通过"; "withdrawn" -> "已下架"; else -> "待确认"
+    /** Resource labels never alter the opaque wire type/status or user-provided author names. */
+    @get:StringRes val typeLabelRes: Int get() = when (workType) {
+        "original" -> R.string.novel_en_type_original; "repost" -> R.string.novel_en_type_repost
+        "ai" -> R.string.novel_en_type_ai; else -> R.string.novel_en_work
     }
+    @get:StringRes val statusLabelRes: Int get() = when (status) {
+        "draft" -> R.string.novel_en_local_draft; "pending" -> R.string.novel_en_in_review
+        "published" -> if (completed) R.string.novel_en_status_completed else R.string.novel_en_status_serializing
+        "rejected" -> R.string.novel_en_status_rejected; "withdrawn" -> R.string.novel_en_status_withdrawn
+        else -> R.string.novel_en_status_unknown
+    }
+    fun displayAuthorName(context: Context): String = if (workType == "repost") originalAuthor.ifBlank { context.getString(R.string.novel_en_original_author_missing) } else author.name
+    // Preserve getDisplayAuthorName/getTypeLabel/getStatusLabel for existing Java consumers.
+    val displayAuthorName: String get() = if (workType == "repost") originalAuthor.ifBlank { MastodonApp.context.getString(R.string.novel_en_original_author_missing) } else author.name
+    val typeLabel: String get() = MastodonApp.context.getString(typeLabelRes)
+    val statusLabel: String get() = MastodonApp.context.getString(statusLabelRes)
     val hasUpdate: Boolean get() = progress?.let { !it.completed && releaseId != null && it.releaseId != releaseId } ?: false
 }
 

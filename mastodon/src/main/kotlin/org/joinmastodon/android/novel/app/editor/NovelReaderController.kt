@@ -1,5 +1,9 @@
 package org.joinmastodon.android.novel.app.editor
 
+import org.joinmastodon.android.novel.app.novelUserMessage
+
+import org.joinmastodon.android.R
+
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -48,10 +52,10 @@ internal class NovelReaderController(application: Application, val repository: N
                 var remoteMark: JSONObject? = null
                 val directory: Pair<ReaderBook, List<ReaderHeader>> = when {
                     localId != null -> repository.local { s -> val structure = s.structure(localId); ReaderBook(readingId, structure.work().title(), format = BookFormat.TXT) to structure.chapters().map { ReaderHeader(it.id(), it.title(), it.contentLength()) } }
-                    privateId != null -> privateDatabase { db -> val book = requireNotNull(db.novelBookDao().getById(repository.accountId, privateId)); require(book.deletedAt == null) { "此私人作品已移除" }; if (mark == null) { val saved = db.syncDao().progress(repository.accountId, "progress:$privateId")?.payload?.let(::JSONObject); if (saved != null) remoteMark = saved }; ReaderBook(readingId, book.title, book.author, BookFormat.TXT) to db.novelChapterDao().getHeadersByBookId(privateId).map { ReaderHeader(it.id, it.title, it.contentLength) } }
+                    privateId != null -> privateDatabase { db -> val book = requireNotNull(db.novelBookDao().getById(repository.accountId, privateId)); require(book.deletedAt == null) { repository.context.getString(R.string.novel_en_private_work_removed) }; if (mark == null) { val saved = db.syncDao().progress(repository.accountId, "progress:$privateId")?.payload?.let(::JSONObject); if (saved != null) remoteMark = saved }; ReaderBook(readingId, book.title, book.author, BookFormat.TXT) to db.novelChapterDao().getHeadersByBookId(privateId).map { ReaderHeader(it.id, it.title, it.contentLength) } }
                     else -> {
                         val work = repository.api.raw("GET", "/works/${NovelAppApi.segment(requireNotNull(publicId))}")
-                        val release = requireNotNull(work.stringOrNull("release_id")) { "作品暂无可阅读的公开版本" }
+                        val release = requireNotNull(work.stringOrNull("release_id")) { repository.context.getString(R.string.novel_en_no_public_release) }
                         update { it.copy(release = release) }
                         remoteMark = work.optJSONObject("progress")
                         if (remoteMark == null) runCatching { repository.api.raw("GET", "/progress/${NovelAppApi.segment(publicId)}").optJSONObject("progress") }.onSuccess { remoteMark = it }.onFailure { if (it is CancellationException) throw it }
@@ -59,14 +63,14 @@ internal class NovelReaderController(application: Application, val repository: N
                         ReaderBook(readingId, work.getString("title"), work.optJSONObject("author")?.optString("display_name"), BookFormat.TXT) to (0 until (rows?.length() ?: 0)).map { i -> val row = rows!!.getJSONObject(i); ReaderHeader(row.getString("id"), row.getString("title"), row.optInt("word_count")) }
                     }
                 }
-                require(directory.second.isNotEmpty()) { "这本作品暂无章节" }
+                require(directory.second.isNotEmpty()) { repository.context.getString(R.string.novel_en_work_no_chapters) }
                 val markChapter = mark?.chapterId() ?: if (privateId != null) directory.second.getOrNull(remoteMark?.optInt("chapterIndex", -1) ?: -1)?.id else remoteMark?.optString("chapter_id")
                 val chapter = requestedChapter ?: markChapter
                 val index = directory.second.indexOfFirst { it.id == chapter }.coerceAtLeast(0)
                 val resume = if (directory.second[index].id == markChapter && requestedChapter == null) (mark?.page() ?: remoteMark?.optInt(if (privateId != null) "pageIndex" else "offset", 0) ?: 0) else 0
                 val oldRelease = mark?.releaseId() ?: remoteMark?.stringOrNull("release_id")
                 val changed = publicId != null && oldRelease != null && oldRelease != mutable.value.release
-                update { it.copy(book = directory.first, headers = directory.second, index = index, page = resume, notice = if (changed) "作品已更新，已按稳定章节 ID 恢复位置；正文分页可能变化。" else null) }
+                update { it.copy(book = directory.first, headers = directory.second, index = index, page = resume, notice = if (changed) repository.context.getString(R.string.novel_en_position_restored_update) else null) }
                 openNow(index, resume)
                 refreshAnnotations()
             } catch (cancel: CancellationException) { throw cancel }
@@ -85,15 +89,15 @@ internal class NovelReaderController(application: Application, val repository: N
         val body = when {
             localId != null -> repository.local { s -> requireNotNull(s.getChapter(header.id)).also { require(it.workId() == localId) }; requireNotNull(s.loadDraft(header.id)).content() }
             privateId != null -> privateDatabase { db ->
-                val row = db.novelChapterDao().getHeadersByBookId(privateId).firstOrNull { it.id == header.id } ?: error("本地章节已移除")
-                require(row.contentLength <= 5_000_000) { "此本地章节过长，请先拆分后阅读" }
+                val row = db.novelChapterDao().getHeadersByBookId(privateId).firstOrNull { it.id == header.id } ?: error(repository.context.getString(R.string.novel_en_local_chapter_removed))
+                require(row.contentLength <= 5_000_000) { repository.context.getString(R.string.novel_en_local_chapter_too_long) }
                 buildString(row.contentLength) { var offset = 1; while (offset <= row.contentLength) { val chunk = db.novelChapterDao().getContentChunk(header.id, offset, NovelChapterDao.CHAPTER_CURSOR_CHUNK_SIZE).orEmpty(); if (chunk.isEmpty()) break; append(chunk); offset += chunk.codePointCount(0, chunk.length) } }
             }
             else -> {
                 val loaded = repository.api.raw("GET", "/works/${NovelAppApi.segment(requireNotNull(publicId))}/chapters/${NovelAppApi.segment(header.id)}${NovelAppApi.query("release_id" to snapshot.release)}")
-                require(loaded.getString("release_id") == snapshot.release) { "公开版本已变化，请重新加载" }
+                require(loaded.getString("release_id") == snapshot.release) { repository.context.getString(R.string.novel_en_release_changed) }
                 val text = loaded.getString("body")
-                loaded.stringOrNull("body_sha256")?.let { require(org.joinmastodon.noveleditor.EditorText.sha256(text) == it) { "章节校验失败，请重试" } }
+                loaded.stringOrNull("body_sha256")?.let { require(org.joinmastodon.noveleditor.EditorText.sha256(text) == it) { repository.context.getString(R.string.novel_en_chapter_checksum_failed) } }
                 text
             }
         }
@@ -103,7 +107,7 @@ internal class NovelReaderController(application: Application, val repository: N
     private fun fail(e: Exception) {
         val unavailable = e is NovelAppApiException && e.status in listOf(401, 403, 404)
         val changed = e is NovelAppApiException && e.status == 409
-        update { it.copy(loading = false, chapter = null, changed = changed, error = when { changed -> "作品版本已变化，请重新加载目录。阅读进度与笔记仍保留。"; unavailable -> "作品已不可用或当前账号无权阅读。不会展示旧正文。"; else -> e.message ?: "无法加载章节，请重试" }) }
+        update { it.copy(loading = false, chapter = null, changed = changed, error = when { changed -> repository.context.getString(R.string.novel_en_reader_version_changed); unavailable -> repository.context.getString(R.string.novel_en_reader_unavailable); else -> e.novelUserMessage(repository.context, R.string.novel_en_chapter_load_failed) }) }
     }
     fun position(position: ReaderPosition) { update { it.copy(page = position.pageIndex.coerceAtLeast(0)) }; savePosition(position.pageIndex) }
     fun savePosition(page: Int = mutable.value.page) { val snapshot = mutable.value; viewModelScope.launch { persistPosition(snapshot, page) } }
@@ -128,7 +132,7 @@ internal class NovelReaderController(application: Application, val repository: N
                     }
                 }
                 true
-            } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { update { it.copy(notice = if (localSaved) "阅读位置已保留本机；云端同步失败可稍后重试" else "本机阅读位置保存失败，请重试后再离开") }; localSaved }
+            } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { update { it.copy(notice = if (localSaved) repository.context.getString(R.string.novel_en_position_sync_failed) else repository.context.getString(R.string.novel_en_position_save_failed)) }; localSaved }
     }
     fun annotation(note: String? = null) {
         val snapshot = mutable.value; val header = snapshot.headers.getOrNull(snapshot.index) ?: return
@@ -143,8 +147,8 @@ internal class NovelReaderController(application: Application, val repository: N
                 } else if (note == null) db.bookmarkDao().applyRemote(BookmarkEntity(id, repository.accountId, privateId, header.id, snapshot.page))
                 else db.annotationDao().applyRemote(AnnotationEntity(id, repository.accountId, privateId, header.id, snapshot.page, snapshot.page, "", note))
             }
-            refreshAnnotations(); update { it.copy(notice = if (note == null) "书签已保存" else "笔记已保存") }
-        } catch (cancel: CancellationException) { throw cancel } catch (error: Exception) { update { it.copy(notice = "保存书签/笔记失败，请重试") } } }
+            refreshAnnotations(); update { it.copy(notice = if (note == null) repository.context.getString(R.string.novel_en_bookmark_saved) else repository.context.getString(R.string.novel_en_note_saved)) }
+        } catch (cancel: CancellationException) { throw cancel } catch (error: Exception) { update { it.copy(notice = repository.context.getString(R.string.novel_en_annotation_save_failed)) } } }
     }
     private suspend fun refreshAnnotations() {
         val annotations = if (privateId == null) repository.local { s -> s.readingAnnotations(readingId).map { ReaderAnnotation(it.id(), it.chapterId(), it.page(), it.note()) } }
@@ -153,7 +157,7 @@ internal class NovelReaderController(application: Application, val repository: N
     }
     fun clearNotice() = update { it.copy(notice = null) }
     private suspend fun <T> privateDatabase(block: suspend (NovelDatabase) -> T): T = kotlinx.coroutines.withContext(repository.io) {
-        val lease = checkNotNull(NovelAccountDataCleaner.enterOperation(repository.accountId, repository.generation)) { "账号已注销" }
+        val lease = checkNotNull(NovelAccountDataCleaner.enterOperation(repository.accountId, repository.generation)) { repository.context.getString(R.string.novel_en_account_logged_out) }
         lease.use { val db = NovelDatabase.open(getApplication(), repository.accountId); try { block(db) } finally { db.close() } }
     }
 }

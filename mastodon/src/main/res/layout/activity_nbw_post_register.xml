@@ -85,7 +85,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
                     android:layout_marginBottom="16dp"
-                    android:text="ABDL Space 联邦·深度合作成员"
+                    android:text="@string/general_federation_partner"
                     android:textSize="13sp"
                     android:textColor="?colorM3OnSurfaceVariant" />
 
@@ -168,7 +168,7 @@
                     android:layout_height="48dp"
                     android:background="@android:color/transparent"
                     android:backgroundTint="@null"
-                    android:text="暂时跳过"
+                    android:text="@string/general_skip"
                     android:textSize="14sp"
                     android:textAllCaps="false"
                     android:textColor="?colorM3Primary" />

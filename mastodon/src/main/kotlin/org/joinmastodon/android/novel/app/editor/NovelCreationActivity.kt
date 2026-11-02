@@ -30,7 +30,7 @@ import org.joinmastodon.android.novel.app.design.NovelTheme
 import org.joinmastodon.android.ui.utils.UiUtils
 
 /** Local-first creation and management. Merely opening this Activity never uploads a manuscript. */
-class NovelCreationActivity : ComponentActivity(), NavigationEventDispatcherOwner {
+class NovelCreationActivity : ComponentActivity(), NavigationEventDispatcherOwner, org.joinmastodon.android.ui.utils.AppLanguageManager.DraftOwner {
     private var controller: NovelEditorController? = null
     private var accountId: String? = null
     private var eventsRegistered = false
@@ -51,7 +51,13 @@ class NovelCreationActivity : ComponentActivity(), NavigationEventDispatcherOwne
         accountId = account
         if (!sessionActive()) { closeExpiredSession(); return }
         E.register(this); eventsRegistered = true
-        if (model.state.value.page == "loading") model.open(intent.getStringExtra("local_work_id"), intent.getStringExtra("work_id"), intent.getStringExtra("mode") ?: "create")
+        if (model.state.value.page == "loading") {
+            val restoreLocal = savedInstanceState?.getString("novel_editor_local_work") ?: intent.getStringExtra("local_work_id")
+            model.open(restoreLocal, if (restoreLocal == null) intent.getStringExtra("work_id") else null, intent.getStringExtra("mode") ?: "create")
+            savedInstanceState?.getString("novel_editor_form")?.let { json ->
+                model.restoreFormWhenReady(NovelMetadata.from(org.json.JSONObject(json)))
+            }
+        }
         enableEdgeToEdge(SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT), SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT))
         setContent {
             CompositionLocalProvider(LocalNavigationEventDispatcherOwner provides this) {
@@ -64,6 +70,16 @@ class NovelCreationActivity : ComponentActivity(), NavigationEventDispatcherOwne
                 }
             }
         }
+    }
+    /** Synchronous veto only: never claim an asynchronous save has finished. */
+    override fun prepareForAppLanguageChange(): Boolean = controller?.state?.value?.canChangeAppLanguage() ?: true
+    override fun onSaveInstanceState(outState: Bundle) {
+        controller?.state?.value?.let { state ->
+            state.workId?.let { outState.putString("novel_editor_local_work", it) }
+            // Small form only. The native 500k manuscript remains in its existing journal/recovery store.
+            if (state.page == "metadata") outState.putString("novel_editor_form", state.metadata.json().toString())
+        }
+        super.onSaveInstanceState(outState)
     }
     override fun onResume() { super.onResume(); if (!sessionActive()) closeExpiredSession() }
     override fun onPause() {

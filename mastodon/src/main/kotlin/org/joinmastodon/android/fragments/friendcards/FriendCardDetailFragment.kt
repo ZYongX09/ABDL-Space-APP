@@ -2,6 +2,7 @@
 
 package org.joinmastodon.android.fragments.friendcards
 
+import org.joinmastodon.android.R
 import android.os.Build
 import android.os.Bundle
 import android.view.View
@@ -45,7 +46,7 @@ class FriendCardDetailFragment : FriendCardBaseFragment() {
     private var busy = false
     private var safeTopPx by mutableIntStateOf(0)
     private lateinit var cardId: String
-    override fun onCreate(state: Bundle?) { super.onCreate(state); setTitle("扩列卡"); cardId = arguments?.getString("card_id").orEmpty() }
+    override fun onCreate(state: Bundle?) { super.onCreate(state); setTitle(R.string.friend_cards_detail_title); cardId = arguments?.getString("card_id").orEmpty() }
     @Suppress("DEPRECATION")
     override fun onApplyWindowInsets(insets: WindowInsets) {
         // AppKit already lays out behind the bars. Move only its top reservation into the
@@ -82,30 +83,30 @@ class FriendCardDetailFragment : FriendCardBaseFragment() {
         if (busy) return
         cancelRequests()
         card = null; loading = true; globalError = null; styleToolbar(); changed()
-        if (cardId.isBlank()) { loading = false; globalError = "卡片暂不可用"; changed(); return }
+        if (cardId.isBlank()) { loading = false; globalError = getString(R.string.fc_card_unavailable); changed(); return }
         execute(FriendCardRequest.detail(cardId), { result ->
             loading = false
-            if (result.card?.isSupported == true && result.card.id == cardId) card = result.card else globalError = "此卡暂不可用或格式不受支持"
+            if (result.card?.isSupported == true && result.card.id == cardId) card = result.card else globalError = getString(R.string.fc_card_unsupported)
             onUpdateToolbar()
             changed()
         }, { loading = false; globalError = message(it); changed() })
     }
     override fun onHidden() { busy = false; super.onHidden(); card = null; changed() }
     private fun report(value: FriendCard) {
-        val input = EditText(activity).apply { hint = "请填写举报原因（1–500字）"; minLines = 2; maxLines = 6 }
+        val input = EditText(activity).apply { hint = getString(R.string.fc_report_hint); minLines = 2; maxLines = 6 }
         activeDialog?.dismiss()
-        activeDialog = M3AlertDialogBuilder(activity).setTitle("举报扩列卡").setView(input).setPositiveButton("提交举报") { _, _ ->
+        activeDialog = M3AlertDialogBuilder(activity).setTitle(getString(R.string.fc_report_card)).setView(input).setPositiveButton(getString(R.string.fc_submit_report)) { _, _ ->
             if (!shown || !accountValid() || busy) return@setPositiveButton
             val reason = input.text.toString().trim()
-            if (reason.isEmpty() || reason.codePointCount(0, reason.length) > 500) { toast("请填写1–500字的举报原因"); return@setPositiveButton }
+            if (reason.isEmpty() || reason.codePointCount(0, reason.length) > 500) { toast(getString(R.string.fc_report_invalid)); return@setPositiveButton }
             busy = true; changed()
-            execute(FriendCardRequest.report(value.id, reason, null), { result -> busy = false; if (result.reported) toast("举报已提交") else globalError = "服务端未确认举报，请重试"; changed() }, { busy = false; globalError = message(it); changed() })
-        }.setNegativeButton("取消", null).show()
+            execute(FriendCardRequest.report(value.id, reason, null), { result -> busy = false; if (result.reported) toast(getString(R.string.fc_report_sent)) else globalError = getString(R.string.fc_report_unconfirmed); changed() }, { busy = false; globalError = message(it); changed() })
+        }.setNegativeButton(getString(R.string.fc_cancel), null).show()
     }
     private fun block(value: FriendCard) {
-        confirm("屏蔽此用户", "将停止互相推荐与读取新卡，并拒绝私信。只对这位用户生效。", "屏蔽") {
+        confirm(getString(R.string.fc_block_user_title), getString(R.string.fc_block_user_help), getString(R.string.fc_block)) {
             busy = true; changed()
-            execute(FriendCardRequest.block(value.ownerId, true), { result -> busy = false; if (result.blocked) { card = null; toast("已屏蔽此用户"); finish() } else globalError = "服务端未确认屏蔽，请重试"; changed() }, { busy = false; globalError = message(it); changed() })
+            execute(FriendCardRequest.block(value.ownerId, true), { result -> busy = false; if (result.blocked) { card = null; toast(getString(R.string.fc_blocked)); finish() } else globalError = getString(R.string.fc_block_unconfirmed); changed() }, { busy = false; globalError = message(it); changed() })
         }
     }
     private data class ScreenState(val card: FriendCard?, val loading: Boolean, val busy: Boolean, val error: String?)
@@ -129,12 +130,12 @@ class FriendCardDetailFragment : FriendCardBaseFragment() {
             LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = scroll, contentPadding = PaddingValues(bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (state.loading) item {
                     Box(Modifier.padding(top = topClearance, start = 12.dp, end = 12.dp).clip(RoundedCornerShape(18.dp)).background(MiuixTheme.colorScheme.surface)) {
-                        FriendCardNotice("正在读取卡片…", null, null)
+                        FriendCardNotice(getString(R.string.fc_loading_card), null, null)
                     }
                 }
                 state.error?.let { text -> item {
                     Box(Modifier.padding(top = topClearance, start = 12.dp, end = 12.dp, bottom = 12.dp).clip(RoundedCornerShape(18.dp)).background(MiuixTheme.colorScheme.surface)) {
-                        FriendCardNotice(text, "重新读取", { refresh() })
+                        FriendCardNotice(text, getString(R.string.fc_reload), { refresh() })
                     }
                 } }
                 if (value != null) {
@@ -146,14 +147,14 @@ class FriendCardDetailFragment : FriendCardBaseFragment() {
                     item {
                         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                DetailLink("用户主页", !state.busy) { profile(value) }
-                                DetailLink("查看发布帖与互动", !state.busy) { post(value) }
+                                DetailLink(getString(R.string.fc_profile), !state.busy) { profile(value) }
+                                DetailLink(getString(R.string.fc_post_interactions), !state.busy) { post(value) }
                                 if (!owner(value)) {
-                                    DetailLink("举报", !state.busy) { report(value) }
-                                    DetailLink("屏蔽用户", !state.busy) { block(value) }
+                                    DetailLink(getString(R.string.fc_report), !state.busy) { report(value) }
+                                    DetailLink(getString(R.string.fc_block_user), !state.busy) { block(value) }
                                 }
                             }
-                            if (owner(value)) Text("此处预览公开资料；编辑页可查看和修改仅自己可见字段。",
+                            if (owner(value)) Text(getString(R.string.fc_owner_preview_help),
                                 color = Color.White.copy(alpha = .72f), fontSize = 12.sp)
                         }
                     }
@@ -176,13 +177,13 @@ class FriendCardDetailFragment : FriendCardBaseFragment() {
                     val stacked = maxWidth.value / LocalDensity.current.fontScale < 320f
                     if (stacked) {
                         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            FriendCardPrimaryButton("编辑卡片", { go(FriendCardCreateFragment::class.java, args(value.id)) }, enabled = !busy, outlined = true, light = true)
-                            FriendCardPrimaryButton("管理我的卡", { go(MyFriendCardsFragment::class.java) }, enabled = !busy, outlined = true, light = true)
+                            FriendCardPrimaryButton(getString(R.string.fc_edit_card), { go(FriendCardCreateFragment::class.java, args(value.id)) }, enabled = !busy, outlined = true, light = true)
+                            FriendCardPrimaryButton(getString(R.string.fc_manage_cards_short), { go(MyFriendCardsFragment::class.java) }, enabled = !busy, outlined = true, light = true)
                         }
                     } else {
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            FriendCardPrimaryButton("编辑卡片", { go(FriendCardCreateFragment::class.java, args(value.id)) }, modifier = Modifier.weight(1f), enabled = !busy, outlined = true, light = true)
-                            FriendCardPrimaryButton("管理我的卡", { go(MyFriendCardsFragment::class.java) }, modifier = Modifier.weight(1f), enabled = !busy, outlined = true, light = true)
+                            FriendCardPrimaryButton(getString(R.string.fc_edit_card), { go(FriendCardCreateFragment::class.java, args(value.id)) }, modifier = Modifier.weight(1f), enabled = !busy, outlined = true, light = true)
+                            FriendCardPrimaryButton(getString(R.string.fc_manage_cards_short), { go(MyFriendCardsFragment::class.java) }, modifier = Modifier.weight(1f), enabled = !busy, outlined = true, light = true)
                         }
                     }
                 }

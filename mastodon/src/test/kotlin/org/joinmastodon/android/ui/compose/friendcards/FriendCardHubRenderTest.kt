@@ -47,7 +47,7 @@ import java.io.File
 
 /** Native component renders. Real Fragment lifecycle/routing lives in FriendCardHubUiTest. */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [28], qualifiers = "w393dp-h852dp-mdpi", application = CompatibilityTestApplication::class,
+@Config(sdk = [28], qualifiers = "zh-w393dp-h852dp-mdpi", application = CompatibilityTestApplication::class,
     shadows = [FriendCardHubRenderTest.Images::class])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @LooperMode(LooperMode.Mode.PAUSED)

@@ -2,6 +2,7 @@
 
 package org.joinmastodon.android.fragments.friendcards
 
+import org.joinmastodon.android.R
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -31,7 +32,7 @@ class FriendCardDiaperSelectFragment : FriendCardBaseFragment() {
     private var scrollIndex = 0
     private var scrollOffset = 0
     override fun onCreate(state: Bundle?) {
-        super.onCreate(state); setTitle("选择纸尿裤")
+        super.onCreate(state); setTitle(R.string.friend_cards_diaper_title)
         val ids = state?.getIntegerArrayList("selection") ?: arguments?.getIntegerArrayList("selected_ids") ?: arrayListOf()
         val draftId = state?.getString("draft_id") ?: arguments?.getString("draft_id") ?: UUID.randomUUID().toString()
         selection = FriendCardDiaperSelection(account, draftId, ids)
@@ -58,14 +59,14 @@ class FriendCardDiaperSelectFragment : FriendCardBaseFragment() {
         changed()
         execute(GetDiaperList(ticket.page, 20, ticket.query.trim(), null, null), { result ->
             try {
-                val raw = result["diapers"] as? List<*> ?: throw IllegalStateException("商品列表响应不完整")
+                val raw = result["diapers"] as? List<*> ?: throw IllegalStateException(getString(R.string.fc_products_incomplete))
                 val items = raw.map { FriendCardRules.gson.fromJson(FriendCardRules.gson.toJson(it), Diaper::class.java) }.map { value ->
-                    if (value.id <= 0) throw IllegalStateException("商品ID无效")
+                    if (value.id <= 0) throw IllegalStateException(getString(R.string.fc_product_id_invalid))
                     FriendCard.Diaper().apply { id = value.id; name = listOfNotNull(value.brand, value.model).filter { it.isNotBlank() }.joinToString(" "); imageUrl = value.images?.firstOrNull(); available = true }
                 }
-                val total = ((result["pagination"] as? Map<*, *>)?.get("total") as? Number)?.toInt() ?: throw IllegalStateException("商品分页响应不完整")
+                val total = ((result["pagination"] as? Map<*, *>)?.get("total") as? Number)?.toInt() ?: throw IllegalStateException(getString(R.string.fc_products_pagination_incomplete))
                 selection.accept(ticket, items, total)
-            } catch (error: Exception) { selection.fail(ticket, error.message ?: "商品列表读取失败") }
+            } catch (error: Exception) { selection.fail(ticket, error.message ?: getString(R.string.fc_products_failed)) }
             changed()
         }, { selection.fail(ticket, message(it)); changed() })
     }
@@ -94,29 +95,29 @@ class FriendCardDiaperSelectFragment : FriendCardBaseFragment() {
         LaunchedEffect(list) { snapshotFlow { list.firstVisibleItemIndex to list.firstVisibleItemScrollOffset }.collect { (index, offset) -> scrollIndex = index; scrollOffset = offset } }
         LaunchedEffect(state.query) { if (displayedQuery != state.query) { list.scrollToItem(0); displayedQuery = state.query } }
         Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            FriendCardField("搜索品牌 / 型号", state.query, 100, hint = "输入库内商品名称", onChange = { search(it) })
+            FriendCardField(getString(R.string.fc_product_search), state.query, 100, hint = getString(R.string.fc_product_search_hint), onChange = { search(it) })
             if (state.ids.isNotEmpty()) FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                state.ids.forEach { id -> FriendCardChip("${state.known[id]?.name ?: "商品 #$id"} ×", selected = true, onClick = { toggle(id) }) }
+                state.ids.forEach { id -> FriendCardChip("${state.known[id]?.name?.takeIf { it.isNotBlank() } ?: getString(R.string.fc_product_fallback, id)} ×", selected = true, onClick = { toggle(id) }) }
             }
             LazyColumn(Modifier.weight(1f), state = list, verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 items(state.results, key = { it.id }) { item ->
                     FriendCardPanel {
                         Row(Modifier.fillMaxWidth().clickable(role = Role.Checkbox) { toggle(item.id) }.padding(4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text(if (item.id in state.ids) "已选 · 点击取消" else "点击选择")
+                            Text(if (item.id in state.ids) getString(R.string.fc_product_selected_toggle) else getString(R.string.fc_tap_select))
                             Text(if (item.id in state.ids) "✓" else "○")
                         }
                         // Product body has an explicit detail affordance; choosing never navigates away.
                         FriendCardProduct(item, { toggle(item.id) })
-                        FriendCardActions("查看商品详情" to { diaper(item) }, (if (item.id in state.ids) "取消选择" else "选择此款") to { toggle(item.id) })
+                        FriendCardActions(getString(R.string.fc_product_details) to { diaper(item) }, (if (item.id in state.ids) getString(R.string.fc_deselect) else getString(R.string.fc_select_product)) to { toggle(item.id) })
                     }
                 }
-                if (state.loading) item { FriendCardNotice("正在加载商品…", null, null) }
-                state.error?.let { error -> item { FriendCardNotice(error, "重试", { load() }) } }
-                if (!state.loading && state.results.isEmpty() && state.error == null) item { FriendCardNotice("没有找到匹配的库内商品", null, null) }
-                if (!state.loading && state.hasMore && state.error == null && state.results.isNotEmpty()) item { FriendCardActions("加载更多商品" to { load() }) }
+                if (state.loading) item { FriendCardNotice(getString(R.string.fc_loading_products), null, null) }
+                state.error?.let { error -> item { FriendCardNotice(error, getString(R.string.fc_retry), { load() }) } }
+                if (!state.loading && state.results.isEmpty() && state.error == null) item { FriendCardNotice(getString(R.string.fc_products_no_matches), null, null) }
+                if (!state.loading && state.hasMore && state.error == null && state.results.isNotEmpty()) item { FriendCardActions(getString(R.string.fc_more_products) to { load() }) }
             }
-            FriendCardActions("取消" to { finish() }, "完成（${state.ids.size}）" to { complete() })
-            Text("完成会一次性替换表单选集；零项表示清空，返回或取消不修改表单。")
+            FriendCardActions(getString(R.string.fc_cancel) to { finish() }, getString(R.string.fc_selection_done, state.ids.size) to { complete() })
+            Text(getString(R.string.fc_product_selection_help))
         }
     }
 }

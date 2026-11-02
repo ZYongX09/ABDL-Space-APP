@@ -99,7 +99,7 @@ public class OAuthActivity extends Activity{
 			if(clientState!=null || "bind".equals(flow)){
 				bindingAccount=NBWPostRegisterActivity.consumeBindingAccount(this, clientState);
 				if(bindingAccount==null){
-					Toast.makeText(this, "绑定请求已失效，请从原账号重新发起绑定", Toast.LENGTH_LONG).show();
+					Toast.makeText(this, getString(R.string.general_nbw_binding_expired), Toast.LENGTH_LONG).show();
 					finish();
 					return;
 				}
@@ -108,7 +108,7 @@ public class OAuthActivity extends Activity{
 			Intent intent;
 			if("already_bound".equals(nbwBind)){
 				// NBW 账号已被其他用户绑定 → 显示错误提示，回到绑定引导页
-				Toast.makeText(this, "该宝宝新天地账号已被其他用户绑定", Toast.LENGTH_LONG).show();
+				Toast.makeText(this, getString(R.string.general_nbw_already_linked), Toast.LENGTH_LONG).show();
 				Intent backIntent = new Intent(this, NBWPostRegisterActivity.class);
 					backIntent.putExtra("account", bindingAccount);
 					backIntent.putExtra("show_back", true);

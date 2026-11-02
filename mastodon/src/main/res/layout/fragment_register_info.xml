@@ -25,13 +25,13 @@
             android:src="@drawable/ic_arrow_back_24"
             android:tint="?colorM3OnSurface"
             android:background="?android:attr/selectableItemBackgroundBorderless"
-            android:contentDescription="返回" />
+            android:contentDescription="@string/back" />
 
         <!-- 标题 -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="完善注册信息"
+            android:text="@string/general_register_title"
             android:textSize="28sp"
             android:textStyle="bold"
             android:textColor="?colorM3OnSurface"
@@ -57,10 +57,11 @@
                 <EditText
                     android:id="@+id/tv_email"
                     android:layout_width="match_parent"
-                    android:layout_height="56dp"
+                    android:layout_height="wrap_content"
+                android:minHeight="56dp"
                     android:layout_marginBottom="20dp"
                     android:background="@drawable/bg_input_light"
-                    android:hint="邮箱"
+                    android:hint="@string/email"
                     android:inputType="textEmailAddress"
                     android:singleLine="true"
                     android:textSize="16sp"
@@ -75,10 +76,11 @@
                 <EditText
                     android:id="@+id/username_edit"
                     android:layout_width="match_parent"
-                    android:layout_height="56dp"
+                    android:layout_height="wrap_content"
+                android:minHeight="56dp"
                     android:layout_marginBottom="14dp"
                     android:background="@drawable/bg_input_light"
-                    android:hint="请输入用户名（3-30个字符）"
+                    android:hint="@string/username"
                     android:inputType="textPersonName"
                     android:singleLine="true"
                     android:textSize="16sp"
@@ -93,10 +95,11 @@
                 <EditText
                     android:id="@+id/password_edit"
                     android:layout_width="match_parent"
-                    android:layout_height="56dp"
+                    android:layout_height="wrap_content"
+                android:minHeight="56dp"
                     android:layout_marginBottom="14dp"
                     android:background="@drawable/bg_input_light"
-                    android:hint="请输入密码（至少8位）"
+                    android:hint="@string/password"
                     android:inputType="textPassword"
                     android:autofillHints="newPassword"
                     android:singleLine="true"
@@ -115,17 +118,18 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="14dp"
-                    android:text="密码需8位以上，包含大小写字母和数字"
+                    android:text="@string/general_password_rules"
                     android:textSize="11sp"
                     android:textColor="?colorM3OnSurfaceVariant" />
 
                 <EditText
                     android:id="@+id/confirm_edit"
                     android:layout_width="match_parent"
-                    android:layout_height="56dp"
+                    android:layout_height="wrap_content"
+                android:minHeight="56dp"
                     android:layout_marginBottom="24dp"
                     android:background="@drawable/bg_input_light"
-                    android:hint="确认密码"
+                    android:hint="@string/confirm_password"
                     android:inputType="textPassword"
                     android:autofillHints="newPassword"
                     android:singleLine="true"
@@ -143,13 +147,14 @@
                 <Button
                     android:id="@+id/btn_register"
                     android:layout_width="match_parent"
-                    android:layout_height="52dp"
+                    android:layout_height="wrap_content"
+                android:minHeight="52dp"
                     android:background="@drawable/bg_btn_gradient_purple"
-                    android:text="注册"
+                    android:text="@string/general_register"
                     android:textSize="16sp"
                     android:textAllCaps="false"
                     android:enabled="false"
-                    android:textColor="#FFFFFF" />
+                    android:textColor="#FFFFFF" android:singleLine="false" />
             </LinearLayout>
         </ScrollView>
     </LinearLayout>

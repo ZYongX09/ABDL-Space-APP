@@ -92,6 +92,7 @@ public abstract class StatusDisplayItem{
 			case REBLOG_OR_REPLY_LINE -> new ReblogOrReplyLineCustomStatusDisplayItem.Holder(activity, parent);
 
 			case TEXT -> new TextStatusDisplayItem.Holder(activity, parent);
+			case TRANSLATION -> new TranslationStatusDisplayItem.Holder(activity, parent);
 			case AUDIO -> new AudioStatusDisplayItem.Holder(activity, parent);
 			case POLL_OPTION -> new PollOptionStatusDisplayItem.Holder(activity, parent);
 			case POLL_FOOTER -> new PollFooterStatusDisplayItem.Holder(activity, parent);
@@ -139,6 +140,10 @@ public abstract class StatusDisplayItem{
 			callbacks=new NoOpCallbacks(context);
 		String parentID=parentObject.getID();
 		Status statusForContent=status.getContentStatus();
+		String translationTarget=org.joinmastodon.android.translation.PostTranslationSupport.target(context);
+		org.joinmastodon.android.translation.PostTranslationSupport.validateCached(statusForContent, accountID, translationTarget);
+		boolean allowTranslation=(flags & (FLAG_NO_TRANSLATE | FLAG_MEDIA_FORCE_HIDDEN | FLAG_CHECKABLE))==0
+				&& (callbacks.supportsPostTranslation() || callbacks instanceof NoOpCallbacks) && !status.preview;
 		if(statusForContent.advertisement!=null){
 			ArrayList<StatusDisplayItem> result=new ArrayList<>();
 			AdvertisementStatusDisplayItem adItem=new AdvertisementStatusDisplayItem(parentID, callbacks, context, statusForContent, accountID);
@@ -210,6 +215,10 @@ public abstract class StatusDisplayItem{
 		boolean albumUpdate=!friendCardBody && AlbumUpdateStatusDisplayItem.supported(statusForContent.albumUpdate);
 		String displayedContent=friendCardBody ? null : albumUpdate ? statusForContent.albumUpdate.description
 				: NovelStatusDisplayItem.contentWithoutFallback(FriendCardStatusDisplayItem.contentWithoutFallback(statusForContent.content, statusForContent.friendCard), statusForContent.novel);
+		if(allowTranslation && !friendCardBody && !albumUpdate
+				&& org.joinmastodon.android.translation.PostTranslationSupport.eligible(statusForContent, translationTarget)){
+			contentItems.add(new TranslationStatusDisplayItem(parentID, callbacks, context, statusForContent, status, accountID));
+		}
 		if(!TextUtils.isEmpty(displayedContent)){
 			SpannableStringBuilder parsedText=albumUpdate ? new SpannableStringBuilder(displayedContent)
 					: HtmlParser.parse(displayedContent, statusForContent.emojis, statusForContent.mentions, statusForContent.tags, accountID, statusForContent, context);
@@ -247,7 +256,7 @@ public abstract class StatusDisplayItem{
 			}
 		}
 		if(statusForContent.poll!=null){
-			buildPollItems(parentID, callbacks, context, statusForContent.poll, status, contentItems);
+			buildPollItems(parentID, callbacks, context, statusForContent.poll, statusForContent, contentItems);
 		}
 		if(novel==NovelStatusDisplayItem.Presentation.NONE && !albumUpdate && statusForContent.card!=null && statusForContent.mediaAttachments.isEmpty() && TextUtils.isEmpty(statusForContent.spoilerText)){
 			contentItems.add(new LinkCardStatusDisplayItem(parentID, callbacks, context, statusForContent, accountID));
@@ -255,7 +264,7 @@ public abstract class StatusDisplayItem{
 		if(statusForContent.quote!=null){
 			if(statusForContent.quote.state==Quote.State.ACCEPTED){
 				if(statusForContent.quote.quotedStatus!=null && (flags & FLAG_IS_QUOTE)==0){
-					ArrayList<StatusDisplayItem> quoteItems=buildItems(callbacks, context, statusForContent.quote.quotedStatus, accountID, parentObject, knownAccounts, FLAG_NO_FOOTER | FLAG_NO_IN_REPLY_TO |FLAG_IS_QUOTE);
+					ArrayList<StatusDisplayItem> quoteItems=buildItems(callbacks, context, statusForContent.quote.quotedStatus, accountID, parentObject, knownAccounts, FLAG_NO_FOOTER | FLAG_NO_IN_REPLY_TO | FLAG_IS_QUOTE | (allowTranslation ? 0 : FLAG_NO_TRANSLATE));
 					for(StatusDisplayItem item:quoteItems){
 						item.isQuote=true;
 						if(item instanceof SpoilerStatusDisplayItem spoiler){
@@ -316,6 +325,7 @@ public abstract class StatusDisplayItem{
 		HEADER,
 		REBLOG_OR_REPLY_LINE,
 		TEXT,
+		TRANSLATION,
 		AUDIO,
 		POLL_OPTION,
 		POLL_FOOTER,
@@ -409,6 +419,7 @@ public abstract class StatusDisplayItem{
 		void onGapClick(GapStatusDisplayItem.Holder item);
 		Relationship getRelationship(String id);
 		void putRelationship(String id, Relationship rel);
+		default boolean supportsPostTranslation(){ return false; }
 		void togglePostTranslation(Status status, String itemID);
 		void maybeShowPreReplySheet(Status status, Runnable proceed);
 	}

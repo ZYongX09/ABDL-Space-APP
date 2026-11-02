@@ -50,7 +50,7 @@ public class MediaStoreLoader {
 
 	private ArrayList<MediaAlbum> query(MediaPickerConfig config){
 		Map<Long, MediaAlbum> byAlbum=new LinkedHashMap<>();
-		MediaAlbum all=new MediaAlbum(0, "全部媒体");
+		MediaAlbum all=new MediaAlbum(0, context.getString(org.joinmastodon.android.R.string.media_picker_all_media));
 		byAlbum.put(0L, all);
 		if(config.allowImages)
 			queryImages(config, byAlbum, all);
@@ -144,7 +144,7 @@ public class MediaStoreLoader {
 		all.add(item);
 		MediaAlbum album=byAlbum.get(item.albumId);
 		if(album==null){
-			album=new MediaAlbum(item.albumId, TextUtils.isEmpty(item.albumName) ? "未命名相册" : item.albumName);
+			album=new MediaAlbum(item.albumId, TextUtils.isEmpty(item.albumName) ? context.getString(org.joinmastodon.android.R.string.general_unnamed_album) : item.albumName);
 			byAlbum.put(item.albumId, album);
 		}
 		album.add(item);

@@ -101,7 +101,7 @@
 		android:paddingEnd="8dp"
 		android:paddingTop="2dp"
 		android:paddingBottom="2dp"
-		android:text="疑似敏感"
+		android:text="@string/general_sensitive_suspected"
 		android:textSize="10sp"
 		android:textColor="#FFFFFF"
 		android:background="#CCFF6B35"

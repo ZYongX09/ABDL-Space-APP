@@ -13,13 +13,17 @@
         android:padding="12dp"
         android:src="@drawable/ic_arrow_back_24"
         android:background="?android:attr/selectableItemBackgroundBorderless"
-        android:contentDescription="返回"
+        android:contentDescription="@string/back"
         android:tint="?android:attr/textColorPrimary" />
 
-    <LinearLayout
+    <ScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
+        android:fillViewport="true">
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
         android:orientation="vertical"
         android:gravity="center_horizontal">
 
@@ -29,7 +33,7 @@
             android:layout_marginStart="24dp"
             android:layout_marginTop="16dp"
             android:layout_gravity="start"
-            android:text="宝宝新天地账号未绑定"
+            android:text="@string/general_nbw_unbound_title"
             android:textSize="28sp"
             android:textStyle="bold"
             android:textColor="?android:attr/textColorPrimary" />
@@ -70,33 +74,36 @@
             android:layout_marginTop="48dp"
             android:layout_marginHorizontal="32dp"
             android:gravity="center"
-            android:text="这个宝宝新天地账号还没有绑定 ABDL Space 账号。你可以一键注册新的 ABDL Space 账号并绑定，也可以先登录已有账号后再完成绑定。"
+            android:text="@string/general_nbw_unbound_body"
             android:textSize="14sp"
             android:textColor="?android:attr/textColorSecondary"
             android:lineSpacingExtra="4dp" />
 
     </LinearLayout>
+    </ScrollView>
 
     <Button
         android:id="@+id/btn_register"
         android:layout_width="match_parent"
-        android:layout_height="44dp"
+        android:layout_height="wrap_content"
+                android:minHeight="48dp"
         android:layout_marginHorizontal="24dp"
         android:layout_marginBottom="12dp"
         style="@style/Widget.Mastodon.M3.Button.Filled"
-        android:text="一键注册新 ABDL Space 账号"
+        android:text="@string/general_nbw_register"
         android:textAllCaps="false"
-        android:textSize="14sp" />
+        android:textSize="14sp" android:singleLine="false" />
 
     <Button
         android:id="@+id/btn_login_existing"
         android:layout_width="match_parent"
-        android:layout_height="44dp"
+        android:layout_height="wrap_content"
+                android:minHeight="48dp"
         android:layout_marginHorizontal="24dp"
         android:layout_marginBottom="32dp"
         style="@style/Widget.Mastodon.M3.Button.Outlined"
-        android:text="登录已有 ABDL Space 账号"
+        android:text="@string/general_existing_login"
         android:textAllCaps="false"
-        android:textSize="14sp" />
+        android:textSize="14sp" android:singleLine="false" />
 
 </LinearLayout>

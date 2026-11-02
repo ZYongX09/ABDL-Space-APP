@@ -122,6 +122,12 @@ public class Status extends BaseModel implements DisplayItemsParent, Searchable 
 	private transient String strippedText;
 	public transient TranslationState translationState=TranslationState.HIDDEN;
 	public transient Translation translation;
+	/** Local source snapshot and account/locale identity; never persisted or sent as trusted input. */
+	public transient String translationSourceVersion;
+	public transient String translationAccountID;
+	public transient String translationTargetLanguage;
+	public transient String translationSourceHash;
+	public transient long translationValidatedAt;
 
 	// MOSHIDON:
 	public boolean localOnly;
@@ -269,11 +275,23 @@ public class Status extends BaseModel implements DisplayItemsParent, Searchable 
 		Status copy=(Status) super.clone();
 		copy.revealedSpoilers=EnumSet.noneOf(SpoilerType.class);
 		copy.translationState=TranslationState.HIDDEN;
+		copy.translation=null;
+		copy.translationSourceVersion=null;
+		copy.translationSourceHash=null;
+		copy.translationAccountID=null;
+		copy.translationTargetLanguage=null;
 		return copy;
 	}
 
 	public boolean isEligibleForTranslation(){
-		return !TextUtils.isEmpty(content) && !TextUtils.isEmpty(language) && !Objects.equals(Locale.getDefault().getLanguage(), language)
+		return isEligibleForTranslation(org.joinmastodon.android.translation.PostTranslationSupport.target(org.joinmastodon.android.MastodonApp.context));
+	}
+
+	public boolean isEligibleForTranslation(String target){
+		String source=org.joinmastodon.android.translation.PostTranslationSupport.normalizeLanguage(language);
+		String destination=org.joinmastodon.android.translation.PostTranslationSupport.normalizeLanguage(target);
+		return (!TextUtils.isEmpty(content) || !TextUtils.isEmpty(spoilerText)) && !source.isEmpty() && !destination.isEmpty()
+				&& !Objects.equals(Locale.forLanguageTag(source).getLanguage(), Locale.forLanguageTag(destination).getLanguage())
 				&& (visibility==StatusPrivacy.PUBLIC || visibility==StatusPrivacy.UNLISTED);
 	}
 

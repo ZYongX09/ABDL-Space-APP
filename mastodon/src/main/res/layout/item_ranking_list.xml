@@ -48,7 +48,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
-            android:text="儿童款"
+            android:text="@string/diaper_baby"
             android:textSize="11sp"
             android:textColor="#FF6B6B"
             android:background="@drawable/bg_tag_red"
@@ -71,7 +71,7 @@
             android:layout_height="16dp"
             android:src="@drawable/ic_fluent_star_24_filled"
             android:tint="#FFB300"
-            android:contentDescription="评分" />
+            android:contentDescription="@string/general_rating" />
 
         <TextView
             android:id="@+id/avg_score"

@@ -64,6 +64,19 @@ public class FriendRequestCreateFragment extends ToolbarFragment {
 		"X(原推特)", "Telegram", "博客", "宝宝新天地", "爱好", "出生地", "工作地", "现居地", "性取向", "会玩游戏"
 	};
 
+	public static String localizedLookingFor(android.content.Context context, String value){
+		return localizedValue(context, value, LOOKING_FOR_OPTIONS, R.array.general_friend_looking_for_labels);
+	}
+
+	public static String localizedField(android.content.Context context, String value){
+		return localizedValue(context, value, FIELD_NAME_OPTIONS, R.array.general_friend_field_labels);
+	}
+
+	private static String localizedValue(android.content.Context context, String value, String[] stored, int labels){
+		for(int i=0;i<stored.length;i++) if(stored[i].equals(value)) return context.getResources().getStringArray(labels)[i];
+		return value==null ? "" : value; // Custom/user fields remain untouched.
+	}
+
 	// 默认字段
 	private static final String[] DEFAULT_FIELDS = {"生理性别", "年龄", "城市"};
 
@@ -88,7 +101,7 @@ public class FriendRequestCreateFragment extends ToolbarFragment {
 	@Override
 	public void onAttach(Activity activity) {
 		super.onAttach(activity);
-		setTitle(editRequestId != null ? "编辑交友请求" : getString(R.string.friend_request_create));
+		setTitle(editRequestId != null ? getString(R.string.general_friend_edit) : getString(R.string.friend_request_create));
 	}
 
 	@Override
@@ -100,9 +113,9 @@ public class FriendRequestCreateFragment extends ToolbarFragment {
 		if (!prefs.getBoolean("privacy_warning_shown", false)) {
 			prefs.edit().putBoolean("privacy_warning_shown", true).apply();
 			new android.app.AlertDialog.Builder(getContext())
-				.setTitle("隐私提醒")
-				.setMessage("发布交友请求时，请谨慎公开自己的真实姓名、手机号、地址等敏感个人信息。如果出现隐私泄露问题，请及时删除相关交友请求。保护好自己的隐私，才能更好地遇见同好。")
-				.setPositiveButton("我知道了", null)
+				.setTitle(getString(R.string.general_privacy_reminder))
+				.setMessage(getString(R.string.general_friend_privacy_body))
+				.setPositiveButton(getString(R.string.got_it), null)
 				.show();
 		}
 
@@ -110,11 +123,12 @@ public class FriendRequestCreateFragment extends ToolbarFragment {
 		fieldsContainer = view.findViewById(R.id.create_fields);
 		lookingForLabel = view.findViewById(R.id.create_looking_for_label);
 
-		// 设置"交友类型"标签
+		// 设置getString(R.string.general_friend_type)标签
 		LinearLayout lookingForContainer = view.findViewById(R.id.create_looking_for_container);
 		for (String option : LOOKING_FOR_OPTIONS) {
 			TextView tag = new TextView(getContext());
-			tag.setText(option);
+			tag.setText(localizedLookingFor(getContext(), option));
+			tag.setTag(option);
 			tag.setTextSize(13);
 			tag.setPadding(24, 12, 24, 12);
 			tag.setBackgroundResource(R.drawable.bg_tag);
@@ -130,13 +144,13 @@ public class FriendRequestCreateFragment extends ToolbarFragment {
 
 			tag.setOnClickListener(v -> {
 				selectedLookingFor = option;
-				lookingForLabel.setText(option);
+				lookingForLabel.setText(localizedLookingFor(getContext(), option));
 				// 更新所有标签样式
 				for (int i = 0; i < lookingForContainer.getChildCount(); i++) {
 					View child = lookingForContainer.getChildAt(i);
 					if (child instanceof TextView) {
 						TextView tv = (TextView) child;
-						if (tv.getText().toString().equals(option)) {
+						if (option.equals(tv.getTag())) {
 							tv.setBackgroundResource(R.drawable.bg_tag_selected);
 							tv.setTextColor(0xFFFFFFFF);
 						} else {
@@ -156,12 +170,18 @@ public class FriendRequestCreateFragment extends ToolbarFragment {
 		// 保存按钮
 		view.findViewById(R.id.save_btn).setOnClickListener(v -> save());
 
-		// 编辑模式：填充数据
-		if (editRequestId != null) {
+		// Restore form state before falling back to original server values.
+		if(savedInstanceState!=null && savedInstanceState.containsKey("localeDraftDescription")){
+			descriptionInput.setText(savedInstanceState.getString("localeDraftDescription"));
+			selectedLookingFor=savedInstanceState.getString("localeDraftLookingFor", "");
+			lookingForLabel.setText(localizedLookingFor(getContext(), selectedLookingFor));
+			ArrayList<String> keys=savedInstanceState.getStringArrayList("localeDraftKeys"), values=savedInstanceState.getStringArrayList("localeDraftValues");
+			if(keys!=null && values!=null) for(int i=0;i<Math.min(keys.size(), values.size());i++) addFieldRow(keys.get(i), values.get(i));
+		}else if (editRequestId != null) {
 			if (editDescription != null) descriptionInput.setText(editDescription);
 			if (editLookingFor != null) {
 				selectedLookingFor = editLookingFor;
-				lookingForLabel.setText(editLookingFor);
+				lookingForLabel.setText(localizedLookingFor(getContext(), editLookingFor));
 			}
 			// 添加已有字段
 			if (editFieldKeys != null && editFieldValues != null) {
@@ -190,6 +210,17 @@ public class FriendRequestCreateFragment extends ToolbarFragment {
 	@Override public void onSaveInstanceState(Bundle state){
 		super.onSaveInstanceState(state);
 		state.putString(PROMOTION_PAGE,promotionPage);
+		if(descriptionInput!=null){
+			state.putString("localeDraftDescription", descriptionInput.getText().toString());
+			state.putString("localeDraftLookingFor", selectedLookingFor);
+			ArrayList<String> keys=new ArrayList<>(), values=new ArrayList<>();
+			for(int i=0;i<fieldsContainer.getChildCount();i++){
+				View row=fieldsContainer.getChildAt(i);
+				keys.add(FIELD_NAME_OPTIONS[((Spinner)row.findViewById(R.id.field_key_spinner)).getSelectedItemPosition()]);
+				values.add(((EditText)row.findViewById(R.id.field_value_input)).getText().toString());
+			}
+			state.putStringArrayList("localeDraftKeys", keys); state.putStringArrayList("localeDraftValues", values);
+		}
 	}
 
 	@Override protected void onShown(){ super.onShown(); promotionShown=true; updatePromotion(); }
@@ -235,7 +266,7 @@ public class FriendRequestCreateFragment extends ToolbarFragment {
 		View removeBtn = row.findViewById(R.id.field_remove_btn);
 
 		// 设置Spinner
-		ArrayAdapter<String> spinnerAdapter = new ArrayAdapter<>(getContext(), android.R.layout.simple_spinner_item, FIELD_NAME_OPTIONS);
+		ArrayAdapter<String> spinnerAdapter = new ArrayAdapter<>(getContext(), android.R.layout.simple_spinner_item, getResources().getStringArray(R.array.general_friend_field_labels));
 		spinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
 		keySpinner.setAdapter(spinnerAdapter);
 
@@ -259,11 +290,11 @@ public class FriendRequestCreateFragment extends ToolbarFragment {
 		String description = descriptionInput.getText().toString().trim();
 
 		if (selectedLookingFor.isEmpty()) {
-			Toast.makeText(getContext(), "请选择交友类型", Toast.LENGTH_SHORT).show();
+			Toast.makeText(getContext(), getString(R.string.general_friend_choose_type), Toast.LENGTH_SHORT).show();
 			return;
 		}
 		if (selectedLookingFor.isEmpty()) {
-			Toast.makeText(getContext(), "请选择找的类型", Toast.LENGTH_SHORT).show();
+			Toast.makeText(getContext(), getString(R.string.general_friend_choose_looking_for), Toast.LENGTH_SHORT).show();
 			return;
 		}
 
@@ -274,7 +305,7 @@ public class FriendRequestCreateFragment extends ToolbarFragment {
 			Spinner keySpinner = row.findViewById(R.id.field_key_spinner);
 			EditText valueInput = row.findViewById(R.id.field_value_input);
 
-			String key = (String) keySpinner.getSelectedItem();
+			String key = FIELD_NAME_OPTIONS[keySpinner.getSelectedItemPosition()];
 			String value = valueInput.getText().toString().trim();
 			if (key != null && !value.isEmpty()) {
 				Map<String, Object> field = new HashMap<>();
@@ -290,7 +321,7 @@ public class FriendRequestCreateFragment extends ToolbarFragment {
 				.setCallback(new Callback<Map<String, Object>>() {
 					@Override
 					public void onSuccess(Map<String, Object> result) {
-						Toast.makeText(getContext(), "更新成功", Toast.LENGTH_SHORT).show();
+						Toast.makeText(getContext(), getString(R.string.friend_request_update_success), Toast.LENGTH_SHORT).show();
 						getActivity().onBackPressed();
 					}
 
@@ -306,7 +337,7 @@ public class FriendRequestCreateFragment extends ToolbarFragment {
 				.setCallback(new Callback<Map<String, Object>>() {
 					@Override
 					public void onSuccess(Map<String, Object> result) {
-						Toast.makeText(getContext(), "发布成功", Toast.LENGTH_SHORT).show();
+						Toast.makeText(getContext(), getString(R.string.friend_request_create_success), Toast.LENGTH_SHORT).show();
 						getActivity().onBackPressed();
 					}
 

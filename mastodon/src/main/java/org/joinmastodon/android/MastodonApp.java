@@ -30,8 +30,14 @@ public class MastodonApp extends Application{
 	public static Context context;
 
 	@Override
+	protected void attachBaseContext(Context base){
+		super.attachBaseContext(org.joinmastodon.android.ui.utils.AppLanguageManager.wrap(base));
+	}
+
+	@Override
 	public void onCreate(){
 		super.onCreate();
+		org.joinmastodon.android.ui.utils.AppLanguageManager.install(this);
 		context=getApplicationContext();
 		String processName=getCurrentProcessName();
 		if(BuildConfig.DEBUG && getPackageName().equals(processName)){
@@ -57,8 +63,8 @@ public class MastodonApp extends Application{
 				// v2 渠道：NotificationChannel 的 importance/声音/震动一经创建不可修改，
 				// 旧 jpush_high 在部分设备上被系统初始限制后无法恢复，换新 ID 以重置为 HIGH 默认（横幅+声音+震动+锁屏）
 				nm.deleteNotificationChannel("jpush_high");
-				android.app.NotificationChannel ch=new android.app.NotificationChannel("jpush_high_v2", "推送通知", android.app.NotificationManager.IMPORTANCE_HIGH);
-				ch.setDescription("接收推送通知时显示横幅");
+				android.app.NotificationChannel ch=new android.app.NotificationChannel("jpush_high_v2", getString(R.string.general_push_channel), android.app.NotificationManager.IMPORTANCE_HIGH);
+				ch.setDescription(getString(R.string.general_push_channel_description));
 				ch.enableVibration(true);
 				ch.enableLights(true);
 				ch.setLockscreenVisibility(android.app.Notification.VISIBILITY_PUBLIC);
@@ -103,6 +109,7 @@ public class MastodonApp extends Application{
 	@Override
 	public void onConfigurationChanged(Configuration newConfig){
 		super.onConfigurationChanged(newConfig);
+		org.joinmastodon.android.ui.utils.AppLanguageManager.onConfigurationChanged(this);
 		UiUtils.updateLocalizedDateFormatters(context);
 	}
 }

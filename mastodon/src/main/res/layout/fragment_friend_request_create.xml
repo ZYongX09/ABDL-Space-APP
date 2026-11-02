@@ -91,7 +91,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="交友类型"
+            android:text="@string/general_friend_type"
             android:textSize="14sp"
             android:textStyle="bold"
             android:textColor="?android:textColorPrimary"
@@ -102,7 +102,7 @@
             android:id="@+id/create_looking_for_label"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="请选择"
+            android:text="@string/general_choose"
             android:textSize="13sp"
             android:textColor="#FF6D00"
             android:layout_marginBottom="8dp" />
@@ -124,7 +124,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="详细描述"
+            android:text="@string/general_friend_description"
             android:textSize="14sp"
             android:textStyle="bold"
             android:textColor="?android:textColorPrimary"
@@ -147,7 +147,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="个人信息字段"
+            android:text="@string/general_friend_fields"
             android:textSize="14sp"
             android:textStyle="bold"
             android:textColor="?android:textColorPrimary"
@@ -177,7 +177,7 @@
             android:id="@+id/save_btn"
             android:layout_width="match_parent"
             android:layout_height="48dp"
-            android:text="发布"
+            android:text="@string/publish"
             android:textAllCaps="false"
             style="@style/Widget.Mastodon.M3.Button.Filled"
             android:layout_marginTop="24dp"

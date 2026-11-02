@@ -114,7 +114,7 @@ fun AboutPage(
 			)
 			BlurredBar(backdrop, blurActive, topAppBarScrollBehavior) {
 				SmallTopAppBar(
-					title = "关于",
+					title = androidx.compose.ui.res.stringResource(R.string.about_app, "ABDL Space"),
 					scrollBehavior = topAppBarScrollBehavior,
 					color = barColor,
 					titleColor = titleColor,
@@ -322,9 +322,9 @@ private fun AboutContent(
 								saturation = saturation,
 							),
 						) {
-							ArrowPreference(title = "官方网站", endActions = { ValueText("abdl-space.top") }, onClick = { uriHandler.openUri("https://abdl-space.top") })
-							ArrowPreference(title = "源代码", endActions = { ValueText("GitHub") }, onClick = { uriHandler.openUri("https://github.com/ZYongX09/ABDL-Space-APP") })
-							ArrowPreference(title = "博客", onClick = { uriHandler.openUri("https://zhx-blog.top") })
+							ArrowPreference(title = context.getString(R.string.settings_about_website), endActions = { ValueText("abdl-space.top") }, onClick = { uriHandler.openUri("https://abdl-space.top") })
+							ArrowPreference(title = context.getString(R.string.settings_github), endActions = { ValueText("GitHub") }, onClick = { uriHandler.openUri("https://github.com/ZYongX09/ABDL-Space-APP") })
+							ArrowPreference(title = context.getString(R.string.settings_about_blog), onClick = { uriHandler.openUri("https://zhx-blog.top") })
 						}
 						AboutCard(
 							backdrop = backdrop,
@@ -338,12 +338,12 @@ private fun AboutContent(
 								saturation = saturation,
 							),
 						) {
-								ArrowPreference(title = "用户协议", onClick = { uriHandler.openUri("https://abdl-space.top/terms") })
-								ArrowPreference(title = "隐私政策", onClick = { uriHandler.openUri("https://abdl-space.top/privacy") })
-								ArrowPreference(title = "Cookie 政策", onClick = { uriHandler.openUri("https://abdl-space.top/cookies") })
-								ArrowPreference(title = "支持我们", onClick = { uriHandler.openUri("https://ifdian.net/a/ZYongX") })
+								ArrowPreference(title = context.getString(R.string.settings_tos), onClick = { uriHandler.openUri("https://abdl-space.top/terms") })
+								ArrowPreference(title = context.getString(R.string.settings_privacy_policy), onClick = { uriHandler.openUri("https://abdl-space.top/privacy") })
+								ArrowPreference(title = context.getString(R.string.settings_cookie_policy), onClick = { uriHandler.openUri("https://abdl-space.top/cookies") })
+								ArrowPreference(title = context.getString(R.string.support_us), onClick = { uriHandler.openUri("https://ifdian.net/a/ZYongX") })
 								ArrowPreference(title = context.getString(R.string.sponsor_thanks_entry), onClick = onSponsorThanks)
-								ArrowPreference(title = "开源许可", endActions = { ValueText("GPL-3.0") }, onClick = { uriHandler.openUri("https://www.gnu.org/licenses/gpl-3.0.html") })
+								ArrowPreference(title = context.getString(R.string.general_software_license), endActions = { ValueText("GPL-3.0") }, onClick = { uriHandler.openUri("https://www.gnu.org/licenses/gpl-3.0.html") })
 								ArrowPreference(
 									title = context.getString(R.string.open_source_licenses),
 									onClick = onOpenSourceLicenses,

@@ -115,7 +115,7 @@ import kotlin.math.roundToInt
 @RunWith(RobolectricTestRunner::class)
 @Config(
     sdk = [28],
-    qualifiers = "w393dp-h852dp-mdpi",
+    qualifiers = "zh-w393dp-h852dp-mdpi",
     application = CompatibilityTestApplication::class,
     shadows = [FriendCardRedesignComposeTest.SyntheticImages::class],
 )
@@ -126,6 +126,8 @@ class FriendCardRedesignComposeTest {
 
     @Before
     fun prepareHost() {
+        org.joinmastodon.android.MastodonApp.context = org.robolectric.RuntimeEnvironment.getApplication()
+        org.joinmastodon.android.friendcards.FriendCardGames.updateOptions(emptyList())
         SyntheticImages.loadedViews.clear()
         compose.activityRule.scenario.onActivity { activity ->
             activity.window.setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN)
@@ -324,7 +326,7 @@ class FriendCardRedesignComposeTest {
     }
 
     @Test
-    @Config(qualifiers = "w320dp-h568dp-mdpi")
+    @Config(qualifiers = "zh-w320dp-h568dp-mdpi")
     fun longTitleAtSmallWidthAndLargeFontKeepsFeedActionsInTheViewport() {
         val long = card().apply {
             title = "虚构成人样例：慢慢认识彼此，周末一起散步、读书和玩合作游戏"
@@ -396,7 +398,7 @@ class FriendCardRedesignComposeTest {
     }
 
     @Test
-    @Config(qualifiers = "w393dp-h1800dp-mdpi")
+    @Config(qualifiers = "zh-w393dp-h1800dp-mdpi")
     fun fullPortraitRendersOwnerAndVisitorFooterFixturesWithAndWithoutSyntheticCover() {
         var dark by mutableStateOf(false)
         var owner by mutableStateOf(true)

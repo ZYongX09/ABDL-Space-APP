@@ -31,6 +31,7 @@ public class TextStatusDisplayItem extends StatusDisplayItem{
 	private CharSequence text;
 	private CustomEmojiHelper emojiHelper=new CustomEmojiHelper();
 	private CharSequence translatedText;
+	private String translatedContent;
 	private CustomEmojiHelper translationEmojiHelper=new CustomEmojiHelper();
 	public boolean textSelectable;
 	public boolean largerFont;
@@ -62,6 +63,7 @@ public class TextStatusDisplayItem extends StatusDisplayItem{
 
 	public void setTranslatedText(String text){
 		Status statusForContent=status.getContentStatus();
+		translatedContent=text;
 		translatedText=HtmlParser.parse(text, statusForContent.emojis, statusForContent.mentions, statusForContent.tags, accountID, statusForContent, context);
 		translationEmojiHelper.setText(translatedText);
 	}
@@ -87,7 +89,7 @@ public class TextStatusDisplayItem extends StatusDisplayItem{
 		@Override
 		public void onBind(TextStatusDisplayItem item){
 			if(item.status.translationState==Status.TranslationState.SHOWN){
-				if(item.translatedText==null){
+				if(item.translatedText==null || !java.util.Objects.equals(item.translatedContent, item.status.translation.content)){
 					item.setTranslatedText(item.status.translation.content);
 				}
 				text.setText(item.translatedText);
@@ -128,7 +130,7 @@ public class TextStatusDisplayItem extends StatusDisplayItem{
 		}
 
 		private CustomEmojiHelper getEmojiHelper(){
-			return item.emojiHelper;
+			return item.getCurrentEmojiHelper();
 		}
 
 		public void updateTranslation(boolean updateText){
@@ -154,9 +156,11 @@ public class TextStatusDisplayItem extends StatusDisplayItem{
 					translationProgress.setVisibility(View.GONE);
 					translationInfo.setVisibility(View.VISIBLE);
 					translationShowOriginal.setVisibility(View.VISIBLE);
-					translationInfo.setText(translationInfo.getContext().getString(R.string.post_translated, Locale.forLanguageTag(item.status.translation.detectedSourceLanguage).getDisplayLanguage(), item.status.translation.provider));
+					translationInfo.setText(translationInfo.getContext().getString(R.string.post_translation_footer,
+							Locale.forLanguageTag(item.status.translation.detectedSourceLanguage).getDisplayLanguage(org.joinmastodon.android.ui.utils.AppLanguageManager.getEffectiveLocale(item.context)), item.status.translation.provider));
+					translationShowOriginal.setText(R.string.post_translation_show_original);
 					if(updateText){
-						if(item.translatedText==null){
+						if(item.translatedText==null || !java.util.Objects.equals(item.translatedContent, item.status.translation.content)){
 							item.setTranslatedText(item.status.translation.content);
 						}
 						text.setText(item.translatedText);

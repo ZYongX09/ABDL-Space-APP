@@ -245,8 +245,9 @@ internal class NovelManualNode(private val host: NovelManualComposeHost, private
 }
 
 /** Native production rendering only. API28 fallback is NOT evidence for hardware glass/blur. */
-internal class NovelScreenshotFixture(private val group: String) : ExternalResource() {
+internal class NovelScreenshotFixture(private val group: String, private val resourceFontScale: Float? = null) : ExternalResource() {
     val host = NovelManualComposeHost()
+    private var originalResourceFontScale: Float? = null
     private var oldContext: android.content.Context? = null
     private var oldTheme = GlobalUserPreferences.theme
     private var oldColor = GlobalUserPreferences.color
@@ -276,13 +277,24 @@ internal class NovelScreenshotFixture(private val group: String) : ExternalResou
         MastodonApp.context = RuntimeEnvironment.getApplication(); V.setApplicationContext(MastodonApp.context)
         GlobalUserPreferences.theme = GlobalUserPreferences.ThemePreference.LIGHT
         GlobalUserPreferences.color = ColorPreference.BLUE; GlobalUserPreferences.colorExplicitlyChosen = false
+        resourceFontScale?.let { scale ->
+            // Configure Android before creating any Activity, nested ComposeView, or native EditText.
+            // A LocalDensity override alone does not cross AndroidCompositionLocals boundaries.
+            originalResourceFontScale = RuntimeEnvironment.getApplication().resources.configuration.fontScale
+            RuntimeEnvironment.setFontScale(scale)
+        }
         host.start()
     }
     override fun after() {
         try { host.close() } finally {
-            GlobalUserPreferences.theme = oldTheme; GlobalUserPreferences.color = oldColor; GlobalUserPreferences.colorExplicitlyChosen = oldExplicitColor
-            MastodonApp.context = oldContext
-            ReflectionHelpers.setStaticField(Choreographer::class.java, "USE_VSYNC", oldVsync); ShadowChoreographer.setPaused(oldPaused)
+            try {
+                // Restore only after destroying the host; do not recreate it during test cleanup.
+                originalResourceFontScale?.let(RuntimeEnvironment::setFontScale)
+            } finally {
+                GlobalUserPreferences.theme = oldTheme; GlobalUserPreferences.color = oldColor; GlobalUserPreferences.colorExplicitlyChosen = oldExplicitColor
+                MastodonApp.context = oldContext
+                ReflectionHelpers.setStaticField(Choreographer::class.java, "USE_VSYNC", oldVsync); ShadowChoreographer.setPaused(oldPaused)
+            }
         }
     }
     fun setDark(compose: NovelComposeRule, value: Boolean) = compose.runOnUiThread {
@@ -366,7 +378,7 @@ internal class NovelScreenshotFixture(private val group: String) : ExternalResou
         for (i in 0 until prior.length()) if (prior.getJSONObject(i).optString("file") != output.name) captures.put(prior.getJSONObject(i))
         captures.put(JSONObject().put("file", output.name).put("path", output.absolutePath).put("reference", reference?.let { "novel-ui$it" } ?: JSONObject.NULL)
             .put("width", width).put("height", height).put("theme", if (dark) "dark" else "light").put("test_class", testClass).put("test_method", testMethod)
-            .put("font_scale", renderFontScale).put("native_dialog_window", dialog).put("rendered_at_ms", System.currentTimeMillis()))
+            .put("locale", host.activity.resources.configuration.locales[0].toLanguageTag()).put("font_scale", renderFontScale).put("native_dialog_window", dialog).put("rendered_at_ms", System.currentTimeMillis()))
         val mapping = JSONArray()
         references.filter { it.group == group }.forEach { entry -> mapping.put(JSONObject().put("reference", "novel-ui${entry.id}")
             .put("source", "/home/ZYongX/projects/novel-ui/${entry.id}.png").put("state", entry.state).put("file", "novel-ui${entry.id}-${entry.state}-light-393x852.png")) }

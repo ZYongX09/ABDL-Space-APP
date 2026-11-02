@@ -441,7 +441,7 @@ public class AlbumUploadFragment extends ToolbarFragment{
 	private void showPhotoPermissionError(boolean camera){
 		if(!canEdit()) return;
 		dialog=new M3AlertDialogBuilder(getActivity()).setTitle(R.string.permission_required)
-				.setMessage(camera ? "无法使用相机，请在系统设置中允许相机权限后重试。" : "无法读取相册照片，请在系统设置中允许照片访问权限（也可以仅允许所选照片）后重试。")
+				.setMessage(camera ? getString(R.string.general_camera_permission) : getString(R.string.general_photo_permission))
 				.setPositiveButton(R.string.open_settings, (d, which)->{
 					if(!canEdit()) return;
 					try{ startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:"+getActivity().getPackageName()))); }
@@ -512,7 +512,7 @@ public class AlbumUploadFragment extends ToolbarFragment{
 		List<Uri> sources=new ArrayList<>(); for(String source:draft.photos) sources.add(Uri.parse(source));
 		try{
 			uploader=new AlbumUploader(accountId, selected.id, sources, draft.description, captured, draft.quality);
-			if(!preferences.edit().putString(accountId, uploader.getOperationId()).commit()){ uploader.discard(); uploader=null; throw new IOException("无法保存上传任务，请重试"); }
+			if(!preferences.edit().putString(accountId, uploader.getOperationId()).commit()){ uploader.discard(); uploader=null; throw new IOException(getString(R.string.general_upload_task_save_failed)); }
 			attachUploader(); uploader.start(); updateActions();
 		}catch(IOException failure){ showStatus(getString(R.string.album_upload_design_failed_details), failure.getMessage()); }
 	}

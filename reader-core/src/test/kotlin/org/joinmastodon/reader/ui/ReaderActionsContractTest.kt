@@ -18,8 +18,8 @@ class ReaderActionsContractTest {
 
 	@Test fun controlsRenderProductionActionButtons() {
 		assertTrue(controls.contains("TextButton(onClick = onBookmark)"))
-		assertTrue(controls.contains("Text(\"添加书签\""))
+		assertTrue(controls.contains("stringResource(R.string.novel_reader_add_bookmark)"))
 		assertTrue(controls.contains("TextButton(onClick = onNote)"))
-		assertTrue(controls.contains("Text(\"添加笔记\""))
+		assertTrue(controls.contains("stringResource(R.string.novel_reader_add_note)"))
 	}
 }

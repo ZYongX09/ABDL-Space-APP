@@ -1,5 +1,6 @@
 package org.joinmastodon.android.ui.compose.friendcards
 
+import androidx.compose.ui.res.stringResource
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -45,17 +46,18 @@ internal fun FriendCardDetailControls(
 ) {
     Row(modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-        DetailControlSurface(backdrop, true, "关闭", onClose, circle = true,
+        DetailControlSurface(backdrop, true, stringResource(R.string.fc_close), onClose, circle = true,
             contrast = contrast, control = FriendCardContrastControl.Close,
             ink = contrast?.closeInk ?: FriendCardContrastInk.Unknown) { tint ->
             FriendCardResourceIcon(R.drawable.ic_fluent_dismiss_24_regular, tint = tint, modifier = Modifier.size(20.dp))
         }
-        DetailControlSurface(backdrop, enabled, "管理我的扩列卡", onManage, circle = false,
+        Spacer(Modifier.width(12.dp))
+        DetailControlSurface(backdrop, enabled, stringResource(R.string.fc_manage_my_cards), onManage, circle = false,
             contrast = contrast, control = FriendCardContrastControl.Manage,
-            ink = contrast?.manageInk ?: FriendCardContrastInk.Unknown) { tint ->
+            ink = contrast?.manageInk ?: FriendCardContrastInk.Unknown, modifier = Modifier.weight(1f, fill = false)) { tint ->
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 FriendCardResourceIcon(R.drawable.ic_friend_card, tint = tint, modifier = Modifier.size(24.dp))
-                Text("管理我的扩列卡", fontSize = 13.sp, color = tint)
+                Text(stringResource(R.string.fc_manage_my_cards), modifier = Modifier.weight(1f, fill = false), fontSize = 13.sp, color = tint)
             }
         }
     }
@@ -71,6 +73,7 @@ private fun DetailControlSurface(
     contrast: FriendCardContrastSampler?,
     control: FriendCardContrastControl,
     ink: FriendCardContrastInk,
+    modifier: Modifier = Modifier,
     content: @Composable (Color) -> Unit,
 ) {
     val interaction = remember { MutableInteractionSource() }
@@ -92,7 +95,7 @@ private fun DetailControlSurface(
     val shadow by animateColorAsState((if (darkInk) Color.Black else Color(0xFF071013)).copy(alpha = if (darkInk) .30f else .58f),
         tween(220), label = "friendCardControlShadow")
     val highlight = rememberIsolatedGlassHighlight(iosIndicatorSpecular, extraDegrees = -45f)
-    Box(Modifier.friendCardContrastBounds(contrast, control)) {
+    Box(modifier.friendCardContrastBounds(contrast, control)) {
     WithIsolatedGlassShaderCache {
         Box(Modifier.heightIn(min = 44.dp).then(if (circle) Modifier.width(44.dp) else Modifier.widthIn(max = 240.dp))
             .graphicsLayer {

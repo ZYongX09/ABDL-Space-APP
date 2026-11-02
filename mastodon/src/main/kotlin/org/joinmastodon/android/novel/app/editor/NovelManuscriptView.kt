@@ -1,5 +1,7 @@
 package org.joinmastodon.android.novel.app.editor
 
+import org.joinmastodon.android.R
+
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
@@ -45,7 +47,7 @@ internal class NovelManuscriptView(context: Context) : LinearLayout(context) {
         input.setLineSpacing(dp(7).toFloat(), 1f)
         input.filters = arrayOf(InputFilter.LengthFilter(EditorLimits.CHAPTER_CONTENT))
         input.isSaveEnabled = false // a 500k chapter must not enter an Activity Bundle
-        input.contentDescription = "小说正文输入"
+        input.contentDescription = context.getString(R.string.novel_en_manuscript_input)
         input.setOnFocusChangeListener { _, focused -> focusListener(focused) }
         input.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
@@ -59,7 +61,7 @@ internal class NovelManuscriptView(context: Context) : LinearLayout(context) {
     fun bind(chapter: String, frame: EditorSession.Frame, enabled: Boolean, foreground: Int, muted: Int, accent: Int, showLines: Boolean, fontSize: Float, onChange: (EditorSession.Frame) -> Unit) {
         listener = onChange; title = frame.title()
         input.isEnabled = enabled
-        input.setTextColor(foreground); input.setHintTextColor(muted); input.hint = "开始写作…"
+        input.setTextColor(foreground); input.setHintTextColor(muted); input.hint = context.getString(R.string.novel_en_start_writing_hint)
         input.highlightColor = ColorUtils.setAlphaComponent(accent, 65)
         gutter.paint.color = muted; gutter.visibility = if (showLines) View.VISIBLE else View.GONE
         if (input.textSize / resources.displayMetrics.scaledDensity != fontSize) input.textSize = fontSize

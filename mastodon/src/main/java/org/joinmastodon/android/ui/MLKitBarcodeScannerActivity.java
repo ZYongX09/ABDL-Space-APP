@@ -112,11 +112,11 @@ public class MLKitBarcodeScannerActivity extends Activity implements SensorEvent
     private void updateTorchUI() {
         if (torchOn) {
             btnTorch.setImageResource(R.drawable.ic_fluent_flashlight_24_filled);
-            torchLabel.setText("关闭手电筒");
+            torchLabel.setText(getString(R.string.general_flashlight_off));
             torchLabel.setTextColor(0xFFFFD600);
         } else {
             btnTorch.setImageResource(R.drawable.ic_fluent_flashlight_off_24_filled);
-            torchLabel.setText("打开手电筒");
+            torchLabel.setText(getString(R.string.general_flashlight_on));
             torchLabel.setTextColor(0xFFFFFFFF);
         }
     }
@@ -159,7 +159,7 @@ public class MLKitBarcodeScannerActivity extends Activity implements SensorEvent
             });
         } catch (Exception e) {
             Log.e(TAG, "Failed to start scanning", e);
-            Toast.makeText(this, "扫码启动失败", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, getString(R.string.general_scan_start_failed), Toast.LENGTH_SHORT).show();
             finish();
         }
     }
@@ -238,7 +238,7 @@ public class MLKitBarcodeScannerActivity extends Activity implements SensorEvent
         }else if(requestCode == CAMERA_PERMISSION_REQUEST && grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED){
             startScanning();
         } else if(requestCode == CAMERA_PERMISSION_REQUEST){
-            Toast.makeText(this, "需要相机权限才能扫码", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, getString(R.string.general_scan_camera_required), Toast.LENGTH_SHORT).show();
             finish();
         }
     }

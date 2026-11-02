@@ -51,7 +51,7 @@ public class FriendRequestReportFragment extends ToolbarFragment {
 	private void submitReport() {
 		String reason = reasonInput.getText().toString().trim();
 		if (reason.isEmpty()) {
-			Toast.makeText(getContext(), "请填写举报原因", Toast.LENGTH_SHORT).show();
+			Toast.makeText(getContext(), getString(R.string.general_report_reason_required), Toast.LENGTH_SHORT).show();
 			return;
 		}
 

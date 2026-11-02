@@ -25,7 +25,7 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [28], application = CompatibilityTestApplication::class)
+@Config(qualifiers = "zh", sdk = [28], application = CompatibilityTestApplication::class)
 class FriendCardSocialContractTest {
     @Before fun initializeApiContext() { MastodonApp.context = RuntimeEnvironment.getApplication() }
 

@@ -584,9 +584,9 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 			return;
 
 		featureDialog=new M3AlertDialogBuilder(getActivity())
-				.setTitle("功能上新啦！")
-				.setMessage("欢迎来到2.3.0版本！在此版本中纸尿裤评分与排行榜功能上线APP啦！欢迎各位小宝宝进入纸尿裤列表页给自己穿过的裤裤进行评分，方便其他同好选择优质的裤裤，给圈内发展贡献出自己的力量！")
-				.setPositiveButton("关闭", (dialog, which)->
+				.setTitle(getString(R.string.general_new_features_title))
+				.setMessage(getString(R.string.general_new_features_body))
+				.setPositiveButton(getString(R.string.compose_crisis_close), (dialog, which)->
 						GlobalUserPreferences.getPrefs().edit().putBoolean(FEATURE_DIALOG_SEEN_KEY, true).apply())
 				.setCancelable(false)
 				.create();
@@ -605,13 +605,13 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 		if(GlobalUserPreferences.getPrefs().getBoolean("autoStartGuideShown_"+BuildConfig.VERSION_NAME, false))
 			return;
 		autoStartGuideDialog=new M3AlertDialogBuilder(getActivity())
-				.setTitle("开启实时通知")
-				.setMessage("您当前使用的是"+vendor.displayName+"手机，需要允许后台运行才能尽可能保证您能实时收到通知")
-				.setPositiveButton("去设置", (dialog, which)->{
+				.setTitle(getString(R.string.general_realtime_notifications))
+				.setMessage(getString(R.string.general_background_vendor, vendor.displayName))
+				.setPositiveButton(getString(R.string.general_set_up), (dialog, which)->{
 					GlobalUserPreferences.getPrefs().edit().putBoolean("autoStartGuideShown_"+BuildConfig.VERSION_NAME, true).apply();
 					startActivity(new Intent(getActivity(), org.joinmastodon.android.ui.NotificationGuideActivity.class));
 				})
-				.setNegativeButton("以后再说", (dialog, which)->
+				.setNegativeButton(getString(R.string.general_later), (dialog, which)->
 						GlobalUserPreferences.getPrefs().edit().putBoolean("autoStartGuideShown_"+BuildConfig.VERSION_NAME, true).apply())
 				.setCancelable(false)
 				.create();

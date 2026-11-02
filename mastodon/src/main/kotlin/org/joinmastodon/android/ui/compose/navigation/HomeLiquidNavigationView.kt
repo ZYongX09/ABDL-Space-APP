@@ -161,7 +161,7 @@ class HomeLiquidNavigationController(
 			}
 		}
 		val items = listOf(
-			NavigationItem("首页", androidx.compose.ui.graphics.vector.ImageVector.vectorResource(R.drawable.ic_tab_rating)),
+			NavigationItem(androidx.compose.ui.res.stringResource(R.string.tab_home), androidx.compose.ui.graphics.vector.ImageVector.vectorResource(R.drawable.ic_tab_rating)),
 			NavigationItem(view.context.getString(R.string.messages), androidx.compose.ui.graphics.vector.ImageVector.vectorResource(R.drawable.ic_tab_messages)),
 			NavigationItem(view.context.getString(R.string.map_presence_title), androidx.compose.ui.graphics.vector.ImageVector.vectorResource(R.drawable.ic_tab_map)),
 			NavigationItem(view.context.getString(R.string.diaper), androidx.compose.ui.graphics.vector.ImageVector.vectorResource(R.drawable.ic_tab_rating)),
@@ -191,7 +191,7 @@ class HomeLiquidNavigationController(
 				surfaceAlphaOverride = fillAlphaState,
 				badge = { index ->
 					when {
-						index == HomeNavigationTabs.indexOf(R.id.tab_diaper) && diaperBadgeVisibleState -> ({ Badge { Text("新功能") } })
+						index == HomeNavigationTabs.indexOf(R.id.tab_diaper) && diaperBadgeVisibleState -> ({ Badge { Text(androidx.compose.ui.res.stringResource(R.string.general_new_feature)) } })
 						index == HomeNavigationTabs.indexOf(R.id.tab_profile) && !unreadBadgeState.isNullOrEmpty() -> ({ Badge { Text(unreadBadgeState.orEmpty()) } })
 						else -> null
 					}

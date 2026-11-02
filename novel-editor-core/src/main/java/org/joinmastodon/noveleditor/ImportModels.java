@@ -9,7 +9,9 @@ public final class ImportModels{
 
 	public record Metadata(String title, @Nullable String author, @Nullable String language, String format,
 			@Nullable String encoding, int encodingConfidence){}
-	public record Warning(String code, String message, @Nullable String location){}
+	public record Warning(String code, String message, @Nullable String location){
+		public String userMessage(android.content.Context context){ return EditorMessages.forCode(context,code); }
+	}
 	public record Chapter(int ordinal, String title, String content, @Nullable String sourceAnchor){}
 	public record Result(Metadata metadata, List<Chapter> chapters, List<Warning> warnings){}
 	public record Job(String id,String accountId,String displayName,String mimeType,String format,String stagedPath,

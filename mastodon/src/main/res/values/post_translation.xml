@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="post_translation_settings">Post translation</string>
+    <string name="post_translation_translate">Translate post</string>
+    <string name="post_translation_from">Translated from %1$s</string>
+    <string name="post_translation_footer">Translated from %1$s by %2$s</string>
+    <string name="post_translation_show_original">Show original</string>
+    <string name="post_translation_loading">Translating…</string>
+    <string name="post_translation_failed">This post could not be translated. Please try again later.</string>
+    <string name="post_translation_unavailable">Post translation is currently unavailable.</string>
+    <string name="post_translation_rate_limited">Translation requests are temporarily limited. Please wait before trying again. Cached translations are still available.</string>
+    <string name="post_translation_quota_exhausted">Your daily translation allowance has been used. Cached translations are still available.</string>
+    <string name="post_translation_preferences_conflict">Translation preferences changed on another device. Please reload and try again.</string>
+    <string name="post_translation_pending">Translation is still processing. Tap Translate post later to check the result.</string>
+    <string name="post_translation_unknown">The translation result is not yet known. We will not submit another AI request. Tap Translate post later to check.</string>
+    <string name="post_translation_auto">Automatically translate visible posts</string>
+    <string name="post_translation_auto_description">Opt in to translate posts into the app language. Requires active sponsorship. Hidden posts and collapsed content warnings are never sent automatically.</string>
+    <string name="post_translation_auto_unavailable">Automatic translation requires active sponsorship and server availability. Your saved preference is preserved.</string>
+    <string name="post_translation_reading_language">Reading language</string>
+    <string name="post_translation_reading_description">Follows the app language: %1$s</string>
+    <string name="post_translation_quota">Daily allowance</string>
+    <string name="post_translation_quota_value">%1$d used · %2$d processing · %3$d total</string>
+    <string name="post_translation_reload">Reload translation preferences</string>
+    <string name="post_translation_preferences_loading">Loading translation preferences…</string>
+    <string name="post_translation_preferences_failed">Could not load translation preferences. Automatic translation is off until preferences can be verified.</string>
+    <color name="post_translation_action_blue">#1464C0</color>
+    <color name="post_translation_label_gray">#6B7078</color>
+    <color name="post_translation_action_blue_dark">#86B9FF</color>
+    <color name="post_translation_label_gray_dark">#A3A9B2</color>
+    <item name="post_translation_action" type="id" />
+    <item name="post_translation_label" type="id" />
+    <item name="post_translation_icon" type="id" />
+</resources>

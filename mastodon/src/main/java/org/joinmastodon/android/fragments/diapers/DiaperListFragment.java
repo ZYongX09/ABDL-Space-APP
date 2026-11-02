@@ -455,7 +455,7 @@ public class DiaperListFragment extends LoaderFragment {
 
 				// 评价数
 				if (diaper.rating_count > 0) {
-					itemHolder.ratingCount.setText(String.format("%d 评价", diaper.rating_count));
+					itemHolder.ratingCount.setText(getString(R.string.diaper_ratings_count, diaper.rating_count));
 					itemHolder.ratingCount.setVisibility(View.VISIBLE);
 				} else {
 					itemHolder.ratingCount.setVisibility(View.GONE);
@@ -477,7 +477,7 @@ public class DiaperListFragment extends LoaderFragment {
 					Nav.go(getActivity(), DiaperDetailFragment.class, args);
 				});
 			} else if (holder instanceof EndViewHolder) {
-				((EndViewHolder) holder).endText.setText(String.format("已显示全部 %d 款", data.size()));
+				((EndViewHolder) holder).endText.setText(getString(R.string.general_diapers_all_shown, data.size()));
 			}
 		}
 

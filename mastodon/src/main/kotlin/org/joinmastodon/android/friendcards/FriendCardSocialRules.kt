@@ -1,5 +1,6 @@
 package org.joinmastodon.android.friendcards
 
+import org.joinmastodon.android.R
 import java.net.URI
 import java.net.IDN
 import org.joinmastodon.android.model.FriendCard
@@ -7,25 +8,26 @@ import org.joinmastodon.android.model.FriendCard
 object FriendCardSocialRules {
     fun validate(accounts: List<FriendCard.SocialAccount>?): String? {
         if (accounts == null) return null
-        if (accounts.size > 5) return "社交账号最多添加5项"
-        if (accounts.map { it.id }.distinct().size != accounts.size) return "社交账号编号重复，请重新添加"
+        if (accounts.size > 5) return FriendCardText.get(R.string.fc_social_limit_error)
+        if (accounts.map { it.id }.distinct().size != accounts.size) return FriendCardText.get(R.string.fc_social_duplicate_id)
         for (item in accounts) {
-            if (!item.id.orEmpty().matches(Regex("[A-Za-z0-9_-]{1,64}"))) return "社交账号编号无效，请重新添加"
-            if (item.platform !in listOf("qq", "wechat", "custom")) return "请选择支持的社交平台"
+            if (!item.id.orEmpty().matches(Regex("[A-Za-z0-9_-]{1,64}"))) return FriendCardText.get(R.string.fc_social_invalid_id)
+            if (item.platform !in listOf("qq", "wechat", "custom")) return FriendCardText.get(R.string.fc_social_invalid_platform)
             val name = item.name.orEmpty().trim()
             val account = item.account.orEmpty().trim()
-            if (FriendCardRules.length(name) > 20 || name.any { it.isISOControl() || it == '\u2028' || it == '\u2029' }) return "自定义平台名称最多20字且不能含控制字符"
-            if (item.platform == "custom" && name.isEmpty()) return "请填写自定义平台名称"
-            if (account.isEmpty() || FriendCardRules.length(account) > 120 || account.any { it.isISOControl() || it == '\u2028' || it == '\u2029' }) return "请填写1–120字的社交账号或主页链接"
-            if (item.platform == "custom" && !safeAccount(account)) return "社交主页仅支持公开的 HTTP 或 HTTPS 地址"
+            if (FriendCardRules.length(name) > 20 || name.any { it.isISOControl() || it == '\u2028' || it == '\u2029' }) return FriendCardText.get(R.string.fc_social_invalid_name)
+            if (item.platform == "custom" && name.isEmpty()) return FriendCardText.get(R.string.fc_social_name_required)
+            if (account.isEmpty() || FriendCardRules.length(account) > 120 || account.any { it.isISOControl() || it == '\u2028' || it == '\u2029' }) return FriendCardText.get(R.string.fc_social_invalid_account)
+            if (item.platform == "custom" && !safeAccount(account)) return FriendCardText.get(R.string.fc_social_invalid_url)
         }
         return null
     }
 
-    fun platformName(item: FriendCard.SocialAccount): String = when (item.platform) {
+    fun platformName(item: FriendCard.SocialAccount): String = platformName(item, org.joinmastodon.android.MastodonApp.context)
+    fun platformName(item: FriendCard.SocialAccount, context: android.content.Context): String = when (item.platform) {
         "qq" -> "QQ"
-        "wechat" -> "微信"
-        else -> item.name.orEmpty().ifBlank { "其他平台" }
+        "wechat" -> context.getString(R.string.fc_wechat)
+        else -> item.name.orEmpty().ifBlank { context.getString(R.string.fc_social_other_platform) }
     }
 
     fun copy(item: FriendCard.SocialAccount) = FriendCard.SocialAccount().apply {

@@ -120,7 +120,7 @@ public class FriendRequestDetailFragment extends LoaderFragment {
 		ImageButton menuBtn = getView().findViewById(R.id.detail_menu);
 
 		username.setText(friendRequest.user != null ? friendRequest.user.username : "");
-		lookingFor.setText(friendRequest.looking_for != null ? friendRequest.looking_for : "");
+		lookingFor.setText(FriendRequestCreateFragment.localizedLookingFor(getContext(), friendRequest.looking_for));
 		description.setText(friendRequest.description != null ? friendRequest.description : "");
 
 		if (friendRequest.user != null && friendRequest.user.avatar != null) {
@@ -178,7 +178,7 @@ public class FriendRequestDetailFragment extends LoaderFragment {
 					icon.setVisibility(View.GONE);
 				}
 
-				keyText.setText(field.field_key);
+				keyText.setText(FriendRequestCreateFragment.localizedField(getContext(), field.field_key));
 				valueText.setText(field.field_value);
 				fieldsCard.addView(row);
 			}
@@ -192,10 +192,10 @@ public class FriendRequestDetailFragment extends LoaderFragment {
 			boolean isOwner = itemUserId.equals(myUserId);
 
 			if (isOwner) {
-				popup.getMenu().add(0, 1, 0, "编辑");
-				popup.getMenu().add(0, 2, 1, "删除");
+				popup.getMenu().add(0, 1, 0, getString(R.string.edit));
+				popup.getMenu().add(0, 2, 1, getString(R.string.delete));
 			}
-			popup.getMenu().add(0, 3, 2, "举报");
+			popup.getMenu().add(0, 3, 2, getString(R.string.friend_request_report));
 
 			popup.setOnMenuItemClickListener(menuItem -> {
 				if (menuItem.getItemId() == 1) {
@@ -212,7 +212,7 @@ public class FriendRequestDetailFragment extends LoaderFragment {
 						.setCallback(new Callback<Map<String, Object>>() {
 							@Override
 							public void onSuccess(Map<String, Object> result) {
-								Toast.makeText(getContext(), "已删除", Toast.LENGTH_SHORT).show();
+								Toast.makeText(getContext(), getString(R.string.friend_request_deleted), Toast.LENGTH_SHORT).show();
 								getActivity().onBackPressed();
 							}
 

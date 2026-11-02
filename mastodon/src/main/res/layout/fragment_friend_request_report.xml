@@ -8,7 +8,7 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="举报原因"
+        android:text="@string/album_report_reason_header"
         android:textSize="16sp"
         android:textStyle="bold"
         android:textColor="?android:textColorPrimary"
@@ -17,7 +17,7 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="正在举报："
+        android:text="@string/general_reporting"
         android:textSize="13sp"
         android:textColor="?android:textColorSecondary"
         android:layout_marginBottom="16dp" />
@@ -39,7 +39,7 @@
         android:id="@+id/report_submit_btn"
         android:layout_width="match_parent"
         android:layout_height="48dp"
-        android:text="提交举报"
+        android:text="@string/album_report_submit"
         android:textSize="16sp"
         android:textColor="#FFFFFF"
         android:background="#E53935"

@@ -1,10 +1,14 @@
 package org.joinmastodon.android.ui.compose.friendcards
 
+import android.content.Context
+import androidx.annotation.StringRes
+import org.joinmastodon.android.MastodonApp
+import org.joinmastodon.android.R
 import org.joinmastodon.android.model.FriendCard
 
 /** Local destinations only: changing these never adds a navigation-stack entry. */
 enum class FriendCardHubTab { Plaza, MyCards }
-enum class FriendCardHubFilter(val label: String) { Recommended("推荐"), SameCity("同城"), Movies("电影"), Games("游戏") }
+enum class FriendCardHubFilter(@StringRes val labelRes: Int) { Recommended(R.string.fc_filter_recommended), SameCity(R.string.fc_filter_city), Movies(R.string.fc_filter_movies), Games(R.string.fc_filter_games) }
 
 /** A footer/section keeps its preceding card anchor and row delta, not just a first-page index. */
 data class FriendCardHubPosition(val index: Int = 0, val offset: Int = 0, val cardId: String? = null, val anchorDelta: Int = 0)
@@ -89,9 +93,9 @@ object FriendCardHubFilters {
     }
 }
 
-fun friendCardHubStateName(state: String?): String = when (state) {
-    "active" -> "展示中"
-    "paused" -> "已暂停"
-    "archived" -> "已归档"
-    else -> "${state ?: "状态未知"} · 以服务端审核状态为准"
+fun friendCardHubStateName(state: String?, context: Context = MastodonApp.context): String = when (state) {
+    "active" -> context.getString(R.string.fc_state_active)
+    "paused" -> context.getString(R.string.fc_state_paused)
+    "archived" -> context.getString(R.string.fc_state_archived)
+    else -> context.getString(R.string.fc_state_other, state ?: context.getString(R.string.fc_state_unknown))
 }

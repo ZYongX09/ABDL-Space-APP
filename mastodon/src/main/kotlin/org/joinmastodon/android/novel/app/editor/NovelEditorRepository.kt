@@ -24,15 +24,15 @@ internal data class NovelMetadata(
     val originalAuthor: String = "", val coverPending: Boolean = localCover != null && coverUrl == null,
 ) {
     fun validate() {
-        require(title.isNotBlank() && title.length <= 30) { "作品名称需为 1–30 字" }
-        require(description.isNotBlank() && description.length <= 500) { "作品简介需为 1–500 字" }
-        require(type in setOf("original", "repost", "ai")) { "请选择作品类型" }
-        require(tags.size <= 3 && tags.all { it.isNotBlank() && it.length <= 30 }) { "最多 3 个标签，每个不超过 30 字" }
-        require(originalAuthor.length <= 120) { "原作者名不能超过 120 字" }
-        require(type != "repost" || originalAuthor.isNotBlank()) { "转载需填写原作者名" }
-        require(type != "repost" || (source.isNotBlank() && authorization.isNotBlank())) { "转载需填写来源及授权说明" }
-        require(source.length <= 2000 && authorization.length <= 2000) { "来源及授权说明过长" }
-        require(accepted) { "请确认创作与发布规范" }
+        require(title.isNotBlank() && title.length <= 30) { "novel_i18n_title_length" }
+        require(description.isNotBlank() && description.length <= 500) { "novel_i18n_description_length" }
+        require(type in setOf("original", "repost", "ai")) { "novel_i18n_type_required" }
+        require(tags.size <= 3 && tags.all { it.isNotBlank() && it.length <= 30 }) { "novel_i18n_tags_limit" }
+        require(originalAuthor.length <= 120) { "novel_i18n_original_author_limit" }
+        require(type != "repost" || originalAuthor.isNotBlank()) { "novel_i18n_original_author_required" }
+        require(type != "repost" || (source.isNotBlank() && authorization.isNotBlank())) { "novel_i18n_permission_required" }
+        require(source.length <= 2000 && authorization.length <= 2000) { "novel_i18n_permission_length" }
+        require(accepted) { "novel_i18n_rules_required" }
     }
     fun json() = JSONObject().put("title", title).put("description", description).put("work_type", type)
         .put("cover_url", coverUrl ?: JSONObject.NULL).put("local_cover", localCover ?: JSONObject.NULL)
@@ -62,7 +62,7 @@ internal fun JSONObject.stringOrNull(key: String): String? = if (isNull(key)) nu
 internal fun JSONObject.strings(key: String): List<String> = optJSONArray(key)?.let { a -> (0 until a.length()).map { a.getString(it) } }.orEmpty()
 internal data class EditorDirectory(val structure: EditorModels.WorkStructure, val metadata: NovelMetadata, val remote: Map<String, NovelEditorStorage.RemoteChapter>, val server: JSONObject? = null, val conflict: String? = null)
 internal class NovelOwnerConflict(message: String) : IllegalStateException(message)
-internal class NovelReviewInProgress : IllegalStateException("此作品已有上传或审核中的提交。可刷新审核状态，或重试原冻结提交；本机草稿仍保留。")
+internal class NovelReviewInProgress : IllegalStateException("novel_i18n_review_in_progress")
 
 /** Account-leased local IO. No mutation here schedules an uploader or a sync worker. */
 internal class NovelEditorRepository(val context: Context, val accountId: String, val api: NovelAppTransport,
@@ -78,11 +78,11 @@ internal class NovelEditorRepository(val context: Context, val accountId: String
         }
     }
     suspend fun <T> local(block: (NovelEditorStorage) -> T): T = withContext(io) {
-        val lease = checkNotNull(NovelAccountDataCleaner.enterOperation(accountId, generation)) { "账号已注销" }
+        val lease = checkNotNull(NovelAccountDataCleaner.enterOperation(accountId, generation)) { "novel_i18n_account_logged_out" }
         lease.use { NovelEditorStorage(context, accountId).use(block) }
     }
     internal fun requireActive() {
-        check(NovelAccountDataCleaner.isGenerationValid(accountId, generation)) { "账号已注销" }
+        check(NovelAccountDataCleaner.isGenerationValid(accountId, generation)) { "novel_i18n_account_logged_out" }
         (api as? NovelAppApi)?.requireSessionActive()
     }
     suspend fun directory(id: String): EditorDirectory = local { s ->
@@ -119,8 +119,8 @@ internal class NovelEditorRepository(val context: Context, val accountId: String
         requireActive()
         val remote = api.raw("GET", "/owner/works/${NovelAppApi.segment(serverId)}")
         requireActive()
-        require(remote.getString("id") == serverId) { "服务端作品绑定不匹配；本机文稿未改动" }
-        val clientId = requireNotNull(remote.stringOrNull("client_work_id")) { "服务端未返回作品绑定，请刷新后重试" }
+        require(remote.getString("id") == serverId) { "novel_i18n_server_binding_mismatch" }
+        val clientId = requireNotNull(remote.stringOrNull("client_work_id")) { "novel_i18n_server_binding_missing" }
         val id = local { s ->
             s.writableDatabase.beginTransaction()
             try {
@@ -131,12 +131,12 @@ internal class NovelEditorRepository(val context: Context, val accountId: String
                 val reviews = remote.optJSONArray("reviews") ?: JSONArray()
                 val knownRelease = release != null && s.localAppSubmissionForServer(work, release) != null
                 var conflict = old?.ownerConflict()
-                if (existing != null && old?.releaseId() != release && !knownRelease) conflict = "远端公开版本已变化。本机正文与作品资料均已保留；请检查后明确保留本机稿并重新选择提交章节。"
+                if (existing != null && old?.releaseId() != release && !knownRelease) conflict = "novel_i18n_owner_release_conflict"
                 val previous = old?.ownerPayload()?.let(::JSONObject)
                 if (existing != null && previous != null && ownerContent(previous) != ownerContent(remote)) {
                     val latest = remote.optJSONArray("chapters")?.optJSONObject(0)?.stringOrNull("submission_id")
                         ?: reviews.optJSONObject(0)?.stringOrNull("id")
-                    if (latest == null || s.localAppSubmissionForServer(work, latest) == null) conflict = conflict ?: "远端投稿内容已变化。本机草稿未覆盖，请检查后明确保留本机稿并重新选章。"
+                    if (latest == null || s.localAppSubmissionForServer(work, latest) == null) conflict = conflict ?: "novel_i18n_owner_content_conflict"
                 }
                 val metadata = old?.let { NovelMetadata.from(JSONObject(it.payload())) } ?: NovelMetadata.from(remote).copy(accepted = true)
                 s.putAppMetadata(work, metadata.json().toString(), serverId, release)
@@ -174,13 +174,13 @@ internal class NovelEditorRepository(val context: Context, val accountId: String
     }
     suspend fun refreshOwner(workId: String): EditorDirectory {
         val serverId = local { it.appMetadata(workId)?.serverId() }
-        if (serverId != null) { val (bound, _) = ownerWork(serverId); check(bound == workId) { "作品绑定变化；本机文稿仍保留" } }
+        if (serverId != null) { val (bound, _) = ownerWork(serverId); check(bound == workId) { "novel_i18n_work_binding_changed" } }
         return directory(workId)
     }
     suspend fun acknowledgeOwner(workId: String, expected: String) {
         val previous = JSONObject(expected)
         val refreshed = requireNotNull(refreshOwner(workId).server)
-        check(previous.stringOrNull("release_id") == refreshed.stringOrNull("release_id") && ownerContent(previous) == ownerContent(refreshed)) { "远端内容再次变化，请检查刷新后的状态再确认；本机稿仍保留。" }
+        check(previous.stringOrNull("release_id") == refreshed.stringOrNull("release_id") && ownerContent(previous) == ownerContent(refreshed)) { "novel_i18n_owner_changed_again" }
         local { it.acknowledgeOwnerConflict(workId, refreshed.toString()) }
     }
     suspend fun hydrate(workId: String, chapterId: String) {
@@ -193,19 +193,19 @@ internal class NovelEditorRepository(val context: Context, val accountId: String
         local { s -> s.hydrateRemoteChapter(chapterId, result.getString("body"), result.optLong("generation", info.second.generation())) }
     }
     suspend fun prepare(workId: String, selected: List<String>): String {
-        require(selected.isNotEmpty()) { "请选择要提交的章节" }
+        require(selected.isNotEmpty()) { "novel_i18n_select_chapters" }
         val directory = refreshOwner(workId)
         directory.conflict?.let { throw NovelOwnerConflict(it) }
         val reviews = directory.server?.optJSONArray("reviews") ?: JSONArray()
         if ((0 until reviews.length()).any { reviews.getJSONObject(it).optString("status") in setOf("uploading", "pending", "reviewing") }) throw NovelReviewInProgress()
-        check(local { it.pendingAppSubmission(workId) } == null) { "已有未完成的冻结提交，请重试或明确放弃；本机新修改不会混入重试。" }
+        check(local { it.pendingAppSubmission(workId) } == null) { "novel_i18n_frozen_submission_exists" }
         selected.forEach { hydrate(workId, it) }
         return local { s ->
-            val meta = requireNotNull(s.appMetadata(workId)) { "请先完善作品资料" }
+            val meta = requireNotNull(s.appMetadata(workId)) { "novel_i18n_metadata_required" }
             meta.ownerConflict()?.let { throw NovelOwnerConflict(it) }
             val metadata = NovelMetadata.from(JSONObject(meta.payload())); metadata.validate()
-            require(!metadata.coverPending && (metadata.localCover == null || metadata.coverUrl != null)) { "请先明确上传所选封面，或移除本地封面" }
-            val clientId = if (meta.serverId() == null) workId else requireNotNull(meta.clientWorkId()) { "请先刷新服务端作品绑定" }
+            require(!metadata.coverPending && (metadata.localCover == null || metadata.coverUrl != null)) { "novel_i18n_pending_cover" }
+            val clientId = if (meta.serverId() == null) workId else requireNotNull(meta.clientWorkId()) { "novel_i18n_refresh_binding" }
             val payload = metadata.submissionJson().apply { put("client_work_id", clientId); put("base_release_id", meta.releaseId() ?: JSONObject.NULL); meta.serverId()?.let { put("work_id", it) } }
             s.prepareAppSubmission(workId, payload.toString(), selected)
         }
@@ -220,18 +220,18 @@ internal class NovelSubmissionSender(private val repository: NovelEditorReposito
     /** Run before reserving the server's uploading slot, including JSON escaping expansion. */
     private suspend fun preflight(snapshot: NovelEditorStorage.AppSubmission): List<String> {
         val ids = repository.local { it.appSubmissionChapterIds(snapshot.id()) }
-        require(ids.isNotEmpty()) { "请选择要提交的章节" }
-        require(snapshot.metadata().toByteArray(StandardCharsets.UTF_8).size <= NovelAppApi.MAX_REQUEST_BYTES) { "作品资料过大" }
+        require(ids.isNotEmpty()) { "novel_i18n_select_chapters" }
+        require(snapshot.metadata().toByteArray(StandardCharsets.UTF_8).size <= NovelAppApi.MAX_REQUEST_BYTES) { "novel_i18n_metadata_too_large" }
         var total = 0L; var rows = JSONArray()
         for (index in ids.indices) {
             val c = repository.local { it.appSubmissionChapter(snapshot.id(), index) }
             total += c.body().toByteArray(StandardCharsets.UTF_8).size
-            require(total <= 20L * 1024 * 1024) { "所选正文超过 20 MiB，请减少所选章节" }
+            require(total <= 20L * 1024 * 1024) { "novel_i18n_selected_text_limit" }
             val value = json(c)
-            require(bytes(JSONArray().put(value)) <= NovelAppApi.MAX_REQUEST_BYTES) { "此章节 JSON 超过 2 MiB，请拆分后明确重新提交" }
+            require(bytes(JSONArray().put(value)) <= NovelAppApi.MAX_REQUEST_BYTES) { "novel_i18n_chapter_json_limit" }
             if (rows.length() == 40 || bytes(JSONArray(rows.toString()).put(value)) > NovelAppApi.MAX_REQUEST_BYTES - 1024) rows = JSONArray()
             rows.put(value)
-            require(bytes(rows) <= NovelAppApi.MAX_REQUEST_BYTES) { "所选章节编码过大" }
+            require(bytes(rows) <= NovelAppApi.MAX_REQUEST_BYTES) { "novel_i18n_encoded_chapters_limit" }
         }
         return ids
     }
@@ -264,7 +264,7 @@ internal class NovelSubmissionSender(private val repository: NovelEditorReposito
     suspend fun send(localSubmissionId: String): JSONObject {
         val snapshot = repository.local { it.appSubmission(localSubmissionId) }
         if (snapshot.state() in setOf("pending", "reviewing", "approved")) return JSONObject(requireNotNull(snapshot.result()))
-        check(snapshot.state() in setOf("prepared", "starting", "uploading")) { "本次提交已结束，请明确重新选择章节提交" }
+        check(snapshot.state() in setOf("prepared", "starting", "uploading")) { "novel_i18n_submission_finished" }
         val ids = preflight(snapshot)
         val remoteId = start(snapshot)
         var part = 0; var array = JSONArray()
@@ -284,7 +284,7 @@ internal class NovelSubmissionSender(private val repository: NovelEditorReposito
         repository.requireActive()
         val result = repository.api.raw("POST", "/submissions/${NovelAppApi.segment(remoteId)}/finalize", JSONObject(), key(localSubmissionId, "finalize"))
         repository.requireActive()
-        require(result.optString("status") == "pending") { "服务器尚未进入审核状态" }
+        require(result.optString("status") == "pending") { "novel_i18n_review_not_pending" }
         repository.local { s ->
             s.writableDatabase.beginTransaction()
             try { s.updateAppSubmission(localSubmissionId, remoteId, "pending", result.toString()); ids.forEachIndexed { i, id -> s.putRemoteChapter(id, "pending", remoteId, null, s.appSubmissionChapter(localSubmissionId, i).generation()) }; s.writableDatabase.setTransactionSuccessful() }
@@ -295,13 +295,13 @@ internal class NovelSubmissionSender(private val repository: NovelEditorReposito
     /** Only an explicit user confirmation may abandon a frozen attempt; no local manuscript is deleted. */
     suspend fun cancel(localSubmissionId: String) {
         val snapshot = repository.local { it.appSubmission(localSubmissionId) }
-        check(snapshot.state() in setOf("prepared", "starting", "uploading", "pending")) { "本次提交已进入审核或已结束，请先刷新状态" }
+        check(snapshot.state() in setOf("prepared", "starting", "uploading", "pending")) { "novel_i18n_submission_cannot_cancel" }
         val remoteId = snapshot.serverSubmissionId() ?: if (snapshot.state() == "starting") start(snapshot) else null
         if (remoteId == null) { repository.local { it.updateAppSubmission(localSubmissionId, null, "cancelled", null) }; return }
         repository.requireActive()
         val result = repository.api.raw("POST", "/submissions/${NovelAppApi.segment(remoteId)}/cancel", JSONObject(), key(localSubmissionId, "cancel"))
         repository.requireActive()
-        require(result.getString("id") == remoteId && result.optString("status") == "rejected") { "服务器未确认取消，请重试；本机文稿仍保留" }
+        require(result.getString("id") == remoteId && result.optString("status") == "rejected") { "novel_i18n_cancellation_unconfirmed" }
         repository.local { s -> s.updateAppSubmission(localSubmissionId, remoteId, "cancelled", result.toString()) }
     }
 }

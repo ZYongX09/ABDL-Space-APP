@@ -1,5 +1,9 @@
 package org.joinmastodon.android.novel.app.editor
 
+import org.joinmastodon.android.novel.app.novelUserMessage
+
+import org.joinmastodon.android.R
+
 import android.app.Application
 import android.net.Uri
 import android.os.SystemClock
@@ -12,6 +16,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -35,6 +40,14 @@ internal data class NovelEditorState(
     val importResult: ImportModels.Result? = null, val importRevision: Int = 0, val conflict: String? = null,
 )
 
+/** No uploads, saves, or state mutations are started by the language-change gate. */
+internal fun NovelEditorState.canChangeAppLanguage(): Boolean {
+    if (busy || saving || dirty || page == "loading") return false
+    if (page in setOf("importPreview", "adjust")) return false
+    if (page == "metadata") return if (workId == null) metadata == NovelMetadata() else metadata == directory?.metadata
+    return true
+}
+
 internal class NovelEditorController(application: Application, val repository: NovelEditorRepository,
     private val coverUploader: NovelCoverUploader = NovelCoverUpload.forRepository(repository),
     private val now: () -> Long = SystemClock::elapsedRealtime,
@@ -56,14 +69,14 @@ internal class NovelEditorController(application: Application, val repository: N
         if (mutable.value.busy) return
         viewModelScope.launch {
         update { it.copy(busy = true, error = null) }
-        try { action() } catch (cancel: CancellationException) { throw cancel } catch (e: Exception) { update { it.copy(error = e.message ?: "操作失败；本地文稿仍保留") } }
+        try { action() } catch (cancel: CancellationException) { throw cancel } catch (e: Exception) { update { it.copy(error = e.novelUserMessage(repository.context, R.string.novel_en_operation_failed_local_kept)) } }
         finally { update { it.copy(busy = false) } }
     } }
     fun open(localId: String?, remoteId: String?, mode: String) = operation {
         if (localId != null) {
             if (!showDirectory(localId)) return@operation
             try { refreshOwnerNow(localId) } catch (cancel: CancellationException) { throw cancel }
-            catch (_: Exception) { update { it.copy(error = "无法刷新审核状态，可继续本机编辑；提交前需联网对账。文稿未覆盖。") } }
+            catch (_: Exception) { update { it.copy(error = repository.context.getString(R.string.novel_en_review_refresh_failed)) } }
         }
         else if (remoteId != null) { val (id, _) = repository.ownerWork(remoteId); if (!showDirectory(id)) return@operation }
         else update { it.copy(page = if (mode == "import") "import" else "metadata") }
@@ -89,7 +102,7 @@ internal class NovelEditorController(application: Application, val repository: N
     fun refreshOwner() = operation {
         if (!save()) return@operation
         refreshOwnerNow(requireNotNull(mutable.value.workId))
-        update { it.copy(notice = "已刷新服务端审核状态；本机正文与作品资料均保留，未上传") }
+        update { it.copy(notice = repository.context.getString(R.string.novel_en_review_refreshed)) }
     }
     fun keepLocalAfterConflict() = operation {
         if (!save()) return@operation
@@ -97,7 +110,7 @@ internal class NovelEditorController(application: Application, val repository: N
         val expected = requireNotNull(mutable.value.directory?.server).toString()
         repository.acknowledgeOwner(work, expected)
         refreshDirectoryNow(work)
-        update { it.copy(notice = "已明确保留本机稿；请重新勾选要提交的章节。此次确认没有上传。") }
+        update { it.copy(notice = repository.context.getString(R.string.novel_en_local_kept_notice)) }
     }
     private suspend fun refreshDirectoryNow(id: String) {
         val directory = repository.directory(id)
@@ -105,6 +118,13 @@ internal class NovelEditorController(application: Application, val repository: N
     }
     fun clearError() = update { it.copy(error = null, notice = null) }
     fun metadata(value: NovelMetadata) = update { it.copy(metadata = value) }
+    /** Reapply an unsaved small form after the existing open operation has restored the directory. */
+    fun restoreFormWhenReady(value: NovelMetadata) {
+        viewModelScope.launch {
+            state.first { !it.busy && it.page != "loading" }
+            update { it.copy(page = "metadata", metadata = value) }
+        }
+    }
     fun showMetadata() = operation { if (save()) update { it.copy(page = "metadata") } }
     fun showImport() = operation { if (save()) update { it.copy(page = "import") } }
     fun chooseCover(uri: Uri) = operation {
@@ -120,16 +140,16 @@ internal class NovelEditorController(application: Application, val repository: N
         update { it.copy(metadata = metadata) }
     }
     fun uploadCover() = operation {
-        val path = requireNotNull(mutable.value.metadata.localCover) { "请先选择封面" }
+        val path = requireNotNull(mutable.value.metadata.localCover) { repository.context.getString(R.string.novel_en_cover_required) }
         repository.requireActive()
         val url = coverUploader.upload(File(path))
         repository.requireActive()
-        require(okhttp3.HttpUrl.parse(url)?.isHttps == true) { "封面服务未返回有效 HTTPS 地址" }
+        require(okhttp3.HttpUrl.parse(url)?.isHttps == true) { repository.context.getString(R.string.novel_en_cover_url_invalid) }
         // Do not replace a newer selection with a late response.
         if (mutable.value.metadata.localCover != path) return@operation
         val metadata = mutable.value.metadata.copy(coverUrl = url, coverPending = false)
         mutable.value.workId?.let { repository.saveCover(it, metadata) }
-        update { it.copy(metadata = metadata, notice = "封面已上传；文稿仍仅在本地") }
+        update { it.copy(metadata = metadata, notice = repository.context.getString(R.string.novel_en_cover_uploaded_local_text)) }
     }
     fun storeMetadata() = operation {
         val data = mutable.value.metadata
@@ -151,7 +171,7 @@ internal class NovelEditorController(application: Application, val repository: N
         editing = EditorSession(id, loaded.first.currentGeneration(), frame, now())
         editToken++
         if (recovered != null) { frame = recovered; editing?.edit(frame) }
-        update { it.copy(page = "editor", chapterId = id, editToken = editToken, frame = frame, dirty = editing!!.dirty(), canUndo = editing!!.canUndo(), canRedo = false, notice = if (recovered != null) "已恢复未完成保存的本机文稿；请检查并保存" else null) }
+        update { it.copy(page = "editor", chapterId = id, editToken = editToken, frame = frame, dirty = editing!!.dirty(), canUndo = editing!!.canUndo(), canRedo = false, notice = if (recovered != null) repository.context.getString(R.string.novel_en_manuscript_recovered) else null) }
     }
     fun frame(chapterId: String, token: Long, value: EditorSession.Frame) {
         // UI callbacks carry the chapter AND session they were bound to, never the newly opened chapter.
@@ -160,7 +180,7 @@ internal class NovelEditorController(application: Application, val repository: N
     }
     fun frame(value: EditorSession.Frame) {
         // Busy is not a reason to discard input already delivered by the IME to the active old session.
-        try { editing?.edit(value); reflect() } catch (e: IllegalArgumentException) { update { it.copy(error = e.message) } }
+        try { editing?.edit(value); reflect() } catch (e: IllegalArgumentException) { update { it.copy(error = e.novelUserMessage(repository.context, R.string.novel_en_operation_failed_local_kept)) } }
     }
     private fun reflect() { val session = editing ?: return; update { it.copy(frame = session.frame(), dirty = session.dirty(), canUndo = session.canUndo(), canRedo = session.canRedo()) } }
     fun undo() { editing?.undo(); reflect() }
@@ -176,7 +196,7 @@ internal class NovelEditorController(application: Application, val repository: N
             do {
                 val checkpoint = session.capture(); val f = checkpoint.frame()
                 try {
-                    val result = repository.local { s -> s.checkpointWithTitle(checkpoint.chapterId(), checkpoint.generation(), f.title().ifBlank { "未命名章节" }, f.body(), f.start(), f.end(), f.scroll()) }
+                    val result = repository.local { s -> s.checkpointWithTitle(checkpoint.chapterId(), checkpoint.generation(), f.title().ifBlank { repository.context.getString(R.string.novel_en_untitled_chapter) }, f.body(), f.start(), f.end(), f.scroll()) }
                     session.saved(checkpoint, result.generation())
                     repository.local { recoveryFile(checkpoint.chapterId()).delete() }
                     reflect()
@@ -185,7 +205,7 @@ internal class NovelEditorController(application: Application, val repository: N
                     session.failed(checkpoint)
                     val backedUp = try { repository.local { backup(checkpoint.chapterId(), session.frame()) }; true }
                         catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { false }
-                    update { it.copy(dirty = true, error = if (backedUp) "保存失败，已保留本机恢复副本。请重试；不会切章或离开。" else "保存失败（含恢复副本）。请勿关闭应用，可复制或导出正文后重试。") }
+                    update { it.copy(dirty = true, error = if (backedUp) repository.context.getString(R.string.novel_en_save_failed_recovery_kept) else repository.context.getString(R.string.novel_en_save_failed_no_recovery)) }
                     return@withLock false
                 }
             } while (latest && session.dirty())
@@ -196,14 +216,14 @@ internal class NovelEditorController(application: Application, val repository: N
     fun backgroundSave() { viewModelScope.launch { save() } }
     fun leaveEditor(after: () -> Unit) = operation { if (save()) { val id = mutable.value.workId; if (mutable.value.page == "editor" && id != null) showDirectory(id) else after() } }
     fun preview(after: (String, String?) -> Unit) = operation { if (save()) after(requireNotNull(mutable.value.workId), mutable.value.chapterId) }
-    fun newChapter() = operation { if (save()) { val id = requireNotNull(mutable.value.workId); val chapter = repository.local { s -> val st = s.structure(id); s.addChapter(id, st.volumes().first().id(), "第${st.chapters().size + 1}章") }; val directory = repository.directory(id); update { it.copy(directory = directory) }; openChapterNow(chapter.id()) } }
+    fun newChapter() = operation { if (save()) { val id = requireNotNull(mutable.value.workId); val chapter = repository.local { s -> val st = s.structure(id); s.addChapter(id, st.volumes().first().id(), repository.context.getString(R.string.novel_en_new_chapter_title, st.chapters().size + 1)) }; val directory = repository.directory(id); update { it.copy(directory = directory) }; openChapterNow(chapter.id()) } }
     fun reorder(ids: List<String>) = operation { repository.local { it.reorderChapters(requireNotNull(mutable.value.workId), ids) }; showDirectory(requireNotNull(mutable.value.workId)) }
     fun deleteChapter(id: String) = operation { repository.local { it.softDeleteChapter(id) }; showDirectory(requireNotNull(mutable.value.workId)) }
     fun submit(selected: List<String>, retry: Boolean = false) = operation {
         if (!save()) return@operation
         val work = requireNotNull(mutable.value.workId)
         try {
-            val id = if (retry) requireNotNull(repository.local { it.pendingAppSubmission(work) }) { "没有待重试的提交" } else repository.prepare(work, selected)
+            val id = if (retry) requireNotNull(repository.local { it.pendingAppSubmission(work) }) { repository.context.getString(R.string.novel_en_no_submission_retry) } else repository.prepare(work, selected)
             NovelSubmissionSender(repository).send(id)
         } catch (cancel: CancellationException) { throw cancel }
         catch (e: Exception) {
@@ -211,50 +231,50 @@ internal class NovelEditorController(application: Application, val repository: N
             refreshDirectoryNow(work)
             if (e is org.joinmastodon.android.novel.app.NovelAppApiException && e.status == 409) {
                 try { refreshOwnerNow(work) } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { /* Keep the frozen attempt and drafts for explicit retry. */ }
-                throw IllegalStateException("服务端投稿状态或公开版本已变化，已尝试刷新状态。请检查后重新选章或重试原冻结提交；本机文稿保留。", e)
+                throw IllegalStateException(repository.context.getString(R.string.novel_en_submission_conflict), e)
             }
             throw e
         }
-        if (showDirectory(work)) update { it.copy(notice = "所选章节已提交审核；公开版本不会立即变化") }
+        if (showDirectory(work)) update { it.copy(notice = repository.context.getString(R.string.novel_en_submitted_for_review)) }
     }
     fun cancelSubmission() = operation {
         if (!save()) return@operation
         val work = requireNotNull(mutable.value.workId)
-        val id = requireNotNull(repository.local { it.cancellableAppSubmission(work) }) { "没有可放弃的本机提交，请先刷新审核状态" }
+        val id = requireNotNull(repository.local { it.cancellableAppSubmission(work) }) { repository.context.getString(R.string.novel_en_no_submission_cancel) }
         try { NovelSubmissionSender(repository).cancel(id) }
         catch (cancel: CancellationException) { throw cancel }
         catch (e: Exception) {
             if (e is org.joinmastodon.android.novel.app.NovelAppApiException && e.status == 409) {
                 try { refreshOwnerNow(work) } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { }
-                throw IllegalStateException("提交已进入审核或已经结束，不能放弃。已尝试刷新状态；本机稿和重试记录仍保留。", e)
+                throw IllegalStateException(repository.context.getString(R.string.novel_en_cancel_submission_conflict), e)
             }
             throw e
         }
         // Owner refresh is best effort only after the server acknowledged the explicit cancellation.
         try { refreshOwnerNow(work) } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { }
         refreshDirectoryNow(work)
-        update { it.copy(notice = "已放弃本次提交，全部本机文稿仍保留；如需投稿请明确重新选章。") }
+        update { it.copy(notice = repository.context.getString(R.string.novel_en_submission_abandoned)) }
     }
     fun workAction(action: String, afterDelete: () -> Unit) = operation {
         if (!save()) return@operation
         val id = requireNotNull(mutable.value.workId)
-        if (action == "complete") { val m = mutable.value.metadata.copy(completed = true); repository.saveMetadata(id, m); showDirectory(id); update { it.copy(notice = "完结标记已保存本机；明确提交章节后进入人工审核") }; return@operation }
+        if (action == "complete") { val m = mutable.value.metadata.copy(completed = true); repository.saveMetadata(id, m); showDirectory(id); update { it.copy(notice = repository.context.getString(R.string.novel_en_completion_saved_local)) }; return@operation }
         val server = repository.local { it.appMetadata(id)?.serverId() }
         if (server != null) repository.api.raw("POST", "/owner/works/${org.joinmastodon.android.novel.app.NovelAppApi.segment(server)}/action", JSONObject().put("action", action), UUID.randomUUID().toString())
         if (action == "delete") { repository.local { it.softDeleteWork(id) }; afterDelete() }
-        else update { it.copy(notice = "作品已下架；本地文稿保留") }
+        else update { it.copy(notice = repository.context.getString(R.string.novel_en_unpublished_local_kept)) }
     }
     fun parse(uri: Uri, autoRecognize: Boolean) = operation {
         val name = repository.context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c -> if (c.moveToFirst()) c.getString(0) else null } ?: uri.lastPathSegment?.takeIf { uri.scheme == "file" } ?: "文稿.txt"
-        require(name.endsWith(".txt", true) || name.endsWith(".docx", true)) { "仅支持 TXT / DOCX" }
+        require(name.endsWith(".txt", true) || name.endsWith(".docx", true)) { repository.context.getString(R.string.novel_en_import_supported_formats) }
         val parsed = repository.local { s ->
             val dir = File(root, "imports").apply { mkdirs() }; val file = File(dir, "${UUID.randomUUID()}.source")
             try {
-                repository.context.contentResolver.openInputStream(uri).use { input -> requireNotNull(input); file.outputStream().use { output -> val buffer = ByteArray(32768); var total = 0L; while (true) { val n = input.read(buffer); if (n < 0) break; total += n; require(total <= 10L * 1024 * 1024) { "文稿不能超过 10 MB" }; output.write(buffer, 0, n) }; require(total > 0) { "文件为空" } } }
+                repository.context.contentResolver.openInputStream(uri).use { input -> requireNotNull(input); file.outputStream().use { output -> val buffer = ByteArray(32768); var total = 0L; while (true) { val n = input.read(buffer); if (n < 0) break; total += n; require(total <= 10L * 1024 * 1024) { repository.context.getString(R.string.novel_en_manuscript_size_limit) }; output.write(buffer, 0, n) }; require(total > 0) { repository.context.getString(R.string.novel_en_empty_file) } } }
                 var result = NovelImportParser().parse(file, name, ImportModels.Cancellation.NONE)
-                require(result.metadata().format() in setOf("txt", "docx")) { "仅支持 TXT / DOCX" }
-                require(result.chapters().sumOf { it.content().toByteArray().size.toLong() } <= 10L * 1024 * 1024) { "解析正文不能超过 10 MB" }
-                if (!autoRecognize) { val body = result.chapters().joinToString("\n\n") { it.title() + "\n" + it.content() }; require(body.length <= EditorLimits.CHAPTER_CONTENT) { "正文过长，请开启章节识别后拆分" }; result = ImportModels.Result(result.metadata(), listOf(ImportModels.Chapter(0, "正文", body, null)), result.warnings()) }
+                require(result.metadata().format() in setOf("txt", "docx")) { repository.context.getString(R.string.novel_en_import_supported_formats) }
+                require(result.chapters().sumOf { it.content().toByteArray().size.toLong() } <= 10L * 1024 * 1024) { repository.context.getString(R.string.novel_en_parsed_text_limit) }
+                if (!autoRecognize) { val body = result.chapters().joinToString("\n\n") { it.title() + "\n" + it.content() }; require(body.length <= EditorLimits.CHAPTER_CONTENT) { repository.context.getString(R.string.novel_en_body_too_long) }; result = ImportModels.Result(result.metadata(), listOf(ImportModels.Chapter(0, "正文", body, null)), result.warnings()) }
                 val job = s.createImportJob(name, repository.context.contentResolver.getType(uri), file.absolutePath, file.length(), EditorText.sha256(file.absolutePath + file.length()))
                 s.storeImportResult(job.id(), result); job.id() to result
             } finally { file.delete() }
@@ -262,12 +282,12 @@ internal class NovelEditorController(application: Application, val repository: N
         importOriginal = parsed.second; review = ImportReview(parsed.second.chapters())
         update { it.copy(page = "importPreview", importName = name, importJob = parsed.first, importResult = parsed.second, importRevision = it.importRevision + 1) }
     }
-    fun adjust(action: (ImportReview) -> Unit) { try { action(requireNotNull(review)); update { it.copy(importRevision = it.importRevision + 1, importResult = review!!.result(requireNotNull(importOriginal))) } } catch (e: Exception) { update { it.copy(error = e.message) } } }
+    fun adjust(action: (ImportReview) -> Unit) { try { action(requireNotNull(review)); update { it.copy(importRevision = it.importRevision + 1, importResult = review!!.result(requireNotNull(importOriginal))) } } catch (e: Exception) { update { it.copy(error = e.novelUserMessage(repository.context, R.string.novel_en_operation_failed_local_kept)) } } }
     fun importPage(page: String) = update { it.copy(page = page) }
     fun confirmImport(targetWork: String?) = operation {
         val original = requireNotNull(importOriginal); val result = requireNotNull(review).result(original); val job = requireNotNull(mutable.value.importJob)
         val created = repository.local { s -> s.storeImportResult(job, result); if (targetWork == null) s.commitImport(job, original.metadata().title().ifBlank { mutable.value.importName.substringBeforeLast('.') }.take(30), "", "fiction") else s.appendReviewedImport(job, targetWork) }
-        showDirectory(created.workId()); update { it.copy(notice = "已导入为本地草稿，未上传或发布。请完善作品资料后提交。") }
+        showDirectory(created.workId()); update { it.copy(notice = repository.context.getString(R.string.novel_en_import_saved_local)) }
     }
     suspend fun export(uri: Uri) {
         if (!save()) return
@@ -277,7 +297,7 @@ internal class NovelEditorController(application: Application, val repository: N
             headers.forEach { c -> repository.hydrate(id, c.id()); val text = repository.local { requireNotNull(it.loadDraft(c.id())).content() }; output.write((c.title() + "\n\n").toByteArray()); output.write(text.toByteArray()); output.write("\n\n".toByteArray()) }
         }
     }
-    fun exportTo(uri: Uri) = operation { kotlinx.coroutines.withContext(Dispatchers.IO) { export(uri) }; update { it.copy(notice = "文稿已导出") } }
+    fun exportTo(uri: Uri) = operation { kotlinx.coroutines.withContext(Dispatchers.IO) { export(uri) }; update { it.copy(notice = repository.context.getString(R.string.novel_en_manuscript_exported)) } }
     private fun recoveryFile(chapter: String) = AtomicFile(File(root.apply { mkdirs() }, "recovery-${EditorText.sha256(chapter)}.json"))
     private fun backup(chapter: String, frame: EditorSession.Frame) { val file = recoveryFile(chapter); val stream = file.startWrite(); try { stream.write(JSONObject().put("title", frame.title()).put("body", frame.body()).put("start", frame.start()).put("end", frame.end()).put("scroll", frame.scroll()).toString().toByteArray()); file.finishWrite(stream) } catch (e: Exception) { file.failWrite(stream); throw e } }
     private fun recover(chapter: String): EditorSession.Frame? { val file = recoveryFile(chapter); if (!file.baseFile.exists()) return null; val j = JSONObject(file.openRead().bufferedReader().use { it.readText() }); return EditorSession.Frame(j.getString("title"), j.getString("body"), j.getInt("start"), j.getInt("end"), j.getInt("scroll")) }

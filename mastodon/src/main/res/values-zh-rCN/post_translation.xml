@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="post_translation_settings">帖子翻译</string>
+    <string name="post_translation_translate">翻译帖子</string>
+    <string name="post_translation_from">翻译自%1$s</string>
+    <string name="post_translation_footer">由%2$s翻译自%1$s</string>
+    <string name="post_translation_show_original">显示原文</string>
+    <string name="post_translation_loading">正在翻译…</string>
+    <string name="post_translation_failed">暂时无法翻译此帖子，请稍后重试。</string>
+    <string name="post_translation_unavailable">帖子翻译当前不可用。</string>
+    <string name="post_translation_rate_limited">翻译请求暂时受限，请稍后重试，已有缓存的译文仍可查看。</string>
+    <string name="post_translation_quota_exhausted">今日翻译额度已用完，已有缓存的译文仍可查看。</string>
+    <string name="post_translation_preferences_conflict">翻译偏好已在其他设备上更改，请重新加载后再试。</string>
+    <string name="post_translation_pending">译文仍在处理中，稍后点击“翻译帖子”可查询结果。</string>
+    <string name="post_translation_unknown">翻译结果尚未确认，不会重复提交AI请求。稍后点击“翻译帖子”可查询结果。</string>
+    <string name="post_translation_auto">自动翻译可见帖子</string>
+    <string name="post_translation_auto_description">自愿开启后，将帖子翻译为App语言，需要有效赞助资格。隐藏帖子及未展开的内容警告不会自动发送。</string>
+    <string name="post_translation_auto_unavailable">自动翻译需要有效赞助资格且服务可用，已保存的开关偏好不会被更改。</string>
+    <string name="post_translation_reading_language">阅读语言</string>
+    <string name="post_translation_reading_description">跟随App语言：%1$s</string>
+    <string name="post_translation_quota">每日额度</string>
+    <string name="post_translation_quota_value">已用%1$d · 处理中%2$d · 共%3$d</string>
+    <string name="post_translation_reload">重新加载翻译偏好</string>
+    <string name="post_translation_preferences_loading">正在加载翻译偏好…</string>
+    <string name="post_translation_preferences_failed">无法加载翻译偏好，验证成功前不会自动翻译。</string>
+</resources>

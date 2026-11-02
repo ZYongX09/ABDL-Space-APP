@@ -183,9 +183,9 @@ public class DiaperRankingsFragment extends LoaderFragment {
 	private void buildTabs() {
 		tabContainer.removeAllViews();
 		String[][] tabs = {
-			{"hot", "热门"},
-			{"absorbency", "最强吸收"},
-			{"popular", "最受关注"}
+			{"hot", getString(R.string.general_hot)},
+			{"absorbency", getString(R.string.general_top_absorbency)},
+			{"popular", getString(R.string.general_most_followed)}
 		};
 		for (String[] tab : tabs) {
 			View chipView = LayoutInflater.from(getContext()).inflate(R.layout.item_diaper_chip, tabContainer, false);
@@ -256,7 +256,7 @@ public class DiaperRankingsFragment extends LoaderFragment {
 
 					// 更新总数
 					totalCount = ((Number) result.getOrDefault("total", 0)).intValue();
-					totalCountText.setText(String.format("共 %d 款纸尿裤", totalCount));
+					totalCountText.setText(getString(R.string.general_diapers_total, totalCount));
 
 					hasMore = Boolean.TRUE.equals(result.get("hasMore"));
 
@@ -377,7 +377,7 @@ public class DiaperRankingsFragment extends LoaderFragment {
 					Nav.go(getActivity(), DiaperDetailFragment.class, args);
 				});
 			} else if (holder instanceof EndViewHolder) {
-				((EndViewHolder) holder).endText.setText(String.format("已显示全部 %d 款", totalCount));
+				((EndViewHolder) holder).endText.setText(getString(R.string.general_diapers_all_shown, totalCount));
 			}
 		}
 
