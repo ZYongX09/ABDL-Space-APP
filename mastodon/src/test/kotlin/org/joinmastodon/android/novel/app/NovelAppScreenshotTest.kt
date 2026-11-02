@@ -131,7 +131,7 @@ class NovelAppScreenshotTest {
         shot(15, "creator")
         click("新建作品"); assertEquals(Triple(null, null, "create"), created)
         click("上传文稿"); assertEquals(Triple(null, null, "import"), created)
-        compose.onNodeWithText("全部作品  ›").performScrollTo().performClick(); fixture.settle(compose)
+        compose.onNodeWithText(compose.activity.getString(org.joinmastodon.android.R.string.novel_en_all_works_link)).performScrollTo().performClick(); fixture.settle(compose)
         assertEquals(NovelPage.OwnerWorks, vm.state.value.page)
         compose.onNodeWithText("全部创作").assertIsDisplayed()
         fixture.capture(compose, "owner-works-light-393x852")

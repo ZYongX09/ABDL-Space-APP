@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_seamless_transitions">卡片无缝转场</string>
+    <string name="settings_seamless_transitions_summary">打开帖子、小说和相册卡片时使用本机支持的系统动画，遵循减少动画和内容保护设置。</string>
+</resources>

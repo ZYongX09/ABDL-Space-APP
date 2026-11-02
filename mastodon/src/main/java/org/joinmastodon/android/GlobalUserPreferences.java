@@ -70,6 +70,7 @@ public class GlobalUserPreferences{
 	public static boolean showMediaPreview;
 	public static boolean removeTrackingParams;
 	public static boolean useIosLiquidNavigation;
+	public static boolean useSeamlessTransitions=true;
 
 	// MOSHIDON: we changed this to public, because otherwise we can't export the settings
 	public static SharedPreferences getPrefs(){
@@ -82,6 +83,8 @@ public class GlobalUserPreferences{
 
 	public static void load(){
 		SharedPreferences prefs=getPrefs();
+		useSeamlessTransitions=prefs.getBoolean("useSeamlessTransitions", true);
+		if(!useSeamlessTransitions) org.joinmastodon.android.ui.seamless.SeamlessTransitions.clear();
 		playGifs=prefs.getBoolean("playGifs", true);
 		useCustomTabs=prefs.getBoolean("useCustomTabs", true);
 		altTextReminders=prefs.getBoolean("altTextReminders", false);
@@ -177,6 +180,7 @@ public class GlobalUserPreferences{
 	}
 
 	public static void save(){
+		if(!useSeamlessTransitions) org.joinmastodon.android.ui.seamless.SeamlessTransitions.clear();
 		boolean liquidSupported=isIosLiquidNavigationSupported();
 		if(!liquidSupported)
 			useIosLiquidNavigation=false;
@@ -185,6 +189,7 @@ public class GlobalUserPreferences{
 		if(liquidSupported)
 			editor.putBoolean("useIosLiquidNavigation", useIosLiquidNavigation);
 		editor
+				.putBoolean("useSeamlessTransitions", useSeamlessTransitions)
 				.putBoolean("playGifs", playGifs)
 				.putBoolean("useCustomTabs", useCustomTabs)
 				.putInt("theme", theme.ordinal())

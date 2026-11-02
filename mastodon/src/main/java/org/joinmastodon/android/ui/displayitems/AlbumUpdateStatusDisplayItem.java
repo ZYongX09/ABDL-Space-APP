@@ -120,6 +120,8 @@ public class AlbumUpdateStatusDisplayItem extends StatusDisplayItem{
 
 		@Override public void onBind(AlbumUpdateStatusDisplayItem item){
 			boundItem=item;
+			org.joinmastodon.android.ui.seamless.SeamlessTransitions.bindCard(card, item.accountID, item.update.albumId,
+					!item.update.downloadProtected && !item.status.sensitive && item.status.visibility!=StatusPrivacy.PRIVATE && item.status.visibility!=StatusPrivacy.DIRECT, item.status);
 			wrapper.setPaddingRelative(V.dp(item.fullWidth ? 16 : 64), 0, V.dp(16), V.dp(8));
 			int available=wrapper.getResources().getDisplayMetrics().widthPixels-wrapper.getPaddingStart()-wrapper.getPaddingEnd();
 			int cardWidth=Math.max(V.dp(120), Math.min(V.dp(360), available));
@@ -190,6 +192,8 @@ public class AlbumUpdateStatusDisplayItem extends StatusDisplayItem{
 			Bundle args=new Bundle();
 			args.putString("account", item.accountID);
 			args.putString("albumId", item.update.albumId);
+			if(org.joinmastodon.android.ui.seamless.SeamlessTransitions.openAlbum(activity, card, item.accountID,
+					item.update.albumId, item.update.downloadProtected, args)) return;
 			Nav.go(activity, AlbumDetailFragment.class, args);
 		}
 	}

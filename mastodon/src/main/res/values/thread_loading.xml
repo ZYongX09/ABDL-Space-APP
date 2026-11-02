@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+	<string name="thread_loading_replies">Loading replies</string>
+	<string name="thread_loading_retry">Retry</string>
+</resources>

@@ -236,7 +236,7 @@ class NovelVisualLayoutRegressionTest {
         val finalRange = requireNotNull(host.nodes().single { it.config.getOrNull(SemanticsActions.ScrollBy)?.action != null && it.config.getOrNull(SemanticsProperties.VerticalScrollAxisRange) != null }.config.getOrNull(SemanticsProperties.VerticalScrollAxisRange))
         reachedEnd = reachedEnd || (finalRange.maxValue().isFinite() && finalRange.value() >= finalRange.maxValue())
         assertTrue("Must reach actual LazyColumn end before checking padding: ${finalRange.value()}/${finalRange.maxValue()}", reachedEnd)
-        val link = text("全部图书  ›").single().boundsInWindow
+        val link = text(host.activity.getString(org.joinmastodon.android.R.string.novel_en_all_books_link)).single().boundsInWindow
         assertTrue("Last content remains above the measured overlay", link.bottom <= after.top + 1)
         assertTrue("No fixed 96dp redundant gap", after.top - link.bottom < 80)
         fixture.capture(host, "store-single-insets-scroll-end-light-393x852", 21)

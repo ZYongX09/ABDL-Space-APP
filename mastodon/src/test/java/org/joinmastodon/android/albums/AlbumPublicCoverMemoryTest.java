@@ -96,7 +96,8 @@ public class AlbumPublicCoverMemoryTest{
 	@Test public void refreshedSignatureHitsWithoutRewritingNetworkUrl(){
 		String initial=signed(); BitmapDrawable original=image(12, 10); put(initial, original);
 		advance(1000);
-		String refreshed=signed(PATH, now(), now()+60, "b");
+		long refreshedAt=now();
+		String refreshed=signed(PATH, refreshedAt, refreshedAt+60, "b");
 		assertNotEquals(initial, refreshed);
 		Request networkRequest=new Request.Builder().url(refreshed).build(); // Construct only; never executed.
 		Drawable cached=get(refreshed);
@@ -105,7 +106,7 @@ public class AlbumPublicCoverMemoryTest{
 		assertNotSame(original, cached);
 		assertEquals(refreshed, networkRequest.url().toString());
 		assertEquals("b".repeat(40), networkRequest.url().queryParameter("q-signature"));
-		assertEquals(now()+";"+(now()+60), networkRequest.url().queryParameter("q-sign-time"));
+		assertEquals(refreshedAt+";"+(refreshedAt+60), networkRequest.url().queryParameter("q-sign-time"));
 		assertEquals(1, entryCount());
 	}
 

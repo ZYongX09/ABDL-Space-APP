@@ -43,6 +43,14 @@ import org.joinmastodon.android.BuildConfig;
 import org.joinmastodon.android.E;
 import org.joinmastodon.android.R;
 import org.joinmastodon.android.api.MastodonAPIRequest;
+import org.joinmastodon.android.api.MastodonErrorResponse;
+import org.joinmastodon.android.api.CacheController;
+import org.joinmastodon.android.api.cache.HomeTimelineSnapshot;
+import org.joinmastodon.android.api.session.AccountSession;
+import me.grishka.appkit.utils.Preloader;
+import me.grishka.appkit.imageloader.ListImageLoaderAdapter;
+import me.grishka.appkit.imageloader.ImageCache;
+import me.grishka.appkit.imageloader.requests.ImageLoaderRequest;
 import org.joinmastodon.android.api.requests.catalog.GetDonationCampaigns;
 import org.joinmastodon.android.api.requests.markers.SaveMarkers;
 import org.joinmastodon.android.api.requests.timelines.GetAllTimeline;
@@ -123,6 +131,20 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 	private String lastSavedMarkerID;
 	private DonationCampaign currentDonationCampaign;
 	private BottomSheet donationSheet;
+	private CacheController homeCache;
+	private CacheController.HomeTimelineLease homeLease;
+	private AccountSession homeSession;
+	private org.joinmastodon.android.model.Token homeToken;
+	private String homeAccessToken;
+	private long homeNBWGeneration;
+	private long homeGeneration;
+	private boolean homeHeadInFlight, homeHistoryAttempted, showingHomeHistory, homeViewDestroyed;
+	private TextView homeRefreshingText;
+	private Runnable pendingHomeDelivery;
+	private final Runnable homeIdentityCheck=()->{
+		if(homeHeadInFlight && !isHomeIdentityCurrent()) acceptsHomeResponse(homeGeneration);
+		else updateHomeRefreshingText();
+	};
 
 	public HomeTimelineFragment(){
 		setLayout(R.layout.fragment_loader_hiding_toolbar);
@@ -209,25 +231,194 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 		});
 	}
 
+	private boolean isHomeIdentityCurrent(){
+		return homeSession!=null && AccountSessionManager.getInstance().tryGetAccount(accountID)==homeSession
+				&& homeToken==homeSession.token && homeToken!=null && java.util.Objects.equals(homeAccessToken, homeToken.accessToken)
+				&& homeNBWGeneration==homeSession.getNBWForumOptionsRepository().getSnapshot().generation
+				&& accountID.equals(AccountSessionManager.getInstance().getLastActiveAccountID())
+				&& (homeLease==null || homeCache.isHomeTimelineLeaseCurrent(homeLease));
+	}
+
+	private boolean acceptsHomeResponse(long generation){
+		if(generation!=homeGeneration || homeViewDestroyed || getActivity()==null || listMode!=ListMode.FOLLOWING) return false;
+		if(!isHomeIdentityCurrent()){
+			cancelLoading();
+			if(AccountSessionManager.getInstance().tryGetAccount(accountID)!=null && list!=null){
+				showingHomeHistory=true;
+				replaceHomeHead(List.of(), null, false);
+			}
+			return false;
+		}
+		return true;
+	}
+
+	private void deliverHomeResult(long generation, Runnable delivery){
+		if(!homeHeadInFlight || !acceptsHomeResponse(generation)) return;
+		if(list==null){
+			Runnable previous=pendingHomeDelivery;
+			pendingHomeDelivery=()->{
+				if(previous!=null) previous.run();
+				if(homeHeadInFlight && acceptsHomeResponse(generation)) delivery.run();
+			};
+		}else delivery.run();
+	}
+
+	private void startHomeHead(int count, boolean allowHistory){
+		if(homeHeadInFlight) return;
+		AccountSession session=AccountSessionManager.getInstance().tryGetAccount(accountID);
+		if(session==null || !accountID.equals(AccountSessionManager.getInstance().getLastActiveAccountID())){ cancelLoading(); return; }
+		homeViewDestroyed=false;
+		homeSession=session;
+		homeToken=session.token;
+		homeAccessToken=homeToken==null ? null : homeToken.accessToken;
+		homeNBWGeneration=session.getNBWForumOptionsRepository().getSnapshot().generation;
+		homeCache=session.getCacheController();
+		homeLease=homeCache.beginHomeTimelineSnapshot();
+		long generation=++homeGeneration;
+		homeHeadInFlight=true;
+		dataLoading=true;
+		maxID=null; // Cached opaque cursor is metadata only, never a pagination capability.
+		preloader.setMoreAvailable(false);
+		updateHomeRefreshingText();
+		if(allowHistory && homeLease!=null && !homeHistoryAttempted && data.isEmpty()){
+			homeHistoryAttempted=true;
+			homeCache.getHomeTimelineSnapshot(homeLease, snapshot->deliverHomeResult(generation, ()->{
+				if(snapshot!=null){
+					ArrayList<Status> history=new ArrayList<>(snapshot.posts);
+					session.filterStatuses(history, getFilterContext());
+					if(!history.isEmpty()){
+						showingHomeHistory=true;
+						replaceHomeHead(history, null, false);
+						dataLoading=true;
+						showHomeContentImmediately();
+					}
+				}
+				sendHomeHead(generation, count);
+			}));
+		}else{
+			homeHistoryAttempted=true;
+			sendHomeHead(generation, count);
+		}
+	}
+
+	private void sendHomeHead(long generation, int count){
+		if(!acceptsHomeResponse(generation)) return;
+		GetAllTimeline request=new GetAllTimeline(null, count);
+		currentRequest=request;
+		request.setCallback(new Callback<>(){
+			@Override public void onSuccess(List<Status> result){
+				deliverHomeResult(generation, ()->{
+					ArrayList<Status> authoritative=new ArrayList<>(result);
+					homeSession.filterStatuses(authoritative, getFilterContext());
+					homeCache.putHomeTimelineSnapshot(homeLease, authoritative, request.getNextMaxID());
+					showingHomeHistory=false;
+					replaceHomeHead(authoritative, request.getNextMaxID(), request.getNextMaxID()!=null);
+					homeHeadInFlight=false;
+					dataLoading=false;
+					updateHomeRefreshingText();
+				});
+			}
+			@Override public void onError(ErrorResponse error){
+				deliverHomeResult(generation, ()->{
+					homeHeadInFlight=false;
+					dataLoading=false;
+					currentRequest=null;
+					refreshDone();
+					updateHomeRefreshingText();
+					if(error instanceof MastodonErrorResponse response && (response.httpStatus==401 || response.httpStatus==403)){
+						homeCache.invalidateHomeTimelineSnapshot();
+						showingHomeHistory=false;
+						replaceHomeHead(List.of(), null, false);
+						loaded=false;
+						doReauthOnErrorRetry=true;
+						HomeTimelineFragment.super.onError(error);
+					}else if(showingHomeHistory){
+						preloader.setMoreAvailable(false);
+						showHomeContentImmediately();
+					}else HomeTimelineFragment.super.onError(error);
+				});
+			}
+		}).exec(accountID);
+	}
+
+	/** AppKit 1.4.8 has no reset for preloading/preloadOnReady. Rebind its real backing arrays. */
+	private void replaceHomeHead(List<Status> posts, String nextMaxID, boolean more){
+		data.clear(); preloadedData.clear();
+		preloader=new Preloader<>(this, itemsPerPage);
+		data=preloader.getData(); preloadedData=preloader.getPreloadedData();
+		preloader.setFooterViews(footerProgress, footerError);
+		knownAccounts.clear(); relationships.clear();
+		maxID=nextMaxID;
+		preloadingFailed=false;
+		refreshing=true;
+		onDataLoaded(posts, more);
+	}
+
+	private void showHomeContentImmediately(){
+		if(content!=null){ content.animate().cancel(); content.setAlpha(1f); content.setVisibility(View.VISIBLE); }
+		if(progress!=null){ progress.animate().cancel(); progress.setVisibility(View.GONE); }
+		if(errorView!=null){ errorView.animate().cancel(); errorView.setVisibility(View.GONE); }
+		if(refreshLayout!=null){ refreshLayout.setRefreshing(false); refreshLayout.setVisibility(View.VISIBLE); }
+		updateHomeRefreshingText();
+	}
+
+	private void updateHomeRefreshingText(){
+		if(homeRefreshingText==null) return;
+		homeRefreshingText.removeCallbacks(homeIdentityCheck);
+		homeRefreshingText.setVisibility(homeHeadInFlight && listMode==ListMode.FOLLOWING ? View.VISIBLE : View.GONE);
+		if(homeHeadInFlight) homeRefreshingText.postDelayed(homeIdentityCheck, 500);
+	}
+
+	@Override protected boolean shouldAutomaticallyTranslateVisibleContent(){ return !showingHomeHistory; }
+	@Override protected boolean shouldFetchMissingNestedQuotes(){ return !showingHomeHistory; }
+	@Override protected void loadRelationships(Set<String> ids){ if(!showingHomeHistory) super.loadRelationships(ids); }
+	@Override public boolean isDataLoading(){ return homeHeadInFlight || showingHomeHistory || super.isDataLoading(); }
+	@Override public void onError(ErrorResponse error){
+		if(listMode==ListMode.FOLLOWING && error instanceof MastodonErrorResponse response && (response.httpStatus==401 || response.httpStatus==403)){
+			cancelLoading();
+			if(homeCache!=null) homeCache.invalidateHomeTimelineSnapshot();
+			showingHomeHistory=false;
+			if(list!=null) replaceHomeHead(List.of(), null, false);
+			loaded=false;
+			doReauthOnErrorRetry=true;
+		}
+		super.onError(error);
+	}
+	@Override public void onScrolledToLastItem(){ if(!homeHeadInFlight && !showingHomeHistory) super.onScrolledToLastItem(); }
+	@Override public void loadData(int offset, int count){ if(!homeHeadInFlight && !showingHomeHistory) super.loadData(offset, count); }
+	@Override protected void showProgress(){ if(showingHomeHistory && !data.isEmpty()) showHomeContentImmediately(); else super.showProgress(); }
+
+	@Override protected void cancelLoading(){
+		homeGeneration++;
+		homeHeadInFlight=false;
+		pendingHomeDelivery=null;
+		super.cancelLoading();
+		dataLoading=false;
+		refreshDone();
+		updateHomeRefreshingText();
+	}
+
 	@Override
 	protected void doLoadData(int offset, int count){
+		if(listMode==ListMode.FOLLOWING && offset==0){ startHomeHead(count, true); return; }
+		if(listMode==ListMode.FOLLOWING && (homeHeadInFlight || showingHomeHistory)) return;
 		switch(listMode){
 			case FOLLOWING -> {
-				GetAllTimeline req = new GetAllTimeline(offset>0 ? maxID : null, count);
-				currentRequest=req
-						.setCallback(new SimpleCallback<>(this){
-							@Override
-							public void onSuccess(List<Status> result){
-								if(getActivity()==null || listMode!=ListMode.FOLLOWING)
-									return;
-								if(refreshing)
-									list.scrollToPosition(0);
-								maxID=req.getNextMaxID();
-								AccountSessionManager.get(accountID).filterStatuses(result, getFilterContext());
-								onDataLoaded(result, maxID!=null);
-							}
-						})
-						.exec(accountID);
+				long generation=homeGeneration;
+				GetAllTimeline req=new GetAllTimeline(maxID, count);
+				currentRequest=req;
+				req.setCallback(new Callback<>(){
+					@Override public void onSuccess(List<Status> result){
+						if(!acceptsHomeResponse(generation) || list==null) return;
+						maxID=req.getNextMaxID();
+						ArrayList<Status> filtered=new ArrayList<>(result);
+						homeSession.filterStatuses(filtered, getFilterContext());
+						onDataLoaded(filtered, maxID!=null);
+					}
+					@Override public void onError(ErrorResponse error){
+						if(acceptsHomeResponse(generation) && list!=null) HomeTimelineFragment.this.onError(error);
+					}
+				}).exec(accountID);
 			}
 			case LOCAL -> {
 				currentRequest=new GetPublicTimeline(true, false, offset>0 ? maxID : null, null, count, null, /* MOSHIDON */ null)
@@ -269,6 +460,9 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 		newPostsBtn=view.findViewById(R.id.new_posts_btn);
 		newPostsBtn.setOnClickListener(this::onNewPostsBtnClick);
 		newPostsBtnWrap=view.findViewById(R.id.new_posts_btn_wrap);
+		homeViewDestroyed=false;
+		homeRefreshingText=view.findViewById(R.id.home_timeline_refreshing);
+		updateHomeRefreshingText();
 
 		if(newPostsBtnShown){
 			newPostsBtnWrap.setVisibility(View.VISIBLE);
@@ -337,6 +531,8 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 		}
 		if(currentDonationCampaign!=null)
 			showDonationBanner(currentDonationCampaign);
+		if(pendingHomeDelivery!=null){ Runnable delivery=pendingHomeDelivery; pendingHomeDelivery=null; delivery.run(); }
+		if(showingHomeHistory && !homeHeadInFlight) startHomeHead(itemsPerPage*2, false);
 	}
 
 	@Override
@@ -390,6 +586,7 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 	protected void onShown(){
 		super.onShown();
 		if(!getArguments().getBoolean("noAutoLoad")){
+			if(showingHomeHistory && !homeHeadInFlight){ startHomeHead(itemsPerPage*2, false); return; }
 			if(!loaded && !dataLoading){
 				loadData();
 			}else if(!dataLoading){
@@ -401,7 +598,7 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 	@Override
 	protected void onHidden(){
 		super.onHidden();
-		if(!data.isEmpty() && listMode==ListMode.FOLLOWING){
+		if(!showingHomeHistory && !homeHeadInFlight && !data.isEmpty() && list!=null && list.getChildCount()>0 && !displayItems.isEmpty() && listMode==ListMode.FOLLOWING){
 			String topPostID=displayItems.get(Math.max(0, list.getChildAdapterPosition(list.getChildAt(0))-getMainAdapterOffset())).parentID;
 			if(!topPostID.equals(lastSavedMarkerID)){
 				lastSavedMarkerID=topPostID;
@@ -437,6 +634,7 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 	}
 
 	private void loadNewPosts(){
+		if(homeHeadInFlight || showingHomeHistory) return;
 		dataLoading=true;
 		// The idea here is that we request the timeline such that if there are fewer than `limit` posts,
 		// we'll get the currently topmost post as last in the response. This way we know there's no gap
@@ -482,7 +680,7 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 
 	@Override
 	public void onGapClick(GapStatusDisplayItem.Holder item){
-		if(dataLoading)
+		if(homeHeadInFlight || showingHomeHistory || dataLoading)
 			return;
 		GapStatusDisplayItem gap=item.getItem();
 		gap.loading=true;
@@ -655,12 +853,24 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 			case LOCAL -> new GetPublicTimeline(true, false, maxID, minID, limit, sinceID, /* MOSHIDON */ null);
 			case LIST -> new GetListTimeline(currentList.id, maxID, minID, limit, sinceID);
 		};
+		long generation=homeGeneration;
+		ListMode requestedMode=listMode;
 		currentRequest=req;
-		req.setCallback(callback).exec(accountID);
+		req.setCallback(new Callback<>(){
+			private boolean current(){ return requestedMode==listMode && list!=null && (requestedMode!=ListMode.FOLLOWING || acceptsHomeResponse(generation)); }
+			@Override public void onSuccess(List<Status> result){ if(current()) callback.onSuccess(result); }
+			@Override public void onError(ErrorResponse error){ if(current()) callback.onError(error); }
+		}).exec(accountID);
 	}
 
 	@Override
 	public void onRefresh(){
+		if(listMode==ListMode.FOLLOWING){
+			cancelLoading();
+			startHomeHead(itemsPerPage*2, false);
+			if(refreshLayout!=null) refreshLayout.setRefreshing(false);
+			return;
+		}
 		if(currentRequest!=null){
 			currentRequest.cancel();
 			currentRequest=null;
@@ -795,6 +1005,10 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 
 	@Override
 	public void onDestroyView(){
+		cancelLoading();
+		homeViewDestroyed=true;
+		if(homeRefreshingText!=null) homeRefreshingText.removeCallbacks(homeIdentityCheck);
+		homeRefreshingText=null;
 		super.onDestroyView();
 		donationBanner=null;
 		donationBannerDismissing=false;
@@ -841,6 +1055,14 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 
 	@Override
 	public void reload(){
+		cancelLoading();
+		if(listMode==ListMode.FOLLOWING){
+			startHomeHead(itemsPerPage*2, false);
+			if(listsDropdownText!=null) listsDropdownText.setText(getCurrentListTitle());
+			invalidateOptionsMenu();
+			return;
+		}
+		showingHomeHistory=false;
 		if(currentRequest!=null){
 			currentRequest.cancel();
 			currentRequest=null;
@@ -850,6 +1072,37 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 		loadData();
 		listsDropdownText.setText(getCurrentListTitle());
 		invalidateOptionsMenu();
+	}
+
+	@Override
+	protected ListImageLoaderAdapter getImageLoaderAdapter(){
+		ListImageLoaderAdapter delegate=super.getImageLoaderAdapter();
+		if(delegate==null) return null;
+		return new ListImageLoaderAdapter(){
+			@Override public int getCount(){ return delegate.getCount(); }
+			@Override public int getImageCountForItem(int position){ return delegate.getImageCountForItem(position); }
+			@Override public ImageLoaderRequest getImageRequest(int position, int image){
+				ImageLoaderRequest request=delegate.getImageRequest(position, image);
+				if(!showingHomeHistory || request==null) return request;
+				// Binding still reuses the original memory key. Disk misses never download a source.
+				try{
+					java.io.File file=ImageCache.getInstance(getActivity()).getFile(request);
+					return file==null ? null : new CachedHomeImageRequest(request, file);
+				}catch(java.io.IOException | RuntimeException unavailable){ return null; }
+			}
+			@Override public void imageLoaded(int position, int image, android.graphics.drawable.Drawable drawable){ delegate.imageLoaded(position, image, drawable); }
+			@Override public void imageLoadingFailed(int position, int image, Throwable error){ delegate.imageLoadingFailed(position, image, error); }
+		};
+	}
+
+	private static final class CachedHomeImageRequest extends me.grishka.appkit.imageloader.requests.UrlImageLoaderRequest{
+		private final ImageLoaderRequest source;
+		CachedHomeImageRequest(ImageLoaderRequest source, java.io.File file){
+			super(source.desiredConfig, source.desiredMaxWidth, source.desiredMaxHeight, source.processingSteps, Uri.fromFile(file));
+			this.source=source;
+		}
+		@Override public String getMemoryCacheKey(){ return source.getMemoryCacheKey(); }
+		@Override public String getDiskCacheKey(){ return source.getDiskCacheKey(); }
 	}
 
 	@Override

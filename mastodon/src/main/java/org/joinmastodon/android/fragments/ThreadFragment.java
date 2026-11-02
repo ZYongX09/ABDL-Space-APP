@@ -13,6 +13,7 @@ import android.os.Bundle;
 import android.text.SpannableStringBuilder;
 import android.text.TextUtils;
 import android.util.Property;
+import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
@@ -29,6 +30,7 @@ import org.joinmastodon.android.BuildConfig;
 import org.joinmastodon.android.GlobalUserPreferences;
 import org.joinmastodon.android.R;
 import org.joinmastodon.android.api.requests.statuses.GetStatusContext;
+import org.joinmastodon.android.api.session.AccountSession;
 import org.joinmastodon.android.api.session.AccountSessionManager;
 import org.joinmastodon.android.model.Account;
 import org.joinmastodon.android.model.AsyncRefresh;
@@ -46,6 +48,7 @@ import org.joinmastodon.android.ui.displayitems.TextStatusDisplayItem;
 import org.joinmastodon.android.ui.text.HtmlParser;
 import org.joinmastodon.android.ui.utils.UiUtils;
 import org.joinmastodon.android.ui.views.CrisisWarningViewController;
+import org.joinmastodon.android.ui.views.ThreadSkeletonView;
 import org.parceler.Parcels;
 
 import java.util.ArrayList;
@@ -64,6 +67,7 @@ import androidx.recyclerview.widget.ListUpdateCallback;
 import androidx.recyclerview.widget.RecyclerView;
 import me.grishka.appkit.Nav;
 import me.grishka.appkit.api.SimpleCallback;
+import me.grishka.appkit.api.ErrorResponse;
 import me.grishka.appkit.imageloader.ViewImageLoader;
 import me.grishka.appkit.imageloader.requests.UrlImageLoaderRequest;
 import me.grishka.appkit.utils.CubicBezierInterpolator;
@@ -74,6 +78,11 @@ import me.grishka.appkit.utils.V;
 public class ThreadFragment extends StatusListFragment implements AssistContentProviderFragment{
 	private Status mainStatus;
 	private boolean mainStatusDeleted;
+	// Only the context request owns this page's reply skeleton. No cross-page transfer/cache.
+	private long repliesRequestGeneration;
+	private GetStatusContext repliesRequest;
+	private ErrorResponse repliesLoadError;
+	private boolean threadViewReady, threadShown, repliesRetryRefresh;
 	// Keep successful local replies until context acknowledges them, including stale refreshes.
 	private final ArrayList<Status> pendingCreatedReplies=new ArrayList<>();
 	private ImageView endMark;
@@ -137,6 +146,7 @@ public class ThreadFragment extends StatusListFragment implements AssistContentP
 
 	@Override
 	public void onPause(){
+		setRepliesAnimationActive(false);
 		dismissNbwContextSnackbar();
 		super.onPause();
 	}
@@ -144,14 +154,19 @@ public class ThreadFragment extends StatusListFragment implements AssistContentP
 	@Override
 	public void onResume(){
 		super.onResume();
+		renderRepliesLoading();
 		maybeShowNbwContextSnackbar();
 	}
 
 	@Override
 	public void onDestroyView(){
+		threadViewReady=false;
+		threadShown=false;
+		cancelLoading();
+		setRepliesAnimationActive(false);
 		dismissNbwContextSnackbar();
 		moreRepliesSnackbar=null;
-		if(asyncRefreshID!=null){
+		if(asyncRefreshID!=null && contentView!=null){
 			contentView.removeCallbacks(asyncRefreshPartialRunnable);
 		}
 		if(highlightAlphaAnimator!=null){
@@ -186,15 +201,40 @@ public class ThreadFragment extends StatusListFragment implements AssistContentP
 
 	@Override
 	protected void doLoadData(int offset, int count){
-		if(mainStatusDeleted)
+		if(mainStatusDeleted || !threadViewReady || getView()==null){
+			cancelLoading();
 			return;
-		currentRequest=new GetStatusContext(mainStatus.id)
-				.setCallback(new SimpleCallback<>(this){
+		}
+		AccountSessionManager sessions=AccountSessionManager.getInstance();
+		final String requestAccount=accountID, rootID=mainStatus.id;
+		final AccountSession requestSession=sessions.tryGetAccount(requestAccount);
+		final String activeAccount=sessions.getLastActiveAccountID();
+		if(requestSession==null || activeAccount!=null && !activeAccount.equals(requestAccount)){
+			cancelLoading();
+			return;
+		}
+		// Install identity before exec: transport may deliver a synchronous error.
+		boolean refreshingRequest=refreshing;
+		if(repliesRequest!=null) cancelLoading();
+		refreshing=refreshingRequest;
+		final long generation=++repliesRequestGeneration;
+		final View requestView=getView();
+		final GetStatusContext request=new GetStatusContext(rootID);
+		repliesRequest=request;
+		currentRequest=request;
+		dataLoading=true;
+		preloadingFailed=false;
+		repliesLoadError=null;
+		renderRepliesLoading();
+		request.setNBWCancellationCleanup(()->{
+			if(generation==repliesRequestGeneration && repliesRequest==request) cancelLoading();
+		});
+		request.setCallback(new SimpleCallback<StatusContext>(this){
 					@Override
 					public void onSuccess(StatusContext result){
-						currentRequest=null;
-						if(getActivity()==null || mainStatusDeleted)
+						if(!acceptRepliesCallback(generation, request, requestView, requestAccount, requestSession, activeAccount, rootID))
 							return;
+						currentRequest=null;
 						// Context and StatusCreatedEvent may arrive in either order. Never insert the
 						// same ID twice or drop a just-created reply from an older server snapshot.
 						ArrayList<Status> ancestors=new ArrayList<>(result.ancestors);
@@ -233,8 +273,6 @@ public class ThreadFragment extends StatusListFragment implements AssistContentP
 						}else{
 							prevDisplayItems=null;
 						}
-						if(footerProgress!=null)
-							footerProgress.setVisibility(View.GONE);
 						data.addAll(descendants);
 						int prevCount=displayItems.size();
 						onAppendItems(descendants);
@@ -323,8 +361,113 @@ public class ThreadFragment extends StatusListFragment implements AssistContentP
 							dismissNbwContextSnackbar();
 						}
 					}
-				})
-				.exec(accountID);
+
+					@Override
+					public void onError(ErrorResponse error){
+						if(acceptRepliesCallback(generation, request, requestView, requestAccount, requestSession, activeAccount, rootID))
+							ThreadFragment.this.onError(error);
+					}
+				});
+		request.exec(requestAccount);
+	}
+
+	private boolean acceptRepliesCallback(long generation, GetStatusContext request, View requestView,
+			String requestAccount, AccountSession requestSession, String activeAccount, String rootID){
+		if(generation!=repliesRequestGeneration || repliesRequest!=request) return false;
+		AccountSessionManager sessions=AccountSessionManager.getInstance();
+		if(!threadViewReady || getView()!=requestView || getActivity()==null || mainStatusDeleted
+				|| !Objects.equals(accountID, requestAccount) || !Objects.equals(mainStatus.id, rootID)
+				|| sessions.tryGetAccount(requestAccount)!=requestSession
+				|| !Objects.equals(sessions.getLastActiveAccountID(), activeAccount)){
+			cancelLoading();
+			return false;
+		}
+		return true;
+	}
+
+	@Override
+	protected View onCreateFooterView(LayoutInflater inflater){
+		return inflater.inflate(R.layout.thread_replies_footer, null);
+	}
+
+	@Override
+	protected void showProgress(){
+		// The existing parcelled main post/author is real content, even before replies arrive.
+		showContent();
+	}
+
+	@Override
+	protected void showContent(){
+		super.showContent();
+		// No crossfade over the known main post, nor a second loading accessibility node.
+		setReplyViewVisibility(content, View.VISIBLE);
+		setReplyViewVisibility(progress, View.GONE);
+		setReplyViewVisibility(errorView, View.GONE);
+		if(progress instanceof ThreadSkeletonView skeleton) skeleton.setLoading(false);
+	}
+
+	@Override
+	public void dataLoaded(){
+		dataLoading=false; // AppKit LoaderFragment.dataLoaded() only sets loaded/showContent.
+		repliesRequest=null;
+		currentRequest=null;
+		preloadingFailed=false;
+		repliesLoadError=null;
+		super.dataLoaded();
+		renderRepliesLoading();
+	}
+
+	@Override
+	public void onError(ErrorResponse error){
+		if(!threadViewReady || mainStatusDeleted) return;
+		dataLoading=false;
+		repliesRequest=null;
+		currentRequest=null;
+		repliesRetryRefresh=refreshing;
+		if(refreshing) refreshDone();
+		preloadingFailed=true;
+		repliesLoadError=error;
+		showContent();
+		renderRepliesLoading();
+	}
+
+	@Override
+	protected void cancelLoading(){
+		++repliesRequestGeneration;
+		repliesRequest=null;
+		super.cancelLoading();
+		dataLoading=false;
+		if(refreshing) refreshDone();
+		preloadingFailed=false;
+		repliesLoadError=null;
+		renderRepliesLoading();
+	}
+
+	private void renderRepliesLoading(){
+		boolean pending=threadViewReady && !mainStatusDeleted && dataLoading && repliesRequest!=null;
+		boolean failed=threadViewReady && !mainStatusDeleted && repliesLoadError!=null;
+		if(footerProgress instanceof ThreadSkeletonView skeleton){
+			skeleton.setHostActive(threadShown && isResumed() && !isHidden());
+			skeleton.setLoading(pending);
+		}
+		setReplyViewVisibility(footerProgress, pending ? View.VISIBLE : View.GONE);
+		setReplyViewVisibility(footerError, failed ? View.VISIBLE : View.GONE);
+		if(failed && footerError!=null) repliesLoadError.bindErrorView(footerError);
+		setReplyViewVisibility(footerView, pending || failed ? View.VISIBLE : View.GONE);
+		setReplyViewVisibility(endMark, loaded && !pending && !failed && !mainStatusDeleted ? View.VISIBLE : View.GONE);
+	}
+
+	private void setRepliesAnimationActive(boolean active){
+		if(footerProgress instanceof ThreadSkeletonView skeleton) skeleton.setHostActive(active);
+	}
+
+	private void setReplyViewVisibility(View view, int visibility){
+		if(view==null) return;
+		// Hidden footer means no animation at all, independent of framework visibility dispatch.
+		if(visibility!=View.VISIBLE && view instanceof ThreadSkeletonView skeleton) skeleton.setLoading(false);
+		V.cancelVisibilityAnimation(view);
+		view.setAlpha(1f);
+		view.setVisibility(visibility);
 	}
 
 	private void filterStatuses(List<Status> statuses){
@@ -333,7 +476,9 @@ public class ThreadFragment extends StatusListFragment implements AssistContentP
 
 	@Override
 	protected void onShown(){
+		threadShown=true;
 		super.onShown();
+		renderRepliesLoading();
 		if(!mainStatusDeleted && !getArguments().getBoolean("noAutoLoad") && !loaded && !dataLoading){
 			dataLoading=true;
 			doLoadData();
@@ -343,12 +488,15 @@ public class ThreadFragment extends StatusListFragment implements AssistContentP
 
 	@Override
 	protected void onHidden(){
+		threadShown=false;
+		setRepliesAnimationActive(false);
 		dismissNbwContextSnackbar();
 		super.onHidden();
 	}
 
 	@Override
 	public void onViewCreated(View view, Bundle savedInstanceState){
+		threadViewReady=true;
 		super.onViewCreated(view, savedInstanceState);
 		crisisWarningController=new CrisisWarningViewController(view);
 		if(mainStatus.getContentStatus().mentalCrisis)
@@ -378,8 +526,7 @@ public class ThreadFragment extends StatusListFragment implements AssistContentP
 		}
 		UiUtils.loadCustomEmojiInTextView(toolbarTitleView);
 		showContent();
-		if(!loaded)
-			footerProgress.setVisibility(View.VISIBLE);
+		renderRepliesLoading();
 
 		list.addItemDecoration(new ReplyLinesItemDecoration());
 	}
@@ -405,10 +552,7 @@ public class ThreadFragment extends StatusListFragment implements AssistContentP
 			mainStatusDeleted=true;
 			dismissNbwContextSnackbar();
 			pendingCreatedReplies.clear();
-			if(currentRequest!=null){
-				currentRequest.cancel();
-				currentRequest=null;
-			}
+			cancelLoading();
 			if(asyncRefreshID!=null){
 				AccountSessionManager.get(accountID).getApiController().cancelPollingAsyncRefresh(asyncRefreshID, asyncRefreshCallback);
 				asyncRefreshID=null;
@@ -448,10 +592,9 @@ public class ThreadFragment extends StatusListFragment implements AssistContentP
 
 	@Override
 	protected void onErrorRetryClick(){
+		if(mainStatusDeleted || !threadViewReady || dataLoading || repliesRequest!=null) return;
 		if(preloadingFailed){
-			preloadingFailed=false;
-			V.setVisibilityAnimated(footerProgress, View.VISIBLE);
-			V.setVisibilityAnimated(footerError, View.GONE);
+			refreshing=repliesRetryRefresh;
 			doLoadData();
 			return;
 		}

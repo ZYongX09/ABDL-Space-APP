@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item name="seamless_source_binding" type="id" />
+    <string name="settings_seamless_transitions">Seamless card transitions</string>
+    <string name="settings_seamless_transitions_summary">Use this device’s supported system animation when opening post, novel and album cards. Respects reduced motion and content protection.</string>
+</resources>

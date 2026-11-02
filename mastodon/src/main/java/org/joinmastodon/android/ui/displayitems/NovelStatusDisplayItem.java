@@ -171,6 +171,9 @@ public final class NovelStatusDisplayItem extends StatusDisplayItem{
 		}
 		@Override public void onBind(NovelStatusDisplayItem next){
 			if(shelfRequest!=null)shelfRequest.cancel(); shelfRequest=null; shelfGeneration++; collected=null; bound=next;
+			org.joinmastodon.android.ui.seamless.SeamlessTransitions.bindCard(card, next.accountID, next.attachment==null ? null : next.attachment.workId,
+					!next.hideCover && !next.status.sensitive && next.status.visibility!=StatusPrivacy.PRIVATE && next.status.visibility!=StatusPrivacy.DIRECT
+							&& TextUtils.isEmpty(next.status.spoilerText) && !filtered(next.concealmentOwner), next.concealmentOwner);
 			wrapper.setPaddingRelative(V.dp(next.fullWidth ? 16 : 64),0,V.dp(16),V.dp(10));
 			NovelAttachment data=next.attachment; boolean available=data!=null && data.isDisplayable() && next.presentation!=Presentation.NONE;
 			boolean link=next.presentation==Presentation.LINK, update=next.presentation==Presentation.CHAPTER_UPDATE;
@@ -206,12 +209,15 @@ public final class NovelStatusDisplayItem extends StatusDisplayItem{
 			shelf.setContentDescription(wrapper.getContext().getString(inShelf ? R.string.novel_card_shelf_remove : R.string.novel_card_shelf_add));shelf.setTooltipText(shelf.getContentDescription());
 		}
 		@Override public void onClick(){
-			if(bound!=null && bound.attachment!=null && bound.attachment.isDisplayable()) openDetail(wrapper.getContext(),bound.accountID,bound.attachment.workId);
+			if(bound==null || bound.attachment==null || !bound.attachment.isDisplayable()) return;
+			if(wrapper.getContext() instanceof Activity activity
+					&& org.joinmastodon.android.ui.seamless.SeamlessTransitions.openNovel(activity, card, bound.accountID, bound.attachment.workId)) return;
+			openDetail(wrapper.getContext(),bound.accountID,bound.attachment.workId);
 		}
 		private void read(){
 			if(bound==null || !bound.attachment.isDisplayable()) return;
 			if(bound.presentation==Presentation.LINK) openReader(wrapper.getContext(),bound.accountID,bound.attachment.workId,null);
-			else openDetail(wrapper.getContext(),bound.accountID,bound.attachment.workId);
+			else onClick();
 		}
 		private void toggleShelf(){
 			NovelStatusDisplayItem current=bound; if(current==null || !current.attachment.isDisplayable() || !shelf.isEnabled())return;

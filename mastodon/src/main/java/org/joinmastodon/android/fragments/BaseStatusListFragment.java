@@ -331,11 +331,13 @@ public abstract class BaseStatusListFragment<T extends DisplayItemsParent> exten
 		}
 	}
 
+	protected boolean shouldFetchMissingNestedQuotes(){ return true; }
+
 	protected void populateNestedQuotes(List<StatusDisplayItem> items){
 		HashSet<String> needExtraStatuses=new HashSet<>();
 		ArrayList<StatusDisplayItem> itemsWithMissingStatuses=new ArrayList<>();
 		populateNestedQuotes(items, needExtraStatuses, itemsWithMissingStatuses);
-		if(!needExtraStatuses.isEmpty()){
+		if(shouldFetchMissingNestedQuotes() && !needExtraStatuses.isEmpty()){
 			APIRequest<?>[] req=new APIRequest[1];
 			req[0]=new GetStatusesByIDs(needExtraStatuses)
 					.setCallback(new Callback<>(){
@@ -727,6 +729,8 @@ public abstract class BaseStatusListFragment<T extends DisplayItemsParent> exten
 		args.putParcelable("status", Parcels.wrap(status.clone()));
 		if(status.inReplyToAccountId!=null && knownAccounts.containsKey(status.inReplyToAccountId))
 			args.putParcelable("inReplyToAccount", Parcels.wrap(knownAccounts.get(status.inReplyToAccountId)));
+		if(org.joinmastodon.android.ui.seamless.SeamlessTransitions.openPost(getActivity(), list, accountID, status, args))
+			return;
 		Nav.go(getActivity(), ThreadFragment.class, args);
 	}
 
@@ -1120,8 +1124,11 @@ public abstract class BaseStatusListFragment<T extends DisplayItemsParent> exten
 		if(list==null || !translationScreenActive) return;
 		list.removeCallbacks(translationVisibilityCheck); list.post(translationVisibilityCheck);
 	}
+	/** A historical list is not a current server permission check. */
+	protected boolean shouldAutomaticallyTranslateVisibleContent(){ return true; }
+
 	private void checkVisibleTranslations(){
-		if(!translationHostCurrent() || translationCoordinator==null) return;
+		if(!shouldAutomaticallyTranslateVisibleContent() || !translationHostCurrent() || translationCoordinator==null) return;
 		translationCoordinator.prune();
 		for(int i=0;i<list.getChildCount();i++){
 			View child=list.getChildAt(i);

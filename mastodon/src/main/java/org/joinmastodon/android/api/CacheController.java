@@ -18,6 +18,8 @@ import org.joinmastodon.android.api.requests.notifications.GetNotificationsV1;
 import org.joinmastodon.android.api.requests.notifications.GetNotificationsV2;
 import org.joinmastodon.android.api.requests.timelines.GetHomeTimeline;
 import org.joinmastodon.android.api.session.AccountSessionManager;
+import org.joinmastodon.android.api.session.AccountSession;
+import org.joinmastodon.android.api.cache.HomeTimelineSnapshot;
 import org.joinmastodon.android.model.Account;
 import org.joinmastodon.android.model.CacheablePaginatedResponse;
 import org.joinmastodon.android.model.FilterContext;
@@ -60,6 +62,12 @@ public class CacheController{
 	private boolean loadingNotifications;
 	private final ArrayList<Callback<PaginatedResponse<List<NotificationViewModel>>>> pendingNotificationsCallbacks=new ArrayList<>();
 	private List<FollowList> lists;
+	private final Object homeSnapshotLock=new Object();
+	private AccountSession homeSnapshotSession;
+	private boolean homeSnapshotRegistered;
+	private final HomeSnapshotEvents homeSnapshotEvents=new HomeSnapshotEvents();
+	private long homeSnapshotGeneration;
+	private boolean homeSnapshotRetired;
 
 	private static final int POST_FLAG_GAP_AFTER=1;
 
@@ -69,6 +77,135 @@ public class CacheController{
 
 	public CacheController(String accountID){
 		this.accountID=accountID;
+	}
+
+	/** In-memory CAS lease; no session or bearer token is serialized. */
+	public static final class HomeTimelineLease{
+		private final CacheController owner;
+		public final AccountSession session;
+		private final org.joinmastodon.android.model.Token token;
+		private final String accessToken, identity;
+		private final long generation, nbwGeneration;
+		private HomeTimelineLease(CacheController owner, AccountSession session, long generation, long nbwGeneration){
+			this.owner=owner; this.session=session; this.generation=generation;
+			token=session.token; accessToken=token.accessToken;
+			identity=HomeTimelineSnapshot.identity(owner.accountID, accessToken);
+			this.nbwGeneration=nbwGeneration;
+		}
+	}
+
+	public HomeTimelineLease beginHomeTimelineSnapshot(){
+		AccountSession session=AccountSessionManager.getInstance().tryGetAccount(accountID);
+		if(session==null || session.token==null || session.token.accessToken==null) return null;
+		long nbwGeneration=session.getNBWForumOptionsRepository().getSnapshot().generation;
+		synchronized(homeSnapshotLock){
+			if(homeSnapshotRetired || AccountSessionManager.getInstance().tryGetAccount(accountID)!=session) return null;
+			if(homeSnapshotSession==null){
+				homeSnapshotSession=session;
+				org.joinmastodon.android.E.register(homeSnapshotEvents);
+				homeSnapshotRegistered=true;
+			}
+			if(session!=homeSnapshotSession) return null;
+			return new HomeTimelineLease(this, session, ++homeSnapshotGeneration, nbwGeneration);
+		}
+	}
+
+	private boolean homeLeaseCurrentLocked(HomeTimelineLease lease){
+		return lease!=null && lease.owner==this && !homeSnapshotRetired && lease.generation==homeSnapshotGeneration
+				&& AccountSessionManager.getInstance().tryGetAccount(accountID)==lease.session && lease.session==homeSnapshotSession
+				&& lease.token==lease.session.token && Objects.equals(lease.accessToken, lease.token.accessToken);
+	}
+
+	public boolean isHomeTimelineLeaseCurrent(HomeTimelineLease lease){
+		if(lease==null) return false;
+		long nbwGeneration=lease.session.getNBWForumOptionsRepository().getSnapshot().generation;
+		synchronized(homeSnapshotLock){ return homeLeaseCurrentLocked(lease) && lease.nbwGeneration==nbwGeneration; }
+	}
+
+	public void getHomeTimelineSnapshot(HomeTimelineLease lease, Consumer<HomeTimelineSnapshot> callback){
+		cancelDelayedClose();
+		databaseThread.postRunnable(()->{
+			HomeTimelineSnapshot snapshot=null;
+			try{
+				// Current readability decides how much of the projection may be decoded. A mode change
+				// also invalidates the snapshot generation, so a stale lease cannot resurrect NBW rows.
+				var nbw=lease==null ? null : lease.session.getNBWForumOptionsRepository().getSnapshot();
+				synchronized(homeSnapshotLock){
+					if(homeLeaseCurrentLocked(lease) && nbw!=null && nbw.generation==lease.nbwGeneration){
+						SQLiteDatabase database=getOrOpenDatabase();
+						try(Cursor cursor=database.query("misc", new String[]{"value"}, "`key`=? AND length(CAST(`value` AS BLOB))<=?",
+								new String[]{HomeTimelineSnapshot.KEY, String.valueOf(HomeTimelineSnapshot.MAX_UTF8_BYTES)}, null, null, null)){
+							if(cursor.moveToFirst()) snapshot=HomeTimelineSnapshot.decode(cursor.getString(0), lease.identity, System.currentTimeMillis(), nbw.canRead());
+						}
+						if(snapshot==null) database.delete("misc", "`key`=?", new String[]{HomeTimelineSnapshot.KEY});
+					}
+				}
+			}catch(RuntimeException malformed){
+				// A broken optional cache must never kill the shared database worker thread.
+				Log.w(TAG, "Home head unavailable", malformed);
+			}
+			finally{ closeDelayed(); }
+			HomeTimelineSnapshot result=snapshot;
+			uiHandler.post(()->{
+				boolean current;
+				try{ current=isHomeTimelineLeaseCurrent(lease); }catch(RuntimeException unavailable){ current=false; }
+				callback.accept(current ? result : null);
+			});
+		}, 0);
+	}
+
+	public void putHomeTimelineSnapshot(HomeTimelineLease lease, List<Status> posts, String nextMaxID){
+		if(!isHomeTimelineLeaseCurrent(lease)) return;
+		String json=HomeTimelineSnapshot.encode(posts, nextMaxID, lease.identity, System.currentTimeMillis(), lease.session.getNBWForumOptionsRepository().getSnapshot().canRead());
+		cancelDelayedClose();
+		databaseThread.postRunnable(()->{
+			try{
+				long nbwGeneration=lease.session.getNBWForumOptionsRepository().getSnapshot().generation;
+				synchronized(homeSnapshotLock){
+					if(!homeLeaseCurrentLocked(lease) || nbwGeneration!=lease.nbwGeneration) return;
+					SQLiteDatabase database=getOrOpenDatabase();
+					if(json==null) database.delete("misc", "`key`=?", new String[]{HomeTimelineSnapshot.KEY});
+					else{
+						ContentValues values=new ContentValues(2);
+						values.put("key", HomeTimelineSnapshot.KEY); values.put("value", json);
+						database.insertWithOnConflict("misc", null, values, SQLiteDatabase.CONFLICT_REPLACE);
+					}
+				}
+			}catch(RuntimeException unavailable){ Log.w(TAG, "Home head write skipped", unavailable); }
+			finally{ closeDelayed(); }
+		}, 0);
+	}
+
+	public void invalidateHomeTimelineSnapshot(){
+		synchronized(homeSnapshotLock){ homeSnapshotGeneration++; }
+		cancelDelayedClose();
+		databaseThread.postRunnable(()->{
+			try{
+				synchronized(homeSnapshotLock){
+					if(homeSnapshotRetired || homeSnapshotSession==null || AccountSessionManager.getInstance().tryGetAccount(accountID)!=homeSnapshotSession) return;
+					getOrOpenDatabase().delete("misc", "`key`=?", new String[]{HomeTimelineSnapshot.KEY});
+				}
+			}catch(RuntimeException unavailable){ Log.w(TAG, "Home head invalidation skipped", unavailable); }
+			finally{ closeDelayed(); }
+		}, 0);
+	}
+
+	public final class HomeSnapshotEvents{
+		@com.squareup.otto.Subscribe public void removed(org.joinmastodon.android.events.RemoveAccountPostsEvent event){ if(accountID.equals(event.accountID)) invalidateHomeTimelineSnapshot(); }
+		@com.squareup.otto.Subscribe public void updated(org.joinmastodon.android.events.StatusUpdatedEvent event){ invalidateHomeTimelineSnapshot(); }
+		@com.squareup.otto.Subscribe public void muted(org.joinmastodon.android.events.StatusMuteChangedEvent event){ invalidateHomeTimelineSnapshot(); }
+		@com.squareup.otto.Subscribe public void deleted(org.joinmastodon.android.events.StatusDeletedEvent event){ if(accountID.equals(event.accountID)) invalidateHomeTimelineSnapshot(); }
+		@com.squareup.otto.Subscribe public void filterChanged(org.joinmastodon.android.events.SettingsFilterCreatedOrUpdatedEvent event){ if(accountID.equals(event.accountID)) invalidateHomeTimelineSnapshot(); }
+		@com.squareup.otto.Subscribe public void filterDeleted(org.joinmastodon.android.events.SettingsFilterDeletedEvent event){ if(accountID.equals(event.accountID)) invalidateHomeTimelineSnapshot(); }
+		@com.squareup.otto.Subscribe public void loggedOut(org.joinmastodon.android.events.AccountLoggedOutEvent event){ if(accountID.equals(event.id)) retireHomeSnapshot(); }
+	}
+
+	private void retireHomeSnapshot(){
+		synchronized(homeSnapshotLock){
+			if(homeSnapshotRetired) return;
+			homeSnapshotRetired=true; homeSnapshotGeneration++;
+			if(homeSnapshotRegistered){ org.joinmastodon.android.E.unregister(homeSnapshotEvents); homeSnapshotRegistered=false; }
+		}
 	}
 
 	public void getHomeTimeline(String maxID, int count, boolean forceReload, Callback<CacheablePaginatedResponse<List<Status>>> callback){
@@ -397,6 +534,7 @@ public class CacheController{
 	}
 
 	public void deleteStatus(String id){
+		invalidateHomeTimelineSnapshot();
 		runOnDbThread((db)->{
 			db.delete("home_timeline", "`id`=?", new String[]{id});
 		});
@@ -404,6 +542,7 @@ public class CacheController{
 
 	/** Drop remote-only rows, never a local p_/c_ entity that happens to have NBW metadata. */
 	public void clearNBWRemoteCache(){
+		invalidateHomeTimelineSnapshot();
 		runOnDbThread(db->{
 			for(String table:new String[]{"home_timeline", "notifications_statuses_all", "notifications_statuses_mentions", "notifications_accounts_all", "notifications_accounts_mentions"}){
 				db.delete(table, "substr(`id`,1,4)=?", new String[]{"nbw_"});
@@ -424,11 +563,14 @@ public class CacheController{
 	}
 
 	public void closeDatabase(){
-		if(db!=null){
-			if(BuildConfig.DEBUG)
-				Log.d(TAG, "closeDatabase");
-			db.close();
-			db=null;
+		synchronized(homeSnapshotLock){
+			if(homeSnapshotSession!=null && homeSnapshotSession!=AccountSessionManager.getInstance().tryGetAccount(accountID)) retireHomeSnapshot();
+			if(db!=null){
+				if(BuildConfig.DEBUG)
+					Log.d(TAG, "closeDatabase");
+				db.close();
+				db=null;
+			}
 		}
 	}
 

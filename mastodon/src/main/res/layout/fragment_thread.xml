@@ -22,7 +22,7 @@
 		android:layout_height="0dp"
 		android:layout_weight="1">
 
-		<include layout="@layout/loading"
+		<include layout="@layout/thread_replies_loading"
 				 android:id="@+id/loading"/>
 
 		<ViewStub android:layout="?errorViewLayout"

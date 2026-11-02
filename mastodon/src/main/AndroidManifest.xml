@@ -117,6 +117,7 @@
 				<data android:mimeType="application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
 			</intent-filter>
 		</activity>
+		<activity android:name=".ui.seamless.SeamlessDetailActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
 		<activity android:name="org.joinmastodon.android.novel.app.NovelAppActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
 		<activity android:name="org.joinmastodon.android.novel.app.NovelAccountActionActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
 		<activity android:name="org.joinmastodon.android.novel.app.editor.NovelCreationActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />

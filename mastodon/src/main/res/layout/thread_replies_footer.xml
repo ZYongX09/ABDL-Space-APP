@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+	android:layout_width="match_parent"
+	android:layout_height="wrap_content"
+	android:visibility="gone">
+
+	<org.joinmastodon.android.ui.views.ThreadSkeletonView
+		android:id="@id/load_more_progress"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:visibility="gone"/>
+
+	<LinearLayout
+		android:id="@id/load_more_error"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:orientation="vertical"
+		android:padding="16dp"
+		android:visibility="gone">
+
+		<TextView
+			android:id="@id/error_text"
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:textAppearance="@style/m3_body_medium"
+			android:textColor="?colorM3OnSurfaceVariant"
+			android:accessibilityLiveRegion="polite"/>
+
+		<Button
+			android:id="@id/error_retry"
+			android:layout_width="wrap_content"
+			android:layout_height="wrap_content"
+			android:layout_gravity="end"
+			android:minWidth="64dp"
+			android:minHeight="48dp"
+			android:layout_marginTop="4dp"
+			android:text="@string/thread_loading_retry"
+			android:textColor="?colorM3Primary"
+			android:background="?android:attr/selectableItemBackground"/>
+
+	</LinearLayout>
+
+</FrameLayout>

@@ -80,6 +80,8 @@ internal val LocalNovelBottomPadding = staticCompositionLocalOf { 0.dp }
 class NovelAppActivity : ComponentActivity(), NavigationEventDispatcherOwner {
     private var model: NovelAppViewModel? = null
     private var accountId: String? = null
+    private var externalDetailRoot = false
+    private var entryWorkId: String? = null
     override val navigationEventDispatcher = NavigationEventDispatcher { goBack() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -89,6 +91,13 @@ class NovelAppActivity : ComponentActivity(), NavigationEventDispatcherOwner {
         super.onCreate(savedInstanceState)
         if (account == null || session == null) { finish(); return }
         accountId = account
+        externalDetailRoot = savedInstanceState?.getBoolean(org.joinmastodon.android.ui.seamless.SeamlessTransitions.DETAIL_ENTRY)
+            ?: intent.getBooleanExtra(org.joinmastodon.android.ui.seamless.SeamlessTransitions.DETAIL_ENTRY, false)
+        entryWorkId = intent.getStringExtra(EXTRA_WORK_ID)?.takeIf { it.isNotBlank() }
+        intent.removeExtra(org.joinmastodon.android.ui.seamless.SeamlessTransitions.DETAIL_ENTRY)
+        if (externalDetailRoot && savedInstanceState == null) org.joinmastodon.android.ui.seamless.SeamlessTransitions.attach(this, account, entryWorkId)
+        org.joinmastodon.android.security.AppSecurity.runAfterUnlock(this) {
+        if (AccountSessionManager.getInstance().tryGetAccount(account) !== session || AccountSessionManager.getInstance().lastActiveAccountID != account || isFinishing || isDestroyed) { finish(); return@runAfterUnlock }
         val vm = ViewModelProvider(this, object : ViewModelProvider.Factory {
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
                 @Suppress("UNCHECKED_CAST")
@@ -126,6 +135,20 @@ class NovelAppActivity : ComponentActivity(), NavigationEventDispatcherOwner {
         val chapter = intent.getStringExtra(EXTRA_CHAPTER_ID)?.takeIf { it.isNotBlank() }
         val work = intent.getStringExtra(EXTRA_WORK_ID)?.takeIf { it.isNotBlank() }
         if (savedInstanceState == null && chapter != null && work != null) startActivity(NovelReaderActivity.intent(this, account, work, chapter))
+        }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putBoolean(org.joinmastodon.android.ui.seamless.SeamlessTransitions.DETAIL_ENTRY, externalDetailRoot)
+        super.onSaveInstanceState(outState)
+    }
+    override fun finish() {
+        org.joinmastodon.android.ui.seamless.SeamlessTransitions.beforeFinish(this)
+        super.finish()
+    }
+    override fun onDestroy() {
+        org.joinmastodon.android.ui.seamless.SeamlessTransitions.protectedContent(this)
+        super.onDestroy()
     }
 
     override fun onResume() {
@@ -134,7 +157,11 @@ class NovelAppActivity : ComponentActivity(), NavigationEventDispatcherOwner {
         if (AccountSessionManager.getInstance().tryGetAccount(id) == null) { model?.unbindAccount(); finish() }
         else model?.refresh() // Includes fresh, account-scoped device manuscripts on return from the editor.
     }
-    private fun goBack() { if (model?.back() != true) finish() }
+    private fun goBack() {
+        val pages = model?.state?.value?.pages
+        if (externalDetailRoot && pages?.size == 2 && pages.last() == entryWorkId?.let(NovelPage::Detail)) { finish(); return }
+        if (model?.back() != true) finish()
+    }
     private fun openAccountAction(action: String) { accountId?.let { startActivity(NovelAccountActionActivity.intent(this, it, action)) } }
     private fun shareWork(work: Work) { shareText(listOf("《${work.title}》 · ${work.displayAuthorName(this)}", work.description, getString(R.string.novel_en_share_signature)).filter { it.isNotBlank() }.joinToString("\n\n")) }
     private fun shareText(text: String) { startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text), getString(R.string.novel_en_share))) }

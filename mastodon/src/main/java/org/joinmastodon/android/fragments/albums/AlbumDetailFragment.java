@@ -80,6 +80,7 @@ public class AlbumDetailFragment extends LoaderFragment{
 	private AlbumSecureWindow.Scope secureScope;
 	private boolean protectedVisitor(){ return album!=null && album.downloadProtected && !album.isOwner; }
 	private void updateSecureScope(){
+		if(album!=null && album.downloadProtected && getActivity()!=null) org.joinmastodon.android.ui.seamless.SeamlessTransitions.protectedContent(getActivity());
 		if(protectedVisitor() && sessionValid() && getActivity()!=null){
 			if(secureScope==null) secureScope=AlbumSecureWindow.acquire(getActivity().getWindow());
 		}else releaseSecureScope();

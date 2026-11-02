@@ -3,11 +3,13 @@ package org.joinmastodon.android.fragments;
 import static org.junit.Assert.*;
 
 import android.app.Fragment;
+import android.graphics.Rect;
 import android.os.Bundle;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
 
+import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import org.joinmastodon.android.CompatibilityTestApplication;
@@ -20,6 +22,11 @@ import org.joinmastodon.android.api.requests.accounts.GetAccountStatuses;
 import org.joinmastodon.android.api.requests.statuses.GetStatusContext;
 import org.joinmastodon.android.api.session.AccountSession;
 import org.joinmastodon.android.api.session.AccountSessionManager;
+import org.joinmastodon.android.api.session.NBWForumOptionsRepository;
+import org.joinmastodon.android.api.NBWV2RepositoryTest;
+import org.joinmastodon.android.model.NBWCapabilities;
+import org.joinmastodon.android.model.NBWForumOptions;
+import org.joinmastodon.android.model.NBWSelection;
 import org.joinmastodon.android.events.StatusCountersUpdatedEvent;
 import org.joinmastodon.android.events.StatusCreatedEvent;
 import org.joinmastodon.android.events.StatusDeletedEvent;
@@ -94,7 +101,23 @@ public class ThreadTimelineEventBehaviorTest{
 		List<String> ids(){ return data.stream().map(s->s.id).collect(Collectors.toList()); }
 	}
 
+	/** Real repository validation/state transitions, with only metadata transport held offline. */
+	private static class ReadOnlyMetadata implements NBWForumOptionsRepository.Transport{
+		NBWForumOptionsRepository.Result<NBWCapabilities> capabilities;
+		NBWForumOptionsRepository.Result<NBWForumOptions> options;
+		@Override public NBWForumOptionsRepository.Cancelable capabilities(NBWForumOptionsRepository.Result<NBWCapabilities> result){
+			capabilities=result; return ()->{};
+		}
+		@Override public NBWForumOptionsRepository.Cancelable options(NBWForumOptionsRepository.Result<NBWForumOptions> result){
+			options=result; return ()->{};
+		}
+		@Override public NBWForumOptionsRepository.Cancelable consent(boolean accepted, NBWForumOptionsRepository.Result<Object> result){
+			throw new AssertionError("Read-only Thread fixture must never request consent");
+		}
+	}
+
 	private AccountSession session, previousSession;
+	private NBWForumOptionsRepository readOnlyRepository;
 	private Instance previousInstance;
 	private Map<String, AccountSession> sessions;
 	private Map<String, Instance> instances;
@@ -125,6 +148,7 @@ public class ThreadTimelineEventBehaviorTest{
 	@After public void cleanup(){
 		for(Object listener:extraListeners) E.unregister(listener);
 		if(lifecycle!=null) lifecycle.close();
+		if(readOnlyRepository!=null) readOnlyRepository.deactivate();
 		if(previousSession==null) sessions.remove(session.getID()); else sessions.put(session.getID(), previousSession);
 		if(previousInstance==null) instances.remove(session.domain); else instances.put(session.domain, previousInstance);
 		GlobalUserPreferences.showInteractionCounts=previousShowCounts;
@@ -210,8 +234,23 @@ public class ThreadTimelineEventBehaviorTest{
 		Status preloaded=status("boost_preloaded", null); preloaded.favouritesCount=81; preloaded.bookmarksCount=82;
 		preloaded.reblog=status("nbw_123", "p_root"); statuses(thread, "preloadedData").add(preloaded);
 		RecyclerView list=(RecyclerView)field(thread.getClass(), "list").get(thread);
-		list.measure(View.MeasureSpec.makeMeasureSpec(480, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(2400, View.MeasureSpec.EXACTLY));
-		list.layout(0, 0, 480, 2400); idle();
+		int footerPosition=-1;
+		for(int position=0;position<thread.displayItems.size();position++){
+			if(thread.displayItems.get(position) instanceof FooterStatusDisplayItem footer && footer.status==visible.reblog){
+				assertEquals("There must be exactly one target content footer", -1, footerPosition);
+				footerPosition=position;
+			}
+		}
+		assertTrue("The genuine target footer must exist in the production adapter", footerPosition>=0);
+		assertTrue(list.getLayoutManager() instanceof LinearLayoutManager);
+		((LinearLayoutManager)list.getLayoutManager()).scrollToPositionWithOffset(footerPosition, 0);
+		lifecycle.get().getWindow().getDecorView().requestLayout(); idle();
+		RecyclerView.ViewHolder target=list.findViewHolderForAdapterPosition(footerPosition);
+		assertTrue("The target footer must be bound before the counter event", target instanceof FooterStatusDisplayItem.Holder);
+		assertSame(visible.reblog, ((FooterStatusDisplayItem.Holder)target).getItem().status);
+		assertVisibleInList(list, target.itemView);
+		assertFalse(target.itemView.findViewById(R.id.favorite_btn).isSelected());
+		assertFalse(target.itemView.findViewById(R.id.bookmark_btn).isSelected());
 		Status authoritative=status("nbw_123", null); authoritative.favouritesCount=42; authoritative.favourited=true;
 		authoritative.bookmarksCount=12; authoritative.bookmarked=true;
 		E.post(new StatusCountersUpdatedEvent(authoritative, StatusCountersUpdatedEvent.CounterType.FAVORITES));
@@ -226,6 +265,8 @@ public class ThreadTimelineEventBehaviorTest{
 		for(int i=0;i<list.getChildCount();i++){
 			RecyclerView.ViewHolder holder=list.getChildViewHolder(list.getChildAt(i));
 			if(holder instanceof FooterStatusDisplayItem.Holder footer && footer.getItem().status==visible.reblog){
+				assertSame("The event must rebind the already-visible holder", target, footer);
+				assertVisibleInList(list, footer.itemView);
 				assertTrue(footer.itemView.findViewById(R.id.favorite_btn).isSelected());
 				assertTrue(footer.itemView.findViewById(R.id.bookmark_btn).isSelected()); rebound=true;
 			}
@@ -397,11 +438,28 @@ public class ThreadTimelineEventBehaviorTest{
 		field(AccountTimelineFragment.class, "user").set(account, session.self);
 		field(AccountTimelineFragment.class, "filter").set(account, filter); register(account.eventListener); return account;
 	}
+	private void grantReadOnlyMetadata(){
+		ReadOnlyMetadata metadata=new ReadOnlyMetadata();
+		readOnlyRepository=new NBWForumOptionsRepository(metadata, ()->0L, new NBWForumOptionsRepository.SelectionStore(){
+			@Override public NBWSelection load(){ return NBWSelection.ai(); }
+			@Override public void save(NBWSelection value){}
+		}, ()->{}, Runnable::run);
+		try{
+			field(AccountSession.class, "nbwForumOptionsRepository").set(session, readOnlyRepository);
+		}catch(ReflectiveOperationException error){ throw new AssertionError(error); }
+		readOnlyRepository.activate();
+		metadata.capabilities.success(NBWV2RepositoryTest.capabilities("read_only"));
+		metadata.options.success(NBWV2RepositoryTest.options());
+		assertEquals(NBWForumOptionsRepository.State.READY, readOnlyRepository.getSnapshot().state);
+		assertTrue(readOnlyRepository.getSnapshot().canRead()); assertFalse(readOnlyRepository.getSnapshot().canWrite());
+	}
+
 	private void register(Object listener){ E.register(listener); extraListeners.add(listener); }
 	private void created(Status status){ E.post(new StatusCreatedEvent(status, session.getID())); idle(); }
 	private void launchThread(){ launchThread("p_root"); }
 	private void launchThread(String rootID){ launchThread(status(rootID, null)); }
 	private void launchThread(Status root){
+		if(root.id.startsWith("nbw_")) grantReadOnlyMetadata();
 		lifecycle=Robolectric.buildActivity(FragmentStackActivity.class);
 		FragmentStackActivity activity=lifecycle.get(); activity.setTheme(R.style.Theme_Mastodon_Light); lifecycle.create();
 		thread=new ThreadFragment(); Bundle args=new Bundle(); args.putString("account", session.getID());
@@ -430,6 +488,9 @@ public class ThreadTimelineEventBehaviorTest{
 	}
 	private static List<TextView> viewsWithText(View view, String text){
 		ArrayList<TextView> matches=new ArrayList<>();
+		// Ignore hidden error/retry layouts, including visible children of a hidden ancestor.
+		// Traverse every shown branch: two visible notices must still count as two, never pick the first.
+		if(view==null || view.getVisibility()!=View.VISIBLE || !view.isShown()) return matches;
 		if(view instanceof TextView label && text.contentEquals(label.getText())) matches.add(label);
 		if(view instanceof ViewGroup group){
 			for(int i=0;i<group.getChildCount();i++) matches.addAll(viewsWithText(group.getChildAt(i), text));
@@ -437,7 +498,22 @@ public class ThreadTimelineEventBehaviorTest{
 		return matches;
 	}
 	private static TextView onlyText(View view, String text){
-		List<TextView> matches=viewsWithText(view, text); assertEquals(1, matches.size()); return matches.get(0);
+		idle();
+		List<TextView> matches=viewsWithText(view, text); assertEquals(1, matches.size());
+		TextView action=matches.get(0);
+		assertTrue("Retry must be an attached, shown action", action.isAttachedToWindow() && action.isShown());
+		Rect visible=new Rect();
+		assertTrue("Retry must be inside the real window viewport", action.getGlobalVisibleRect(visible) && !visible.isEmpty());
+		assertTrue("Retry must be enabled and clickable", action.isEnabled() && action.isClickable());
+		return action;
+	}
+	private static void assertVisibleInList(RecyclerView list, View child){
+		assertTrue("The target footer must really be attached", list.isAttachedToWindow() && child.isAttachedToWindow());
+		assertTrue("The target footer must be shown", child.isShown());
+		Rect viewport=new Rect(), visible=new Rect();
+		assertTrue(list.getGlobalVisibleRect(viewport));
+		assertTrue(child.getGlobalVisibleRect(visible));
+		assertTrue("The target footer must intersect the actual RecyclerView viewport", visible.intersect(viewport) && !visible.isEmpty());
 	}
 	private static FilterResult hiddenIn(FilterContext context){
 		Filter filter=new Filter(); filter.id="hide_"+context; filter.title="Offline filter";
@@ -459,5 +535,10 @@ public class ThreadTimelineEventBehaviorTest{
 		}
 		throw new NoSuchFieldException(name);
 	}
-	private static void idle(){ ShadowLooper.idleMainLooper(); }
+	private static void idle(){
+		for(int frame=0;frame<3;frame++){
+			ShadowLooper.getShadowMainLooper().idleFor(ShadowChoreographer.getFrameDelay());
+			ShadowLooper.idleMainLooper();
+		}
+	}
 }

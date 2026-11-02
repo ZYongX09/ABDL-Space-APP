@@ -39,7 +39,7 @@ public class SettingsDisplayFragment extends BaseSettingsFragment<Void>{
 
 	// MOSHIDON:
 	private ListItem<Void> colorItem;
-	private CheckableListItem<Void> trueBlackModeItem, iosLiquidNavigationItem;
+	private CheckableListItem<Void> trueBlackModeItem, iosLiquidNavigationItem, seamlessTransitionsItem;
 	private AccountLocalPreferences lp;
 	private AlertDialog liquidNavigationDialog;
 
@@ -75,6 +75,13 @@ public class SettingsDisplayFragment extends BaseSettingsFragment<Void>{
 			iosLiquidNavigationItem.checkedChangeListener=this::requestLiquidNavigation;
 		}
 
+		if(org.joinmastodon.android.ui.seamless.SeamlessTransitions.isSupported()){
+			items.add(seamlessTransitionsItem=new CheckableListItem<>(R.string.settings_seamless_transitions,
+					R.string.settings_seamless_transitions_summary, CheckableListItem.Style.SWITCH,
+					GlobalUserPreferences.useSeamlessTransitions, R.drawable.ic_animation_24px,
+					item->setSeamlessTransitions(!item.checked)));
+			seamlessTransitionsItem.checkedChangeListener=this::setSeamlessTransitions;
+		}
 		items.add(showCWsItem=new CheckableListItem<>(R.string.settings_show_cws, 0, CheckableListItem.Style.SWITCH, GlobalUserPreferences.showCWs, R.drawable.ic_warning_24px, this::toggleCheckableItem));
 		items.add(hideSensitiveMediaItem=new CheckableListItem<>(R.string.settings_hide_sensitive_media, 0, CheckableListItem.Style.SWITCH, GlobalUserPreferences.hideSensitiveMedia, R.drawable.ic_no_adult_content_24px, this::toggleCheckableItem));
 		items.add(interactionCountsItem=new CheckableListItem<>(R.string.settings_show_interaction_counts, 0, CheckableListItem.Style.SWITCH, GlobalUserPreferences.showInteractionCounts, R.drawable.ic_social_leaderboard_24px, this::toggleCheckableItem));
@@ -105,6 +112,19 @@ public class SettingsDisplayFragment extends BaseSettingsFragment<Void>{
 		dismissLiquidNavigationDialog();
 		GlobalUserPreferences.save();
 		E.post(new StatusDisplaySettingsChangedEvent(accountID));
+	}
+
+	private void setSeamlessTransitions(boolean enabled){
+		if(seamlessTransitionsItem==null) return;
+		if(!org.joinmastodon.android.ui.seamless.SeamlessTransitions.isSupported()){
+			seamlessTransitionsItem.isEnabled=false;
+			rebindItem(seamlessTransitionsItem);
+			return;
+		}
+		seamlessTransitionsItem.checked=enabled;
+		GlobalUserPreferences.useSeamlessTransitions=enabled;
+		GlobalUserPreferences.save();
+		rebindItem(seamlessTransitionsItem);
 	}
 
 	private void requestLiquidNavigation(boolean enabled){
