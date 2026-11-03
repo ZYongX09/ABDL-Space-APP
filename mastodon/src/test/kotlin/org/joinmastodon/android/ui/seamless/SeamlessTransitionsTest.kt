@@ -49,6 +49,8 @@ import org.joinmastodon.android.security.ui.securityState
 import org.joinmastodon.android.ui.displayitems.AlbumUpdateStatusDisplayItem
 import org.joinmastodon.android.ui.displayitems.NovelStatusDisplayItem
 import org.joinmastodon.android.ui.displayitems.StatusDisplayItem
+import org.joinmastodon.android.ui.viewholders.SwitchListItemViewHolder
+import org.joinmastodon.android.ui.views.M3Switch
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
@@ -395,21 +397,213 @@ class SeamlessTransitionsTest {
         val binding = SeamlessSource.card(activity, source, account, "work")!!
         status.spoilerText = "Now hidden"; assertFalse(binding.valid())
     }
-    @Test fun settingsOfferOnlySupportedRuntimeDefaultOnAndPersistOptOut() {
-        fun settings(): SettingsDisplayFragment = SettingsDisplayFragment().apply {
-            arguments = Bundle().apply { putString("account", account) }
-            this@SeamlessTransitionsTest.activity.showFragment(this)
-            this@SeamlessTransitionsTest.activity.fragmentManager.executePendingTransactions()
-        }
-        val unsupported = settings()
-        assertNotNull(field(SettingsDisplayFragment::class.java, "seamlessTransitionsItem").get(unsupported))
-        val item = field(SettingsDisplayFragment::class.java, "seamlessTransitionsItem").get(unsupported) as CheckableListItem<*>
-        assertTrue(item.checked)
-        SettingsDisplayFragment::class.java.getDeclaredMethod("setSeamlessTransitions", Boolean::class.javaPrimitiveType).apply { isAccessible = true }.invoke(unsupported, false)
+    @Test fun supportedSettingsUseSavedPreferenceAndRealRowAndSwitchPersistOptOutAndOptIn() {
+        val settings = settings()
+        val item = seamlessSetting(settings)
+        assertTrue(item.isEnabled); assertTrue(item.checked)
+        assertFalse(GlobalUserPreferences.getPrefs().contains("useSeamlessTransitions"))
+        val (holder, switch) = seamlessHolder(settings)
+        assertTrue(switch.isEnabled); assertTrue(switch.isChecked)
+        assertEquals(R.string.settings_seamless_transitions_summary, item.subtitleRes)
+        switch.performClick(); ShadowLooper.idleMainLooper()
+        assertFalse(item.checked); assertFalse(GlobalUserPreferences.useSeamlessTransitions)
         assertFalse(GlobalUserPreferences.getPrefs().getBoolean("useSeamlessTransitions", true))
         GlobalUserPreferences.load(); assertFalse(GlobalUserPreferences.useSeamlessTransitions)
+        holder.onClick(); ShadowLooper.idleMainLooper()
+        assertTrue(item.checked); assertTrue(switch.isChecked)
+        assertTrue(GlobalUserPreferences.getPrefs().getBoolean("useSeamlessTransitions", false))
+        GlobalUserPreferences.load(); assertTrue(GlobalUserPreferences.useSeamlessTransitions)
+        assertEquals(0, rom.calls); assertNull(shadowOf(activity).nextStartedActivity)
+    }
+    @Test fun unsupportedSettingsRemainVisibleDisabledAndPreserveFalseFieldAndDiskChoice() {
+        GlobalUserPreferences.useSeamlessTransitions = false; GlobalUserPreferences.save()
+        rom.available = false
+        val settings = settings()
+        val item = seamlessSetting(settings)
+        val (holder, switch) = seamlessHolder(settings)
+        assertFalse(item.isEnabled); assertFalse(item.checked)
+        assertFalse(switch.isEnabled); assertFalse(switch.isChecked)
+        assertEquals(R.string.settings_seamless_transitions_unsupported, item.subtitleRes)
+        val subtitle = holder.itemView.findViewById<android.widget.TextView>(R.id.subtitle)
+        assertEquals(View.VISIBLE, subtitle.visibility)
+        assertEquals(activity.getString(item.subtitleRes), subtitle.text.toString())
+        val before = GlobalUserPreferences.getPrefs().all.toMap()
+        holder.onClick(); switch.performClick(); item.checkedChangeListener.accept(true)
+        ShadowLooper.idleMainLooper()
+        assertFalse(item.isEnabled); assertFalse(item.checked)
+        assertFalse(GlobalUserPreferences.useSeamlessTransitions)
+        assertEquals(before, GlobalUserPreferences.getPrefs().all)
+        assertFalse(SeamlessTransitions.openNovel(activity, card(), account, "work"))
+        assertEquals(0, rom.calls); assertNull(shadowOf(activity).nextStartedActivity)
+        controller.pause(); ShadowLooper.idleMainLooper() // onHidden saves unrelated display fields.
+        assertFalse(GlobalUserPreferences.getPrefs().getBoolean("useSeamlessTransitions", true))
+        GlobalUserPreferences.load(); assertFalse(GlobalUserPreferences.useSeamlessTransitions)
+    }
+    @Test @Config(sdk = [26]) fun noRomOnApi26StillShowsDisabledSettingAndKeepsTruePreference() {
+        GlobalUserPreferences.useSeamlessTransitions = true; GlobalUserPreferences.save()
+        SharedViewRom.setTransportForTests(null)
+        val settings = settings()
+        val item = seamlessSetting(settings)
+        assertFalse(item.isEnabled); assertFalse(item.checked)
+        assertEquals(R.string.settings_seamless_transitions_unsupported, item.subtitleRes)
+        item.performClick(); item.checkedChangeListener.accept(false)
+        assertTrue(GlobalUserPreferences.useSeamlessTransitions)
+        controller.pause(); ShadowLooper.idleMainLooper()
+        assertTrue(GlobalUserPreferences.getPrefs().getBoolean("useSeamlessTransitions", false))
+        GlobalUserPreferences.load(); assertTrue(GlobalUserPreferences.useSeamlessTransitions)
+    }
+    @Test fun disabledRomKeepsTruePreferenceAndCanBecomeAvailableWhenSettingsAreShownAgain() {
+        GlobalUserPreferences.useSeamlessTransitions = true; GlobalUserPreferences.save()
         rom.enabled = false
-        assertNull(field(SettingsDisplayFragment::class.java, "seamlessTransitionsItem").get(settings()))
+        val settings = settings()
+        val item = seamlessSetting(settings)
+        assertFalse(item.isEnabled); assertFalse(item.checked)
+        assertEquals(R.string.settings_seamless_transitions_disabled, item.subtitleRes)
+        item.checkedChangeListener.accept(false)
+        assertTrue(GlobalUserPreferences.useSeamlessTransitions)
+        assertTrue(GlobalUserPreferences.getPrefs().getBoolean("useSeamlessTransitions", false))
+        rom.enabled = true
+        // The callback originated from a disabled item, so even recovered capability cannot save it.
+        item.checkedChangeListener.accept(false)
+        assertTrue(item.isEnabled); assertTrue(item.checked)
+        assertTrue(GlobalUserPreferences.useSeamlessTransitions)
+        rom.enabled = false; showSettingsAgain(settings)
+        assertFalse(item.isEnabled); assertEquals(R.string.settings_seamless_transitions_disabled, item.subtitleRes)
+        rom.enabled = true; showSettingsAgain(settings)
+        assertTrue(item.isEnabled); assertTrue(item.checked)
+        assertEquals(R.string.settings_seamless_transitions_summary, item.subtitleRes)
+        assertEquals(0, rom.calls)
+    }
+    @Test fun staleEnabledSwitchCannotWriteTrueAfterRomTurnsOffOrItsQueryFails() {
+        GlobalUserPreferences.useSeamlessTransitions = false; GlobalUserPreferences.save()
+        val settings = settings()
+        val item = seamlessSetting(settings)
+        val (_, switch) = seamlessHolder(settings)
+        assertTrue(item.isEnabled); assertFalse(switch.isChecked)
+        val before = GlobalUserPreferences.getPrefs().all.toMap()
+        rom.enabled = false
+        switch.performClick(); ShadowLooper.idleMainLooper()
+        assertFalse(item.isEnabled); assertFalse(switch.isEnabled); assertFalse(switch.isChecked)
+        assertEquals(R.string.settings_seamless_transitions_disabled, item.subtitleRes)
+        assertFalse(GlobalUserPreferences.useSeamlessTransitions)
+        assertEquals(before, GlobalUserPreferences.getPrefs().all)
+        rom.enabled = true; showSettingsAgain(settings)
+        rom.queryFailure = true
+        item.performClick()
+        assertFalse(item.isEnabled); assertFalse(item.checked)
+        assertEquals(R.string.settings_seamless_transitions_query_failed, item.subtitleRes)
+        assertFalse(GlobalUserPreferences.useSeamlessTransitions)
+        assertFalse(GlobalUserPreferences.getPrefs().getBoolean("useSeamlessTransitions", true))
+        assertFalse(SeamlessTransitions.openNovel(activity, card(), account, "work"))
+        assertEquals(0, rom.calls); assertNull(shadowOf(activity).nextStartedActivity)
+    }
+    @Test fun incompatibleAndFailedQueriesHaveDifferentDisabledReasonsAndNeverEnableThePreference() {
+        GlobalUserPreferences.useSeamlessTransitions = false; GlobalUserPreferences.save()
+        SharedViewRom.setTransportForTests(SharedViewRom.BootTransport { name ->
+            if (name.endsWith("Manager")) String::class.java else Runnable::class.java
+        })
+        val settings = settings()
+        val item = seamlessSetting(settings)
+        assertEquals(SharedViewRom.Availability.INTERFACE_INCOMPATIBLE, SharedViewRom.availability())
+        assertFalse(item.isEnabled); assertEquals(R.string.settings_seamless_transitions_incompatible, item.subtitleRes)
+        rom.queryFailure = true; SharedViewRom.setTransportForTests(rom); showSettingsAgain(settings)
+        assertFalse(item.isEnabled); assertFalse(item.checked)
+        assertEquals(R.string.settings_seamless_transitions_query_failed, item.subtitleRes)
+        item.checkedChangeListener.accept(true)
+        assertFalse(GlobalUserPreferences.useSeamlessTransitions)
+        assertFalse(GlobalUserPreferences.getPrefs().getBoolean("useSeamlessTransitions", true))
+        rom.queryFailure = false; showSettingsAgain(settings)
+        assertTrue(item.isEnabled); assertFalse(item.checked) // Runtime recovery is not user opt-in.
+        assertEquals(R.string.settings_seamless_transitions_summary, item.subtitleRes)
+        assertEquals(0, rom.calls)
+    }
+    @Test @Config(qualifiers = "zh-rCN-w393dp-h852dp-mdpi") fun unavailableReasonIsLocalizedInChinese() {
+        rom.available = false
+        val settings = settings()
+        val item = seamlessSetting(settings)
+        val (holder, _) = seamlessHolder(settings)
+        assertEquals(R.string.settings_seamless_transitions_unsupported, item.subtitleRes)
+        val subtitle = holder.itemView.findViewById<android.widget.TextView>(R.id.subtitle).text.toString()
+        assertEquals(activity.getString(R.string.settings_seamless_transitions_unsupported), subtitle)
+        assertTrue(subtitle.contains("当前系统未提供"))
+    }
+    @Test fun resumingSettingsRechecksSystemFlagAndQueryWithoutChangingRequestedChoice() {
+        GlobalUserPreferences.useSeamlessTransitions = false; GlobalUserPreferences.save()
+        val settings = settings()
+        val item = seamlessSetting(settings)
+        assertTrue(item.isEnabled); assertFalse(item.checked)
+        controller.pause(); rom.enabled = false; controller.resume(); ShadowLooper.idleMainLooper()
+        assertFalse(item.isEnabled); assertFalse(item.checked)
+        assertEquals(R.string.settings_seamless_transitions_disabled, item.subtitleRes)
+        controller.pause(); rom.enabled = true; rom.queryFailure = true; controller.resume(); ShadowLooper.idleMainLooper()
+        assertFalse(item.isEnabled); assertEquals(R.string.settings_seamless_transitions_query_failed, item.subtitleRes)
+        controller.pause(); rom.queryFailure = false; controller.resume(); ShadowLooper.idleMainLooper()
+        assertTrue(item.isEnabled); assertFalse(item.checked)
+        assertEquals(R.string.settings_seamless_transitions_summary, item.subtitleRes)
+        assertFalse(GlobalUserPreferences.useSeamlessTransitions)
+        assertFalse(GlobalUserPreferences.getPrefs().getBoolean("useSeamlessTransitions", true))
+        assertEquals(0, rom.calls)
+    }
+    @Test @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun englishUnsupportedSettingsRenderRealDisabledRowWithoutErasingTruePreference() = renderUnavailableSettings("en")
+
+    @Test @GraphicsMode(GraphicsMode.Mode.NATIVE) @Config(qualifiers = "zh-rCN-w393dp-h852dp-mdpi")
+    fun chineseUnsupportedSettingsRenderRealDisabledRowWithoutErasingTruePreference() = renderUnavailableSettings("zh-rCN")
+
+    private fun renderUnavailableSettings(language: String) {
+        rom.available = false
+        GlobalUserPreferences.useSeamlessTransitions = true; GlobalUserPreferences.save()
+        val settings = settings()
+        val item = seamlessSetting(settings)
+        val (holder, switch) = seamlessHolder(settings)
+        assertFalse(item.isEnabled); assertFalse(switch.isEnabled); assertFalse(switch.isChecked)
+        assertTrue(GlobalUserPreferences.useSeamlessTransitions)
+        assertTrue(GlobalUserPreferences.getPrefs().getBoolean("useSeamlessTransitions", false))
+        val subtitle = holder.itemView.findViewById<android.widget.TextView>(R.id.subtitle)
+        assertEquals(View.VISIBLE, subtitle.visibility)
+        assertEquals(activity.getString(R.string.settings_seamless_transitions_unsupported), subtitle.text.toString())
+        val view = settings.view!!
+        assertTrue(holder.itemView.width > 0 && holder.itemView.height > 0)
+        val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+        try {
+            view.draw(Canvas(bitmap))
+            val output = java.io.File(System.getProperty("beta35RenderDir", "/tmp/abdl-beta35-renders"), "seamless/settings-unsupported-$language.png")
+            val directory = output.parentFile!!
+            assertTrue(directory.isDirectory || directory.mkdirs())
+            java.io.FileOutputStream(output).use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+            assertTrue(output.length() > 0)
+        } finally { bitmap.recycle() }
+    }
+    private fun settings(): SettingsDisplayFragment = SettingsDisplayFragment().apply {
+        arguments = Bundle().apply { putString("account", account) }
+        this@SeamlessTransitionsTest.activity.showFragment(this)
+        this@SeamlessTransitionsTest.activity.fragmentManager.executePendingTransactions()
+    }
+    private fun seamlessSetting(settings: SettingsDisplayFragment) =
+        field(SettingsDisplayFragment::class.java, "seamlessTransitionsItem").get(settings) as CheckableListItem<*>
+
+    private fun seamlessHolder(settings: SettingsDisplayFragment): Pair<SwitchListItemViewHolder, M3Switch> {
+        val item = seamlessSetting(settings)
+        val list = field(me.grishka.appkit.fragments.BaseRecyclerFragment::class.java, "list").get(settings) as RecyclerView
+        layout(list, 393, 852)
+        val adapter = field(org.joinmastodon.android.fragments.settings.BaseSettingsFragment::class.java, "itemsAdapter").get(settings) as org.joinmastodon.android.ui.adapters.GenericListItemsAdapter<*>
+        val positions = (0 until adapter.itemCount).filter { adapter.getItem(it) === item }
+        assertEquals("Exactly one seamless settings entry must be visible", 1, positions.size)
+        val holder = list.findViewHolderForAdapterPosition(positions.single()) as SwitchListItemViewHolder
+        assertSame(item, holder.getItem())
+        return holder to findSwitch(holder.itemView)!!
+    }
+    private fun findSwitch(view: View): M3Switch? = when (view) {
+        is M3Switch -> view
+        is ViewGroup -> (0 until view.childCount).firstNotNullOfOrNull { findSwitch(view.getChildAt(it)) }
+        else -> null
+    }
+    private fun showSettingsAgain(settings: SettingsDisplayFragment) {
+        activity.fragmentManager.beginTransaction().hide(settings).commit()
+        activity.fragmentManager.executePendingTransactions()
+        activity.fragmentManager.beginTransaction().show(settings).commit()
+        activity.fragmentManager.executePendingTransactions()
+        ShadowLooper.idleMainLooper()
     }
     @Test fun hostRestoresSameCredentialIdentityWithoutAnAnimationSession() {
         val state = savedHostWithPrivateChild()
@@ -564,12 +758,12 @@ class SeamlessTransitionsTest {
     }
     private fun field(owner: Class<*>, name: String) = owner.getDeclaredField(name).apply { isAccessible = true }
     private class FakeRom : SharedViewRom.Transport {
-        var available = true; var enabled = true; var nullOptions = false; var throwOptions = false
+        var available = true; var enabled = true; var queryFailure = false; var nullOptions = false; var throwOptions = false
         var calls = 0; var cancels = 0; var overrides = 0
         var source: View? = null; var bitmap: Bitmap? = null; var bounds: Rect? = null; var lastOverride: Bundle? = null
         val metadata = mapOf(SharedViewRom.BOUNDS to "rect|WINDOW|bounds", SharedViewRom.BACK to "int|VIEW_ANIM_FADE_OUT,VIEW_ANIM_FOLLOW_SYSTEM|return")
         override fun available() = available
-        override fun enabled() = enabled
+        override fun enabled(): Boolean { if (queryFailure) throw IllegalStateException("System query failed"); return enabled }
         override fun extras() = metadata
         override fun fromView(view: View, config: Bundle): ActivityOptions? { source = view; return options() }
         override fun fromBitmap(bitmap: Bitmap, bounds: Rect, radius: Float, config: Bundle): ActivityOptions? { this.bitmap = bitmap; this.bounds = Rect(bounds); return options() }

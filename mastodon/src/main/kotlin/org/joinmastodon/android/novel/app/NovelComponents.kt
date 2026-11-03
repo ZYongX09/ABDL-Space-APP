@@ -148,10 +148,7 @@ import org.joinmastodon.android.novel.app.models.Work
             Text(work.title, color = foreground, fontFamily = NovelTypography.serif, fontSize = if (width > 100.dp) 21.sp else 15.sp, lineHeight = if (width > 100.dp) 29.sp else 21.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
             Text(work.displayAuthorName(androidx.compose.ui.platform.LocalContext.current), color = foreground, fontSize = 8.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        val url = work.coverUrl?.takeIf { it.startsWith("https://") }
-        if (url != null) key(url) {
-            AndroidView(factory = { context -> ImageView(context).apply { scaleType = ImageView.ScaleType.CENTER_CROP; importantForAccessibility = android.view.View.IMPORTANT_FOR_ACCESSIBILITY_NO; ViewImageLoader.load(this, null, UrlImageLoaderRequest(url, 500, 700)) } }, modifier = Modifier.fillMaxSize())
-        }
+        NovelRemoteCover("work:${work.id}", "${work.author.id}:${work.status}", work.coverUrl, Modifier.fillMaxSize())
     }
 }
 

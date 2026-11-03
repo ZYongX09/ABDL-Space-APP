@@ -57,15 +57,20 @@ class ComposeFanMenuInteractionTest {
 			R.string.compose_menu_friend_request to R.id.compose_friend_request,
 			R.string.compose_menu_friend_card to R.id.compose_friend_card,
 			R.string.baby_albums_compose_upload to R.id.compose_album,
+			R.string.compose_menu_novel to R.id.compose_novel,
 		)
 		for ((titleRes, id) in expected) {
 			expand()
 			val title = RuntimeEnvironment.getApplication().getString(titleRes)
+			if (id == R.id.compose_novel) compose.runOnIdle {
+				assertTrue("Fan paints the unified novel resource, not a generic fallback icon",
+					imageViews(menu.view).any { it.tag == R.drawable.ic_novel_rebuilt && it.isAttachedToWindow })
+			}
 			compose.onNodeWithContentDescription(title).performClick()
 			compose.waitForIdle()
 			compose.runOnIdle { assertEquals(id, actions.lastOrNull()) }
 		}
-		assertEquals(4, actions.size)
+		assertEquals(5, actions.size)
 		// Selecting an option folds the fan away.
 		compose.runOnIdle { assertFalse(menu.isExpanded) }
 	}
@@ -102,6 +107,11 @@ class ComposeFanMenuInteractionTest {
 			assertFalse(menu.collapseIfExpanded())
 		}
 		compose.runOnIdle { assertEquals(listOf(true, false), expandedStates) }
+	}
+
+	private fun imageViews(view: View): List<android.widget.ImageView> = buildList {
+		if (view is android.widget.ImageView) add(view)
+		if (view is android.view.ViewGroup) repeat(view.childCount) { addAll(imageViews(view.getChildAt(it))) }
 	}
 
 	private fun expand() {

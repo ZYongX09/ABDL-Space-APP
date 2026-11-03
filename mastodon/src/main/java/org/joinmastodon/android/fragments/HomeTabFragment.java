@@ -756,6 +756,26 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		updateLiquidToolbarMode();
 	}
 
+	/** Window geometry for the home refresh text; never use the full-screen glass host's height. */
+	public boolean getVisibleHomeToolbarBoundsInWindow(android.graphics.Rect out){
+		out.setEmpty();
+		Toolbar toolbar=getToolbar();
+		if(toolbar!=null && toolbar.isAttachedToWindow() && toolbar.isShown()){
+			android.graphics.Rect visible=new android.graphics.Rect();
+			if(toolbar.getGlobalVisibleRect(visible)){
+				int[] rootInWindow=new int[2];
+				toolbar.getRootView().getLocationInWindow(rootInWindow);
+				// Global visible bounds are in root coordinates, not physical screen coordinates.
+				visible.offset(rootInWindow[0], rootInWindow[1]);
+				out.union(visible);
+			}
+		}
+		android.graphics.Rect glass=new android.graphics.Rect();
+		if(liquidToolbarController!=null && liquidToolbarController.getVisibleBoundsInWindow(glass))
+			out.union(glass);
+		return !out.isEmpty();
+	}
+
 	private void updateLiquidToolbarState(){
 		if(liquidToolbarController==null || timelines==null)
 			return;
@@ -796,8 +816,13 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 			onNewPostsBtnClick(toolbarShowNewPostsBtn);
 	}
 
-	/** Shared by the classic home sheet and the liquid compose menu. */
+	/** Shared by the home fan, fallback sheet and liquid compose menu. */
 	public void openComposeAction(int id){
+		if(id==R.id.compose_novel){
+			if(getActivity()!=null)
+				startActivity(NovelAppActivity.creatorIntent(getActivity(), accountID));
+			return;
+		}
 		Class<? extends Fragment> destination;
 		if(id==R.id.compose_post)
 			destination=ComposeFragment.class;
@@ -829,7 +854,7 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 			openQrScanner();
 			return;
 		}
-		if(id==R.id.compose_post || id==R.id.compose_friend_request || id==R.id.compose_friend_card || id==R.id.compose_album){
+		if(id==R.id.compose_post || id==R.id.compose_friend_request || id==R.id.compose_friend_card || id==R.id.compose_album || id==R.id.compose_novel){
 			openComposeAction(id);
 			return;
 		}

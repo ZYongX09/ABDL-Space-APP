@@ -3,4 +3,8 @@
     <item name="seamless_source_binding" type="id" />
     <string name="settings_seamless_transitions">Seamless card transitions</string>
     <string name="settings_seamless_transitions_summary">Use this device’s supported system animation when opening post, novel and album cards. Respects reduced motion and content protection.</string>
+    <string name="settings_seamless_transitions_unsupported">Unavailable: this system does not provide the SharedView animation interface. Cards open normally; your saved preference is kept.</string>
+    <string name="settings_seamless_transitions_incompatible">Unavailable: this system’s SharedView interface is incomplete or incompatible. Cards open normally; your saved preference is kept.</string>
+    <string name="settings_seamless_transitions_disabled">Unavailable: this system reports SharedView animations are disabled. Cards open normally; your saved preference is kept.</string>
+    <string name="settings_seamless_transitions_query_failed">Unavailable: the system’s SharedView capability could not be queried. Reopen this page to check again. Cards open normally; your saved preference is kept.</string>
 </resources>

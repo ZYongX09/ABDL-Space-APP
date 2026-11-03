@@ -9,6 +9,8 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.Configuration;
+import android.graphics.Rect;
+import android.view.WindowInsets;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -140,6 +142,9 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 	private long homeGeneration;
 	private boolean homeHeadInFlight, homeHistoryAttempted, showingHomeHistory, homeViewDestroyed;
 	private TextView homeRefreshingText;
+	private View homeRefreshingLayoutRoot;
+	private WindowInsets homeRefreshingInsets;
+	private final ViewTreeObserver.OnPreDrawListener homeRefreshingPosition=this::positionHomeRefreshingText;
 	private Runnable pendingHomeDelivery;
 	private final Runnable homeIdentityCheck=()->{
 		if(homeHeadInFlight && !isHomeIdentityCurrent()) acceptsHomeResponse(homeGeneration);
@@ -369,6 +374,77 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 		if(homeHeadInFlight) homeRefreshingText.postDelayed(homeIdentityCheck, 500);
 	}
 
+	/** Runs after real measurement, including ancestor scroll/translation and toolbar replacement.
+	 * Only presentation is affected: the identity timer and home request state remain independent. */
+	private boolean positionHomeRefreshingText(){
+		if(homeRefreshingText==null || homeRefreshingText.getVisibility()!=View.VISIBLE
+				|| !homeRefreshingText.isAttachedToWindow()) return true;
+		View parent=(View)homeRefreshingText.getParent();
+		View root=homeRefreshingText.getRootView();
+		Rect viewport=new Rect(), visible=new Rect();
+		if(!parent.getGlobalVisibleRect(viewport)) return true;
+		int[] window=new int[2];
+		root.getLocationInWindow(window);
+		// getGlobalVisibleRect is root-relative, not screen-relative. Convert only by the
+		// root's window position; subtracting the screen origin breaks floating/split windows.
+		viewport.offset(window[0], window[1]);
+		WindowInsets insets=root.getRootWindowInsets();
+		if(insets==null) insets=homeRefreshingInsets;
+		int left=0, top=0, right=0, bottom=0;
+		if(insets!=null){
+			if(Build.VERSION.SDK_INT>=30){
+				android.graphics.Insets safe=insets.getInsets(WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
+				left=safe.left; top=safe.top; right=safe.right; bottom=safe.bottom;
+			}else{
+				left=insets.getSystemWindowInsetLeft(); top=insets.getSystemWindowInsetTop();
+				right=insets.getSystemWindowInsetRight(); bottom=insets.getSystemWindowInsetBottom();
+				if(Build.VERSION.SDK_INT>=28 && insets.getDisplayCutout()!=null){
+					left=Math.max(left, insets.getDisplayCutout().getSafeInsetLeft());
+					top=Math.max(top, insets.getDisplayCutout().getSafeInsetTop());
+					right=Math.max(right, insets.getDisplayCutout().getSafeInsetRight());
+					bottom=Math.max(bottom, insets.getDisplayCutout().getSafeInsetBottom());
+				}
+			}
+		}
+		// Root can itself already be inset. max/intersection avoids counting a status bar twice.
+		viewport.left=Math.max(viewport.left, left);
+		viewport.top=Math.max(viewport.top, top);
+		viewport.right=Math.min(viewport.right, window[0]+root.getWidth()-right);
+		viewport.bottom=Math.min(viewport.bottom, window[1]+root.getHeight()-bottom);
+		Toolbar toolbar=getToolbar();
+		if(toolbar!=null && toolbar.isShown() && toolbar.getGlobalVisibleRect(visible)){
+			toolbar.getRootView().getLocationInWindow(window);
+			visible.offset(window[0], window[1]);
+			if(visible.left<viewport.right && visible.right>viewport.left) viewport.top=Math.max(viewport.top, visible.bottom);
+		}
+		if(getParentFragment() instanceof HomeTabFragment home && home.getVisibleHomeToolbarBoundsInWindow(visible)
+				&& visible.left<viewport.right && visible.right>viewport.left)
+			viewport.top=Math.max(viewport.top, visible.bottom);
+		int gap=getResources().getDimensionPixelSize(R.dimen.home_refresh_text_gap);
+		int side=getResources().getDimensionPixelSize(R.dimen.home_refresh_text_side);
+		int availableWidth=Math.max(1, viewport.width()-side*2);
+		int desiredWidth=Math.min(homeRefreshingText.getMeasuredWidth(), availableWidth);
+		boolean remeasure=homeRefreshingText.getMaxWidth()!=availableWidth;
+		if(remeasure) homeRefreshingText.setMaxWidth(availableWidth);
+		// While the next traversal remeasures wrapping text, never draw it through a system bar.
+		boolean fits=viewport.height()>=homeRefreshingText.getHeight()+gap
+				&& homeRefreshingText.getMeasuredWidth()<=availableWidth;
+		homeRefreshingText.setAlpha(fits ? 1f : 0f);
+		parent.getLocationInWindow(window);
+		float targetX=(viewport.left+viewport.right-desiredWidth)/2f-window[0]-homeRefreshingText.getLeft();
+		float targetY=viewport.top+gap-window[1]-homeRefreshingText.getTop();
+		if(homeRefreshingText.getTranslationX()!=targetX) homeRefreshingText.setTranslationX(targetX);
+		if(homeRefreshingText.getTranslationY()!=targetY) homeRefreshingText.setTranslationY(targetY);
+		return !remeasure;
+	}
+
+	@Override
+	public void onApplyWindowInsets(WindowInsets insets){
+		homeRefreshingInsets=insets;
+		super.onApplyWindowInsets(insets);
+		if(homeRefreshingText!=null) homeRefreshingText.invalidate();
+	}
+
 	@Override protected boolean shouldAutomaticallyTranslateVisibleContent(){ return !showingHomeHistory; }
 	@Override protected boolean shouldFetchMissingNestedQuotes(){ return !showingHomeHistory; }
 	@Override protected void loadRelationships(Set<String> ids){ if(!showingHomeHistory) super.loadRelationships(ids); }
@@ -462,6 +538,8 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 		newPostsBtnWrap=view.findViewById(R.id.new_posts_btn_wrap);
 		homeViewDestroyed=false;
 		homeRefreshingText=view.findViewById(R.id.home_timeline_refreshing);
+		homeRefreshingLayoutRoot=view;
+		view.getViewTreeObserver().addOnPreDrawListener(homeRefreshingPosition);
 		updateHomeRefreshingText();
 
 		if(newPostsBtnShown){
@@ -513,7 +591,8 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 		scroller.setScrollableChildSupplier(()->list);
 		scroller.setTakePriorityOverChildViews(true);
 		scroller.setOnScrollChangeListener((v, scrollX, scrollY, oldScrollX, oldScrollY)->{
-			bottomOverlays.setTranslationY(scrollY-getToolbar().getHeight());
+			Toolbar toolbar=getToolbar();
+			bottomOverlays.setTranslationY(scrollY-(toolbar==null ? 0 : toolbar.getHeight()));
 		});
 		scroller.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener(){
 			@Override
@@ -1008,6 +1087,10 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 		cancelLoading();
 		homeViewDestroyed=true;
 		if(homeRefreshingText!=null) homeRefreshingText.removeCallbacks(homeIdentityCheck);
+		if(homeRefreshingLayoutRoot!=null && homeRefreshingLayoutRoot.getViewTreeObserver().isAlive())
+			homeRefreshingLayoutRoot.getViewTreeObserver().removeOnPreDrawListener(homeRefreshingPosition);
+		homeRefreshingLayoutRoot=null;
+		homeRefreshingInsets=null;
 		homeRefreshingText=null;
 		super.onDestroyView();
 		donationBanner=null;

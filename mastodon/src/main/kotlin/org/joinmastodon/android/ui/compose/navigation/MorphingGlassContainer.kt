@@ -97,6 +97,7 @@ internal fun MorphingGlassContainer(
 	onSelectionConfirmed: (Int) -> Unit = {},
 	onUpwardFling: () -> Unit = {},
 	onBoundsChanged: (Offset, IntSize) -> Unit = { _, _ -> },
+	onLayoutCoordinates: (androidx.compose.ui.layout.LayoutCoordinates) -> Unit = {},
 	closedContent: @Composable BoxScope.() -> Unit,
 	expandedContent: @Composable BoxScope.(progress: Float) -> Unit,
 ) {
@@ -185,7 +186,10 @@ internal fun MorphingGlassContainer(
 		modifier = modifier
 			.width(width)
 			.height(height)
-			.onGloballyPositioned { onBoundsChanged(it.positionInRoot(), it.size) }
+			.onGloballyPositioned {
+				onBoundsChanged(it.positionInRoot(), it.size)
+				onLayoutCoordinates(it)
+			}
 			.graphicsLayer {
 				scaleX = pressScale.value * containerScale.value
 				scaleY = pressScale.value * containerScale.value

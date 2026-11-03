@@ -82,6 +82,8 @@ class NovelAppActivity : ComponentActivity(), NavigationEventDispatcherOwner {
     private var accountId: String? = null
     private var externalDetailRoot = false
     private var entryWorkId: String? = null
+    private var pendingNavigation: Bundle? = null
+    private var restoringNavigation = false
     override val navigationEventDispatcher = NavigationEventDispatcher { goBack() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -94,6 +96,11 @@ class NovelAppActivity : ComponentActivity(), NavigationEventDispatcherOwner {
         externalDetailRoot = savedInstanceState?.getBoolean(org.joinmastodon.android.ui.seamless.SeamlessTransitions.DETAIL_ENTRY)
             ?: intent.getBooleanExtra(org.joinmastodon.android.ui.seamless.SeamlessTransitions.DETAIL_ENTRY, false)
         entryWorkId = intent.getStringExtra(EXTRA_WORK_ID)?.takeIf { it.isNotBlank() }
+        // Keep the bounded descriptor while unlock is pending, even if Android saves us again.
+        pendingNavigation = savedInstanceState?.getBundle(NOVEL_NAVIGATION_STATE)?.takeIf {
+            restoreNovelAppNavigation(it, account, intent, externalDetailRoot) != null
+        } ?: if (savedInstanceState == null) pendingNovelAppNavigation(account, intent, externalDetailRoot) else null
+        restoringNavigation = savedInstanceState != null
         intent.removeExtra(org.joinmastodon.android.ui.seamless.SeamlessTransitions.DETAIL_ENTRY)
         if (externalDetailRoot && savedInstanceState == null) org.joinmastodon.android.ui.seamless.SeamlessTransitions.attach(this, account, entryWorkId)
         org.joinmastodon.android.security.AppSecurity.runAfterUnlock(this) {
@@ -111,7 +118,8 @@ class NovelAppActivity : ComponentActivity(), NavigationEventDispatcherOwner {
         })[NovelAppViewModel::class.java]
         model = vm
         val self = session.self
-        vm.bindAccount(account, Author(self.id.toLongOrNull() ?: 0, self.username.orEmpty(), self.displayName.orEmpty(), self.avatar.orEmpty(), self.url.orEmpty()), intent.getStringExtra(EXTRA_WORK_ID)?.takeIf { it.isNotBlank() })
+        bindNovelAppEntry(vm, account, Author(self.id.toLongOrNull() ?: 0, self.username.orEmpty(), self.displayName.orEmpty(), self.avatar.orEmpty(), self.url.orEmpty()), intent, externalDetailRoot, pendingNavigation, restoringNavigation)
+        pendingNavigation = null
         enableEdgeToEdge(SystemBarStyle.auto(AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT) { UiUtils.isDarkTheme() }, SystemBarStyle.auto(AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT) { UiUtils.isDarkTheme() })
         setContent {
             CompositionLocalProvider(LocalNavigationEventDispatcherOwner provides this, LocalNovelAccount provides account) {
@@ -140,6 +148,8 @@ class NovelAppActivity : ComponentActivity(), NavigationEventDispatcherOwner {
 
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putBoolean(org.joinmastodon.android.ui.seamless.SeamlessTransitions.DETAIL_ENTRY, externalDetailRoot)
+        val navigation = model?.state?.value?.let { saveNovelAppNavigation(it, intent, externalDetailRoot) } ?: pendingNavigation
+        if (navigation != null) outState.putBundle(NOVEL_NAVIGATION_STATE, Bundle(navigation))
         super.onSaveInstanceState(outState)
     }
     override fun finish() {
@@ -170,10 +180,122 @@ class NovelAppActivity : ComponentActivity(), NavigationEventDispatcherOwner {
         const val EXTRA_ACCOUNT = "account"
         const val EXTRA_WORK_ID = "work_id"
         const val EXTRA_CHAPTER_ID = "chapter_id"
+        const val EXTRA_CREATOR = "creator_center"
+        @JvmStatic fun creatorIntent(context: Context, accountId: String): Intent =
+            intent(context, accountId).putExtra(EXTRA_CREATOR, true)
         @JvmStatic @JvmOverloads fun intent(context: Context, accountId: String, workId: String? = null, chapterId: String? = null): Intent {
             require(accountId.isNotBlank())
             return Intent(context, NovelAppActivity::class.java).putExtra(EXTRA_ACCOUNT, accountId).putExtra(EXTRA_WORK_ID, workId).putExtra(EXTRA_CHAPTER_ID, chapterId)
         }
+    }
+}
+
+internal const val NOVEL_NAVIGATION_STATE = "novel_navigation_v1"
+private const val NOVEL_NAVIGATION_MAX_PAGES = 32
+
+private fun Intent.novelWorkEntry() = getStringExtra(NovelAppActivity.EXTRA_WORK_ID)?.takeIf { it.isNotBlank() }
+private fun Intent.novelChapterEntry() = getStringExtra(NovelAppActivity.EXTRA_CHAPTER_ID)?.takeIf { it.isNotBlank() }
+private fun NovelPage.isRoot() = this == NovelPage.Store || this == NovelPage.Shelf || this == NovelPage.Creator
+private fun validNovelPageId(id: String) = id.isNotBlank() && id.length <= 256 && id.none { it.isISOControl() }
+
+/** Only navigation identifiers are persisted, never bodies, drafts, eligibility or server results. */
+internal fun saveNovelAppNavigation(state: NovelAppState, entry: Intent, externalDetailRoot: Boolean): Bundle? {
+    if (state.accountId.isBlank() || state.accountId != entry.getStringExtra(NovelAppActivity.EXTRA_ACCOUNT)
+        || state.pages.size !in 1..NOVEL_NAVIGATION_MAX_PAGES || !state.pages.first().isRoot()
+        || state.pages.drop(1).any { it.isRoot() }) return null
+    val pages = ArrayList<String>()
+    for (page in state.pages) {
+        pages += when (page) {
+            NovelPage.Store -> "store"
+            NovelPage.Shelf -> "shelf"
+            NovelPage.Creator -> "creator"
+            NovelPage.Search -> "search"
+            NovelPage.AllWorks -> "all"
+            NovelPage.Messages -> "messages"
+            NovelPage.Statistics -> "statistics"
+            NovelPage.OwnerWorks -> "owner"
+            is NovelPage.Detail -> if (validNovelPageId(page.workId)) "detail:${page.workId}" else return null
+            is NovelPage.Chapters -> if (validNovelPageId(page.workId)) "chapters:${page.workId}" else return null
+            is NovelPage.Comments -> if (validNovelPageId(page.workId)) "comments:${page.workId}" else return null
+            is NovelPage.AuthorProfile -> if (page.authorId > 0) "author:${page.authorId}" else return null
+        }
+    }
+    return Bundle().apply {
+        putInt("version", 1)
+        putString("account", state.accountId)
+        putString("entry_work", entry.novelWorkEntry())
+        putString("entry_chapter", entry.novelChapterEntry())
+        putBoolean("entry_external", externalDetailRoot)
+        putBoolean("entry_creator", entry.getBooleanExtra(NovelAppActivity.EXTRA_CREATOR, false))
+        putStringArrayList("pages", pages)
+    }
+}
+
+/** Reject foreign accounts/entries, unknown routes and oversized stacks as a whole. Rebuilding
+ * these typed destinations still uses the VM's ordinary session-fenced loads and qualification UI. */
+internal fun restoreNovelAppNavigation(saved: Bundle?, account: String, entry: Intent, externalDetailRoot: Boolean): List<NovelPage>? {
+    if (saved == null || saved.getInt("version") != 1 || saved.getString("account") != account
+        || entry.getStringExtra(NovelAppActivity.EXTRA_ACCOUNT) != account
+        || saved.getString("entry_work") != entry.novelWorkEntry()
+        || saved.getString("entry_chapter") != entry.novelChapterEntry()
+        || saved.getBoolean("entry_external") != externalDetailRoot
+        || saved.getBoolean("entry_creator") != entry.getBooleanExtra(NovelAppActivity.EXTRA_CREATOR, false)) return null
+    val encoded = saved.getStringArrayList("pages") ?: return null
+    if (encoded.size !in 1..NOVEL_NAVIGATION_MAX_PAGES) return null
+    val pages = ArrayList<NovelPage>()
+    for (route in encoded) {
+        if (route == null || route.length > 288) return null
+        pages += when (route) {
+            "store" -> NovelPage.Store
+            "shelf" -> NovelPage.Shelf
+            "creator" -> NovelPage.Creator
+            "search" -> NovelPage.Search
+            "all" -> NovelPage.AllWorks
+            "messages" -> NovelPage.Messages
+            "statistics" -> NovelPage.Statistics
+            "owner" -> NovelPage.OwnerWorks
+            else -> {
+                val id = route.substringAfter(':', "")
+                if (!validNovelPageId(id)) return null
+                when (route.substringBefore(':')) {
+                    "detail" -> NovelPage.Detail(id)
+                    "chapters" -> NovelPage.Chapters(id)
+                    "comments" -> NovelPage.Comments(id)
+                    "author" -> NovelPage.AuthorProfile(id.toLongOrNull()?.takeIf { it > 0 } ?: return null)
+                    else -> return null
+                }
+            }
+        }
+    }
+    return pages.takeIf { it.first().isRoot() && it.drop(1).none(NovelPage::isRoot) }
+}
+
+/** Snapshot an entry not yet delivered because unlock is pending. This saves its intended route,
+ * rather than later treating a restored Activity as a new shortcut invocation. */
+internal fun pendingNovelAppNavigation(account: String, entry: Intent, externalDetailRoot: Boolean): Bundle? {
+    val work = entry.novelWorkEntry()
+    val pages = when {
+        work != null -> listOf(NovelPage.Store, NovelPage.Detail(work))
+        !externalDetailRoot && entry.getBooleanExtra(NovelAppActivity.EXTRA_CREATOR, false) -> listOf(NovelPage.Creator)
+        else -> listOf(NovelPage.Store)
+    }
+    return saveNovelAppNavigation(NovelAppState(accountId = account, pages = pages), entry, externalDetailRoot)
+}
+
+/** Run only after the host's unlock/current-session gate. Retained navigation wins on rotation;
+ * after process death, a validated account/entry-scoped descriptor wins over the original shortcut. */
+internal fun bindNovelAppEntry(vm: NovelAppViewModel, account: String, self: Author, entry: Intent, externalDetailRoot: Boolean,
+    savedNavigation: Bundle? = null, restoring: Boolean = false) {
+    val freshAccount = vm.state.value.accountId != account
+    val work = entry.novelWorkEntry()
+    vm.bindAccount(account, self, work)
+    if (!freshAccount) return
+    val restored = restoreNovelAppNavigation(savedNavigation, account, entry, externalDetailRoot)
+    if (restored != null) {
+        restored.forEach(vm::navigate)
+    } else if (!restoring && savedNavigation == null && work == null && !externalDetailRoot
+        && entry.getBooleanExtra(NovelAppActivity.EXTRA_CREATOR, false)) {
+        vm.navigate(NovelPage.Creator)
     }
 }
 

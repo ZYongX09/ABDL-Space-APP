@@ -101,6 +101,27 @@ public class HomeComposeActionRoutingTest{
 		}
 	}
 
+	@Test public void novelSharedRouteUsesCreatorIntentForBothMenusAndCurrentAccount() throws Exception{
+		for(String account:new String[]{"account-one@example.test", "account-two@example.test"}){
+			setAccount(account);
+			home.openComposeAction(R.id.compose_novel);
+			assertCreatorIntent(account);
+			home.onLiquidMenuItem(R.id.compose_novel);
+			assertCreatorIntent(account);
+		}
+		assertTrue("A novel shortcut must not fall back to a fragment work list", LocalNavigation.destinations.isEmpty());
+	}
+
+	private void assertCreatorIntent(String account){
+		android.content.Intent intent=((org.robolectric.shadows.ShadowActivity)org.robolectric.shadow.api.Shadow.extract(activity)).getNextStartedActivity();
+		assertNotNull(intent);
+		assertEquals(org.joinmastodon.android.novel.app.NovelAppActivity.class.getName(), intent.getComponent().getClassName());
+		assertEquals(account, intent.getStringExtra("account"));
+		assertTrue(intent.getBooleanExtra("creator_center", false));
+		assertNull(intent.getStringExtra("work_id"));
+		assertNull(intent.getStringExtra("chapter_id"));
+	}
+
 	@Test public void directLiquidButtonStillComposesOrdinaryPostAndUnknownActionCannotNavigate() throws Exception{
 		setAccount("current-fragment-account");
 		home.onLiquidCompose();

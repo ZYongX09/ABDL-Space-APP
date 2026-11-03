@@ -19,6 +19,7 @@ import org.joinmastodon.android.MastodonApp;
 import org.joinmastodon.android.R;
 import org.joinmastodon.android.model.FriendCard;
 import org.joinmastodon.android.model.FriendCardAttachment;
+import org.joinmastodon.android.model.NovelAttachment;
 import org.joinmastodon.android.model.Status;
 import org.joinmastodon.android.model.StatusPrivacy;
 import org.joinmastodon.android.model.albums.AlbumModels.AlbumUpdate;
@@ -59,7 +60,7 @@ import me.grishka.appkit.views.UsableRecyclerView;
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk=28, application=CompatibilityTestApplication.class)
 public class CoverCardImageCacheTest{
-	private enum Kind{ ALBUM, PUBLICATION, LINK }
+	private enum Kind{ ALBUM, PUBLICATION, LINK, NOVEL }
 	private ActivityController<Activity> lifecycle;
 	private Activity activity;
 	private ImageCache cache;
@@ -147,16 +148,17 @@ public class CoverCardImageCacheTest{
 			BitmapDrawable image=bitmap(); cache.put(original.getImageRequest(0), image); holder.bind(original);
 			cache.remove(original.getImageRequest(0));
 			Status b=post(kind, coverUrl(kind, a));
-			if(change==2){ if(kind==Kind.ALBUM) b.albumUpdate.albumId="other-album"; else { b.friendCard.id="other-card"; b.friendCard.card.id="other-card"; } }
+			if(change==2){ if(kind==Kind.ALBUM) b.albumUpdate.albumId="other-album"; else if(kind==Kind.NOVEL) b.novel.workId="other-work"; else { b.friendCard.id="other-card"; b.friendCard.card.id="other-card"; } }
 			if(change==3) setCoverUrl(kind, b, url());
 			Kind nextKind=kind;
 			if(change==4){
 				if(kind==Kind.ALBUM){ b.albumUpdate.downloadProtected=true; }
+				else if(kind==Kind.NOVEL){ b.novel.mode="link"; }
 				else { nextKind=kind==Kind.LINK ? Kind.PUBLICATION : Kind.LINK; b.friendCard.mode=nextKind==Kind.LINK ? "link" : "publication"; }
 			}
 			holder.bind(model(nextKind, b, change==0 ? "account-b" : "account-a", change==1 ? "other-post" : a.id, false, callbacks));
 			if(kind==Kind.ALBUM && change==4) assertNotSame(image, imageView(kind, holder).getDrawable());
-			else { assertNull(publicationCover(holder, kind).getDrawable()); if(kind!=Kind.ALBUM) assertNull(linkCover(holder).getDrawable()); }
+			else { assertNull(publicationCover(holder, kind).getDrawable()); if(kind==Kind.PUBLICATION || kind==Kind.LINK) assertNull(linkCover(holder).getDrawable()); }
 		}
 	}
 
@@ -192,8 +194,8 @@ public class CoverCardImageCacheTest{
 				case 2 -> blocked.visibility=StatusPrivacy.PRIVATE;
 				case 3 -> blocked.visibility=StatusPrivacy.DIRECT;
 				case 4 -> setCoverUrl(kind, blocked, null);
-				case 5 -> { if(kind==Kind.ALBUM) blocked.albumUpdate.downloadProtected=true; else blocked.friendCard.available=false; }
-				case 6 -> { if(kind==Kind.ALBUM) blocked.albumUpdate.photoCount=0; else blocked.friendCard.schemaVersion=2; }
+				case 5 -> { if(kind==Kind.ALBUM) blocked.albumUpdate.downloadProtected=true; else if(kind==Kind.NOVEL) blocked.novel.available=false; else blocked.friendCard.available=false; }
+				case 6 -> { if(kind==Kind.ALBUM) blocked.albumUpdate.photoCount=0; else if(kind==Kind.NOVEL) blocked.novel.schemaVersion=2; else blocked.friendCard.schemaVersion=2; }
 				case 7 -> { if(kind==Kind.ALBUM) blocked.albumUpdate.coverUrl="file:///not-public"; }
 			}
 			StatusDisplayItem restricted=model(kind, blocked, "account-a", blocked.id, kind!=Kind.ALBUM && block==7, callbacks);
@@ -230,6 +232,7 @@ public class CoverCardImageCacheTest{
 			cache.put(model.getImageRequest(0), bitmap()); holder.bind(model);
 			Status replacement=post(kind, coverUrl(kind, status));
 			if(kind==Kind.ALBUM){ replacement.albumUpdate.downloadProtected=true; status.albumUpdate=replacement.albumUpdate; }
+			else if(kind==Kind.NOVEL){ replacement.novel.available=false; status.novel=replacement.novel; }
 			else { replacement.friendCard.available=false; status.friendCard=replacement.friendCard; }
 			assertEquals(0, model.getImageCount()); assertNull(model.getImageRequest(0));
 			ImageLoaderViewHolder images=(ImageLoaderViewHolder)holder;
@@ -334,7 +337,7 @@ public class CoverCardImageCacheTest{
 			try(LoaderFixture fixture=new LoaderFixture(kind, model(kind, a, "account-a", a.id, false, callbacks), callbacks)){
 				fixture.wrapper.forceUpdateImages(); await(()->downloader.entered.getCount()==0);
 				Status b=post(kind, url()); b.id="p_other";
-				if(kind==Kind.ALBUM) b.albumUpdate.albumId="album-other"; else { b.friendCard.id="card-other"; b.friendCard.card.id="card-other"; }
+				if(kind==Kind.ALBUM) b.albumUpdate.albumId="album-other"; else if(kind==Kind.NOVEL) b.novel.workId="work-other"; else { b.friendCard.id="card-other"; b.friendCard.card.id="card-other"; }
 				fixture.bind(model(kind, b, "account-a", b.id, false, callbacks)); assertEmpty(kind, fixture.boundHolder());
 				downloader.release.countDown(); await(()->!fixture.engine.isLoading(0, 0));
 				assertEquals("Real RunnableTask must reject the old request before adapter.imageLoaded", 0, fixture.list.loaded);
@@ -349,7 +352,7 @@ public class CoverCardImageCacheTest{
 			ControlledDownloader downloader=new ControlledDownloader(cover, 0, true); ImageCache.registerDownloader(0, downloader);
 			try(LoaderFixture fixture=new LoaderFixture(kind, model(kind, status, "account-a", status.id, false, callbacks), callbacks)){
 				fixture.wrapper.forceUpdateImages(); await(()->downloader.entered.getCount()==0);
-				if(kind==Kind.ALBUM) status.albumUpdate.downloadProtected=true; else status.friendCard.available=false;
+				if(kind==Kind.ALBUM) status.albumUpdate.downloadProtected=true; else if(kind==Kind.NOVEL) status.novel.available=false; else status.friendCard.available=false;
 				fixture.bind(model(kind, status, "account-a", status.id, false, callbacks));
 				downloader.release.countDown(); await(()->!fixture.engine.isLoading(0, 0));
 				assertEquals(0, fixture.list.loaded); assertEquals(0, callbacks.schedules);
@@ -440,6 +443,11 @@ public class CoverCardImageCacheTest{
 		if(kind==Kind.ALBUM){
 			AlbumUpdate album=new AlbumUpdate(); album.albumId="album"; album.albumName="Album"; album.photoCount=3; album.width=1200; album.height=1600; album.coverUrl=cover;
 			status.albumUpdate=album;
+		}else if(kind==Kind.NOVEL){
+			NovelAttachment novel=new NovelAttachment(); novel.schemaVersion=1; novel.workId="work"; novel.releaseId="release";
+			novel.mode="new_book"; novel.available=true; novel.title="Novel"; novel.coverUrl=cover; novel.workType="original";
+			novel.author=new NovelAttachment.Author(); novel.author.id=42; novel.author.username="owner"; novel.author.displayName="Owner";
+			novel.description="Fictional cover fixture"; status.novel=novel;
 		}else{
 			FriendCard card=new FriendCard(); card.schemaVersion=1; card.id="card"; card.state="active"; card.title="Friends"; card.coverUrl=cover; card.publicFields=List.of();
 			FriendCardAttachment attachment=new FriendCardAttachment(); attachment.schemaVersion=1; attachment.id=card.id; attachment.available=true;
@@ -452,13 +460,20 @@ public class CoverCardImageCacheTest{
 
 	private StatusDisplayItem model(Kind kind, Status status, String account, String parent, boolean hidden, RetryCallbacks callbacks){
 		return kind==Kind.ALBUM ? new AlbumUpdateStatusDisplayItem(parent, callbacks, activity, status, account)
+				: kind==Kind.NOVEL ? new NovelStatusDisplayItem(parent, callbacks, activity, status, account, hidden)
 				: new FriendCardStatusDisplayItem(parent, callbacks, activity, status, account, hidden);
 	}
 	@SuppressWarnings("unchecked") private StatusDisplayItem.Holder<StatusDisplayItem> holder(Kind kind){
 		return (StatusDisplayItem.Holder<StatusDisplayItem>)(StatusDisplayItem.Holder<?>)(kind==Kind.ALBUM
-				? new AlbumUpdateStatusDisplayItem.Holder(activity, new FrameLayout(activity)) : new FriendCardStatusDisplayItem.Holder(activity, new FrameLayout(activity)));
+				? new AlbumUpdateStatusDisplayItem.Holder(activity, new FrameLayout(activity))
+				: kind==Kind.NOVEL ? new NovelStatusDisplayItem.Holder(activity, new FrameLayout(activity))
+				: new FriendCardStatusDisplayItem.Holder(activity, new FrameLayout(activity)));
 	}
 	private static ImageView publicationCover(StatusDisplayItem.Holder<?> holder, Kind kind){
+		if(kind==Kind.NOVEL){
+			try{Field field=NovelStatusDisplayItem.Holder.class.getDeclaredField("cover");field.setAccessible(true);return (ImageView)field.get(holder);}
+			catch(ReflectiveOperationException error){throw new AssertionError(error);}
+		}
 		LinearLayout card=(LinearLayout)((FrameLayout)holder.itemView).getChildAt(0);
 		return kind==Kind.ALBUM ? (ImageView)card.getChildAt(0) : (ImageView)((FrameLayout)card.getChildAt(0)).getChildAt(0);
 	}
@@ -470,14 +485,15 @@ public class CoverCardImageCacheTest{
 	private static void assertEmpty(Kind kind, StatusDisplayItem.Holder<?> holder){
 		assertNull(kind.name(), imageView(kind, holder).getDrawable());
 		if(kind==Kind.PUBLICATION) assertEquals(View.GONE, ((View)imageView(kind, holder).getParent()).getVisibility());
+		if(kind==Kind.NOVEL){assertEquals(View.GONE,imageView(kind,holder).getVisibility());assertEquals(View.VISIBLE,((ViewGroup)imageView(kind,holder).getParent()).getChildAt(0).getVisibility());}
 		if(kind==Kind.LINK){ assertEquals(View.GONE, linkCover(holder).getVisibility()); assertEquals(View.VISIBLE, ((ViewGroup)linkCover(holder).getParent()).getChildAt(1).getVisibility()); }
 	}
 	private static void assertVisible(Kind kind, StatusDisplayItem.Holder<?> holder){
 		if(kind==Kind.PUBLICATION) assertEquals(View.VISIBLE, ((View)imageView(kind, holder).getParent()).getVisibility());
 		else assertEquals(View.VISIBLE, imageView(kind, holder).getVisibility());
 	}
-	private static String coverUrl(Kind kind, Status status){ return kind==Kind.ALBUM ? status.albumUpdate.coverUrl : kind==Kind.LINK ? status.friendCard.linkPreview.coverUrl : status.friendCard.card.coverUrl; }
-	private static void setCoverUrl(Kind kind, Status status, String url){ if(kind==Kind.ALBUM) status.albumUpdate.coverUrl=url; else { status.friendCard.card.coverUrl=url; status.friendCard.linkPreview.coverUrl=url; } }
+	private static String coverUrl(Kind kind, Status status){ return kind==Kind.ALBUM ? status.albumUpdate.coverUrl : kind==Kind.NOVEL ? status.novel.coverUrl : kind==Kind.LINK ? status.friendCard.linkPreview.coverUrl : status.friendCard.card.coverUrl; }
+	private static void setCoverUrl(Kind kind, Status status, String url){ if(kind==Kind.ALBUM) status.albumUpdate.coverUrl=url; else if(kind==Kind.NOVEL) status.novel.coverUrl=url; else { status.friendCard.card.coverUrl=url; status.friendCard.linkPreview.coverUrl=url; } }
 	private static String url(){ return "https://offline.example.test/card-cache/"+UUID.randomUUID(); }
 	private BitmapDrawable bitmap(){ return new BitmapDrawable(activity.getResources(), Bitmap.createBitmap(24, 18, Bitmap.Config.ARGB_8888)); }
 }

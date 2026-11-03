@@ -57,7 +57,7 @@ public class ComposeActionSheetTest{
 	}
 
 	@Test public void eachRealCardDispatchesExactIdOnceAfterDialogRemoval(){
-		for(int id:new int[]{R.id.compose_post, R.id.compose_friend_request, R.id.compose_album}){
+		for(int id:new int[]{R.id.compose_post, R.id.compose_friend_request, R.id.compose_album, R.id.compose_novel}){
 			List<Integer> delivered=new ArrayList<>();
 			sheet=new ComposeActionSheet(activity, action->{
 				assertFalse("Dispatch must follow actual dialog removal", sheet.isShowing());
@@ -98,16 +98,19 @@ public class ComposeActionSheetTest{
 			assertContainer(R.id.compose_post, R.attr.colorM3PrimaryContainer, R.attr.colorM3OnPrimaryContainer);
 			assertContainer(R.id.compose_friend_request, R.attr.colorM3SecondaryContainer, R.attr.colorM3OnSecondaryContainer);
 			assertContainer(R.id.compose_album, R.attr.colorM3TertiaryContainer, R.attr.colorM3OnTertiaryContainer);
+			assertContainer(R.id.compose_novel, R.attr.colorM3PrimaryContainer, R.attr.colorM3OnPrimaryContainer);
 			sheet.dismissWithoutAnimation();
 		}
 	}
 
-	@Test public void normalPhoneShowsThreeEqualColumnsAndLargeTextReflowsWithoutTruncation(){
+	@Test public void fourDestinationsStackOnPhoneAndUseEqualColumnsOnlyWhenWideEnough(){
 		sheet=new ComposeActionSheet(activity, id->fail("No click expected"));
 		sheet.showWithoutAnimation();
 		LinearLayout cards=sheet.findViewById(R.id.compose_action_cards);
 		measure(cards, 353);
-		assertEquals(3, cards.getChildCount());
+		assertEquals(4, cards.getChildCount());
+		assertEquals(LinearLayout.VERTICAL, cards.getOrientation());
+		measure(cards, 520);
 		assertEquals(LinearLayout.HORIZONTAL, cards.getOrientation());
 		assertEquals(cards.getChildAt(0).getWidth(), cards.getChildAt(1).getWidth());
 		assertEquals(cards.getChildAt(1).getWidth(), cards.getChildAt(2).getWidth());
@@ -123,7 +126,7 @@ public class ComposeActionSheetTest{
 		cards=sheet.findViewById(R.id.compose_action_cards);
 		measure(cards, 352);
 		assertEquals(LinearLayout.VERTICAL, cards.getOrientation());
-		for(int i=0; i<3; i++){
+		for(int i=0; i<cards.getChildCount(); i++){
 			ViewGroup card=(ViewGroup)cards.getChildAt(i);
 			assertEquals(V.dp(352), card.getWidth());
 			for(int textId:new int[]{R.id.compose_action_card_title, R.id.compose_action_card_description}){

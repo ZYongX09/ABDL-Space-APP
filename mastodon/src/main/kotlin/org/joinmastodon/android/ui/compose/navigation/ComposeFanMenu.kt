@@ -109,6 +109,7 @@ class ComposeFanMenuController(
 		ComposeFanMenuItem(R.id.compose_friend_request, context.getString(R.string.compose_menu_friend_request), MiuixIcons.ContactsBook),
 		ComposeFanMenuItem(R.id.compose_friend_card, context.getString(R.string.compose_menu_friend_card), MiuixIcons.ContactsBook, iconRes = R.drawable.ic_friend_card),
 		ComposeFanMenuItem(R.id.compose_album, context.getString(R.string.baby_albums_compose_upload), MiuixIcons.Image),
+		ComposeFanMenuItem(R.id.compose_novel, context.getString(R.string.compose_menu_novel), MiuixIcons.Notes, iconRes = R.drawable.ic_novel_rebuilt),
 	)
 
 	private val composeView = ComposeView(context).apply {

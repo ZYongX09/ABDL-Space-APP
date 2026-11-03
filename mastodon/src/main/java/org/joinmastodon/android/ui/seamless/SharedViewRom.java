@@ -18,12 +18,16 @@ public final class SharedViewRom{
 	public static final String RADIUS="sharedView.radius", COLOR="sharedView.color", BOUNDS="sharedView.bounds";
 	public static final String BACK="sharedView.backAnimType", FALLBACK="sharedView.fallbackAnimType";
 	public static final int NONE=1, SYSTEM=2, FADE=3, EXPLODE=4;
-	private static Transport transport=new BootTransport();
+	private static volatile Transport transport=new BootTransport();
 
 	private SharedViewRom(){}
 
+	/** ABI availability, the ROM's live flag and the user's preference are separate states. */
+	public enum Availability{ SUPPORTED, UNSUPPORTED, INTERFACE_INCOMPATIBLE, DISABLED, QUERY_FAILED }
+
 	interface Transport{
 		boolean available();
+		default Availability abiAvailability(){ return available() ? Availability.SUPPORTED : Availability.UNSUPPORTED; }
 		boolean enabled() throws Exception;
 		Map<String, String> extras() throws Exception;
 		ActivityOptions fromView(View view, Bundle config) throws Exception;
@@ -32,11 +36,18 @@ public final class SharedViewRom{
 		boolean cancel() throws Exception;
 	}
 
-	/** 100 means this bridge verified the complete V1 ABI plus the ROM's boolean feature flag. */
-	public static int supportedProtocol(){
-		try{ return transport.available() && transport.enabled() ? 100 : 0; }
-		catch(Exception | LinkageError unavailable){ return 0; }
+	public static Availability availability(){
+		Transport current=transport;
+		try{
+			Availability abi=current.abiAvailability();
+			if(abi!=Availability.SUPPORTED) return abi;
+			// Only the immutable ABI is cached. Disabled/failed queries must not poison later checks.
+			return current.enabled() ? Availability.SUPPORTED : Availability.DISABLED;
+		}catch(Exception | LinkageError unavailable){ return Availability.QUERY_FAILED; }
 	}
+
+	/** 100 is verified common V1, not the SDK/KIT version or a guess based on the brand. */
+	public static int supportedProtocol(){ return availability()==Availability.SUPPORTED ? 100 : 0; }
 
 	static Map<String, String> extras() throws Exception{
 		Map<String, String> result=transport.extras();
@@ -73,20 +84,36 @@ public final class SharedViewRom{
 	// Package-private injection is solely a transport seam; production security gates are not injectable.
 	static void setTransportForTests(Transport value){ transport=value==null ? new BootTransport() : value; }
 
-	private static final class BootTransport implements Transport{
-		private boolean inspected;
+	interface RomClassLookup{
+		Class<?> load(String name) throws ClassNotFoundException;
+	}
+
+	static final class BootTransport implements Transport{
+		private final RomClassLookup classes;
+		private Availability abi;
 		private ReflectionTransport delegate;
-		@Override public boolean available(){
-			if(!inspected){
-				inspected=true;
+		BootTransport(){
+			// Same ROM path as SharedViewDemo's KIT delegate; never use an APK-side placeholder.
+			this(name->Class.forName(name, false, null));
+		}
+		BootTransport(RomClassLookup classes){ this.classes=classes; }
+		@Override public boolean available(){ return abiAvailability()==Availability.SUPPORTED; }
+		@Override public synchronized Availability abiAvailability(){
+			if(abi==null){
+				Class<?> manager;
 				try{
-					// null is the boot loader: never mistake an APK's placeholder for a ROM implementation.
-					delegate=ReflectionTransport.inspect(
-							Class.forName("com.androidex.animation.sharedview.ViewAnimationManager", false, null),
-							Class.forName("com.androidex.animation.sharedview.ViewAnimationListener", false, null));
-				}catch(ReflectiveOperationException | RuntimeException | LinkageError ignored){}
+					manager=classes.load("com.androidex.animation.sharedview.ViewAnimationManager");
+				}catch(ClassNotFoundException missing){ return abi=Availability.UNSUPPORTED; }
+				catch(RuntimeException | LinkageError failure){ return Availability.QUERY_FAILED; }
+				try{
+					Class<?> listener=classes.load("com.androidex.animation.sharedview.ViewAnimationListener");
+					delegate=ReflectionTransport.inspect(manager, listener);
+					abi=Availability.SUPPORTED;
+				}catch(ClassNotFoundException | NoSuchMethodException incompatible){ abi=Availability.INTERFACE_INCOMPATIBLE; }
+				catch(RuntimeException | LinkageError failure){ return Availability.QUERY_FAILED; }
 			}
-			return delegate!=null;
+			// Publish the complete result under the same monitor, never a partial "inspected" flag.
+			return abi;
 		}
 		@Override public boolean enabled() throws Exception{ return available() && delegate.enabled(); }
 		@Override public Map<String, String> extras() throws Exception{ return available() ? delegate.extras() : Collections.emptyMap(); }
@@ -102,6 +129,8 @@ public final class SharedViewRom{
 			this.enabled=enabled; this.extras=extras; this.view=view; this.bitmap=bitmap; this.override=override; this.cancel=cancel;
 		}
 		static ReflectionTransport inspect(Class<?> manager, Class<?> listener) throws NoSuchMethodException{
+			// The demo KIT checks public (including inherited) methods, static manager calls and
+			// instance listener callbacks. Do not guess getInstance()/getDeclaredMethod() variants.
 			if(!Modifier.isPublic(manager.getModifiers()) || !listener.isInterface() || !Modifier.isPublic(listener.getModifiers())) throw new NoSuchMethodException("Not a public ROM contract");
 			for(String name:new String[]{"onAnimationStart", "onAnimationCancel", "onAnimationEnd"}){
 				Method callback=listener.getMethod(name, int.class);

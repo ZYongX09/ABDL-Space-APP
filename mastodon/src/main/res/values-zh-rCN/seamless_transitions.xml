@@ -2,4 +2,8 @@
 <resources>
     <string name="settings_seamless_transitions">卡片无缝转场</string>
     <string name="settings_seamless_transitions_summary">打开帖子、小说和相册卡片时使用本机支持的系统动画，遵循减少动画和内容保护设置。</string>
+    <string name="settings_seamless_transitions_unsupported">暂不可用：当前系统未提供 SharedView 动画接口。卡片仍正常打开，已保存的偏好保持不变。</string>
+    <string name="settings_seamless_transitions_incompatible">暂不可用：当前系统的 SharedView 接口不完整或不兼容。卡片仍正常打开，已保存的偏好保持不变。</string>
+    <string name="settings_seamless_transitions_disabled">暂不可用：当前系统报告 SharedView 动画已禁用。卡片仍正常打开，已保存的偏好保持不变。</string>
+    <string name="settings_seamless_transitions_query_failed">暂不可用：无法查询系统的 SharedView 能力。重新打开此页可再次检查。卡片仍正常打开，已保存的偏好保持不变。</string>
 </resources>

@@ -35,6 +35,8 @@ class ComposeFanMenuContractTest {
 		assertTrue(menu.contains("ComposeFanMenuItem(R.id.compose_post"))
 		assertTrue(menu.contains("ComposeFanMenuItem(R.id.compose_friend_request"))
 		assertTrue(menu.contains("ComposeFanMenuItem(R.id.compose_album"))
+		assertTrue(menu.contains("ComposeFanMenuItem(R.id.compose_novel"))
+		assertTrue(menu.contains("iconRes = R.drawable.ic_novel_rebuilt"))
 	}
 
 	@Test

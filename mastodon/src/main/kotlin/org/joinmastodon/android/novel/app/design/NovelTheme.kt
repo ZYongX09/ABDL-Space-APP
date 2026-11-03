@@ -20,6 +20,7 @@ import org.joinmastodon.android.GlobalUserPreferences
 import org.joinmastodon.android.R
 import org.joinmastodon.android.api.session.AccountLocalPreferences.ColorPreference
 import org.joinmastodon.android.api.session.AccountSessionManager
+import org.joinmastodon.android.novel.app.NovelCoverProvider
 import org.joinmastodon.android.ui.utils.ColorPalette
 import org.joinmastodon.android.ui.utils.UiUtils
 
@@ -116,6 +117,6 @@ fun NovelTheme(accountId: String, content: @Composable () -> Unit) {
         surfaceVariant = colors.surfaceVariant, onSurfaceVariant = colors.textSecondary, outline = colors.outline, error = colors.error,
     )
     CompositionLocalProvider(LocalNovelColors provides colors) {
-        MaterialTheme(colorScheme = scheme, content = content)
+        NovelCoverProvider(accountId) { MaterialTheme(colorScheme = scheme, content = content) }
     }
 }

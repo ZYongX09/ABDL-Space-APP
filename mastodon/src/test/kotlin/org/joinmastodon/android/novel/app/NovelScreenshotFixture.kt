@@ -257,6 +257,8 @@ internal class NovelScreenshotFixture(private val group: String, private val res
     private var testClass = ""
     private var testMethod = ""
     private var dark by mutableStateOf(false)
+    // Explicit fictional authority: reference renders never borrow a real logged-in account.
+    private val covers = NovelCoverScope(ACCOUNT, { true })
     private var renderFontScale = 1f
     private val navigationOwner = object : NavigationEventDispatcherOwner { override val navigationEventDispatcher = NavigationEventDispatcher { } }
     override fun apply(base: Statement, description: Description): Statement {
@@ -286,7 +288,7 @@ internal class NovelScreenshotFixture(private val group: String, private val res
         host.start()
     }
     override fun after() {
-        try { host.close() } finally {
+        try { covers.retire(); host.close() } finally {
             try {
                 // Restore only after destroying the host; do not recreate it during test cleanup.
                 originalResourceFontScale?.let(RuntimeEnvironment::setFontScale)
@@ -303,7 +305,7 @@ internal class NovelScreenshotFixture(private val group: String, private val res
     fun show(compose: NovelComposeRule, fontScale: Float = 1f, content: @Composable () -> Unit) {
         renderFontScale = fontScale
         compose.setContent {
-            key(dark) { CompositionLocalProvider(LocalDensity provides Density(1f, fontScale), LocalNovelAccount provides ACCOUNT, LocalNavigationEventDispatcherOwner provides navigationOwner) {
+            key(dark) { CompositionLocalProvider(LocalDensity provides Density(1f, fontScale), LocalNovelAccount provides ACCOUNT, LocalNovelCoverScope provides covers, LocalNavigationEventDispatcherOwner provides navigationOwner) {
                 NovelTheme(ACCOUNT) { Box(Modifier.fillMaxSize().background(NovelTheme.colors.background)) { content() } }
             } }
         }

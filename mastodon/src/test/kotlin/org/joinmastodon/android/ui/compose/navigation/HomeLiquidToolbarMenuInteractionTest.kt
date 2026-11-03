@@ -9,8 +9,6 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.geometry.Offset
 import kotlin.math.abs
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Edit
 import org.joinmastodon.android.CompatibilityTestApplication
 import org.joinmastodon.android.MastodonApp
 import org.joinmastodon.android.R
@@ -28,7 +26,7 @@ import org.robolectric.annotation.LooperMode
 import java.util.function.IntConsumer
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [26], application = CompatibilityTestApplication::class)
+@Config(sdk = [26], qualifiers = "zh-rCN-w393dp-h852dp-mdpi", application = CompatibilityTestApplication::class)
 @LooperMode(LooperMode.Mode.PAUSED)
 class HomeLiquidToolbarMenuInteractionTest {
 	@get:Rule val compose = createComposeRule()
@@ -40,11 +38,7 @@ class HomeLiquidToolbarMenuInteractionTest {
 		compose.setContent {
 			AndroidView(modifier = Modifier.fillMaxSize(), factory = { context ->
 				toolbar = HomeLiquidToolbarController(context, IntConsumer {}, Runnable {}, Runnable {}, IntConsumer { actions.add(it) }, Runnable {})
-				toolbar.setComposeMenu(listOf(
-					HomeToolbarComposeMenuItem(R.id.compose_post, "普通帖", Icons.Default.Edit),
-					HomeToolbarComposeMenuItem(R.id.compose_friend_request, "交友帖", Icons.Default.Edit),
-					HomeToolbarComposeMenuItem(R.id.compose_album, "图片传相册", Icons.Default.Edit),
-				))
+				toolbar.setComposeMenu(org.joinmastodon.android.fragments.HomeFragment.composeMenuItems(context))
 				toolbar.view
 			})
 		}
@@ -53,10 +47,17 @@ class HomeLiquidToolbarMenuInteractionTest {
 
 	@Test fun allRenderedRowsDispatchTheirActionWithAndWithoutStatusInset() {
 		for(inset in listOf(0, 72)) {
-			for((title, id) in listOf("普通帖" to R.id.compose_post, "交友帖" to R.id.compose_friend_request, "图片传相册" to R.id.compose_album)) {
+			for(item in org.joinmastodon.android.fragments.HomeFragment.composeMenuItems(toolbar.view.context)) {
+				val title = item.title
+				val id = item.id
 				openCompose(inset)
 				// Use the actual rendered text position, but dispatch through the outer View gate.
 				val center = composeRowCenter(title)
+				if (id == R.id.compose_novel) compose.runOnIdle {
+					assertEquals(R.drawable.ic_novel_rebuilt, item.iconRes)
+					assertTrue("The actual liquid row paints the unified novel drawable",
+						imageViews(toolbar.view).any { it.drawable != null && org.robolectric.Shadows.shadowOf(it.drawable).createdFromResId == R.drawable.ic_novel_rebuilt && it.isAttachedToWindow })
+				}
 				tap(center.x, center.y)
 				compose.runOnIdle {
 					assertEquals(id, actions.lastOrNull())
@@ -64,7 +65,7 @@ class HomeLiquidToolbarMenuInteractionTest {
 				}
 			}
 		}
-		assertEquals(6, actions.size)
+		assertEquals(10, actions.size)
 	}
 
 	@Test fun outsideTapDismissesWithoutActivatingRow() {
@@ -78,7 +79,7 @@ class HomeLiquidToolbarMenuInteractionTest {
 
 	@Test fun dragJustBelowSecondRowStartSelectsSecondRow() {
 		openCompose(72)
-		val first = composeRowCenter("普通帖")
+		val first = composeRowCenter(toolbar.view.context.getString(R.string.compose_menu_post))
 		val density = toolbar.view.resources.displayMetrics.density
 		val secondRowY = 72 + (ToolbarMenuGeometry.TOP_OFFSET_DP + ToolbarMenuGeometry.CONTENT_TOP_PADDING_DP + ToolbarMenuGeometry.ROW_HEIGHT_DP + 2) * density
 		compose.runOnIdle {
@@ -100,6 +101,11 @@ private fun composeRowCenter(title: String): Offset {
 		}
 		assertEquals("Exactly one full-width compose row must be rendered", 1, rows.size)
 		return rows.single().boundsInRoot.center
+	}
+
+	private fun imageViews(view: android.view.View): List<android.widget.ImageView> = buildList {
+		if (view is android.widget.ImageView) add(view)
+		if (view is android.view.ViewGroup) repeat(view.childCount) { addAll(imageViews(view.getChildAt(it))) }
 	}
 
 	private fun openCompose(inset: Int) {

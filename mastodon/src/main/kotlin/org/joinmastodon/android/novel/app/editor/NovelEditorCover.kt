@@ -4,7 +4,6 @@ import org.joinmastodon.android.R
 import androidx.compose.ui.res.stringResource
 
 import android.graphics.Bitmap
-import android.widget.ImageView
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -20,29 +19,31 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import me.grishka.appkit.imageloader.ViewImageLoader
-import me.grishka.appkit.imageloader.requests.UrlImageLoaderRequest
+import org.joinmastodon.android.novel.app.LocalNovelCoverScope
+import org.joinmastodon.android.novel.app.NovelRemoteCover
 import org.joinmastodon.android.novel.app.design.NovelTheme
 import org.joinmastodon.android.novel.app.design.NovelTypography
 
+private data class NovelLocalCoverPreview(val path: String, val entity: String, val scope: org.joinmastodon.android.novel.app.NovelCoverScope, val bitmap: Bitmap)
+
 /** Decode only the current private selection; a stale result cannot resurrect a replaced image. */
 @Composable
-internal fun NovelEditorCover(data: NovelMetadata, modifier: Modifier = Modifier, placeholder: @Composable (() -> Unit)? = null) {
+internal fun NovelEditorCover(data: NovelMetadata, modifier: Modifier = Modifier, entity: String = "editor-preview", placeholder: @Composable (() -> Unit)? = null) {
+    val scope = LocalNovelCoverScope.current
     val path = data.localCover
-    val preview by produceState<Pair<String, Bitmap>?>(null, path) {
+    val preview by produceState<NovelLocalCoverPreview?>(null, path, entity, scope) {
         value = null
-        if (path != null) {
+        if (path != null && scope?.isActive() == true) {
             val decoded = withContext(Dispatchers.IO) { runCatching { NovelCoverImages.decode(File(path)) }.getOrNull() }
-            value = decoded?.let { path to it }
+            if (scope.isActive()) value = decoded?.let { NovelLocalCoverPreview(path, entity, scope, it) }
         }
     }
     // Never recycle a bitmap handed to Compose: an older render frame may still hold its ImageBitmap.
     // The bounded 512px preview is reclaimed once both composition and renderer release it.
-    val bitmap = preview?.takeIf { it.first == path }?.second
+    val bitmap = preview?.takeIf { it.path == path && it.entity == entity && it.scope === scope && scope != null && scope.active && scope.isActive() }?.bitmap
     Box(modifier.clip(RoundedCornerShape(8.dp)).background(NovelTheme.colors.primaryContainer), contentAlignment = Alignment.Center) {
         if (bitmap == null) {
             if (placeholder != null) placeholder()
@@ -50,13 +51,7 @@ internal fun NovelEditorCover(data: NovelMetadata, modifier: Modifier = Modifier
         }
         bitmap?.let { Image(it.asImageBitmap(), stringResource(R.string.novel_en_local_cover_preview), Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
         // A pending local replacement always wins over the previously published remote cover.
-        val url = data.coverUrl?.takeIf { !data.coverPending && okhttp3.HttpUrl.parse(it)?.isHttps == true }
-        if (url != null) key(url) {
-            AndroidView(factory = { context -> ImageView(context).apply {
-                scaleType = ImageView.ScaleType.CENTER_CROP
-                contentDescription = context.getString(R.string.novel_en_uploaded_cover_preview)
-                ViewImageLoader.load(this, null, UrlImageLoaderRequest(url, 500, 700))
-            } }, modifier = Modifier.fillMaxSize(), onRelease = { it.setImageDrawable(null) })
-        }
+        NovelRemoteCover(entity, "editor", data.coverUrl?.takeUnless { data.coverPending }, Modifier.fillMaxSize(),
+            stringResource(R.string.novel_en_uploaded_cover_preview))
     }
 }

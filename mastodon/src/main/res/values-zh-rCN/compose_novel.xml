@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="compose_menu_novel">发小说</string>
+    <string name="compose_action_novel_description">进入小说创作者中心</string>
+</resources>

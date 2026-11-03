@@ -5,6 +5,7 @@ import android.app.AlertDialog;
 import android.app.Fragment;
 import android.app.NotificationManager;
 import android.app.assist.AssistContent;
+import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
 import android.os.Bundle;
@@ -882,12 +883,7 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 				homeTabFragment::openSearch
 		);
 
-		List<HomeToolbarComposeMenuItem> composeItems=new ArrayList<>();
-		composeItems.add(new HomeToolbarComposeMenuItem(R.id.compose_post, getString(R.string.compose_menu_post), getNotes(MiuixIcons.INSTANCE)));
-		composeItems.add(new HomeToolbarComposeMenuItem(R.id.compose_friend_request, getString(R.string.compose_menu_friend_request), getContactsBook(MiuixIcons.INSTANCE)));
-		composeItems.add(new HomeToolbarComposeMenuItem(R.id.compose_friend_card, getString(R.string.compose_menu_friend_card), getContactsBook(MiuixIcons.INSTANCE), R.drawable.ic_friend_card));
-		composeItems.add(new HomeToolbarComposeMenuItem(R.id.compose_album, getString(R.string.baby_albums_compose_upload), getImage(MiuixIcons.INSTANCE)));
-		liquidToolbarController.setComposeMenu(composeItems);
+		liquidToolbarController.setComposeMenu(composeMenuItems(getActivity()));
 
 		liquidToolbarController.setMenuOpenListener(open->{
 			liquidToolbarMenuOpen=open;
@@ -899,6 +895,17 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 		applyLiquidToolbarInsets();
 		updateLiquidToolbarVisibility();
 		updateCaptureHeights();
+	}
+
+	/** The actual liquid compose model, also usable by offline interaction regression tests. */
+	public static List<HomeToolbarComposeMenuItem> composeMenuItems(Context context){
+		List<HomeToolbarComposeMenuItem> composeItems=new ArrayList<>();
+		composeItems.add(new HomeToolbarComposeMenuItem(R.id.compose_post, context.getString(R.string.compose_menu_post), getNotes(MiuixIcons.INSTANCE)));
+		composeItems.add(new HomeToolbarComposeMenuItem(R.id.compose_friend_request, context.getString(R.string.compose_menu_friend_request), getContactsBook(MiuixIcons.INSTANCE)));
+		composeItems.add(new HomeToolbarComposeMenuItem(R.id.compose_friend_card, context.getString(R.string.compose_menu_friend_card), getContactsBook(MiuixIcons.INSTANCE), R.drawable.ic_friend_card));
+		composeItems.add(new HomeToolbarComposeMenuItem(R.id.compose_album, context.getString(R.string.baby_albums_compose_upload), getImage(MiuixIcons.INSTANCE)));
+		composeItems.add(new HomeToolbarComposeMenuItem(R.id.compose_novel, context.getString(R.string.compose_menu_novel), getNotes(MiuixIcons.INSTANCE), R.drawable.ic_novel_rebuilt));
+		return composeItems;
 	}
 
 	private void applyLiquidToolbarInsets(){

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Visual breathing room only; toolbar/system-bar clearance comes from measured window bounds. -->
+    <dimen name="home_refresh_text_gap">8dp</dimen>
+    <dimen name="home_refresh_text_side">16dp</dimen>
+</resources>

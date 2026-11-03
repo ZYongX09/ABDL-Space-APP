@@ -3,6 +3,7 @@ package org.joinmastodon.android.ui.compose.navigation
 import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.Bitmap
+import android.graphics.Rect
 import android.graphics.RectF
 import android.widget.ImageView
 import android.widget.FrameLayout
@@ -57,6 +58,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.ComposeView
@@ -146,6 +149,7 @@ class HomeLiquidToolbarController(
 	private var forwardingOutsideGesture = false
 	private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop.toFloat()
 	private val leadingGlassBounds = RectF()
+	private val glassCoordinates = arrayOfNulls<LayoutCoordinates>(3)
 	private var leadingGlassTouch = false
 	private var leadingGlassLongPress = false
 	private var leadingGlassMoved = false
@@ -248,6 +252,23 @@ class HomeLiquidToolbarController(
 		}
 	}.apply {
 		addView(composeView, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
+	}
+
+	/** Measured visible glass, in window coordinates, including open menus and layout transforms.
+	 * The full-screen touch/capture host is not itself an occluding toolbar. */
+	fun getVisibleBoundsInWindow(out: Rect): Boolean {
+		out.setEmpty()
+		if (!view.isAttachedToWindow || !view.isShown) return false
+		glassCoordinates.forEach { coordinates ->
+			if (coordinates != null && coordinates.isAttached) {
+				val bounds = coordinates.boundsInWindow()
+				if (!bounds.isEmpty) out.union(
+					kotlin.math.floor(bounds.left).toInt(), kotlin.math.floor(bounds.top).toInt(),
+					kotlin.math.ceil(bounds.right).toInt(), kotlin.math.ceil(bounds.bottom).toInt(),
+				)
+			}
+		}
+		return !out.isEmpty
 	}
 
 	fun setBackdropBitmap(bitmap: Bitmap?) {
@@ -353,6 +374,7 @@ private fun isMenuVisible(): Boolean = menuPageState!=HomeToolbarMenuPage.NONE |
 		outsideGestureDown?.recycle()
 		outsideGestureDown = null
 		contentTouchTarget = null
+		glassCoordinates.fill(null)
 		composeView.disposeComposition()
 	}
 
@@ -423,6 +445,7 @@ private fun isMenuVisible(): Boolean = menuPageState!=HomeToolbarMenuPage.NONE |
 				onSelectionConfirmed = { index -> menuItems.getOrNull(index)?.let { activateMenuItem(HomeToolbarMenuPage.TIMELINES, it) } },
 				onUpwardFling = { closeMenu() },
 				onBoundsChanged = { position, size -> leadingGlassBounds.set(position.x, position.y, position.x + size.width, position.y + size.height) },
+				onLayoutCoordinates = { glassCoordinates[0] = it },
 				closedContent = {
 					Row(Modifier.height(48.dp).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
 					ResourceIcon(if(showNewPostsState) R.drawable.ic_fluent_arrow_up_16_filled else currentTimeline?.iconRes ?: R.drawable.ic_fluent_home_24_regular, 24, contentColor)
@@ -476,6 +499,7 @@ val trailingExpanded = menuPageState==HomeToolbarMenuPage.ROOT || menuPageState=
 				},
 				onUpwardFling = { closeMenu() },
 				onBoundsChanged = { _, _ -> },
+				onLayoutCoordinates = { glassCoordinates[1] = it },
 				closedContent = {
 					Row(Modifier.height(48.dp), verticalAlignment = Alignment.CenterVertically) {
 					SearchAnchorIcon()
@@ -522,6 +546,7 @@ val trailingExpanded = menuPageState==HomeToolbarMenuPage.ROOT || menuPageState=
 					onSelectionConfirmed = { index -> activateComposeItem(index) },
 					onUpwardFling = { closeMenu() },
 					onBoundsChanged = { _, _ -> },
+					onLayoutCoordinates = { glassCoordinates[2] = it },
 					closedContent = {
 						Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
 							ResourceIcon(R.drawable.ic_fluent_edit_24_regular, 24, contentColor)

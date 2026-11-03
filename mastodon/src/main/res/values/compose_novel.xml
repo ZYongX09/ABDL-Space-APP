@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item type="id" name="compose_novel" />
+    <string name="compose_menu_novel">Publish novel</string>
+    <string name="compose_action_novel_description">Open the creator center</string>
+</resources>

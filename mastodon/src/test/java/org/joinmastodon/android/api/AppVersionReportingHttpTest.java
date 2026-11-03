@@ -140,8 +140,8 @@ public class AppVersionReportingHttpTest {
         assertEquals(List.of(String.valueOf(BuildConfig.VERSION_CODE)), recorded.getHeaders().values("X-App-Version-Code"));
         assertEquals(List.of("1"), recorded.getHeaders().values("X-ABDL-App-AI"));
         assertEquals(List.of("2"), recorded.getHeaders().values("X-ABDL-NBW-Protocol"));
-        assertEquals("3.2.0", BuildConfig.VERSION_NAME);
-        assertEquals(34, BuildConfig.VERSION_CODE);
+        assertEquals("3.3.0-beta", BuildConfig.VERSION_NAME);
+        assertEquals(35, BuildConfig.VERSION_CODE);
         assertTrue(recorded.getHeader("User-Agent").matches("^MastodonAndroid/.*"));
         if(conflict) assertEquals("preserved", recorded.getHeader("X-Caller-Header"));
         AccountSession session=(AccountSession)field(MastodonAPIController.class, "session").get(controller);
@@ -208,7 +208,7 @@ public class AppVersionReportingHttpTest {
             assertTrue(status.mediaAttachments.isEmpty());
         }
     }
-    @Test public void syntheticNoticeBuildsRealDisplayItemsAndStringIdComparator() throws Exception {
+    @Test @Config(qualifiers="zh-rCN") public void syntheticNoticeBuildsRealDisplayItemsAndStringIdComparator() throws Exception {
         Status status=submit(new GetAllTimeline(null, 20), new MockResponse().setBody("["+NOTICE+"]"), false, null, false).get(0);
         var items=org.joinmastodon.android.ui.displayitems.StatusDisplayItem.buildItems(
             RuntimeEnvironment.getApplication(), status, "offline.example.test_42", status, Map.of(status.account.id, status.account), 0);
@@ -222,6 +222,22 @@ public class AppVersionReportingHttpTest {
         assertTrue(org.joinmastodon.android.utils.ObjectIdComparator.INSTANCE.compare(NOTICE_ID, "99")>0);
         java.util.Set<String> knownIds=new java.util.HashSet<>();
         assertTrue(knownIds.add(status.id)); assertFalse(knownIds.add(status.clone().id));
+    }
+    @Test @Config(qualifiers="en") public void syntheticNoticeHasNoUnresolvableTranslationForEnglishReaders() throws Exception {
+        Status status=submit(new GetAllTimeline(null, 20), new MockResponse().setBody("["+NOTICE+"]"), false, null, false).get(0);
+        assertEquals("en", org.joinmastodon.android.translation.PostTranslationSupport.target(RuntimeEnvironment.getApplication()));
+        assertFalse(org.joinmastodon.android.translation.PostTranslationSupport.eligible(status, "en"));
+        var items=org.joinmastodon.android.ui.displayitems.StatusDisplayItem.buildItems(
+            RuntimeEnvironment.getApplication(), status, "offline.example.test_42", status, Map.of(status.account.id, status.account), 0);
+        assertEquals(List.of(
+            org.joinmastodon.android.ui.displayitems.StatusDisplayItem.Type.HEADER,
+            org.joinmastodon.android.ui.displayitems.StatusDisplayItem.Type.TEXT,
+            org.joinmastodon.android.ui.displayitems.StatusDisplayItem.Type.FOOTER),
+            items.stream().map(item->item.getType()).collect(java.util.stream.Collectors.toList()));
+        Status ordinary=status.clone(); ordinary.id="ordinary-opaque-status";
+        assertTrue(org.joinmastodon.android.translation.PostTranslationSupport.eligible(ordinary, "en"));
+        Status boosted=status.clone(); boosted.id="ordinary-envelope"; boosted.reblog=status;
+        assertFalse(org.joinmastodon.android.translation.PostTranslationSupport.eligible(boosted, "en"));
     }
     @Test public void allTimelineUsesArrayAndLinkCursorNotSyntheticId() throws Exception {
         GetAllTimeline request=new GetAllTimeline(null, 20);

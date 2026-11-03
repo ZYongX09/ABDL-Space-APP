@@ -23,7 +23,7 @@ import java.util.function.IntConsumer;
 import me.grishka.appkit.utils.V;
 import me.grishka.appkit.views.BottomSheet;
 
-/** The same three publishing destinations as the liquid home compose menu. */
+/** Legacy publishing sheet; keep its destinations aligned with the home compose menus. */
 public class ComposeActionSheet extends BottomSheet{
 	private final LinearLayout cards;
 	private final IntConsumer listener;
@@ -41,6 +41,8 @@ public class ComposeActionSheet extends BottomSheet{
 				R.drawable.compose_action_contacts, R.attr.colorM3SecondaryContainer, R.attr.colorM3OnSecondaryContainer);
 		addCard(R.id.compose_album, R.string.baby_albums_compose_upload, R.string.compose_action_album_description,
 				R.drawable.compose_action_image, R.attr.colorM3TertiaryContainer, R.attr.colorM3OnTertiaryContainer);
+		addCard(R.id.compose_novel, R.string.compose_menu_novel, R.string.compose_action_novel_description,
+				R.drawable.ic_novel_rebuilt, R.attr.colorM3PrimaryContainer, R.attr.colorM3OnPrimaryContainer);
 		root.findViewById(R.id.compose_action_cancel).setOnClickListener(v->dismiss());
 		setContentView(root);
 		// AppKit handles system-bar padding on the outer container, including the right inset.
@@ -95,7 +97,7 @@ public class ComposeActionSheet extends BottomSheet{
 
 	private void updateCardLayout(int width){
 		float fontScale=getContext().getResources().getConfiguration().fontScale;
-		boolean row=width>=V.dp(336) && fontScale<=1.15f;
+		boolean row=width>=V.dp(cards.getChildCount()*112) && fontScale<=1.15f;
 		if(cards.getTag()!=null && cardsInRow==row)
 			return;
 		cards.setTag(Boolean.TRUE);

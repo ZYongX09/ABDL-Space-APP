@@ -38,7 +38,7 @@ public final class PostTranslationSupport{
 	}
 	public static boolean eligible(Status status, String target){
 		Status content=status.getContentStatus();
-		return !content.preview && content.advertisement==null && content.isEligibleForTranslation(target)
+		return !"app-update-required".equals(content.id) && !content.preview && content.advertisement==null && content.isEligibleForTranslation(target)
 				&& (!TextUtils.isEmpty(HtmlParser.strip(cleanBody(content))) || !TextUtils.isEmpty(content.spoilerText));
 	}
 
