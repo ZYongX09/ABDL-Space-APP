@@ -48,9 +48,21 @@
 
 新编译class已改为App运行库存在的新FlowRow签名，独立复核同时确认现有Material3四种调用精确descriptor均兼容，无需扩大BOM或SavedState版本pin。最初离线编译/核心测试因既定传递artifact缺缓存失败，单次联网解析补齐后编译成功；独立reader40/40、editor27/27已真实强制重跑通过且source不变，旧XML不计本轮。
 
-新增App模块真实Activity设置点击、Back/scrim、同章节source anchor及锁定/注销门禁6项首轮因精确offline fixture未建模实例metadata等清理失败，未计通过；只修fixture正常默认配色、精确路由建模和小说内容零请求门禁。最终新6项、原ReaderBehavior5项、Polish6项合跑17/17，全部fresh、0fail/skip、源码指纹前后不变；原legacy默认slot首轮分页等待失败的用例本次不改源即通过，不把未证实原因称为生产回归。普通书详情、外部详情根、直接章节intent实际点击Settings均保持Reader及source anchor，关闭面板不退出宿主，应用锁/失效账号守卫保持。新beta35 APK的真实DEX链接验证仍待最终打包。
+新增App模块真实Activity设置点击、Back/scrim、同章节source anchor及锁定/注销门禁6项首轮因精确offline fixture未建模实例metadata等清理失败，未计通过；只修fixture正常默认配色、精确路由建模和小说内容零请求门禁。最终新6项、原ReaderBehavior5项、Polish6项合跑17/17，全部fresh、0fail/skip、源码指纹前后不变；原legacy默认slot首轮分页等待失败的用例本次不改源即通过，不把未证实原因称为生产回归。普通书详情、外部详情根、直接章节intent实际点击Settings均保持Reader及source anchor，关闭面板不退出宿主，应用锁/失效账号守卫保持。新beta35 APK已严格解析真实DEX指令：Settings调用的新FlowRow descriptor在同包classes.dex有精确实现，调用列表非空，metadata为35/3.3.0-beta，最终二进制核验通过。
 
-最终40类相邻回归391/391全部fresh、0fail/error/skip、源码前后28268文件指纹一致，含首页历史、骨架、翻译、相册、NBW、英语/大字、小说截图与阅读编辑等。本轮采用串行分批验证，不将分次有重叠专项累加成单次全仓测试。正式签名release测试APK正在构建，包内版本/签名/CRC/16KiB对齐/完整字体与地图凭据，以及严格读取新code35 DEX中Settings FlowRow调用/定义一致性由交付脚本核验。
+最终40类相邻回归391/391全部fresh、0fail/error/skip、源码前后28268文件指纹一致，含首页历史、骨架、翻译、相册、NBW、英语/大字、小说截图与阅读编辑等。本轮采用串行分批验证，不将分次有重叠专项累加成单次全仓测试。
+
+## 正式签名测试包交付
+
+源码`4e155ea5b26bf38e0b7e8be7f5d64b13530eb5ee`已合回并推送develop，main仍`c8dd0ccd`，不正式发版。正式签名release构建exit0，耗时2577.64秒；28268个源码/配置文件在最终相邻回归与构建前后逐hash相同。D8的既有Kotlin metadata重写告警仍保留，不宣称无告警。
+
+测试包：`ABDL-Space-3.3.0-beta-code35-feedback-test-20261103.apk`，包名`top.abdl_space.app`，168753592字节（160.94MiB），非debuggable，正式证书SHA256为`fd2098a3d3493222c247a7ba2787ec48fd8f62d38e9432ed4d6290a057dea475`。APK SHA256：
+
+```text
+fbaa79dedb594334e82946ba90a3cba1b3c63f23362b1c3aa14b14b3dce110cb
+```
+
+签名、包内版本、ZIP CRC、16KiB zipalign、完整Noto字体、双地图凭据、非导出详情宿主均核验通过。首次脚本错误要求aapt单列`en`资源而中止；实际默认英文不需要单独限定资源，已直接解析优化路径`res/EdK.xml`的包内LocaleConfig，确认defaultLocale=en-US以及en-US/中文声明，不改源码或重构建。严格code35 DEX检查确认Settings FlowRow调用与同包方法定义精确匹配；不仅检查JVM class或依赖声明。APK及`.sha256`留在仓外项目根，未纳入git。
 
 不会以旧XML、UP-TO-DATE结果或代码静态断言冒充本轮真实执行。未安装到设备，未正式发布App；真实支持ROM上的硬件动画效果不以Robolectric fake-ROM通过替代。
 
