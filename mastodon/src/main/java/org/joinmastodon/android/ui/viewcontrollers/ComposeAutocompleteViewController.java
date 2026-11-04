@@ -348,7 +348,7 @@ public class ComposeAutocompleteViewController{
 		public ImageLoaderRequest getImageRequest(int position, int image){
 			AccountViewModel a=users.get(position);
 			if(image==0)
-				return a.avaRequest;
+					return org.joinmastodon.android.ui.utils.NBWImageRequests.current(a.avaRequest);
 			return a.emojiHelper.getImageRequest(image-1);
 		}
 

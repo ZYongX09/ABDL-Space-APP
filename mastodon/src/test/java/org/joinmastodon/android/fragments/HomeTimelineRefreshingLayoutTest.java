@@ -103,10 +103,13 @@ public class HomeTimelineRefreshingLayoutTest{
     private String previousActive;
     private boolean previousLiquid, previousReduceMotion;
     private int width=320, height=720;
+    private boolean darkTheme;
+    private GlobalUserPreferences.ThemePreference previousTheme;
 
     @Before @SuppressWarnings("unchecked") public void setup() throws Exception{
         ShadowChoreographer.setPaused(true);
         MastodonApp.context=RuntimeEnvironment.getApplication(); V.setApplicationContext(MastodonApp.context);
+        previousTheme=GlobalUserPreferences.theme;
         org.joinmastodon.android.ui.utils.UiUtils.updateLocalizedDateFormatters(MastodonApp.context);
         AccountSessionManager manager=AccountSessionManager.getInstance();
         sessions=(Map<String,AccountSession>)HomeTimelineSnapshotCacheTest.field(AccountSessionManager.class,"sessions").get(manager);
@@ -141,11 +144,13 @@ public class HomeTimelineRefreshingLayoutTest{
         if(previousInstance==null) instances.remove(session.domain); else instances.put(session.domain,previousInstance);
         HomeTimelineSnapshotCacheTest.field(AccountSessionManager.class,"lastActiveAccountID").set(AccountSessionManager.getInstance(),previousActive);
         GlobalUserPreferences.useIosLiquidNavigation=previousLiquid; GlobalUserPreferences.reduceMotion=previousReduceMotion;
+        GlobalUserPreferences.theme=previousTheme;
         HomeTimelineHistoryTest.OfflineRequests.sent.clear(); HomeTimelineHistoryTest.OfflineRequests.canceled.clear();
     }
 
     private void open(boolean embedded) throws Exception{
-        lifecycle=Robolectric.buildActivity(HostActivity.class); activity=lifecycle.get(); activity.setTheme(R.style.Theme_Mastodon_Light);
+        GlobalUserPreferences.theme=darkTheme ? GlobalUserPreferences.ThemePreference.DARK : GlobalUserPreferences.ThemePreference.LIGHT;
+        lifecycle=Robolectric.buildActivity(HostActivity.class); activity=lifecycle.get(); activity.setTheme(darkTheme ? R.style.Theme_Mastodon_Dark : R.style.Theme_Mastodon_Light);
         lifecycle.setup().visible();
         Bundle args=new Bundle(); args.putString("account",session.getID()); args.putBoolean("noAutoLoad",true);
         if(embedded){
@@ -167,7 +172,10 @@ public class HomeTimelineRefreshingLayoutTest{
 
     private void settle(int frames){
         for(int i=0;i<frames;i++){
+            boolean[] vsync={false};
+            android.view.Choreographer.getInstance().postFrameCallback(time->vsync[0]=true);
             ShadowLooper.idleMainLooper(16,TimeUnit.MILLISECONDS);
+            assertTrue("Advance a real attached-window vsync, not only manual layout",vsync[0]);
             View root=activity.getWindow().getDecorView(); root.forceLayout();
             root.measure(View.MeasureSpec.makeMeasureSpec(width,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(height,View.MeasureSpec.EXACTLY));
             root.layout(0,0,width,height);
@@ -358,6 +366,119 @@ public class HomeTimelineRefreshingLayoutTest{
         width=720; height=320; insets(27,21,43,19); moveWindowOrigin(190,830); settle(6); assertWindowOrigin(190,830);
         Rect rotated=assertSafe(21,bounds(toolbar()));
         assertTrue(rotated.left>=27 && rotated.right<=width-43);
+    }
+
+    // The liquid-glass 320dp/fontScale1.6 raster cases (light/dark) are intentionally absent:
+    // Robolectric's bundled SkSL rejects the miuix AGSL at RuntimeShader construction ("cannot
+    // swizzle value of type 'shader'"), and its software canvas rejects RuntimeShader paints when
+    // the glass highlight is drawn ("Software rendering doesn't support RuntimeShader"), so the
+    // liquid glass blur/highlight cannot be rasterized in a unit test here. Liquid layout and
+    // geometry stay covered by attachedActualLiquidGlassBoundsReplaceClassicGeometryAndDisappear-
+    // WithoutStaleOffset in this class and by the HomeTab/liquid toolbar geometry tests; the real
+    // glass visual has to be verified on a device. These cases are removed rather than skipped or
+    // relaxed, and production code is untouched.
+    @Test @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    public void attachedClassicLight320Font160UsesActualToolbarAndPureTextPill() throws Exception{ renderTopGeometry(false,false); }
+
+    @Test @GraphicsMode(GraphicsMode.Mode.NATIVE) @Config(qualifiers="zh-rCN-w320dp-h720dp-night-mdpi")
+    public void attachedClassicDark320Font160UsesActualToolbarAndPureTextPill() throws Exception{ renderTopGeometry(true,false); }
+
+    private void renderTopGeometry(boolean dark, boolean liquid) throws Exception{
+        darkTheme=dark;
+        android.content.res.Configuration config=new android.content.res.Configuration(MastodonApp.context.getResources().getConfiguration());
+        config.fontScale=1.6f; MastodonApp.context.getResources().updateConfiguration(config,MastodonApp.context.getResources().getDisplayMetrics());
+        open(true);
+        if(liquid){
+            glass=new HomeLiquidToolbarController(activity,home::onLiquidTimelineSelected,home::onLiquidNewPosts,home::onLiquidCompose,home::onLiquidMenuItem,home::openSearch);
+            glass.setTimelines(List.of(new HomeToolbarTimeline(0,"Home",R.drawable.ic_fluent_home_24_regular)),0);
+            glass.setComposeMenu(HomeFragment.composeMenuItems(activity)); glass.setStatusBarInset(37);
+            ViewGroup host=(ViewGroup)home.getView().getParent();
+            host.addView(glass.getView(),new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.MATCH_PARENT));
+            // A real attached controller, without bypassing HomeFragment's hardware support gate.
+            GlobalUserPreferences.useIosLiquidNavigation=true;
+            home.setLiquidToolbarController(glass);
+        }
+        insets(0,37,0,24); settle(64);
+        Rect obstruction=new Rect();
+        assertTrue(home.getVisibleHomeToolbarBoundsInWindow(obstruction));
+        assertTightClearance(37,obstruction,true);
+        capture("home-top-"+(liquid?"liquid":"classic")+"-"+(dark?"dark":"light")+"-320-font160");
+        if(liquid){
+            Rect collapsed=new Rect(obstruction), overlay=bounds(glass.getView());
+            float density=activity.getResources().getDisplayMetrics().density;
+            assertTrue("Capture/touch host remains full window",overlay.height()>collapsed.height()*3);
+            tap(glass.getView(),glass.getView().getWidth()-140*density,37+32*density);
+            settle(90);
+            assertTrue(home.getVisibleHomeToolbarBoundsInWindow(obstruction));
+            assertTrue("Real five-row compose menu must expand",obstruction.height()>collapsed.height()*2);
+            assertTightClearance(37,obstruction,true);
+            capture("home-top-liquid-compose-"+(dark?"dark":"light")+"-320-font160");
+            assertTrue(glass.onBackPressed()); settle(90);
+            assertTrue(home.getVisibleHomeToolbarBoundsInWindow(obstruction)); assertTightClearance(37,obstruction,true);
+            width=720; height=320; insets(19,23,31,19); glass.setStatusBarInset(23); settle(64);
+            assertTrue(home.getVisibleHomeToolbarBoundsInWindow(obstruction)); assertTightClearance(23,obstruction,true);
+            capture("home-top-liquid-landscape-"+(dark?"dark":"light")+"-font160");
+            tap(glass.getView(),glass.getView().getWidth()-140*density,23+32*density); settle(90);
+            androidx.recyclerview.widget.RecyclerView shortRows=timeline.getView().findViewById(R.id.list);
+            assertTrue("Short expanded-menu viewport must not blank normal content",shortRows.isShown() && shortRows.getPaddingTop()<shortRows.getHeight());
+            assertEquals("Only the hint may be suppressed when the actual expanded glass leaves no text room",0f,pill().getAlpha(),0f);
+            assertTrue(glass.onBackPressed()); settle(90);
+            width=320; height=720; insets(0,37,0,24); glass.setStatusBarInset(37); settle(64);
+            assertTrue(home.getVisibleHomeToolbarBoundsInWindow(obstruction)); assertTightClearance(37,obstruction,true);
+            androidx.recyclerview.widget.RecyclerView rows=timeline.getView().findViewById(R.id.list);
+            rows.scrollBy(0,31); settle(12);
+            assertTrue(home.getVisibleHomeToolbarBoundsInWindow(obstruction)); assertTightClearance(37,obstruction,false);
+            rows.scrollToPosition(0); settle(12);
+            // Search's anchor keeps its actual 48dp capsule target; the expansion is real AppKit UI.
+            tap(glass.getView(),glass.getView().getWidth()-84*density,37+32*density);
+            settle(90); activity.getFragmentManager().executePendingTransactions(); settle(12);
+            org.joinmastodon.android.fragments.discover.SearchQueryFragment search=null;
+            for(android.app.Fragment fragment:activity.getFragmentManager().getFragments())
+                if(fragment instanceof org.joinmastodon.android.fragments.discover.SearchQueryFragment query) search=query;
+            assertNotNull("Actual glass search click must expand the search UI",search);
+            assertTrue(search.getView().isAttachedToWindow());
+            assertTrue(hasVisibleEditText(search.getView()));
+            capture("home-top-liquid-search-"+(dark?"dark":"light")+"-320-font160");
+            return;
+        }
+        NestedRecyclerScrollView scroller=timeline.getView().findViewById(R.id.scroller);
+        scroller.scrollTo(0,29); settle(12);
+        assertTrue(home.getVisibleHomeToolbarBoundsInWindow(obstruction)); assertTightClearance(37,obstruction,false);
+        width=720; height=320; insets(19,23,31,19); settle(12);
+        assertTrue(home.getVisibleHomeToolbarBoundsInWindow(obstruction)); assertTightClearance(23,obstruction,false);
+    }
+
+    private void assertTightClearance(int topInset, Rect obstruction, boolean checkHeader){
+        Rect hint=assertSafe(topInset,obstruction);
+        int gap=activity.getResources().getDimensionPixelSize(R.dimen.home_refresh_text_gap);
+        View hintParent=(View)pill().getParent();
+        Rect parent=new Rect(); assertTrue(hintParent.getGlobalVisibleRect(parent));
+        int[] rootOrigin=new int[2]; hintParent.getRootView().getLocationInWindow(rootOrigin); parent.offset(rootOrigin[0],rootOrigin[1]);
+        assertEquals("No inset, TOP_SLOT or capture margin may be stacked below actual glass",Math.max(Math.max(topInset,parent.top),obstruction.bottom)+gap,hint.top);
+        androidx.recyclerview.widget.RecyclerView rows=timeline.getView().findViewById(R.id.list);
+        Rect rowBounds=bounds(rows);
+        assertEquals("Only the painted text height and two necessary gaps separate the first post",Math.max(0,hint.bottom+gap-rowBounds.top),rows.getPaddingTop());
+        if(checkHeader){
+            assertTrue("Cached first post is actually attached",rows.getChildCount()>0);
+            View first=((androidx.recyclerview.widget.LinearLayoutManager)rows.getLayoutManager()).findViewByPosition(0);
+            assertNotNull(first);
+            assertTrue("Refresh text cannot paint over the author's header",bounds(first).top>=hint.bottom+gap);
+        }
+        assertEquals("Geometry must not refresh data",1,HomeTimelineHistoryTest.OfflineRequests.sent.stream().filter(GetAllTimeline.class::isInstance).count());
+    }
+
+    private static boolean hasVisibleEditText(View view){
+        if(view instanceof android.widget.EditText text) return text.isShown() && text.getWidth()>0 && text.getHeight()>0;
+        if(view instanceof ViewGroup group) for(int i=0;i<group.getChildCount();i++) if(hasVisibleEditText(group.getChildAt(i))) return true;
+        return false;
+    }
+
+    private static void tap(View host,float x,float y){
+        long now=android.os.SystemClock.uptimeMillis();
+        android.view.MotionEvent down=android.view.MotionEvent.obtain(now,now,android.view.MotionEvent.ACTION_DOWN,x,y,0);
+        android.view.MotionEvent up=android.view.MotionEvent.obtain(now,now+90,android.view.MotionEvent.ACTION_UP,x,y,0);
+        try{ assertTrue(host.dispatchTouchEvent(down)); host.dispatchTouchEvent(up); }
+        finally{ down.recycle(); up.recycle(); }
     }
 
     private void capture(String name) throws Exception{

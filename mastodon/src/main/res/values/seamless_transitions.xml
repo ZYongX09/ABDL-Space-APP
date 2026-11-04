@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <item name="seamless_source_binding" type="id" />
-    <string name="settings_seamless_transitions">Seamless card transitions</string>
-    <string name="settings_seamless_transitions_summary">Use this device’s supported system animation when opening post, novel and album cards. Respects reduced motion and content protection.</string>
+    <string name="settings_seamless_transitions">System-level seamless animations</string>
+    <string name="settings_seamless_transitions_summary">On by default on supported systems. Use system-level seamless animations when opening supported details. Respects reduced motion, content protection and your saved choice.</string>
     <string name="settings_seamless_transitions_unsupported">Unavailable: this system does not provide the SharedView animation interface. Cards open normally; your saved preference is kept.</string>
     <string name="settings_seamless_transitions_incompatible">Unavailable: this system’s SharedView interface is incomplete or incompatible. Cards open normally; your saved preference is kept.</string>
     <string name="settings_seamless_transitions_disabled">Unavailable: this system reports SharedView animations are disabled. Cards open normally; your saved preference is kept.</string>

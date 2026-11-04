@@ -49,15 +49,20 @@ public class FriendCardStatusDisplayItem extends StatusDisplayItem{
 	public final Presentation presentation;
 	private final String accountID;
 	private final boolean hideCover;
+	private final Status concealmentOwner;
 	private final ImageLoaderRequest coverRequest;
 
 	public FriendCardStatusDisplayItem(String parentID, Callbacks callbacks, Context context, Status status, String accountID, boolean hideCover){
+		this(parentID, callbacks, context, status, accountID, hideCover, status);
+	}
+	public FriendCardStatusDisplayItem(String parentID, Callbacks callbacks, Context context, Status status, String accountID, boolean hideCover, Status concealmentOwner){
 		super(parentID, callbacks, context);
 		this.status=status;
 		this.attachment=status.friendCard;
 		this.presentation=presentation(attachment);
 		this.accountID=accountID;
 		this.hideCover=hideCover;
+		this.concealmentOwner=concealmentOwner;
 		// Only the API's live owned-cover projection is used, never attachment.url or a LINK's card snapshot.
 		// Protected or unavailable rows must not request a cover or accept a recycled late image.
 		// CW expansion reuses this model. Keep a candidate, but expose/restore it only while
@@ -367,6 +372,10 @@ public class FriendCardStatusDisplayItem extends StatusDisplayItem{
 			linkContainer.setFocusable(link && available);
 			linkContainer.setEnabled(available);
 			linkContainer.setContentDescription(link ? wrapper.getContext().getString(R.string.fc_link_description, ownership, heading) : null);
+			org.joinmastodon.android.ui.seamless.SeamlessTransitions.bindFriendCard(card, item.accountID, item.attachment.id,
+					publication && !item.hideCover, item.concealmentOwner, item.status);
+			org.joinmastodon.android.ui.seamless.SeamlessTransitions.bindFriendCard(linkContainer, item.accountID, item.attachment.id,
+					item.presentation==Presentation.LINK && !item.hideCover, item.concealmentOwner, item.status);
 			Drawable image=coverBinding.bind(wrapper.getContext(), item.coverKey(), item.permittedCoverRequest());
 			if(image!=null) showCover(image);
 			else clearImage(0); // Failed/missing covers keep the original compact title or LINK icon.
@@ -442,6 +451,9 @@ public class FriendCardStatusDisplayItem extends StatusDisplayItem{
 			Bundle args=new Bundle();
 			args.putString("account", item.accountID);
 			args.putString("card_id", item.attachment.id);
+			View source=item.presentation==Presentation.LINK ? linkContainer : card;
+			if(item.status.friendCard==item.attachment && presentation(item.attachment)==item.presentation
+					&& org.joinmastodon.android.ui.seamless.SeamlessTransitions.openFriendCard(activity, source, item.accountID, item.attachment.id, args)) return;
 			Nav.go(activity, FriendCardDetailFragment.class, args);
 		}
 	}

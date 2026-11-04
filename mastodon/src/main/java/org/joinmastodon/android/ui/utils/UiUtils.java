@@ -1096,11 +1096,11 @@ public class UiUtils{
 
 		if(obj instanceof Account acc){
 			account=acc;
-			url=acc.url;
+			url=org.joinmastodon.android.api.NBWUrlResolver.current(acc.url,false);
 			previewTitle=context.getString(R.string.share_sheet_preview_profile, account.displayName);
 		}else if(obj instanceof Status st){
 			account=st.account;
-			url=st.url;
+			url=org.joinmastodon.android.api.NBWUrlResolver.current(st.url,false);
 			String postText=st.getStrippedText();
 			if(TextUtils.isEmpty(postText)){
 				previewTitle=context.getString(R.string.share_sheet_preview_profile, account.displayName);

@@ -40,6 +40,18 @@ public class NBWPostRegisterActivity extends Activity{
 	private TextView status;
 	private Button connect, settings;
 	private boolean starting;
+	private long preflight;
+	private static AuthorizationTicket authorizationTicket;
+	private static final class AuthorizationTicket{
+		final AccountSession session;
+		final org.joinmastodon.android.model.Token token;
+		final String accessToken;
+		final long generation, started;
+		AuthorizationTicket(AccountSession session){
+			this.session=session; token=session.token; accessToken=token==null ? null : token.accessToken;
+			generation=session.getNBWForumOptionsRepository().getSnapshot().generation; started=android.os.SystemClock.elapsedRealtime();
+		}
+	}
 
 	@Override protected void onCreate(Bundle savedInstanceState){
 		UiUtils.setUserPreferredTheme(this);
@@ -106,18 +118,33 @@ public class NBWPostRegisterActivity extends Activity{
 	private void startAuthorization(){
 		if(starting || !repository.getSnapshot().canWrite() || AccountSessionManager.getInstance().tryGetAccount(session.getID())!=session) return;
 		starting=true; render(repository.getSnapshot());
-		final long generation=repository.getSnapshot().generation;
+		long ticket=++preflight;
+		repository.refreshBeforeAuthorization(snapshot->{
+			if(ticket!=preflight || isFinishing() || isDestroyed() || !currentSession() || !snapshot.canWrite()){
+				starting=false; if(!isFinishing() && !isDestroyed()) render(repository.getSnapshot()); return;
+			}
+			sendAuthorization(snapshot);
+		});
+	}
+	private boolean currentSession(){
+		var manager=AccountSessionManager.getInstance();
+		return manager.tryGetAccount(session.getID())==session && session.getID().equals(manager.getLastActiveAccountID());
+	}
+	private void sendAuthorization(NBWForumOptionsRepository.Snapshot snapshot){
+		final long generation=snapshot.generation;
 		authorizationRequest=NBWAppRequest.authorizationStart().setCallback(new Callback<>(){
 			@Override public void onSuccess(NBWAppRequest.AuthorizationStart result){ runOnUiThread(()->{
-				if(isFinishing() || isDestroyed() || repository.getSnapshot().generation!=generation || AccountSessionManager.getInstance().tryGetAccount(session.getID())!=session) return;
+				if(isFinishing() || isDestroyed() || repository.getSnapshot().generation!=generation || !currentSession()) return;
 				authorizationRequest=null; starting=false;
+				try{ result.postprocess(); }catch(Exception invalid){ render(repository.getSnapshot()); status.setText(R.string.nbw_v2_connection_failed); return; }
+				if(!java.util.Objects.equals(snapshot.endpoints,result.endpoints)){ render(repository.getSnapshot()); status.setText(R.string.nbw_v2_connection_failed); return; }
 				rememberAuthorizationLaunch(NBWPostRegisterActivity.this, session.getID());
 				UiUtils.launchWebBrowser(NBWPostRegisterActivity.this, result.authorizationUrl);
 				render(repository.getSnapshot());
 			}); }
 			@Override public void onError(ErrorResponse error){ runOnUiThread(()->{
 				authorizationRequest=null; starting=false;
-				if(!isFinishing() && !isDestroyed()){ render(repository.getSnapshot()); status.setText(R.string.nbw_v2_connection_failed); }
+				if(!isFinishing() && !isDestroyed() && currentSession() && repository.getSnapshot().generation==generation){ render(repository.getSnapshot()); status.setText(R.string.nbw_v2_connection_failed); }
 			}); }
 		}).setNBWCancellationCleanup(()->{
 			authorizationRequest=null;
@@ -128,23 +155,38 @@ public class NBWPostRegisterActivity extends Activity{
 
 	@Override protected void onResume(){
 		super.onResume();
+		org.joinmastodon.android.api.session.NBWEndpointsRepository.getInstance().enterForeground(this);
 		if(repository!=null) repository.refreshIfExpired();
 	}
+	@Override protected void onPause(){
+		org.joinmastodon.android.api.session.NBWEndpointsRepository.getInstance().leaveForeground(this);
+		super.onPause();
+	}
 	@Override protected void onDestroy(){
+		preflight++;
+		org.joinmastodon.android.api.session.NBWEndpointsRepository.getInstance().leaveForeground(this);
 		if(authorizationRequest!=null) authorizationRequest.cancel();
 		if(subscription!=null) subscription.cancel();
 		if(classification!=null) classification.dispose();
 		super.onDestroy();
 	}
 	public static void rememberAuthorizationLaunch(Context context, String account){
-		context.getSharedPreferences("nbw_v2_authorization", MODE_PRIVATE).edit().putString("account", account).putLong("started", System.currentTimeMillis()).commit();
+		AccountSession session=AccountSessionManager.getInstance().tryGetAccount(account);
+		authorizationTicket=session==null ? null : new AuthorizationTicket(session);
+		// Retire pre-upgrade persisted hints. Proof and session ownership are process-only.
+		context.getSharedPreferences("nbw_v2_authorization", MODE_PRIVATE).edit().clear().commit();
 	}
 	/** Callback is only a metadata-refresh hint. Server owns single-use flow and binding identity. */
 	public static String consumeAuthorizationLaunch(Context context){
-		var prefs=context.getSharedPreferences("nbw_v2_authorization", MODE_PRIVATE);
-		String account=prefs.getString("account", null); long age=System.currentTimeMillis()-prefs.getLong("started", 0);
-		if(!prefs.edit().clear().commit() || account==null || age<0 || age>10*60*1000L) return null;
-		return AccountSessionManager.getInstance().tryGetAccount(account)==null ? null : account;
+		AuthorizationTicket ticket=authorizationTicket; authorizationTicket=null;
+		context.getSharedPreferences("nbw_v2_authorization", MODE_PRIVATE).edit().clear().commit();
+		if(ticket==null) return null;
+		long age=android.os.SystemClock.elapsedRealtime()-ticket.started;
+		var manager=AccountSessionManager.getInstance(); String account=ticket.session.getID();
+		if(age<0 || age>10*60*1000L || manager.tryGetAccount(account)!=ticket.session || !account.equals(manager.getLastActiveAccountID())
+				|| ticket.session.token!=ticket.token || !java.util.Objects.equals(ticket.accessToken,ticket.token==null ? null : ticket.token.accessToken)
+				|| ticket.generation!=ticket.session.getNBWForumOptionsRepository().getSnapshot().generation) return null;
+		return account;
 	}
 
 	/** Retired helpers remain source-compatible only; they cannot authorize or bind V2. */

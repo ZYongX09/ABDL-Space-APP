@@ -30,13 +30,17 @@ import okio.Buffer;
 @Config(sdk=28, application=CompatibilityTestApplication.class)
 public class NBWLoginFlowTest{
 	private final NBWLoginFlow flow=NBWLoginFlow.getInstance();
-	@Before public void setup(){
+	private org.joinmastodon.android.api.NBWEndpointFixtures endpoints;
+	@org.junit.After public void cleanupEndpoints() throws Exception{ flow.cancel(flow.begin()); endpoints.close(); }
+	@Before public void setup() throws Exception{
+		endpoints=new org.joinmastodon.android.api.NBWEndpointFixtures();
 		MastodonApp.context=RuntimeEnvironment.getApplication();
 		flow.cancel(flow.begin());
 	}
 	public static NBWLoginRequest.Start startResult(){
 		NBWLoginRequest.Start result=new NBWLoginRequest.Start();
 		result.flow="A".repeat(43); result.expiresIn=600;
+		result.endpoints=org.joinmastodon.android.api.NBWEndpointFixtures.primary();
 		result.authorizationUrl=new Uri.Builder().scheme("https").authority("www.newbabyworld.top").path("/oauth/authorize.php")
 				.appendQueryParameter("client_id", "public-registered-client")
 				.appendQueryParameter("redirect_uri", NBWLoginRequest.REDIRECT_URI).appendQueryParameter("response_type", "code")
@@ -58,6 +62,28 @@ public class NBWLoginFlowTest{
 	}
 	public static String body(org.joinmastodon.android.api.MastodonAPIRequest<?> request) throws Exception{
 		Buffer buffer=new Buffer(); request.getRequestBody().writeTo(buffer); return buffer.readUtf8();
+	}
+	@Test public void endpointSwitchIsTerminalAndNeverReusesPkceOrCompletionProofOnAnotherHost(){
+		NBWLoginFlow.Handle handle=waiting(); var old=flow.snapshot(handle); assertNotNull(old);
+		endpoints.publish("backup","endpoint-b","full");
+		assertEquals(0,flow.acceptCompletion(completion())); assertFalse(flow.isCurrent(handle)); assertNull(flow.exchange(handle,true));
+		var fresh=flow.begin(); var request=flow.start(fresh); assertNotNull(request);
+		var mismatched=startResult(); assertNull(flow.acceptStart(fresh,request,mismatched));
+		var next=flow.begin(); var start=flow.start(next); var backup=startResult();
+		backup.endpoints=org.joinmastodon.android.api.NBWEndpointFixtures.endpoints("backup","endpoint-b","full");
+		backup.authorizationUrl=backup.authorizationUrl.replace("www.newbabyworld.top","nbw.abdlcalendar.top");
+		assertEquals("nbw.abdlcalendar.top",flow.acceptStart(next,start,backup).getHost());
+		endpoints.publish("primary","endpoint-c","full"); assertFalse(flow.isCurrent(next));
+	}
+	@Test public void nativeResponseMustMatchSnapshotAndBindingStrictAllowlistKeepsSignedState() throws Exception{
+		var response=org.joinmastodon.android.api.NBWEndpointFixtures.authorizationStart(); response.postprocess();
+		for(String replacement:new String[]{"evil.example","www.newbabyworld.top:443","u@www.newbabyworld.top","%77ww.newbabyworld.top"}){
+			String value=response.authorizationUrl.replace("www.newbabyworld.top",replacement);
+			assertFalse(NBWLoginRequest.validAuthorizationUrl(value,response.endpoints,"nbw-v2-flow."));
+		}
+		assertFalse(NBWLoginRequest.validAuthorizationUrl(response.authorizationUrl,response.endpoints,"nbw-v2-login."));
+		var missing=startResult(); missing.endpoints=null;
+		try{ missing.postprocess(); fail("Legacy start cannot claim backup support"); }catch(org.joinmastodon.android.api.ObjectValidationException expected){}
 	}
 	@Test public void secureProofHasCanonicalShapeAndKnownS256Vector(){
 		Set<String> unique=new HashSet<>();
@@ -98,6 +124,8 @@ public class NBWLoginFlowTest{
 		var prefs=MastodonApp.context.getSharedPreferences("nbw_v2_login", 0); var before=prefs.getAll();
 		NBWLoginFlow.Handle handle=waiting(); ShadowSystemClock.advanceBy(Duration.ofMillis(NBWLoginFlow.TTL_MS));
 		assertFalse(flow.isCurrent(handle)); assertEquals(0, flow.acceptCompletion(completion())); assertNull(flow.attach(handle.generation));
+		// Starting another flow needs a live public lease, exactly as a foregrounded app renews it.
+		endpoints.publish("primary","endpoint-a","full");
 		handle=waiting(); flow.cancel(handle); assertNull(flow.exchange(handle, true));
 		handle=waiting(); flow.onAccountLoggedOut(new AccountLoggedOutEvent("other-account")); assertFalse(flow.isCurrent(handle));
 		assertEquals(before, prefs.getAll());

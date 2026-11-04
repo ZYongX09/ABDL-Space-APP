@@ -77,6 +77,7 @@ public final class NBWLoginFlow{
 	private static final class Pending{
 		final long generation, created;
 		final Identity identity=new Identity();
+		final org.joinmastodon.android.api.session.NBWEndpointsRepository.Snapshot endpointSnapshot=org.joinmastodon.android.api.session.NBWEndpointsRepository.getInstance().getSnapshot();
 		long owner;
 		String verifier, flow, completionCode;
 		long completionReceived;
@@ -122,6 +123,7 @@ public final class NBWLoginFlow{
 	public synchronized Uri acceptStart(Handle handle, MastodonAPIRequest<?> request, NBWLoginRequest.Start result){
 		if(!isCurrent(handle) || pending.request!=request || pending.phase!=Phase.STARTING) return null;
 		try{ result.postprocess(); }catch(Exception ignored){ clear(); return null; }
+		if(!Objects.equals(pending.endpointSnapshot.endpoints,result.endpoints)){ clear(); return null; }
 		pending.request=null; pending.flow=result.flow; pending.phase=Phase.WAITING; pending.message=R.string.nbw_login_authorizing;
 		// The URL is returned once, never retained or saved for a second browser launch.
 		return Uri.parse(result.authorizationUrl);
@@ -173,6 +175,10 @@ public final class NBWLoginFlow{
 	private boolean owns(Handle handle){ return handle!=null && pending!=null && pending.generation==handle.generation && pending.owner==handle.owner; }
 	private boolean validPending(){
 		if(pending==null) return false;
+		var routing=org.joinmastodon.android.api.session.NBWEndpointsRepository.getInstance().getSnapshot();
+		// A changed policy/revision is terminal. Never reuse this verifier/code in a new flow.
+		if(!pending.endpointSnapshot.canWrite() || routing.generation!=pending.endpointSnapshot.generation
+				|| !Objects.equals(routing.endpoints,pending.endpointSnapshot.endpoints)){ clear(); return false; }
 		long elapsed=SystemClock.elapsedRealtime()-pending.created;
 		long completionElapsed=SystemClock.elapsedRealtime()-pending.completionReceived;
 		if(elapsed<0 || elapsed>=TTL_MS || (pending.completionCode!=null || pending.phase==Phase.INSTALLING) && (completionElapsed<0 || completionElapsed>=COMPLETION_TTL_MS)

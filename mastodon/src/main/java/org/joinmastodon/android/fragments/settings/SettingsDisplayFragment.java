@@ -22,6 +22,9 @@ import org.joinmastodon.android.model.viewmodel.CheckableListItem;
 import org.joinmastodon.android.model.viewmodel.ListItem;
 import org.joinmastodon.android.ui.M3AlertDialogBuilder;
 import org.joinmastodon.android.ui.seamless.SharedViewRom;
+import org.joinmastodon.android.ui.adapters.GenericListItemsAdapter;
+import org.joinmastodon.android.ui.viewholders.ListItemViewHolder;
+import androidx.recyclerview.widget.RecyclerView;
 import org.joinmastodon.android.ui.utils.LiquidGlassCompatibility;
 
 import java.util.ArrayList;
@@ -89,6 +92,25 @@ public class SettingsDisplayFragment extends BaseSettingsFragment<Void>{
 	}
 
 	@Override
+	protected RecyclerView.Adapter<?> getAdapter(){
+		return itemsAdapter=new GenericListItemsAdapter<Void>(imgLoader, data){
+			@Override
+			public ListItemViewHolder<?> onCreateViewHolder(android.view.ViewGroup parent, int viewType){
+				if(viewType!=R.id.list_item_switch) return super.onCreateViewHolder(parent, viewType);
+				return new org.joinmastodon.android.ui.viewholders.SwitchListItemViewHolder(parent.getContext(), parent, false){
+					@Override
+					public void onBind(CheckableListItem<?> item){
+						super.onBind(item);
+						// The full system-level name must remain readable on narrow/large-text screens.
+						// Do this on every rebind too, without changing other settings rows or hit areas.
+						if(item.titleRes==R.string.settings_seamless_transitions) title.setMaxLines(Integer.MAX_VALUE);
+					}
+				};
+			}
+		};
+	}
+
+	@Override
 	protected void doLoadData(int offset, int count){}
 
 	@Override
@@ -150,10 +172,7 @@ public class SettingsDisplayFragment extends BaseSettingsFragment<Void>{
 			updateSeamlessTransitions(availability);
 			return;
 		}
-		if(GlobalUserPreferences.useSeamlessTransitions!=enabled){
-			GlobalUserPreferences.useSeamlessTransitions=enabled;
-			GlobalUserPreferences.save();
-		}
+		GlobalUserPreferences.setSeamlessTransitionsEnabled(enabled);
 		updateSeamlessTransitions(availability);
 	}
 

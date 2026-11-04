@@ -57,6 +57,28 @@ public class AudioPlayerService extends Service{
 	private AudioManager.OnAudioFocusChangeListener audioFocusChangeListener=this::onAudioFocusChanged;
 	private boolean resumeAfterAudioFocusGain;
 	private boolean isBuffering=true;
+	private org.joinmastodon.android.api.session.NBWForumOptionsRepository.Cancelable nbwSubscription;
+	private org.joinmastodon.android.api.session.AccountSession nbwOwner;
+	private long nbwGeneration, nbwSessionGeneration;
+	private org.joinmastodon.android.model.Token nbwToken;
+	private String nbwAccessToken;
+	private org.joinmastodon.android.api.session.NBWForumOptionsRepository.Cancelable nbwSessionSubscription;
+	private final android.content.SharedPreferences.OnSharedPreferenceChangeListener nbwAccountListener=(prefs,key)->{
+		if("lastActiveAccount".equals(key) && !nbwMediaCurrent()) revokeNBWMedia();
+	};
+	private void revokeNBWMedia(){
+		if(player!=null){ player.release(); player=null; playerReady=false; }
+		stopSelf();
+	}
+	private boolean nbwMediaCurrent(){
+		if(nbwOwner==null) return true;
+		var routing=org.joinmastodon.android.api.session.NBWEndpointsRepository.getInstance().getSnapshot();
+		return routing.canRead() && routing.generation==nbwGeneration
+				&& org.joinmastodon.android.api.session.AccountSessionManager.getInstance().getLastActiveAccount()==nbwOwner
+				&& nbwOwner.token==nbwToken && java.util.Objects.equals(nbwAccessToken,nbwToken==null ? null : nbwToken.accessToken)
+				&& nbwOwner.getNBWForumOptionsRepository().getSnapshot().canRead()
+				&& nbwOwner.getNBWForumOptionsRepository().getSnapshot().generation==nbwSessionGeneration;
+	}
 
 	private BroadcastReceiver receiver=new BroadcastReceiver(){
 		@Override
@@ -96,11 +118,15 @@ public class AudioPlayerService extends Service{
 			registerReceiver(receiver, new IntentFilter(ACTION_STOP));
 		}
 		instance=this;
+		getSharedPreferences("account_manager",MODE_PRIVATE).registerOnSharedPreferenceChangeListener(nbwAccountListener);
 	}
 
 	@Override
 	public void onDestroy(){
 		instance=null;
+		if(nbwSubscription!=null){ nbwSubscription.cancel(); nbwSubscription=null; }
+		if(nbwSessionSubscription!=null){ nbwSessionSubscription.cancel(); nbwSessionSubscription=null; }
+		getSharedPreferences("account_manager",MODE_PRIVATE).unregisterOnSharedPreferenceChangeListener(nbwAccountListener);
 		unregisterReceiver(receiver);
 		if(player!=null){
 			player.release();
@@ -126,6 +152,18 @@ public class AudioPlayerService extends Service{
 
 		status=Parcels.unwrap(intent.getParcelableExtra("status"));
 		attachment=Parcels.unwrap(intent.getParcelableExtra("attachment"));
+		if(nbwSubscription!=null){ nbwSubscription.cancel(); nbwSubscription=null; }
+		if(nbwSessionSubscription!=null){ nbwSessionSubscription.cancel(); nbwSessionSubscription=null; }
+		nbwOwner=null;
+		if(org.joinmastodon.android.api.NBWUrlResolver.isTrusted(attachment.url)){
+			nbwOwner=org.joinmastodon.android.api.session.AccountSessionManager.getInstance().getLastActiveAccount();
+			nbwGeneration=org.joinmastodon.android.api.session.NBWEndpointsRepository.getInstance().getSnapshot().generation;
+			nbwToken=nbwOwner==null ? null : nbwOwner.token; nbwAccessToken=nbwToken==null ? null : nbwToken.accessToken;
+			nbwSessionGeneration=nbwOwner==null ? -1 : nbwOwner.getNBWForumOptionsRepository().getSnapshot().generation;
+			if(nbwOwner==null || !nbwMediaCurrent()){ stopSelf(); return START_NOT_STICKY; }
+			nbwSubscription=org.joinmastodon.android.api.session.NBWEndpointsRepository.getInstance().observe(snapshot->{ if(!nbwMediaCurrent()) revokeNBWMedia(); });
+			nbwSessionSubscription=nbwOwner.getNBWForumOptionsRepository().observe(snapshot->{ if(!nbwMediaCurrent()) revokeNBWMedia(); });
+		}
 
 		session=new MediaSession(this, "audioPlayer");
 		session.setPlaybackState(new PlaybackState.Builder()
@@ -183,7 +221,9 @@ public class AudioPlayerService extends Service{
 		player.setOnSeekCompleteListener(this::onPlayerSeekCompleted);
 		player.setOnInfoListener(this::onPlayerInfo);
 		try{
-			player.setDataSource(this, Uri.parse(attachment.url));
+			String mediaUrl=org.joinmastodon.android.api.NBWUrlResolver.current(attachment.url,true);
+			if(mediaUrl==null || mediaUrl.isEmpty()){ stopSelf(); return START_NOT_STICKY; }
+			player.setDataSource(this,Uri.parse(mediaUrl));
 			player.prepareAsync();
 		}catch(IOException x){
 			Log.w(TAG, "onStartCommand: error starting media player", x);
@@ -193,6 +233,7 @@ public class AudioPlayerService extends Service{
 	}
 
 	private void onPlayerPrepared(MediaPlayer mp){
+		if(!nbwMediaCurrent() || mp!=player){ mp.release(); stopSelf(); return; }
 		Log.i(TAG, "onPlayerPrepared");
 		playerReady=true;
 		isBuffering=false;
@@ -206,6 +247,7 @@ public class AudioPlayerService extends Service{
 	}
 
 	private void onPlayerSeekCompleted(MediaPlayer mp){
+		if(mp!=player || !nbwMediaCurrent()) return;
 		updateSessionState(false);
 	}
 
@@ -214,6 +256,7 @@ public class AudioPlayerService extends Service{
 	}
 
 	private boolean onPlayerInfo(MediaPlayer mp, int what, int extra){
+		if(mp!=player || !nbwMediaCurrent()) return true;
 		switch(what){
 			case MediaPlayer.MEDIA_INFO_BUFFERING_START -> {
 				isBuffering=true;
@@ -254,6 +297,7 @@ public class AudioPlayerService extends Service{
 	}
 
 	private void updateSessionState(boolean removeNotification){
+		if(!nbwMediaCurrent() || player==null){ if(nbwOwner!=null) revokeNBWMedia(); return; }
 		session.setPlaybackState(new PlaybackState.Builder()
 				.setState(switch(getPlayState()){
 					case PLAYING -> PlaybackState.STATE_PLAYING;
@@ -312,6 +356,7 @@ public class AudioPlayerService extends Service{
 	}
 
 	public void play(){
+		if(!nbwMediaCurrent()){ revokeNBWMedia(); return; }
 		if(playerReady && !player.isPlaying()){
 			player.start();
 			updateSessionState(false);
@@ -319,6 +364,7 @@ public class AudioPlayerService extends Service{
 	}
 
 	public void seekTo(int offset){
+		if(!nbwMediaCurrent()){ revokeNBWMedia(); return; }
 		if(playerReady){
 			player.seekTo(offset);
 			updateSessionState(false);

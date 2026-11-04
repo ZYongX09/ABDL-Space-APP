@@ -24,6 +24,8 @@ import org.joinmastodon.android.api.session.AccountSession;
 import org.joinmastodon.android.api.session.AccountSessionManager;
 import org.joinmastodon.android.fragments.ThreadFragment;
 import org.joinmastodon.android.fragments.albums.AlbumDetailFragment;
+import org.joinmastodon.android.fragments.diapers.DiaperDetailFragment;
+import org.joinmastodon.android.fragments.friendcards.FriendCardDetailFragment;
 import org.joinmastodon.android.security.AppSecurity;
 import org.joinmastodon.android.ui.compose.ComposeLifecycleHelperKt;
 import org.joinmastodon.android.ui.utils.AppLanguageManager;
@@ -31,9 +33,9 @@ import org.joinmastodon.android.ui.utils.UiUtils;
 
 import me.grishka.appkit.FragmentStackActivity;
 
-/** Two existing native detail roots; no Home startup, exported dispatch or arbitrary class names. */
+/** Existing native/Compose detail roots; no Home startup, exported dispatch or arbitrary class names. */
 public final class SeamlessDetailActivity extends FragmentStackActivity implements LifecycleOwner, SavedStateRegistryOwner, ViewModelStoreOwner{
-	static final String POST="post", ALBUM="album";
+	static final String POST="post", ALBUM="album", DIAPER="diaper", FRIEND_CARD="friend_card";
 	private static final String ROUTE="detail_route", ARGUMENTS="detail_arguments", ACCOUNT="detail_account", ENTITY="detail_entity", AUTH="detail_auth_digest";
 	private final LifecycleRegistry lifecycle=new LifecycleRegistry(this);
 	private final SavedStateRegistryController savedState=SavedStateRegistryController.create(this);
@@ -50,7 +52,7 @@ public final class SeamlessDetailActivity extends FragmentStackActivity implemen
 	@Override protected void attachBaseContext(Context base){ super.attachBaseContext(AppLanguageManager.wrap(base)); }
 
 	static Intent intent(Context context, String route, Bundle args){
-		if(!POST.equals(route) && !ALBUM.equals(route)) throw new IllegalArgumentException("Unknown detail route");
+		if(!validRoute(route)) throw new IllegalArgumentException("Unknown detail route");
 		return new Intent(context, SeamlessDetailActivity.class).putExtra(ROUTE, route).putExtra(ARGUMENTS, args);
 	}
 
@@ -60,7 +62,7 @@ public final class SeamlessDetailActivity extends FragmentStackActivity implemen
 			route=state==null ? getIntent().getStringExtra(ROUTE) : state.getString(ROUTE);
 			args=state==null ? getIntent().getBundleExtra(ARGUMENTS) : null;
 			account=state==null ? args==null ? null : args.getString("account") : state.getString(ACCOUNT);
-			entity=state==null ? args==null ? null : ALBUM.equals(route) ? args.getString("albumId") : statusId(args) : state.getString(ENTITY);
+			entity=state==null ? args==null ? null : entity(route, args) : state.getString(ENTITY);
 		}catch(RuntimeException invalid){}
 		// The original bounded Parcel belongs only to the root Fragment after this point.
 		getIntent().removeExtra(ARGUMENTS);
@@ -91,7 +93,13 @@ public final class SeamlessDetailActivity extends FragmentStackActivity implemen
 			Bundle rootArgs=args;
 			AppSecurity.runAfterUnlock(this, ()->{
 				if(!validAccount() || isFinishing() || isDestroyed()) return;
-				Fragment root=POST.equals(route) ? new ThreadFragment() : new AlbumDetailFragment();
+				Fragment root=switch(route){
+					case POST -> new ThreadFragment();
+					case ALBUM -> new AlbumDetailFragment();
+					case DIAPER -> new DiaperDetailFragment();
+					case FRIEND_CARD -> new FriendCardDetailFragment();
+					default -> throw new IllegalStateException("Unknown detail route");
+				};
 				root.setArguments(rootArgs);
 				showFragment(root);
 			});
@@ -114,7 +122,14 @@ public final class SeamlessDetailActivity extends FragmentStackActivity implemen
 		// Android also restores window/view state after onStart, independently of super.onCreate's argument.
 		if(restoreViewsAllowed) super.onRestoreInstanceState(state);
 	}
-	private boolean validRoute(){ return POST.equals(route) || ALBUM.equals(route); }
+	private boolean validRoute(){ return validRoute(route); }
+	private static boolean validRoute(String route){ return POST.equals(route) || ALBUM.equals(route) || DIAPER.equals(route) || FRIEND_CARD.equals(route); }
+	private static String entity(String route, Bundle args){
+		if(ALBUM.equals(route)) return args.getString("albumId");
+		if(FRIEND_CARD.equals(route)) return args.getString("card_id");
+		if(DIAPER.equals(route)) return args.getInt("diaper_id", 0)>0 ? Integer.toString(args.getInt("diaper_id")) : null;
+		return POST.equals(route) ? statusId(args) : null;
+	}
 	private boolean validAccount(){
 		byte[] current=authenticationDigest(account, session);
 		return session!=null && SeamlessTransitions.currentAccount(account) && session==AccountSessionManager.getInstance().tryGetAccount(account)

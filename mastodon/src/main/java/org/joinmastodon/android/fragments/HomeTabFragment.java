@@ -103,8 +103,6 @@ import me.grishka.appkit.utils.CubicBezierInterpolator;
 import me.grishka.appkit.utils.V;
 import me.grishka.appkit.views.FragmentRootLinearLayout;
 
-import static org.joinmastodon.android.ui.compose.navigation.HomeLiquidToolbarModelKt.homeTimelineTopPaddingDp;
-
 public class HomeTabFragment extends MastodonToolbarFragment implements ScrollableToTop, HasFab, ProvidesAssistContent, HasElevationOnScrollListener {
 	private static final int ANNOUNCEMENTS_RESULT = 654;
 	private static final int SCAN_RESULT = 456;
@@ -118,7 +116,8 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 	private ViewPager2 pager;
 	private View switcher;
 	private FrameLayout toolbarFrame;
-	private int lastTopInset;
+	private View toolbarGeometryRoot;
+	private final ViewTreeObserver.OnPreDrawListener toolbarGeometry=this::updateTimelineTopGeometry;
 	private int liquidNavBottomInset;
 	private ImageView timelineIcon;
 	private ImageView collapsedChevron;
@@ -272,14 +271,14 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 	public void onApplyWindowInsets(WindowInsets insets){
 		// 时间线内的交友宇宙 fragment 不在 view 树上自动收到 insets，显式转发
 		int top=insets.getSystemWindowInsetTop();
-		lastTopInset=top;
 		if(fragments!=null){
 			for(Fragment f:fragments){
 				if(f instanceof FriendRequestListFragment frf)
 					frf.setTopInset(top);
 			}
 		}
-		// 液态模式下标准 toolbar 隐藏、玻璃悬浮其上，列表顶部安全区需要含状态栏
+		// AppKit consumes this inset in its root. Content clearance is measured in window
+		// coordinates after layout, not added to another fixed toolbar slot here.
 		updateLiquidToolbarMode();
 		super.onApplyWindowInsets(insets);
 	}
@@ -367,6 +366,8 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 	@Override
 	public void onViewCreated(View view, Bundle savedInstanceState){
 		super.onViewCreated(view, savedInstanceState);
+		toolbarGeometryRoot=view;
+		view.getViewTreeObserver().addOnPreDrawListener(toolbarGeometry);
 
 		timelineIcon = toolbarFrame.findViewById(R.id.timeline_icon);
 		timelineTitle = toolbarFrame.findViewById(R.id.timeline_title);
@@ -729,17 +730,13 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 			toolbar.setVisibility(liquid ? View.GONE : View.VISIBLE);
 		if(fab!=null)
 			fab.setVisibility(liquid ? View.GONE : View.VISIBLE);
-		// 液态下标准 toolbar 隐藏、玻璃悬浮其上：列表顶部安全区 = 状态栏 + 玻璃工具栏高度
-		int topPadding=V.dp(homeTimelineTopPaddingDp(liquid)) + (liquid ? lastTopInset : 0);
 		if(fragments!=null){
 			for(Fragment fragment:fragments){
 				if(fragment instanceof BaseStatusListFragment<?> statusListFragment){
-					statusListFragment.setLiquidToolbarTopPadding(topPadding);
 					statusListFragment.setLiquidToolbarFabHidden(liquid);
 					statusListFragment.setLiquidNavBottomPadding(liquid ? liquidNavBottomInset : 0);
 				}
 				if(fragment instanceof FriendRequestListFragment friendRequestListFragment){
-					friendRequestListFragment.setLiquidToolbarTopPadding(topPadding);
 					friendRequestListFragment.setLiquidNavBottomPadding(liquid ? liquidNavBottomInset : 0);
 				}
 				if(fragment instanceof HomeTimelineFragment homeTimelineFragment)
@@ -748,12 +745,54 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		}
 	}
 
+	/** Only the measured glass can occlude a liquid timeline. Its ancestor may already consume
+	 * all or part of the status bar, so subtract the list's real window origin instead of adding
+	 * an inset, TOP_SLOT or capture margin. HomeTimeline also reserves its live refresh pill. */
+	private boolean updateTimelineTopGeometry(){
+		if(fragments==null) return true;
+		android.graphics.Rect glass=new android.graphics.Rect();
+		boolean liquid=liquidToolbarController!=null && liquidToolbarController.getVisibleBoundsInWindow(glass);
+		int gap=getResources().getDimensionPixelSize(R.dimen.home_refresh_text_gap);
+		for(Fragment fragment:fragments){
+			if(fragment instanceof HomeTimelineFragment || fragment.getView()==null) continue;
+			RecyclerView list=findTimelineRecycler(fragment.getView());
+			if(list==null || !list.isAttachedToWindow()) continue;
+			int padding=0;
+			if(liquid){
+				int[] origin=new int[2];
+				list.getLocationInWindow(origin);
+				if(glass.left<origin[0]+list.getWidth() && glass.right>origin[0])
+					padding=Math.max(0, glass.bottom+gap-origin[1]);
+			}
+			if(padding>=list.getHeight()) padding=0;
+			if(list.getPaddingTop()==padding) continue;
+			if(fragment instanceof BaseStatusListFragment<?> status)
+				status.setLiquidToolbarTopPadding(padding);
+			else if(fragment instanceof FriendRequestListFragment friends)
+				friends.setLiquidToolbarTopPadding(padding);
+		}
+		return true;
+	}
+
+	private static RecyclerView findTimelineRecycler(View view){
+		if(view instanceof RecyclerView recycler) return recycler;
+		if(view instanceof ViewGroup group) for(int i=0;i<group.getChildCount();i++){
+			RecyclerView found=findTimelineRecycler(group.getChildAt(i));
+			if(found!=null) return found;
+		}
+		return null;
+	}
+
 	/** 液态底部导航条 overlay 高度（px），由 HomeFragment 在导航布局尺寸变化时转发 */
 	public void setLiquidNavBottomInset(int px){
 		if(liquidNavBottomInset==px)
 			return;
 		liquidNavBottomInset=px;
 		updateLiquidToolbarMode();
+	}
+
+	public boolean hasVisibleLiquidToolbar(){
+		return liquidToolbarController!=null && liquidToolbarController.getVisibleBoundsInWindow(new android.graphics.Rect());
 	}
 
 	/** Window geometry for the home refresh text; never use the full-screen glass host's height. */
@@ -1133,6 +1172,9 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 	public void onDestroyView(){
 		if(nbwSubscription!=null){ nbwSubscription.cancel(); nbwSubscription=null; }
 		liquidToolbarController=null;
+		if(toolbarGeometryRoot!=null && toolbarGeometryRoot.getViewTreeObserver().isAlive())
+			toolbarGeometryRoot.getViewTreeObserver().removeOnPreDrawListener(toolbarGeometry);
+		toolbarGeometryRoot=null;
 		if(fanMenu!=null){
 			if(fanMenu.isExpanded())
 				removeBackCallback(collapseFanMenuOnBack);

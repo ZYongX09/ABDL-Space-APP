@@ -107,7 +107,9 @@ public class NBWV2LifecycleIntegrationTest{
 		@Override public android.net.Uri getWebUri(android.net.Uri.Builder base){ return base.build(); }
 	}
 
+	private NBWEndpointFixtures endpoints;
 	@Before @SuppressWarnings("unchecked") public void setup() throws Exception{
+		endpoints=new NBWEndpointFixtures();
 		MastodonApp.context=RuntimeEnvironment.getApplication();
 		previousColor=GlobalUserPreferences.color;
 		GlobalUserPreferences.color=AccountLocalPreferences.ColorPreference.PURPLE;
@@ -135,7 +137,7 @@ public class NBWV2LifecycleIntegrationTest{
 	}
 	@After public void cleanup() throws Exception{
 		for(ActivityController<NBWPostRegisterActivity> activity:activities) activity.close();
-		repository.deactivate(); idle();
+		repository.deactivate(); idle(); endpoints.close();
 		if(previousSession==null) sessions.remove(session.getID()); else sessions.put(session.getID(), previousSession);
 		if(previousInstance==null) instances.remove(session.domain); else instances.put(session.domain, previousInstance);
 		field(AccountSessionManager.class, "lastActiveAccountID").set(AccountSessionManager.getInstance(), previousActive);
@@ -314,13 +316,31 @@ public class NBWV2LifecycleIntegrationTest{
 		assertEquals(session.getID(), NBWPostRegisterActivity.consumeAuthorizationLaunch(MastodonApp.context));
 		assertNull(NBWPostRegisterActivity.consumeAuthorizationLaunch(MastodonApp.context));
 		NBWPostRegisterActivity.rememberAuthorizationLaunch(MastodonApp.context, session.getID());
-		authorizationTicket().edit().putLong("started", System.currentTimeMillis()-11*60*1000L).commit();
+		org.robolectric.shadows.ShadowSystemClock.advanceBy(java.time.Duration.ofMinutes(11));
 		assertNull(NBWPostRegisterActivity.consumeAuthorizationLaunch(MastodonApp.context)); assertTrue(authorizationTicket().getAll().isEmpty());
 		NBWPostRegisterActivity.rememberAuthorizationLaunch(MastodonApp.context, session.getID());
-		authorizationTicket().edit().putLong("started", System.currentTimeMillis()+60*1000L).commit();
+		repository.deactivate();
 		assertNull(NBWPostRegisterActivity.consumeAuthorizationLaunch(MastodonApp.context));
 		NBWPostRegisterActivity.rememberAuthorizationLaunch(MastodonApp.context, session.getID());
 		sessions.remove(session.getID()); assertNull(NBWPostRegisterActivity.consumeAuthorizationLaunch(MastodonApp.context)); sessions.put(session.getID(), session);
+	}
+	@Test public void queuedRecentSearchWriteAndDeliveryCannotResurrectOldEndpointOrAccount() throws Exception{
+		ready(); CacheController cache=session.getCacheController();
+		CountDownLatch blocked=new CountDownLatch(1),release=new CountDownLatch(1);
+		CacheController.databaseThread.postRunnable(()->{ blocked.countDown(); try{ release.await(); }catch(InterruptedException error){ Thread.currentThread().interrupt(); } },0);
+		assertTrue(blocked.await(5,TimeUnit.SECONDS));
+		cache.putRecentSearch(new SearchResult(status("nbw_123"))); cache.putRecentSearch(new SearchResult(status("p_local")));
+		endpoints.publish("backup","endpoint-b","full"); release.countDown();
+		CountDownLatch writes=new CountDownLatch(1); CacheController.databaseThread.postRunnable(writes::countDown,0); assertTrue(writes.await(5,TimeUnit.SECONDS));
+		transport.capabilities.get(transport.capabilities.size()-1).result.success(NBWV2RepositoryTest.capabilities("full"));
+		transport.options.get(transport.options.size()-1).result.success(NBWV2RepositoryTest.options());
+		cache.putRecentSearch(new SearchResult(status("nbw_124")));
+		CountDownLatch inserted=new CountDownLatch(1); CacheController.databaseThread.postRunnable(inserted::countDown,0); assertTrue(inserted.await(5,TimeUnit.SECONDS));
+		AtomicReference<List<SearchResult>> result=new AtomicReference<>(); cache.getRecentSearches(result::set);
+		CountDownLatch read=new CountDownLatch(1); CacheController.databaseThread.postRunnable(read::countDown,0); assertTrue(read.await(5,TimeUnit.SECONDS));
+		assertNull(result.get()); repository.deactivate(); idle();
+		assertNotNull(result.get()); assertEquals(1,result.get().size()); assertEquals("p_local",result.get().get(0).status.id);
+		cache.closeDatabase(); MastodonApp.context.deleteDatabase(session.getID()+".db");
 	}
 	@Test public void disabledRecentSearchCachePurgesWrappedRemoteIdsButPreservesLocalMetadata() throws Exception{
 		CacheController cache=session.getCacheController();
@@ -348,9 +368,7 @@ public class NBWV2LifecycleIntegrationTest{
 		return (MastodonAPIRequest<NBWAppRequest.AuthorizationStart>)request;
 	}
 	private static NBWAppRequest.AuthorizationStart authorizationStart(){
-		NBWAppRequest.AuthorizationStart result=new NBWAppRequest.AuthorizationStart();
-		result.authorizationUrl="https://authorization.offline.example.test/nbw/connect";
-		return result;
+		return NBWEndpointFixtures.authorizationStart();
 	}
 	private static Field field(Class<?> type, String name) throws Exception{ Field value=type.getDeclaredField(name); value.setAccessible(true); return value; }
 }

@@ -128,8 +128,6 @@ internal fun homeLiquidToolbarContainerMorphSpec(): HomeLiquidToolbarContainerMo
 
 internal fun homeToolbarCaptureHeightDp(menuOpen: Boolean): Int = if(menuOpen) 520 else 72
 
-internal fun homeTimelineTopPaddingDp(liquidMode: Boolean): Int = if(liquidMode) 56 else 0
-
 internal fun homeToolbarCollapsedWidthDp(titleWidthDp: Float): Float =
 	(titleWidthDp + 72f).coerceIn(96f, 260f)
 

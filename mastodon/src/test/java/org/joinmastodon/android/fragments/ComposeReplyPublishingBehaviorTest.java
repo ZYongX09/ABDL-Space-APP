@@ -23,11 +23,14 @@ import org.joinmastodon.android.CompatibilityTestApplication;
 import org.joinmastodon.android.GlobalUserPreferences;
 import org.joinmastodon.android.MastodonApp;
 import org.joinmastodon.android.R;
+import org.joinmastodon.android.api.MastodonAPIController;
 import org.joinmastodon.android.api.MastodonAPIRequest;
 import org.joinmastodon.android.api.MastodonErrorResponse;
 import org.joinmastodon.android.api.NBWV2RepositoryTest;
 import org.joinmastodon.android.api.requests.accounts.GetOwnAccount;
+import org.joinmastodon.android.api.requests.nbw.GetNBWEndpoints;
 import org.joinmastodon.android.api.requests.nbw.NBWAppRequest;
+import org.joinmastodon.android.api.requests.nbw.NBWLoginRequest;
 import org.joinmastodon.android.api.requests.nbw.RecommendNBWForum;
 import org.joinmastodon.android.api.requests.statuses.CreateStatus;
 import org.joinmastodon.android.api.requests.statuses.EditStatus;
@@ -44,6 +47,7 @@ import org.joinmastodon.android.model.FriendCard;
 import org.joinmastodon.android.model.FriendCardAttachment;
 import org.joinmastodon.android.model.Instance;
 import org.joinmastodon.android.model.InstanceV1;
+import org.joinmastodon.android.model.NBWEndpoints;
 import org.joinmastodon.android.model.NBWSelection;
 import org.joinmastodon.android.model.Status;
 import org.joinmastodon.android.model.StatusPrivacy;
@@ -115,6 +119,17 @@ public class ComposeReplyPublishingBehaviorTest{
 	/** Transport only: no replacement fragment, repository, menu, validity or request body. */
 	@Implements(MastodonAPIRequest.class)
 	public static class LocalRequests{
+		/** The single public discovery response, with exactly the nine fields the strict adapter accepts. */
+		private static final String ENDPOINTS_JSON="{"
+				+"\"schema_version\":1,"
+				+"\"revision\":\"endpoint-a\","
+				+"\"mode\":\"primary\","
+				+"\"api_origin\":\"https://www.newbabyworld.top\","
+				+"\"authorize_origin\":\"https://www.newbabyworld.top\","
+				+"\"public_origin\":\"https://www.newbabyworld.top\","
+				+"\"media_origin\":\"https://www.newbabyworld.top\","
+				+"\"ttl_seconds\":30,"
+				+"\"remote_mode\":\"full\"}";
 		@RealObject MastodonAPIRequest<?> request;
 		public static final List<MastodonAPIRequest<?>> sent=new ArrayList<>();
 		public static final List<String> accounts=new ArrayList<>();
@@ -124,10 +139,26 @@ public class ComposeReplyPublishingBehaviorTest{
 			return request;
 		}
 		@Implementation public MastodonAPIRequest<?> execNoAuth(String domain){
+			if(request instanceof GetNBWEndpoints){
+				sent.add(request);
+				assertEquals(NBWLoginRequest.DOMAIN,domain);
+				assertEquals("/api/nbw/endpoints",request.getURL().getPath());
+				Callback<NBWEndpoints> callback=discoveryCallback();
+				assertNotNull("Discovery transport must install its response callback",callback);
+				// Parse the nine-field wire shape through the production adapter and postprocess,
+				// so a malformed discovery stub cannot silently stand in for the real protocol.
+				callback.onSuccess(MastodonAPIController.gson.fromJson(ENDPOINTS_JSON,NBWEndpoints.class));
+				return request;
+			}
 			throw new AssertionError("Unexpected unauthenticated/network fetch: "+request.getClass().getSimpleName());
 		}
 		@Implementation public MastodonAPIRequest<?> exec(String domain, Token token){
 			throw new AssertionError("Unexpected instance/network fetch: "+request.getClass().getSimpleName());
+		}
+		@SuppressWarnings("unchecked")
+		private Callback<NBWEndpoints> discoveryCallback(){
+			try{ return (Callback<NBWEndpoints>)field(APIRequest.class,"callback").get(request); }
+			catch(Exception e){ throw new AssertionError(e); }
 		}
 	}
 
@@ -339,6 +370,7 @@ public class ComposeReplyPublishingBehaviorTest{
 	}
 
 	@Test
+	@Config(qualifiers="zh-rCN-w393dp-h852dp-mdpi")
 	public void unboundReminderHasExactCopyAndNeverBlocksLocalPublishing() throws Exception{
 		launch(null);
 		session.self.nbwUsername="stale-legacy-name";
@@ -662,6 +694,8 @@ public class ComposeReplyPublishingBehaviorTest{
 	private void metadata(String state) throws Exception{
 		if("unavailable".equals(state)) return;
 		repository.activate();
+		// Discovery resolves through the UI queue before authenticated capabilities are requested.
+		idle();
 		assertEquals(1, appCount(CAPS));
 		if("loading".equals(state)) return;
 		if("failed".equals(state)){

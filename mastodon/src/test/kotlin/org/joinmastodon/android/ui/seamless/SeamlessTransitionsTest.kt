@@ -416,7 +416,7 @@ class SeamlessTransitionsTest {
         assertEquals(0, rom.calls); assertNull(shadowOf(activity).nextStartedActivity)
     }
     @Test fun unsupportedSettingsRemainVisibleDisabledAndPreserveFalseFieldAndDiskChoice() {
-        GlobalUserPreferences.useSeamlessTransitions = false; GlobalUserPreferences.save()
+        GlobalUserPreferences.setSeamlessTransitionsEnabled(false)
         rom.available = false
         val settings = settings()
         val item = seamlessSetting(settings)
@@ -440,7 +440,7 @@ class SeamlessTransitionsTest {
         GlobalUserPreferences.load(); assertFalse(GlobalUserPreferences.useSeamlessTransitions)
     }
     @Test @Config(sdk = [26]) fun noRomOnApi26StillShowsDisabledSettingAndKeepsTruePreference() {
-        GlobalUserPreferences.useSeamlessTransitions = true; GlobalUserPreferences.save()
+        GlobalUserPreferences.setSeamlessTransitionsEnabled(true)
         SharedViewRom.setTransportForTests(null)
         val settings = settings()
         val item = seamlessSetting(settings)
@@ -453,7 +453,7 @@ class SeamlessTransitionsTest {
         GlobalUserPreferences.load(); assertTrue(GlobalUserPreferences.useSeamlessTransitions)
     }
     @Test fun disabledRomKeepsTruePreferenceAndCanBecomeAvailableWhenSettingsAreShownAgain() {
-        GlobalUserPreferences.useSeamlessTransitions = true; GlobalUserPreferences.save()
+        GlobalUserPreferences.setSeamlessTransitionsEnabled(true)
         rom.enabled = false
         val settings = settings()
         val item = seamlessSetting(settings)
@@ -475,7 +475,7 @@ class SeamlessTransitionsTest {
         assertEquals(0, rom.calls)
     }
     @Test fun staleEnabledSwitchCannotWriteTrueAfterRomTurnsOffOrItsQueryFails() {
-        GlobalUserPreferences.useSeamlessTransitions = false; GlobalUserPreferences.save()
+        GlobalUserPreferences.setSeamlessTransitionsEnabled(false)
         val settings = settings()
         val item = seamlessSetting(settings)
         val (_, switch) = seamlessHolder(settings)
@@ -498,7 +498,7 @@ class SeamlessTransitionsTest {
         assertEquals(0, rom.calls); assertNull(shadowOf(activity).nextStartedActivity)
     }
     @Test fun incompatibleAndFailedQueriesHaveDifferentDisabledReasonsAndNeverEnableThePreference() {
-        GlobalUserPreferences.useSeamlessTransitions = false; GlobalUserPreferences.save()
+        GlobalUserPreferences.setSeamlessTransitionsEnabled(false)
         SharedViewRom.setTransportForTests(SharedViewRom.BootTransport { name ->
             if (name.endsWith("Manager")) String::class.java else Runnable::class.java
         })
@@ -528,7 +528,7 @@ class SeamlessTransitionsTest {
         assertTrue(subtitle.contains("当前系统未提供"))
     }
     @Test fun resumingSettingsRechecksSystemFlagAndQueryWithoutChangingRequestedChoice() {
-        GlobalUserPreferences.useSeamlessTransitions = false; GlobalUserPreferences.save()
+        GlobalUserPreferences.setSeamlessTransitionsEnabled(false)
         val settings = settings()
         val item = seamlessSetting(settings)
         assertTrue(item.isEnabled); assertFalse(item.checked)
@@ -552,7 +552,7 @@ class SeamlessTransitionsTest {
 
     private fun renderUnavailableSettings(language: String) {
         rom.available = false
-        GlobalUserPreferences.useSeamlessTransitions = true; GlobalUserPreferences.save()
+        GlobalUserPreferences.setSeamlessTransitionsEnabled(true)
         val settings = settings()
         val item = seamlessSetting(settings)
         val (holder, switch) = seamlessHolder(settings)

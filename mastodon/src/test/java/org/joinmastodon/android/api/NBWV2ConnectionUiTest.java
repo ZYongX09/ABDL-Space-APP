@@ -119,7 +119,9 @@ public class NBWV2ConnectionUiTest{
 		@Override public <T> void submitRequest(MastodonAPIRequest<T> request){ requests.add(request); }
 	}
 
+	private NBWEndpointFixtures endpoints;
 	@Before @SuppressWarnings("unchecked") public void setup() throws Exception{
+		endpoints=new NBWEndpointFixtures();
 		MastodonApp.context=RuntimeEnvironment.getApplication(); V.setApplicationContext(MastodonApp.context);
 		previousTheme=GlobalUserPreferences.theme; previousColor=GlobalUserPreferences.color;
 		previousCustomTabs=GlobalUserPreferences.useCustomTabs;
@@ -148,7 +150,7 @@ public class NBWV2ConnectionUiTest{
 
 	@After public void cleanup() throws Exception{
 		for(ActivityController<NBWPostRegisterActivity> activity:activities) activity.close();
-		repository.deactivate(); ShadowLooper.idleMainLooper();
+		repository.deactivate(); ShadowLooper.idleMainLooper(); endpoints.close();
 		if(previousSession==null) sessions.remove(session.getID()); else sessions.put(session.getID(), previousSession);
 		if(previousInstance==null) instances.remove(session.domain); else instances.put(session.domain, previousInstance);
 		field(AccountSessionManager.class, "lastActiveAccountID").set(AccountSessionManager.getInstance(), previousActive);
@@ -251,17 +253,27 @@ public class NBWV2ConnectionUiTest{
 		assertEquals("2", ((Map<?, ?>)field(MastodonAPIRequest.class, "headers").get(request)).get("X-ABDL-NBW-Protocol"));
 		Buffer buffer=new Buffer(); request.getRequestBody().writeTo(buffer); assertEquals(0, com.google.gson.JsonParser.parseString(buffer.readUtf8()).getAsJsonObject().size());
 		assertNull(Shadow.<ShadowActivity>extract(page).getNextStartedActivity());
-		NBWAppRequest.AuthorizationStart response=new NBWAppRequest.AuthorizationStart();
-		response.authorizationUrl="https://authorization.offline.example.test/nbw/connect/flow-83";
+		NBWAppRequest.AuthorizationStart response=NBWEndpointFixtures.authorizationStart();
 		response.postprocess(); authorizationResult(request).onSuccess(response); ShadowLooper.idleMainLooper();
 		Intent browser=Shadow.<ShadowActivity>extract(page).getNextStartedActivity();
 		assertNotNull(browser); assertEquals(Intent.ACTION_VIEW, browser.getAction()); assertEquals(response.authorizationUrl, browser.getDataString());
-		assertNull(browser.getData().getQuery()); assertNull(Shadow.<ShadowActivity>extract(page).getNextStartedActivity());
+		assertEquals(response.flow,browser.getData().getQueryParameter("state")); assertNull(Shadow.<ShadowActivity>extract(page).getNextStartedActivity());
 		assertEquals(session.getID(), NBWPostRegisterActivity.consumeAuthorizationLaunch(page));
 		assertNull(NBWPostRegisterActivity.consumeAuthorizationLaunch(page));
 		assertTrue(connect.isEnabled()); assertFalse(page.isFinishing()); assertTrue(transport.consents.isEmpty());
 	}
 
+	@Test public void bindingStartRejectsThirdPartyAndWrongSnapshotEvenWhenTransportBypassesDeserialization() throws Exception{
+		publishCapabilities("full",false); NBWPostRegisterActivity page=open(true);
+		page.findViewById(R.id.btn_nbw_connect).performClick(); var request=controller.requests.get(0);
+		var result=NBWEndpointFixtures.authorizationStart(); result.authorizationUrl="https://evil.example/connect";
+		authorizationResult(request).onSuccess(result); ShadowLooper.idleMainLooper();
+		assertNull(Shadow.<ShadowActivity>extract(page).getNextStartedActivity()); assertTrue(page.findViewById(R.id.btn_nbw_connect).isEnabled());
+		page.findViewById(R.id.btn_nbw_connect).performClick(); var next=controller.requests.get(1);
+		result=NBWEndpointFixtures.authorizationStart(); result.endpoints=NBWEndpointFixtures.endpoints("backup","endpoint-b","full");
+		result.authorizationUrl=result.authorizationUrl.replace("www.newbabyworld.top","nbw.abdlcalendar.top");
+		authorizationResult(next).onSuccess(result); ShadowLooper.idleMainLooper(); assertNull(Shadow.<ShadowActivity>extract(page).getNextStartedActivity());
+	}
 	@Test public void secondaryOpensOnlyCompactDefaultConsentSheetWithoutStartingAuthorizationOrSelectingAForum(){
 		publishCapabilities("full", false); NBWPostRegisterActivity page=open(true); layout(page);
 		page.findViewById(R.id.btn_nbw_settings).performClick();

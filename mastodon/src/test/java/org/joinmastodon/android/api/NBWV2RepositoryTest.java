@@ -45,7 +45,10 @@ public class NBWV2RepositoryTest{
 		public NBWForumOptionsRepository.Cancelable options(NBWForumOptionsRepository.Result<NBWForumOptions> r){ var p=new Pending<>(r); options.add(p); return p; }
 		public NBWForumOptionsRepository.Cancelable consent(boolean value, NBWForumOptionsRepository.Result<Object> r){ var p=new Pending<>(r); accepted.add(value); consents.add(p); return p; }
 	}
-	@Before public void setup(){
+	private NBWEndpointFixtures endpoints;
+	@org.junit.After public void cleanupEndpoints() throws Exception{ repository.deactivate(); endpoints.close(); }
+	@Before public void setup() throws Exception{
+		endpoints=new NBWEndpointFixtures();
 		MastodonApp.context=RuntimeEnvironment.getApplication();
 		me.grishka.appkit.utils.V.setApplicationContext(MastodonApp.context);
 		transport=new FakeTransport();
@@ -131,6 +134,23 @@ public class NBWV2RepositoryTest{
 		transport.options.get(1).callback.success(newer);
 		assertEquals(NBWSelection.manual(27,41), repository.getSnapshot().selection);
 		assertFalse(repository.getSnapshot().selection.isLegal(repository.getSnapshot().options));
+	}
+	@Test public void sameModeEndpointRevisionAndAbaCancelRequestsAndIgnoreLateMetadata(){
+		ready(); boolean[] canceled={false}; long first=repository.registerRemote(()->canceled[0]=true,false);
+		repository.refreshNow(); var late=transport.caps.get(1);
+		endpoints.publish("backup","endpoint-b","full");
+		assertTrue(canceled[0]); assertFalse(repository.isCurrentRemote(first)); assertNull(repository.getSnapshot().options);
+		late.callback.success(capabilities("full")); assertNull(repository.getSnapshot().options);
+		transport.caps.get(2).callback.success(capabilities("full")); transport.options.get(1).callback.success(options());
+		long backup=repository.getSnapshot().generation;
+		endpoints.publish("primary","endpoint-c","full"); assertTrue(repository.getSnapshot().generation>backup);
+		assertFalse(repository.getSnapshot().canRead()); assertNull(repository.getSnapshot().options);
+	}
+	@Test public void publicReadOnlyIsStricterThanAuthenticatedFull(){
+		ready(); endpoints.publish("backup","endpoint-b","read_only");
+		transport.caps.get(1).callback.success(capabilities("full")); transport.options.get(1).callback.success(options());
+		assertTrue(repository.getSnapshot().canRead()); assertFalse(repository.getSnapshot().canWrite());
+		assertEquals(-1,repository.registerRemote(()->{},true));
 	}
 	@Test public void requestsUseIndependentApiAppAndConsentContractOnly() throws Exception{
 		assertEquals("/api/app/capabilities", NBWAppRequest.capabilities().getURL().getPath());

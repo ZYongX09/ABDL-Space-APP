@@ -506,25 +506,42 @@ public class CacheController{
 		});
 	}
 
+	private static boolean nbwSearch(SearchResult result){
+		return result.account!=null && result.account.id!=null && result.account.id.startsWith("nbw_")
+				|| result.status!=null && result.status.id!=null && result.status.id.startsWith("nbw_");
+	}
+	private final class SearchLease{
+		final AccountSession session=AccountSessionManager.getInstance().tryGetAccount(accountID);
+		final org.joinmastodon.android.model.Token token=session==null ? null : session.token;
+		final String accessToken=token==null ? null : token.accessToken;
+		final long generation=session==null ? -1 : session.getNBWForumOptionsRepository().getSnapshot().generation;
+		boolean current(){
+			return session!=null && AccountSessionManager.getInstance().tryGetAccount(accountID)==session && session.token==token
+					&& Objects.equals(accessToken,token==null ? null : token.accessToken)
+					&& generation==session.getNBWForumOptionsRepository().getSnapshot().generation
+					&& session.getNBWForumOptionsRepository().getSnapshot().canRead();
+		}
+	}
 	public void getRecentSearches(Consumer<List<SearchResult>> callback){
+		SearchLease lease=new SearchLease();
 		runOnDbThread((db)->{
 			try(Cursor cursor=db.query("recent_searches", new String[]{"json"}, null, null, null, null, "time DESC")){
 				List<SearchResult> results=new ArrayList<>();
 				while(cursor.moveToNext()){
 					SearchResult result=MastodonAPIController.gson.fromJson(cursor.getString(0), SearchResult.class);
 					result.postprocess();
-					var session=AccountSessionManager.getInstance().tryGetAccount(accountID);
-					boolean remote=result.account!=null && result.account.id!=null && result.account.id.startsWith("nbw_")
-							|| result.status!=null && result.status.id!=null && result.status.id.startsWith("nbw_");
-					if(!remote || session!=null && session.getNBWForumOptionsRepository().getSnapshot().canRead()) results.add(result);
+					if(!nbwSearch(result) || lease.current()) results.add(result);
 				}
-				uiHandler.post(()->callback.accept(results));
+				uiHandler.post(()->{ if(!lease.current()) results.removeIf(CacheController::nbwSearch); callback.accept(results); });
 			}
 		});
 	}
 
 	public void putRecentSearch(SearchResult result){
+		SearchLease lease=new SearchLease();
+		boolean remote=nbwSearch(result);
 		runOnDbThread((db)->{
+			if(remote && !lease.current()) return;
 			ContentValues values=new ContentValues(4);
 			values.put("id", result.getID());
 			values.put("json", MastodonAPIController.gson.toJson(result));

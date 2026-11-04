@@ -68,7 +68,7 @@ public class MediaGridStatusDisplayItem extends StatusDisplayItem{
 
 	@Override
 	public ImageLoaderRequest getImageRequest(int index){
-		return requests.get(index);
+		return org.joinmastodon.android.ui.utils.NBWImageRequests.current(requests.get(index));
 	}
 
 	public enum GridItemType{

@@ -74,12 +74,6 @@ class HomeLiquidToolbarModelTest {
 	}
 
 	@Test
-	fun liquidTimelineUsesScrollableTopPaddingInsteadOfFixedToolbarSpace() {
-		assertEquals(56, homeTimelineTopPaddingDp(liquidMode = true))
-		assertEquals(0, homeTimelineTopPaddingDp(liquidMode = false))
-	}
-
-	@Test
 	fun toolbarReusesBottomGlassBloomOutline() {
 		val outline = homeLiquidToolbarOutlineSpec()
 		assertEquals(1f, outline.widthDp, 0f)

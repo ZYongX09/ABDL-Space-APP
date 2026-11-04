@@ -193,10 +193,19 @@ public class PhotoViewer implements ZoomPanView.Listener{
 	private SponsorOriginalGate originalGate;
 	private long mediaGeneration;
 	private boolean closing, dismissed;
+	private boolean nbwMedia;
+	private AccountSession nbwSession;
+	private Token nbwToken;
+	private String nbwAccessToken;
+	private long nbwEndpointGeneration, nbwSessionGeneration;
+	private org.joinmastodon.android.api.session.NBWForumOptionsRepository.Cancelable nbwSubscription, nbwSessionSubscription;
 	private Attachment pendingPermissionAttachment;
 	private long pendingPermissionGeneration;
 	private final android.content.SharedPreferences.OnSharedPreferenceChangeListener originalAccountListener=(prefs, key)->{
-		if("lastActiveAccount".equals(key)) invalidateOriginalWork();
+		if("lastActiveAccount".equals(key)){
+			invalidateOriginalWork();
+			if(nbwMedia && !nbwMediaCurrent()) windowView.post(()->{ if(!dismissed) onDismissed(); });
+		}
 	};
 	private View bottomBar;
 	private View postActions;
@@ -266,6 +275,13 @@ public class PhotoViewer implements ZoomPanView.Listener{
 		this.status=status;
 		this.accountID=accountID;
 		this.parentFragment=parentFragment;
+		nbwMedia=albumDelegate==null && this.attachments.stream().anyMatch(a->org.joinmastodon.android.api.NBWUrlResolver.isTrusted(a.url) || org.joinmastodon.android.api.NBWUrlResolver.isTrusted(a.previewUrl));
+		if(nbwMedia){
+			nbwSession=AccountSessionManager.getInstance().tryGetAccount(accountID); nbwToken=nbwSession==null ? null : nbwSession.token;
+			nbwAccessToken=nbwToken==null ? null : nbwToken.accessToken;
+			nbwSessionGeneration=nbwSession==null ? -1 : nbwSession.getNBWForumOptionsRepository().getSnapshot().generation;
+			nbwEndpointGeneration=org.joinmastodon.android.api.session.NBWEndpointsRepository.getInstance().getSnapshot().generation;
+		}
 
 		backgroundColors=new int[this.attachments.size()];
 		int i=0;
@@ -515,6 +531,14 @@ public class PhotoViewer implements ZoomPanView.Listener{
 		}
 		activity.getSharedPreferences("account_manager", Context.MODE_PRIVATE).registerOnSharedPreferenceChangeListener(originalAccountListener);
 		E.register(this);
+		if(nbwMedia){
+			nbwSubscription=org.joinmastodon.android.api.session.NBWEndpointsRepository.getInstance().observe(snapshot->{
+				if(!nbwMediaCurrent()) windowView.post(()->{ if(!dismissed) onDismissed(); });
+			});
+			if(nbwSession!=null) nbwSessionSubscription=nbwSession.getNBWForumOptionsRepository().observe(snapshot->{
+				if(!nbwMediaCurrent()) windowView.post(()->{ if(!dismissed) onDismissed(); });
+			});
+		}
 		if(albumDelegate!=null) windowView.post(()->{
 			for(PhotoViewHolder holder:albumPhotoHolders){ int position=holder.getAbsoluteAdapterPosition(); if(position>=0){ Attachment attachment=this.attachments.get(position); if(attachment.adminBlocked) holder.setImageDrawable(AlbumUi.adminBlockedPlaceholder(activity)); else loadAlbumPreview(holder,attachment); } }
 			updateAlbumViewport();
@@ -1158,6 +1182,8 @@ public class PhotoViewer implements ZoomPanView.Listener{
 	@Override
 	public void onDismissed(){
 		if(dismissed) return;
+		if(nbwSubscription!=null){ nbwSubscription.cancel(); nbwSubscription=null; }
+		if(nbwSessionSubscription!=null){ nbwSessionSubscription.cancel(); nbwSessionSubscription=null; }
 		dismissed=true;
 		closing=true;
 		invalidateOriginalWork();
@@ -1310,8 +1336,22 @@ public class PhotoViewer implements ZoomPanView.Listener{
 		}
 	}
 
+	private boolean nbwMediaCurrent(){
+		if(!nbwMedia) return true;
+		var routing=org.joinmastodon.android.api.session.NBWEndpointsRepository.getInstance().getSnapshot();
+		return !closing && !dismissed && routing.canRead() && routing.generation==nbwEndpointGeneration && nbwSession!=null
+				&& nbwSession.getNBWForumOptionsRepository().getSnapshot().canRead() && nbwSession.getNBWForumOptionsRepository().getSnapshot().generation==nbwSessionGeneration
+				&& AccountSessionManager.getInstance().tryGetAccount(accountID)==nbwSession && accountID.equals(AccountSessionManager.getInstance().getLastActiveAccountID())
+				&& nbwSession.token==nbwToken && java.util.Objects.equals(nbwAccessToken,nbwToken==null ? null : nbwToken.accessToken);
+	}
+	private String mediaUrl(String value){ return nbwMediaCurrent() ? org.joinmastodon.android.api.NBWUrlResolver.current(value,true) : ""; }
+	private ImageLoaderRequest mediaRequest(String value){
+		if(!nbwMediaCurrent() || TextUtils.isEmpty(value)) return null;
+		return org.joinmastodon.android.ui.utils.NBWImageRequests.current(new UrlImageLoaderRequest(value));
+	}
 	private boolean isOriginalCached(Attachment att){
-		UrlImageLoaderRequest req=new UrlImageLoaderRequest(att.url);
+		ImageLoaderRequest req=mediaRequest(att.url);
+		if(req==null) return false;
 		ImageCache cache=ImageCache.getInstance(activity);
 		if(cache.isInTopCache(req))
 			return true;
@@ -1349,7 +1389,7 @@ public class PhotoViewer implements ZoomPanView.Listener{
 	}
 
 	private boolean sameMedia(long generation, int position, Attachment att){
-		return !closing && !dismissed && !activity.isFinishing() && !activity.isDestroyed() && generation==mediaGeneration
+		return !closing && !dismissed && !activity.isFinishing() && !activity.isDestroyed() && generation==mediaGeneration && nbwMediaCurrent()
 				&& pager.getCurrentItem()==position && attachments.get(position)==att
 				&& accountID.equals(AccountSessionManager.getInstance().getLastActiveAccountID())
 				&& AccountSessionManager.getInstance().tryGetAccount(accountID)!=null
@@ -1364,20 +1404,21 @@ public class PhotoViewer implements ZoomPanView.Listener{
 		int position=pager.getCurrentItem();
 		Attachment att=attachments.get(position);
 		if(att.type!=Attachment.Type.IMAGE || originalDownloadPosition!=-1 || originalGate==null || originalGate.isBusy()) return;
-		if(!isAcceptableImageUrl(att.url)) return;
+		if(!nbwMediaCurrent() || !isAcceptableImageUrl(mediaUrl(att.url))) return;
 		long generation=mediaGeneration;
 		Runnable download=()->{
 			if(sameMedia(generation, position, att)) downloadOriginal(att, position, generation);
 		};
 		if(isOriginalCached(att)) download.run();
-		else originalGate.authorize(att.id, att.url, download);
+		else originalGate.authorize(att.id, mediaUrl(att.url), download);
 	}
 
 	private void downloadOriginal(Attachment att, int position, long generation){
 		originalDownloadPosition=position;
 		updateOriginalControls();
 		viewOriginalBtn.setText(R.string.downloading_original);
-		UrlImageLoaderRequest req=new UrlImageLoaderRequest(att.url);
+		ImageLoaderRequest req=mediaRequest(att.url);
+		if(req==null) return;
 		// 与保存原文件的磁盘缓存为同一 ImageCache 键：下载原图后“保存”可直接复用
 		originalDownloadRequest=ImageCache.getInstance(activity).get(req, (loaded, total)->windowView.post(()->{
 			if(!sameMedia(generation, position, att) || originalDownloadPosition!=position) return;
@@ -1677,7 +1718,8 @@ public class PhotoViewer implements ZoomPanView.Listener{
 	private void doSaveCurrentFile(Attachment att){
 		if(closing || dismissed || originalGate==null || originalGate.isBusy() || originalDownloadPosition!=-1) return;
 		if(att.type==Attachment.Type.IMAGE){
-			UrlImageLoaderRequest req=new UrlImageLoaderRequest(att.url);
+			ImageLoaderRequest req=mediaRequest(att.url);
+			if(req==null) return;
 			try{
 				File file=ImageCache.getInstance(activity).getFile(req);
 				if(file==null || !file.isFile() || file.length()==0){
@@ -1685,11 +1727,13 @@ public class PhotoViewer implements ZoomPanView.Listener{
 					return;
 				}
 				MastodonAPIController.runInBackground(()->{
+					if(!nbwMediaCurrent()) return;
 					try(Source src=Okio.source(file); Sink sink=Okio.sink(destinationStreamForFile(att))){
 						BufferedSink buf=Okio.buffer(sink);
 						buf.writeAll(src);
 						buf.flush();
 						activity.runOnUiThread(()->{
+							if(!nbwMediaCurrent()) return;
 							new Snackbar.Builder(activity)
 									.setText(R.string.image_saved)
 									.setAction(R.string.view_file, ()->activity.startActivity(new Intent(DownloadManager.ACTION_VIEW_DOWNLOADS)))
@@ -1721,19 +1765,19 @@ public class PhotoViewer implements ZoomPanView.Listener{
 	}
 
 	private void saveViaDownloadManager(Attachment att){
-		if(closing || dismissed || !isAcceptableImageUrl(att.url)) return;
+		if(closing || dismissed || !nbwMediaCurrent() || !isAcceptableImageUrl(mediaUrl(att.url))) return;
 		if(att.type!=Attachment.Type.IMAGE){ enqueueDownload(att); return; }
 		if(originalGate==null || originalGate.isBusy()) return;
 		final int position=pager.getCurrentItem();
 		final long generation=mediaGeneration;
-		originalGate.authorize(att.id, att.url, ()->{
+		originalGate.authorize(att.id, mediaUrl(att.url), ()->{
 			if(sameMedia(generation, position, att)) enqueueDownload(att);
 		});
 	}
 
 	private void enqueueDownload(Attachment att){
-		if(closing || dismissed || !isAcceptableImageUrl(att.url)) return;
-		Uri uri=Uri.parse(att.url);
+		if(closing || dismissed || !nbwMediaCurrent() || !isAcceptableImageUrl(mediaUrl(att.url))) return;
+		Uri uri=Uri.parse(mediaUrl(att.url));
 		DownloadManager.Request req=new DownloadManager.Request(uri);
 		req.allowScanningByMediaScanner();
 		req.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
@@ -2023,23 +2067,24 @@ public class PhotoViewer implements ZoomPanView.Listener{
 			}
 			// 默认只加载预览图；用户点击“查看原图”完成后（或原图已在本会话加载过）才加载原图
 			int position=getAbsoluteAdapterPosition();
-			UrlImageLoaderRequest req;
-				if(isOriginalCached(item)){
-					req=new UrlImageLoaderRequest(item.url);
+				ImageLoaderRequest req;
+					if(isOriginalCached(item)){
+						req=mediaRequest(item.url);
 				}else{
 					originalLoadedPositions.remove(position);
 					// No preview must not silently fetch an uncached original without authorization.
 					if(TextUtils.isEmpty(item.previewUrl)){
-						setImageDrawable(currentDrawable);
+						setImageDrawable(nbwMediaCurrent() ? currentDrawable : null);
 						return;
 					}
-					req=new UrlImageLoaderRequest(item.previewUrl, maxImageDimensions, maxImageDimensions);
+					req=nbwMediaCurrent() ? org.joinmastodon.android.ui.utils.NBWImageRequests.current(new UrlImageLoaderRequest(item.previewUrl,maxImageDimensions,maxImageDimensions)) : null;
 				}
-				ViewImageLoader.load(this, currentDrawable, req, false);
+				if(req!=null) ViewImageLoader.load(this,currentDrawable,req,false); else setImageDrawable(null);
 		}
 
 		@Override
 		public void setImageDrawable(Drawable d){
+			if(nbwMedia && !nbwMediaCurrent()) return;
 			imageView.setImageDrawable(d);
 		}
 
@@ -2173,7 +2218,8 @@ public class PhotoViewer implements ZoomPanView.Listener{
 				player.setOnCompletionListener(this);
 			}
 			try{
-				player.setDataSource(activity, Uri.parse(item.url));
+				if(!nbwMediaCurrent() || TextUtils.isEmpty(mediaUrl(item.url))) return;
+				player.setDataSource(activity,Uri.parse(mediaUrl(item.url)));
 				player.prepareAsync();
 			}catch(IOException x){
 				Log.w(TAG, "Error initializing gif player", x);

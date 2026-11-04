@@ -186,10 +186,7 @@ internal fun MorphingGlassContainer(
 		modifier = modifier
 			.width(width)
 			.height(height)
-			.onGloballyPositioned {
-				onBoundsChanged(it.positionInRoot(), it.size)
-				onLayoutCoordinates(it)
-			}
+			.onGloballyPositioned { onBoundsChanged(it.positionInRoot(), it.size) }
 			.graphicsLayer {
 				scaleX = pressScale.value * containerScale.value
 				scaleY = pressScale.value * containerScale.value
@@ -198,6 +195,9 @@ internal fun MorphingGlassContainer(
 					pivotFractionY = 0f,
 				)
 			}
+			// Observe inside the real graphics layer so window bounds include its live transform,
+			// not the padding or the full-screen capture/touch host outside the glass.
+			.onGloballyPositioned { onLayoutCoordinates(it) }
 			.then(
 				if(graphicsSupported) Modifier.drawBackdrop(
 					backdrop = backdrop,

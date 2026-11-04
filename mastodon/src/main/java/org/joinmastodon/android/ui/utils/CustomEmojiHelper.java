@@ -34,7 +34,10 @@ public class CustomEmojiHelper{
 	}
 
 	public ImageLoaderRequest getImageRequest(int image){
-		return image<requests.size() ? requests.get(image) : null; // TODO fix this in the image loader
+		if(image>=requests.size()) return null;
+		ImageLoaderRequest request=requests.get(image);
+		// Avatar sources stay raw, including cold start. Resolve only at the actual lazy sink.
+		return spans.get(image).get(0) instanceof org.joinmastodon.android.ui.text.AvatarSpan ? NBWImageRequests.current(request) : request;
 	}
 
 	public void setImageDrawable(int image, Drawable drawable){

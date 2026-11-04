@@ -53,15 +53,17 @@ public class NBWLoginConsentTest{
 	private final List<ActivityController<Activity>> activities=new ArrayList<>();
 	private GlobalUserPreferences.ThemePreference previousTheme;
 	private AccountLocalPreferences.ColorPreference previousColor;
-	@Before public void setup(){
+	private org.joinmastodon.android.api.NBWEndpointFixtures endpoints;
+	@Before public void setup() throws Exception{
+		endpoints=new org.joinmastodon.android.api.NBWEndpointFixtures();
 		MastodonApp.context=RuntimeEnvironment.getApplication(); V.setApplicationContext(MastodonApp.context);
 		previousTheme=GlobalUserPreferences.theme; GlobalUserPreferences.theme=GlobalUserPreferences.ThemePreference.LIGHT;
 		previousColor=GlobalUserPreferences.color; GlobalUserPreferences.color=AccountLocalPreferences.ColorPreference.PURPLE;
 	}
-	@After public void cleanup(){
+	@After public void cleanup() throws Exception{
 		Dialog dialog=ShadowDialog.getLatestDialog(); if(dialog!=null) dialog.dismiss();
 		for(var activity:activities) activity.close(); GlobalUserPreferences.theme=previousTheme;
-		GlobalUserPreferences.color=previousColor;
+		GlobalUserPreferences.color=previousColor; endpoints.close();
 	}
 	private AppKitFragment page(boolean password){
 		var lifecycle=Robolectric.buildActivity(Activity.class).setup(); activities.add(lifecycle); var activity=lifecycle.get();
@@ -101,6 +103,23 @@ public class NBWLoginConsentTest{
 			Intent intent=next(activity); assertNotNull(intent); assertEquals(NBWLoginActivity.class.getName(),intent.getComponent().getClassName());
 			assertTrue(intent.getBooleanExtra(NBWLoginActivity.EXTRA_PERMISSION_CONFIRMED,false)); assertNull(intent.getData());
 			assertEquals(java.util.Set.of(NBWLoginActivity.EXTRA_PERMISSION_CONFIRMED),intent.getExtras().keySet()); assertNull(next(activity));
+		}
+	}
+	@Test public void anonymousLoginControlsTrackReadOnlyLocalOnlyAndHostRevisionWithoutGrantingAccess(){
+		for(boolean password:new boolean[]{false,true}){
+			var fragment=page(password); View button=fragment.getView().findViewById(R.id.btn_nbw);
+			ShadowLooper.idleMainLooper(); // The shared binding applies discovery on the UI queue.
+			assertEquals(View.VISIBLE,button.getVisibility());
+			endpoints.publish("backup","readonly","read_only"); ShadowLooper.idleMainLooper();
+			assertEquals(View.GONE,button.getVisibility()); assertFalse(button.isEnabled());
+			endpoints.publish("backup","local","local_only"); ShadowLooper.idleMainLooper();
+			assertEquals(View.GONE,button.getVisibility());
+			endpoints.publish("backup","full","full"); ShadowLooper.idleMainLooper();
+			assertEquals(View.VISIBLE,button.getVisibility()); assertTrue(button.isEnabled());
+			((CheckBox)fragment.getView().findViewById(R.id.cb_agreement)).setChecked(true); button.performClick();
+			var sheet=ShadowDialog.getLatestDialog(); endpoints.publish("primary","late-policy","local_only"); ShadowLooper.idleMainLooper();
+			sheet.findViewById(R.id.btn_authorize).performClick(); assertNull(next(fragment.getActivity()));
+			endpoints.publish("primary","endpoint-a","full"); ShadowLooper.idleMainLooper();
 		}
 	}
 	@Test public void uncheckingAgreementOrDetachingWhileSheetIsOpenCannotLaunch(){

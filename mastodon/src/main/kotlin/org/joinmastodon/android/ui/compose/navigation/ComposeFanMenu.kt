@@ -46,6 +46,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
@@ -55,6 +56,7 @@ import org.joinmastodon.android.R
 import org.joinmastodon.android.ui.compose.AppState
 import org.joinmastodon.android.ui.compose.LocalAppState
 import org.joinmastodon.android.ui.compose.MiuixAppTheme
+import org.joinmastodon.android.ui.compose.ui.isInDarkTheme
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
@@ -264,7 +266,11 @@ private fun FanRow(
 		}
 	}
 
-	val (containerColor, contentColor) = when (index) {
+	// Dark mode uses one surface for every destination, including the friend-request option.
+	// Keep the existing per-option accents in light mode.
+	val (containerColor, contentColor) = if (isInDarkTheme()) {
+		MiuixTheme.colorScheme.surfaceContainerHighest to MiuixTheme.colorScheme.onSurface
+	} else when (index) {
 		0 -> MiuixTheme.colorScheme.primaryContainer to MiuixTheme.colorScheme.onPrimaryContainer
 		1 -> MiuixTheme.colorScheme.secondaryContainer to MiuixTheme.colorScheme.onSecondaryContainer
 		else -> MiuixTheme.colorScheme.tertiaryContainer to MiuixTheme.colorScheme.onTertiaryContainer
@@ -282,7 +288,10 @@ private fun FanRow(
 			fontSize = 13.sp,
 			fontWeight = FontWeight.Medium,
 			maxLines = 1,
+			overflow = TextOverflow.Ellipsis,
 			modifier = Modifier
+				// The label yields space first so the 48dp circle keeps a full touch target on 320dp/large text.
+				.weight(1f, fill = false)
 				.graphicsLayer {
 					translationX = LABEL_SLIDE_DP * (1f - label.value) * density
 					alpha = label.value

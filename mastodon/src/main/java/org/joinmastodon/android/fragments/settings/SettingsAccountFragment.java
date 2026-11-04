@@ -55,6 +55,7 @@ public class SettingsAccountFragment extends BaseSettingsFragment<Void>{
 	private DonationSheet donationSheet;
 	private boolean loggedOut;
 	private ListItem<Void> nbwItem;
+	private org.joinmastodon.android.api.session.NBWForumOptionsRepository.Cancelable nbwSubscription;
 	private ListItem<Void> qqItem;
 	private ListItem<Void> verificationItem;
 	private QQBindingState qqBindingState=QQBindingState.UNKNOWN;
@@ -132,6 +133,9 @@ public class SettingsAccountFragment extends BaseSettingsFragment<Void>{
 	@Override
 	public void onResume(){
 		super.onResume();
+		if(nbwSubscription==null && pinnedSession!=null) nbwSubscription=pinnedSession.getNBWForumOptionsRepository().observe(snapshot->{
+			if(getActivity()!=null) getActivity().runOnUiThread(this::refreshNBWStatus);
+		});
 		refreshNBWStatus();
 		refreshVerificationStatus();
 		refreshQQStatus();
@@ -280,6 +284,7 @@ public class SettingsAccountFragment extends BaseSettingsFragment<Void>{
 
 	@Override
 	public void onStop(){
+		if(nbwSubscription!=null){ nbwSubscription.cancel(); nbwSubscription=null; }
 		cancelStatusQueries();
 		super.onStop();
 	}

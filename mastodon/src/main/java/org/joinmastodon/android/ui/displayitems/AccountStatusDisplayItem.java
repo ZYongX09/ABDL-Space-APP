@@ -31,7 +31,7 @@ public class AccountStatusDisplayItem extends StatusDisplayItem{
 	@Override
 	public ImageLoaderRequest getImageRequest(int index){
 		if(index==0)
-			return account.avaRequest;
+			return org.joinmastodon.android.ui.utils.NBWImageRequests.current(account.avaRequest);
 		return account.emojiHelper.getImageRequest(index-1);
 	}
 

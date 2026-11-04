@@ -74,7 +74,9 @@ public class HomeTimelineSnapshotCacheTest{
 		CountDownLatch done=new CountDownLatch(1); CacheController.databaseThread.postRunnable(done::countDown, 0);
 		assertTrue("Database queue must finish", done.await(5, TimeUnit.SECONDS)); ShadowLooper.idleMainLooper();
 	}
+	private NBWEndpointFixtures endpoints;
 	@Before @SuppressWarnings("unchecked") public void setup() throws Exception{
+		endpoints=new NBWEndpointFixtures();
 		MastodonApp.context=RuntimeEnvironment.getApplication(); me.grishka.appkit.utils.V.setApplicationContext(MastodonApp.context);
 		var manager=AccountSessionManager.getInstance(); sessions=(Map<String,AccountSession>)field(AccountSessionManager.class,"sessions").get(manager);
 		previousActive=manager.getLastActiveAccountID(); session=add("home-cache.offline.example.test","home-cache-1");
@@ -87,6 +89,7 @@ public class HomeTimelineSnapshotCacheTest{
 		drain();
 		for(AccountSession account:accounts){ sessions.remove(account.getID()); account.getCacheController().closeDatabase(); MastodonApp.context.deleteDatabase(account.getID()+".db"); }
 		field(AccountSessionManager.class,"lastActiveAccountID").set(AccountSessionManager.getInstance(),previousActive);
+		for(AccountSession account:accounts) account.deactivateNBW(); endpoints.close();
 	}
 	private HomeTimelineSnapshot read(CacheController controller) throws Exception{
 		AtomicReference<HomeTimelineSnapshot> result=new AtomicReference<>();
@@ -171,8 +174,15 @@ public class HomeTimelineSnapshotCacheTest{
 		cache.putHomeTimelineSnapshot(cache.beginHomeTimelineSnapshot(),List.of(),null); drain(); assertNull(read(cache));
 	}
 	@Test public void nbwGateAllowsOrderedMixedHeadOnlyWhileCurrentlyReadable() throws Exception{
-		NBWForumOptionsRepository repository=session.getNBWForumOptionsRepository();
-		var capabilities=NBWV2RepositoryTest.capabilities("full"); field(NBWForumOptionsRepository.class,"capabilities").set(repository,capabilities);
+		NBWForumOptionsRepository repository=new NBWForumOptionsRepository(new NBWForumOptionsRepository.Transport(){
+			public NBWForumOptionsRepository.Cancelable capabilities(NBWForumOptionsRepository.Result<org.joinmastodon.android.model.NBWCapabilities> result){ result.success(NBWV2RepositoryTest.capabilities("full")); return ()->{}; }
+			public NBWForumOptionsRepository.Cancelable options(NBWForumOptionsRepository.Result<org.joinmastodon.android.model.NBWForumOptions> result){ result.success(NBWV2RepositoryTest.options()); return ()->{}; }
+			public NBWForumOptionsRepository.Cancelable consent(boolean accepted,NBWForumOptionsRepository.Result<Object> result){ throw new AssertionError(); }
+		},()->0L,new NBWForumOptionsRepository.SelectionStore(){
+			public org.joinmastodon.android.model.NBWSelection load(){ return org.joinmastodon.android.model.NBWSelection.ai(); }
+			public void save(org.joinmastodon.android.model.NBWSelection selection){}
+		},cache::clearNBWRemoteCache,Runnable::run);
+		field(AccountSession.class,"nbwForumOptionsRepository").set(session,repository); repository.activate();
 		cache.putHomeTimelineSnapshot(cache.beginHomeTimelineSnapshot(),List.of(post("p_2"),post("nbw_10"),post("c_3")),"mixed-cursor"); drain();
 		assertEquals(List.of("p_2","nbw_10","c_3"),read(cache).posts.stream().map(s->s.id).toList());
 		repository.deactivate(); drain(); assertNull(read(cache));

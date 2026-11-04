@@ -118,7 +118,7 @@ class NBWClassificationMenuInteractionTest {
         }
     }
 
-    @Test fun optionalZeroHasExplicitDefaultSubtypeLeafWhileRequiredAndModeratorOnlyForumsNeverOfferIt() {
+    @Test @Config(qualifiers = "zh-rCN-w393dp-h852dp-mdpi") fun optionalZeroHasExplicitDefaultSubtypeLeafWhileRequiredAndModeratorOnlyForumsNeverOfferIt() {
         ready(optionsWithOptionalAndModeratorOnlyForums())
         openMenu()
         compose.onNodeWithText("仅管理").assertDoesNotExist()
@@ -145,7 +145,7 @@ class NBWClassificationMenuInteractionTest {
         assertEquals(NBWSelection.manual(27, 41), repository.snapshot.selection)
     }
 
-    @Test fun forumWithoutTypesStillOpensItsExplicitZeroLeafRatherThanSelectingTheParent() {
+    @Test @Config(qualifiers = "zh-rCN-w393dp-h852dp-mdpi") fun forumWithoutTypesStillOpensItsExplicitZeroLeafRatherThanSelectingTheParent() {
         ready()
         openMenu()
         compose.onNodeWithText("闲聊").performClick()
@@ -212,6 +212,9 @@ class NBWClassificationMenuInteractionTest {
             assertEquals(2, wire.size())
             assertFalse(repository.snapshot.hasFallbackConsent())
             ComposeReplyPublishingBehaviorTest.callback(request).onSuccess(Any())
+            // Consent completion refreshes public discovery first; the authenticated re-read is
+            // queued behind that handshake, not fabricated synchronously.
+            ShadowLooper.idleMainLooper()
             assertEquals(3, calls(CAPS))
             assertFalse("PUT success cannot fabricate account consent", repository.snapshot.hasFallbackConsent())
         }
@@ -223,7 +226,7 @@ class NBWClassificationMenuInteractionTest {
         assertNoPublishingOrRecommendation()
     }
 
-    @Test fun decliningFallbackIsAnActualFalseRequestAndNeverChangesTheManualPair() {
+    @Test @Config(qualifiers = "zh-rCN-w393dp-h852dp-mdpi") fun decliningFallbackIsAnActualFalseRequestAndNeverChangesTheManualPair() {
         ready()
         openMenu()
         compose.onNodeWithText("闲聊").performClick()
@@ -433,6 +436,9 @@ class NBWClassificationMenuInteractionTest {
     }
 
     private fun deliver(path: String, value: Any) {
+        // Public discovery resolves on the UI queue before the session repository asks for
+        // authenticated capabilities; deliver only after that real request exists.
+        settle()
         compose.runOnUiThread {
             ComposeReplyPublishingBehaviorTest.callback(ComposeReplyPublishingBehaviorTest.lastAppRequest(path)).onSuccess(value)
         }

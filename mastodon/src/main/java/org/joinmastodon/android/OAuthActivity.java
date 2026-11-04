@@ -68,7 +68,7 @@ public class OAuthActivity extends Activity{
 			finish(); return;
 		}
 		if(uri.getQueryParameter("nbw_v2")!=null){
-			if("authorized".equals(uri.getQueryParameter("nbw_v2"))){
+			if("abdl-space://callback?nbw_v2=authorized".equals(uri.toString())){
 				String launched=NBWPostRegisterActivity.consumeAuthorizationLaunch(this);
 				AccountSession owner=launched==null ? null : AccountSessionManager.getInstance().tryGetAccount(launched);
 				if(owner!=null) owner.getNBWForumOptionsRepository().refreshNow();

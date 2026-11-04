@@ -71,6 +71,8 @@ public class GlobalUserPreferences{
 	public static boolean removeTrackingParams;
 	public static boolean useIosLiquidNavigation;
 	public static boolean useSeamlessTransitions=true;
+	private static final String SEAMLESS_CHOICE="useSeamlessTransitions";
+	private static final String SEAMLESS_EXPLICIT_CHOICE="seamlessTransitionsExplicitlyChosen";
 
 	// MOSHIDON: we changed this to public, because otherwise we can't export the settings
 	public static SharedPreferences getPrefs(){
@@ -83,7 +85,9 @@ public class GlobalUserPreferences{
 
 	public static void load(){
 		SharedPreferences prefs=getPrefs();
-		useSeamlessTransitions=prefs.getBoolean("useSeamlessTransitions", true);
+		// The old key is also a choice: in particular, never migrate a legacy false to true.
+		// No key means automatic opt-in when the ROM's independent capability gate is supported.
+		useSeamlessTransitions=prefs.getBoolean(SEAMLESS_CHOICE, true);
 		if(!useSeamlessTransitions) org.joinmastodon.android.ui.seamless.SeamlessTransitions.clear();
 		playGifs=prefs.getBoolean("playGifs", true);
 		useCustomTabs=prefs.getBoolean("useCustomTabs", true);
@@ -179,6 +183,14 @@ public class GlobalUserPreferences{
 		return LiquidGlassCompatibility.isSupported() && useIosLiquidNavigation;
 	}
 
+	/** Only a deliberate settings action records a choice. Runtime capability is never a choice. */
+	public static void setSeamlessTransitionsEnabled(boolean enabled){
+		useSeamlessTransitions=enabled;
+		if(!enabled) org.joinmastodon.android.ui.seamless.SeamlessTransitions.clear();
+		getPrefs().edit().putBoolean(SEAMLESS_CHOICE, enabled)
+				.putBoolean(SEAMLESS_EXPLICIT_CHOICE, true).apply();
+	}
+
 	public static void save(){
 		if(!useSeamlessTransitions) org.joinmastodon.android.ui.seamless.SeamlessTransitions.clear();
 		boolean liquidSupported=isIosLiquidNavigationSupported();
@@ -188,8 +200,9 @@ public class GlobalUserPreferences{
 		// Old systems preserve the disk choice; runtime failures never overwrite it.
 		if(liquidSupported)
 			editor.putBoolean("useIosLiquidNavigation", useIosLiquidNavigation);
+		// An unrelated save must not persist a default, a stale field or an unavailable switch's
+		// unchecked presentation as an explicit seamless-animation choice.
 		editor
-				.putBoolean("useSeamlessTransitions", useSeamlessTransitions)
 				.putBoolean("playGifs", playGifs)
 				.putBoolean("useCustomTabs", useCustomTabs)
 				.putInt("theme", theme.ordinal())

@@ -35,6 +35,8 @@ public class NBWLoginActivity extends Activity{
 	private Button retry;
 	private ProgressBar progress;
 	private boolean terminal;
+	private int preflightGeneration;
+	private org.joinmastodon.android.api.session.NBWForumOptionsRepository.Cancelable endpointSubscription;
 	private final Runnable expiry=this::render;
 
 	/** Called only by OAuthActivity after strict URI validation and a live in-process pending check. */
@@ -51,6 +53,9 @@ public class NBWLoginActivity extends Activity{
 		status=findViewById(R.id.nbw_login_status); retry=findViewById(R.id.nbw_login_retry); progress=findViewById(R.id.nbw_login_progress);
 		findViewById(R.id.nbw_login_cancel).setOnClickListener(v->cancel());
 		retry.setOnClickListener(v->AppSecurity.runAfterUnlock(this, this::retry));
+		endpointSubscription=org.joinmastodon.android.api.session.NBWEndpointsRepository.getInstance().observe(snapshot->{
+			if(handle!=null && !terminal && !flow.isCurrent(handle)) runOnUiThread(()->fail(R.string.nbw_login_expired));
+		});
 		AppSecurity.runAfterUnlock(this, ()->enter(state));
 	}
 	private void enter(@Nullable Bundle state){
@@ -66,7 +71,7 @@ public class NBWLoginActivity extends Activity{
 			if(handle==null){ fail(R.string.nbw_login_expired); return; }
 			exchange(false);
 		}else if(intent.getBooleanExtra(EXTRA_PERMISSION_CONFIRMED, false)){
-			handle=flow.begin(); start();
+			beginFresh();
 		}else{
 			finish();
 		}
@@ -82,8 +87,20 @@ public class NBWLoginActivity extends Activity{
 				if(handle==null || handle.generation!=generation) return;
 				exchange(false);
 			}else if(intent.getBooleanExtra(EXTRA_PERMISSION_CONFIRMED, false)){
-				terminal=false; handle=flow.begin(); start();
+				terminal=false; beginFresh();
 			}
+		});
+	}
+	private void beginFresh(){
+		int ticket=++preflightGeneration;
+		String account=org.joinmastodon.android.api.session.AccountSessionManager.getInstance().getLastActiveAccountID();
+		var session=org.joinmastodon.android.api.session.AccountSessionManager.getInstance().tryGetAccount(account);
+		status.setText(R.string.nbw_login_starting); progress.setVisibility(View.VISIBLE); retry.setVisibility(View.GONE);
+		org.joinmastodon.android.api.session.NBWEndpointsRepository.getInstance().refreshNow(snapshot->{
+			if(ticket!=preflightGeneration || terminal || isFinishing() || isDestroyed()) return;
+			var manager=org.joinmastodon.android.api.session.AccountSessionManager.getInstance();
+			if(!snapshot.canWrite() || !java.util.Objects.equals(account,manager.getLastActiveAccountID()) || manager.tryGetAccount(account)!=session){ fail(R.string.nbw_login_unavailable); return; }
+			handle=flow.begin(); start();
 		});
 	}
 	private boolean live(){ return !terminal && !isFinishing() && !isDestroyed() && flow.isCurrent(handle); }
@@ -161,21 +178,29 @@ public class NBWLoginActivity extends Activity{
 		handler.postDelayed(expiry, Math.max(1, snapshot.remainingMillis));
 	}
 	private void fail(int message){
-		terminal=true; handler.removeCallbacks(expiry);
+		terminal=true; preflightGeneration++; handler.removeCallbacks(expiry);
+		flow.cancel(handle);
 		status.setText(message); progress.setVisibility(View.GONE); retry.setVisibility(View.GONE);
 	}
 	private void cancel(){ flow.cancel(handle); terminal=true; handler.removeCallbacks(expiry); finish(); }
 	@Override public void onBackPressed(){ cancel(); }
 	@Override protected void onResume(){
 		super.onResume();
+		org.joinmastodon.android.api.session.NBWEndpointsRepository.getInstance().enterForeground(this);
 		if(handle!=null && !terminal) render(); // Browser return without a completion hint never exchanges automatically.
+	}
+	@Override protected void onPause(){
+		org.joinmastodon.android.api.session.NBWEndpointsRepository.getInstance().leaveForeground(this);
+		super.onPause();
 	}
 	@Override protected void onSaveInstanceState(Bundle state){
 		if(handle!=null) state.putLong(EXTRA_GENERATION, handle.generation);
 		super.onSaveInstanceState(state);
 	}
 	@Override protected void onDestroy(){
-		handler.removeCallbacks(expiry);
+		handler.removeCallbacks(expiry); preflightGeneration++;
+		if(endpointSubscription!=null) endpointSubscription.cancel();
+		org.joinmastodon.android.api.session.NBWEndpointsRepository.getInstance().leaveForeground(this);
 		flow.detach(handle, isChangingConfigurations() || !isFinishing());
 		super.onDestroy();
 	}

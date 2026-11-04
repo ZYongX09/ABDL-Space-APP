@@ -2,6 +2,7 @@ package org.joinmastodon.android
 
 import java.io.File
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -34,17 +35,23 @@ class SponsorOriginalGateContractTest {
 		assertTrue(layout.contains("android:id=\"@+id/btn_view_original\""))
 		assertTrue(layout.contains("@drawable/bg_view_original_pill"))
 		assertTrue(viewer.contains("private SponsorOriginalGate originalGate"))
-		assertTrue(viewer.contains("originalGate.authorize(att.id, att.url, download)"))
+		// 原图地址先经 NBW 当前代投影，再由赞助门禁授权；旧直连 att.url 的写法已不存在。
+		assertTrue(viewer.contains("originalGate.authorize(att.id, mediaUrl(att.url), download)"))
 		assertTrue(viewer.contains("R.string.verifying_original"))
 		assertTrue(viewer.contains("R.string.downloading_original"))
-		assertTrue(viewer.contains("if(isOriginalCached(item))"))
+		assertTrue(viewer.contains("if(isOriginalCached(att))"))
 		// 无预览时绝不静默拉取未授权原图
-		assertTrue(viewer.contains("if(TextUtils.isEmpty(item.previewUrl))"))
-		assertTrue(viewer.contains("else originalGate.authorize(att.id, att.url, download)"))
+		assertTrue(viewer.contains("if(!nbwMediaCurrent() || !isAcceptableImageUrl(mediaUrl(att.url))) return;"))
+		assertTrue(viewer.contains("else originalGate.authorize(att.id, mediaUrl(att.url), download)"))
 		assertTrue(viewer.contains("private static boolean isAcceptableImageUrl(String url)"))
 		// 翻页/关闭/账号切换都会使未完成的原图工作失效
 		assertTrue(viewer.contains("if(currentIndex!=index) invalidateOriginalWork()"))
-		assertTrue(viewer.contains("if(\"lastActiveAccount\".equals(key)) invalidateOriginalWork()"))
+		// Bind invalidation to the account listener, not unrelated calls elsewhere in the viewer.
+		val accountInvalidation = Regex("""originalAccountListener\s*=\s*\(prefs,\s*key\)\s*->\s*\{\s*if\s*\(\s*"lastActiveAccount"\.equals\(key\)\s*\)\s*\{\s*invalidateOriginalWork\(\);""")
+		val listener = accountInvalidation.find(viewer)
+		assertNotNull("Account changes must invalidate original work inside the listener", listener)
+		val withoutInvalidation = viewer.replaceRange(listener!!.range, listener.value.replace("invalidateOriginalWork();", ""))
+		assertFalse("Removing only listener invalidation must fail this contract", accountInvalidation.containsMatchIn(withoutInvalidation))
 		// 保存图片同样经赞助门禁
 		assertTrue(viewer.contains("saveViaDownloadManager"))
 	}

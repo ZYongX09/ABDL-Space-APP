@@ -99,6 +99,7 @@ public abstract class BaseStatusListFragment<T extends DisplayItemsParent> exten
 	protected HashMap<String, Status> knownStatuses=new HashMap<>();
 	protected HashSet<APIRequest<?>> requestsToCancelWhenListClears=new HashSet<>();
 	private org.joinmastodon.android.api.session.NBWForumOptionsRepository.Cancelable nbwSubscription;
+	private long observedNBWGeneration=-1;
 	private SpringAnimation listShakeAnimation;
 	private org.joinmastodon.android.translation.PostTranslationCoordinator translationCoordinator;
 	private org.joinmastodon.android.translation.PostTranslationCoordinator.Visit translationVisit=new org.joinmastodon.android.translation.PostTranslationCoordinator.Visit();
@@ -138,7 +139,13 @@ public abstract class BaseStatusListFragment<T extends DisplayItemsParent> exten
 		return visible;
 	}
 	private void applyNBWMode(){
-		if(!hideNBWRemoteItems()) return;
+		var session=AccountSessionManager.getInstance().tryGetAccount(accountID);
+		if(session==null) return;
+		var snapshot=session.getNBWForumOptionsRepository().getSnapshot();
+		boolean revisionChanged=observedNBWGeneration>=0 && observedNBWGeneration!=snapshot.generation;
+		observedNBWGeneration=snapshot.generation;
+		if(!revisionChanged && snapshot.canRead()) return;
+		// Each NBW media viewer owns its lease; local p_/c_ media must not be closed here.
 		if(pruneNBWRemoteItems() && adapter!=null) adapter.notifyDataSetChanged();
 	}
 	private boolean retryFailedImagesScheduled;
@@ -723,14 +730,30 @@ public abstract class BaseStatusListFragment<T extends DisplayItemsParent> exten
 		onItemClick(id);
 	}
 
+	private String seamlessClickParent;
+	private Status seamlessClickVisibility;
+
+	/** Preserve the clicked occurrence without bypassing ThreadFragment's navigate override. */
+	protected final void navigateToStatusFromClick(Status status, String parentID, Status visibilityStatus){
+		String previousParent=seamlessClickParent;
+		Status previousVisibility=seamlessClickVisibility;
+		seamlessClickParent=parentID;
+		seamlessClickVisibility=visibilityStatus;
+		try{ navigateToStatus(status); }
+		finally{ seamlessClickParent=previousParent; seamlessClickVisibility=previousVisibility; }
+	}
+
 	public void navigateToStatus(Status status){
 		Bundle args=new Bundle();
 		args.putString("account", accountID);
 		args.putParcelable("status", Parcels.wrap(status.clone()));
 		if(status.inReplyToAccountId!=null && knownAccounts.containsKey(status.inReplyToAccountId))
 			args.putParcelable("inReplyToAccount", Parcels.wrap(knownAccounts.get(status.inReplyToAccountId)));
-		if(org.joinmastodon.android.ui.seamless.SeamlessTransitions.openPost(getActivity(), list, accountID, status, args))
-			return;
+		boolean opened=seamlessClickParent==null
+				? org.joinmastodon.android.ui.seamless.SeamlessTransitions.openPost(getActivity(), list, accountID, status, args)
+				: org.joinmastodon.android.ui.seamless.SeamlessTransitions.openPost(getActivity(), list, accountID, status, args,
+						seamlessClickParent, seamlessClickVisibility, displayItems);
+		if(opened) return;
 		Nav.go(getActivity(), ThreadFragment.class, args);
 	}
 

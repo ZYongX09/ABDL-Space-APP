@@ -551,7 +551,7 @@ public class SearchQueryFragment extends MastodonRecyclerFragment<SearchResultVi
 			SearchResultViewModel vm=data.get(position);
 			if(vm.account!=null){
 				if(image==0)
-					return vm.account.avaRequest;
+						return org.joinmastodon.android.ui.utils.NBWImageRequests.current(vm.account.avaRequest);
 				return vm.account.emojiHelper.getImageRequest(image-1);
 			}
 			return null;

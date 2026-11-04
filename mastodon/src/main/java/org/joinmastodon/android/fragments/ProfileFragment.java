@@ -169,6 +169,8 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 	private View publicFriendCardMini;
 	private boolean refreshPublicFriendCardOnShown, publicFriendCardRefreshing;
 	private int accountLoadGeneration;
+	private org.joinmastodon.android.api.session.NBWForumOptionsRepository.Cancelable nbwSubscription;
+	private long nbwGeneration=-1;
 	private LinearLayout badgeContainer;
 	private OkHttpClient badgeHttpClient;
 	private CustomDrawingOrderLinearLayout scrollableContent;
@@ -459,6 +461,7 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 						if(generation!=accountLoadGeneration) return;
 						publicFriendCardRefreshing=false;
 						account=result;
+						if(content!=null) content.setVisibility(View.VISIBLE);
 						isOwnProfile=AccountSessionManager.getInstance().isSelf(accountID, account);
 						bindHeaderView();
 						dataLoaded();
@@ -677,6 +680,23 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 	@Override
 	public void onResume(){
 		super.onResume();
+		if(nbwSubscription==null){
+			var session=AccountSessionManager.getInstance().tryGetAccount(accountID);
+			if(session!=null) nbwSubscription=session.getNBWForumOptionsRepository().observe(snapshot->{
+				if(getActivity()==null || !isNBWAccount()) return;
+				boolean changed=nbwGeneration>=0 && nbwGeneration!=snapshot.generation;
+				nbwGeneration=snapshot.generation;
+				if(changed || !snapshot.canRead()){
+					accountLoadGeneration++;
+					if(currentRequest!=null) currentRequest.cancel();
+					if(currentPhotoViewer!=null){ currentPhotoViewer.onDismissed(); currentPhotoViewer=null; }
+					if(avatar!=null) avatar.setImageDrawable(null);
+					if(cover!=null) cover.setImageDrawable(null);
+					if(content!=null) content.setVisibility(View.INVISIBLE);
+				}
+				if(snapshot.canRead() && (changed || content!=null && content.getVisibility()!=View.VISIBLE)) doLoadData();
+			});
+		}
 		updateAlbumPageVisibility();
 	}
 
@@ -797,6 +817,7 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 
 	@Override
 	public void onDestroyView(){
+		if(nbwSubscription!=null){ nbwSubscription.cancel(); nbwSubscription=null; }
 		if(publicFriendCardMini!=null) PublicFriendCardUi.clearMini(publicFriendCardMini);
 		publicFriendCardMini=null;
 		super.onDestroyView();
@@ -818,8 +839,10 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 		}
 		setTitle(account.username);
 		setSubtitle(getResources().getQuantityString(R.plurals.x_posts, (int)(account.statusesCount%1000), account.statusesCount));
-		ViewImageLoader.loadWithoutAnimation(avatar, avatar.getDrawable(), new UrlImageLoaderRequest(GlobalUserPreferences.playGifs ? account.avatar : account.avatarStatic, V.dp(100), V.dp(100)));
-		ViewImageLoader.loadWithoutAnimation(cover, cover.getDrawable(), new UrlImageLoaderRequest(GlobalUserPreferences.playGifs ? account.header : account.headerStatic, 1000, 1000));
+		var avatarRequest=org.joinmastodon.android.ui.utils.NBWImageRequests.current(new UrlImageLoaderRequest(GlobalUserPreferences.playGifs ? account.avatar : account.avatarStatic, V.dp(100), V.dp(100)));
+		var coverRequest=org.joinmastodon.android.ui.utils.NBWImageRequests.current(new UrlImageLoaderRequest(GlobalUserPreferences.playGifs ? account.header : account.headerStatic,1000,1000));
+		org.joinmastodon.android.ui.utils.NBWImageRequests.load(avatar,avatar.getDrawable(),avatarRequest);
+		org.joinmastodon.android.ui.utils.NBWImageRequests.load(cover,cover.getDrawable(),coverRequest);
 		SpannableStringBuilder ssb=new SpannableStringBuilder(account.username);
 		if(GlobalUserPreferences.customEmojiInNames)
 			HtmlParser.parseCustomEmoji(ssb, account.emojis);
@@ -1111,7 +1134,7 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 			args.putParcelable("relationship", Parcels.wrap(relationship));
 			Nav.go(getActivity(), ReportReasonChoiceFragment.class, args);
 		}else if(id==R.id.open_in_browser){
-			UiUtils.launchWebBrowser(getActivity(), account.url);
+			UiUtils.launchWebBrowser(getActivity(),org.joinmastodon.android.api.NBWUrlResolver.current(account.url,false));
 		}else if(id==R.id.block_domain){
 			UiUtils.confirmToggleBlockDomain(getActivity(), accountID, account, relationship.domainBlocking, ()->{
 				relationship.domainBlocking=!relationship.domainBlocking;
@@ -1159,7 +1182,7 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 					.wrapProgress(getActivity(), R.string.loading, false)
 					.exec(accountID);
 		}else if(id==R.id.copy_link){
-			getActivity().getSystemService(ClipboardManager.class).setPrimaryClip(ClipData.newPlainText(null, account.url));
+			getActivity().getSystemService(ClipboardManager.class).setPrimaryClip(ClipData.newPlainText(null,org.joinmastodon.android.api.NBWUrlResolver.current(account.url,false)));
 			UiUtils.maybeShowTextCopiedToast(getActivity());
 		}
 		return true;
@@ -1332,7 +1355,7 @@ public class ProfileFragment extends LoaderFragment implements ScrollableToTop, 
 
 			int i=0;
 			for(AccountViewModel avm:followers){
-				ViewImageLoader.loadWithoutAnimation(familiarFollowersAvatars[i], getResources().getDrawable(R.drawable.image_placeholder, getActivity().getTheme()), avm.avaRequest);
+				ViewImageLoader.loadWithoutAnimation(familiarFollowersAvatars[i], getResources().getDrawable(R.drawable.image_placeholder, getActivity().getTheme()), org.joinmastodon.android.ui.utils.NBWImageRequests.current(avm.avaRequest));
 				i++;
 			}
 		}

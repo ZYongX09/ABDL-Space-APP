@@ -377,8 +377,7 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 	/** Runs after real measurement, including ancestor scroll/translation and toolbar replacement.
 	 * Only presentation is affected: the identity timer and home request state remain independent. */
 	private boolean positionHomeRefreshingText(){
-		if(homeRefreshingText==null || homeRefreshingText.getVisibility()!=View.VISIBLE
-				|| !homeRefreshingText.isAttachedToWindow()) return true;
+		if(homeRefreshingText==null || !homeRefreshingText.isAttachedToWindow()) return true;
 		View parent=(View)homeRefreshingText.getParent();
 		View root=homeRefreshingText.getRootView();
 		Rect viewport=new Rect(), visible=new Rect();
@@ -427,9 +426,27 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 		boolean remeasure=homeRefreshingText.getMaxWidth()!=availableWidth;
 		if(remeasure) homeRefreshingText.setMaxWidth(availableWidth);
 		// While the next traversal remeasures wrapping text, never draw it through a system bar.
-		boolean fits=viewport.height()>=homeRefreshingText.getHeight()+gap
+		boolean showing=homeRefreshingText.getVisibility()==View.VISIBLE;
+		boolean fits=viewport.height()>homeRefreshingText.getHeight()+gap*2
 				&& homeRefreshingText.getMeasuredWidth()<=availableWidth;
 		homeRefreshingText.setAlpha(fits ? 1f : 0f);
+		if(list!=null && list.isAttachedToWindow()){
+			int[] listOrigin=new int[2];
+			list.getLocationInWindow(listOrigin);
+			// The hint and the first post share this real viewport. Reserve only the text that
+			// is actually drawn, so a refresh never paints over the author's header. The root
+			// and toolbar may already consume the status inset; do not add it a second time.
+			boolean hasOverlay=getParentFragment() instanceof HomeTabFragment home
+					&& home.hasVisibleLiquidToolbar();
+			int contentTop=viewport.top+(hasOverlay ? gap : 0);
+			if(showing && fits) contentTop=viewport.top+gap+homeRefreshingText.getHeight()+gap;
+			int padding=Math.max(0, contentTop-listOrigin[1]);
+			// An oversized menu in a short window is an overlay, not permission to blank the
+			// entire timeline. With no room below it, omit extra clearance rather than hide
+			// or clip normal content. The hint alone may be suppressed until it fits again.
+			if(padding>=list.getHeight()) padding=0;
+			if(list.getPaddingTop()!=padding) setLiquidToolbarTopPadding(padding);
+		}
 		parent.getLocationInWindow(window);
 		float targetX=(viewport.left+viewport.right-desiredWidth)/2f-window[0]-homeRefreshingText.getLeft();
 		float targetY=viewport.top+gap-window[1]-homeRefreshingText.getTop();

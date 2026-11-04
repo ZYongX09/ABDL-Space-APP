@@ -54,7 +54,7 @@ public class AudioStatusDisplayItem extends StatusDisplayItem{
 
 	@Override
 	public ImageLoaderRequest getImageRequest(int index){
-		return imageRequest;
+		return org.joinmastodon.android.ui.utils.NBWImageRequests.current(imageRequest);
 	}
 
 	public static class Holder extends StatusDisplayItem.Holder<AudioStatusDisplayItem> implements AudioPlayerService.Callback, ImageLoaderViewHolder{

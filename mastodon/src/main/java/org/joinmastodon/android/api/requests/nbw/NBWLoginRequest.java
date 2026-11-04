@@ -21,6 +21,8 @@ import org.joinmastodon.android.R;
 import org.joinmastodon.android.api.MastodonAPIRequest;
 import org.joinmastodon.android.api.ObjectValidationException;
 import org.joinmastodon.android.model.BaseModel;
+import org.joinmastodon.android.model.NBWEndpoints;
+import org.joinmastodon.android.api.NBWUrlResolver;
 import org.joinmastodon.android.model.Token;
 
 import java.io.IOException;
@@ -45,6 +47,7 @@ public final class NBWLoginRequest<T> extends MastodonAPIRequest<T>{
 	@Override public Uri getURL(){ return Uri.parse("https://"+DOMAIN+getPathPrefix()+"/nbw/login/"+endpoint); }
 	@Override public boolean isSensitiveRequest(){ return true; }
 	@Override public boolean requiresSystemTrust(){ return true; }
+	@Override public int responseByteLimit(){ return 32768; }
 	@Override public NBWLoginRequest<T> execNoAuth(String domain){
 		if(!DOMAIN.equals(domain)) throw new IllegalArgumentException("First-party login host required");
 		super.execNoAuth(DOMAIN);
@@ -73,17 +76,25 @@ public final class NBWLoginRequest<T> extends MastodonAPIRequest<T>{
 		public String flow;
 		public String authorizationUrl;
 		public int expiresIn;
+		public NBWEndpoints endpoints;
 		@Override public void postprocess() throws ObjectValidationException{
-			if(!canonical43(flow) || expiresIn!=600 || !validAuthorizationUrl(authorizationUrl)
+			if(endpoints==null) throw new ObjectValidationException("Matching NBW endpoint server required");
+			endpoints.postprocess();
+			if(!canonical43(flow) || expiresIn!=600 || !endpoints.canWrite() || !validAuthorizationUrl(authorizationUrl,endpoints,"nbw-v2-login.")
 					|| !flow.equals(Uri.parse(authorizationUrl).getQueryParameter("state").split("\\.", -1)[1]))
 				throw new ObjectValidationException("Invalid login authorization response");
 		}
 	}
-	public static boolean validAuthorizationUrl(String value){
-		if(value==null || value.length()>2048) return false;
+	public static boolean validAuthorizationUrl(String value){ return validAuthorizationUrl(value,null,"nbw-v2-login."); }
+	public static boolean validAuthorizationUrl(String value, NBWEndpoints endpoints, String statePrefix){
+		if(value==null || value.length()>2048 || !NBWUrlResolver.isTrusted(value)) return false;
+		if(endpoints!=null){
+			try{ endpoints.postprocess(); }catch(Exception invalid){ return false; }
+			if(!value.startsWith(endpoints.authorizeOrigin+"/")) return false;
+		}
 		try{
 			Uri uri=Uri.parse(value);
-			if(!uri.isHierarchical() || !"https".equals(uri.getScheme()) || !"www.newbabyworld.top".equals(uri.getEncodedAuthority())
+			if(!uri.isHierarchical() || !"https".equals(uri.getScheme())
 					|| uri.getUserInfo()!=null || uri.getPort()!=-1 || uri.getEncodedFragment()!=null
 					|| !"/oauth/authorize.php".equals(uri.getEncodedPath())) return false;
 			Set<String> expected=Set.of("client_id", "redirect_uri", "response_type", "state");
@@ -99,11 +110,12 @@ public final class NBWLoginRequest<T> extends MastodonAPIRequest<T>{
 			return client!=null && client.matches("[A-Za-z0-9._~-]{1,128}")
 					&& REDIRECT_URI.equals(uri.getQueryParameter("redirect_uri"))
 					&& "code".equals(uri.getQueryParameter("response_type"))
-					&& validState(state);
+					&& validState(state,statePrefix);
 		}catch(RuntimeException ignored){ return false; }
 	}
-	private static boolean validState(String state){
-		if(state==null || !state.matches("nbw-v2-login\\.[A-Za-z0-9_-]{43}\\.[1-9][0-9]{12}\\.[A-Za-z0-9_-]{43}")) return false;
+	private static boolean validState(String state,String prefix){
+		if(state==null || !("nbw-v2-login.".equals(prefix) || "nbw-v2-flow.".equals(prefix))
+				|| !state.matches(java.util.regex.Pattern.quote(prefix)+"[A-Za-z0-9_-]{43}\\.[1-9][0-9]{12}\\.[A-Za-z0-9_-]{43}")) return false;
 		String[] parts=state.split("\\.", -1);
 		if(!canonical43(parts[1]) || !canonical43(parts[3])) return false;
 		long expiry=Long.parseLong(parts[2]), now=System.currentTimeMillis();
@@ -141,7 +153,8 @@ public final class NBWLoginRequest<T> extends MastodonAPIRequest<T>{
 		while(in.hasNext()){
 			String key=in.nextName();
 			if(!expected.contains(key) || !seen.add(key)) throw new IOException("Invalid login response member");
-			if("user".equals(key)) object.add(key, readObject(in, Set.of("id", "email", "username", "avatar", "role"), true));
+			if("endpoints".equals(key)) object.add(key, new Gson().toJsonTree(new NBWEndpoints.Adapter().read(in),NBWEndpoints.class));
+			else if("user".equals(key)) object.add(key, readObject(in, Set.of("id", "email", "username", "avatar", "role"), true));
 			else if("expires_in".equals(key)){
 				if(in.peek()!=JsonToken.NUMBER || !"600".equals(in.nextString())) throw new IOException("Invalid login expiry");
 				object.addProperty(key, 600);
@@ -164,8 +177,9 @@ public final class NBWLoginRequest<T> extends MastodonAPIRequest<T>{
 	}
 	public static final class StartAdapter extends TypeAdapter<Start>{
 		@Override public Start read(JsonReader in) throws IOException{
-			JsonObject object=readObject(in, Set.of("flow", "authorization_url", "expires_in"), false);
+			JsonObject object=readObject(in, Set.of("flow", "authorization_url", "expires_in", "endpoints"), false);
 			Start result=new Start(); result.flow=object.get("flow").getAsString(); result.authorizationUrl=object.get("authorization_url").getAsString(); result.expiresIn=600;
+			result.endpoints=new Gson().fromJson(object.get("endpoints"),NBWEndpoints.class);
 			result.postprocess(); return result;
 		}
 		@Override public void write(JsonWriter out, Start value) throws IOException{ throw new IOException("Login response is read-only"); }

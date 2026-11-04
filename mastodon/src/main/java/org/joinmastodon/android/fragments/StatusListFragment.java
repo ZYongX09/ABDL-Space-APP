@@ -58,18 +58,16 @@ public abstract class StatusListFragment extends BaseStatusListFragment<Status>{
 
 	@Override
 	public void onItemClick(String id){
-		Status status=getContentStatusByID(id);
-		if(status==null)
-			return;
-		navigateToStatus(status);
+		onItemClick(id, false);
 	}
 
 	@Override
 	public void onItemClick(String id, boolean quote){
-		Status status=getContentStatusByID(id);
-		if(status==null)
-			return;
-		navigateToStatus(quote ? status.quote.quotedStatus : status);
+		Status occurrence=getStatusByID(id);
+		if(occurrence==null) return;
+		Status content=occurrence.getContentStatus();
+		if(quote && (content.quote==null || content.quote.quotedStatus==null)) return;
+		navigateToStatusFromClick(quote ? content.quote.quotedStatus : content, id, occurrence);
 	}
 
 	@Override

@@ -178,7 +178,7 @@ public abstract class BaseAccountListFragment extends MastodonRecyclerFragment<A
 		@Override
 		public ImageLoaderRequest getImageRequest(int position, int image){
 			AccountViewModel item=data.get(position);
-			return image==0 ? item.avaRequest : item.emojiHelper.getImageRequest(image-1);
+			return image==0 ? org.joinmastodon.android.ui.utils.NBWImageRequests.current(item.avaRequest) : item.emojiHelper.getImageRequest(image-1);
 		}
 	}
 

@@ -74,7 +74,7 @@ public class CompactHeaderStatusDisplayItem extends StatusDisplayItem{
 		if(index>0){
 			return emojiHelper.getImageRequest(index-1);
 		}
-		return avaRequest;
+		return org.joinmastodon.android.ui.utils.NBWImageRequests.current(avaRequest);
 	}
 
 	public static class Holder extends StatusDisplayItem.Holder<CompactHeaderStatusDisplayItem> implements ImageLoaderViewHolder{

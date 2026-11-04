@@ -160,7 +160,7 @@ public class NotificationRequestsFragment extends MastodonRecyclerFragment<Notif
 		public ImageLoaderRequest getImageRequest(int position, int image){
 			AccountViewModel model=Objects.requireNonNull(accountViewModels.get(data.get(position).account.id));
 			return switch(image){
-				case 0 -> model.avaRequest;
+					case 0 -> org.joinmastodon.android.ui.utils.NBWImageRequests.current(model.avaRequest);
 				default -> model.emojiHelper.getImageRequest(image-1);
 			};
 		}

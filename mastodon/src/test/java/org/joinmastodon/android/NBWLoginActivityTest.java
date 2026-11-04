@@ -27,6 +27,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.Robolectric;
+import org.robolectric.shadows.ShadowLooper;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.RuntimeEnvironment;
 import org.robolectric.android.controller.ActivityController;
@@ -74,14 +75,16 @@ public class NBWLoginActivityTest{
 	}
 	private final List<ActivityController<?>> activities=new ArrayList<>();
 	private NBWLoginFlow flow;
-	@Before public void setup(){
+	private org.joinmastodon.android.api.NBWEndpointFixtures endpoints;
+	@Before public void setup() throws Exception{
+		endpoints=new org.joinmastodon.android.api.NBWEndpointFixtures();
 		MastodonApp.context=RuntimeEnvironment.getApplication(); V.setApplicationContext(MastodonApp.context);
 		GlobalUserPreferences.getPrefs().edit().clear().putBoolean("perAccountMigrationDone",true).commit(); GlobalUserPreferences.load();
 		LocalSessions.active=null; LocalSessions.session=null; LocalSessions.additions=0; LocalRequests.sent.clear(); LocalRequests.domains.clear();
 		flow=NBWLoginFlow.getInstance(); flow.cancel(flow.begin());
 	}
-	@After public void cleanup(){
-		for(var activity:activities) activity.close(); flow.cancel(flow.begin());
+	@After public void cleanup() throws Exception{
+		for(var activity:activities) activity.close(); flow.cancel(flow.begin()); endpoints.close();
 	}
 	private ActivityController<NBWLoginActivity> open(){
 		var lifecycle=Robolectric.buildActivity(NBWLoginActivity.class,new Intent(MastodonApp.context,NBWLoginActivity.class).putExtra(NBWLoginActivity.EXTRA_PERMISSION_CONFIRMED,true)).setup();
@@ -175,9 +178,19 @@ public class NBWLoginActivityTest{
 	}
 	@Test public void processLossAndUnconfirmedLaunchFailClosed(){
 		var first=Robolectric.buildActivity(NBWLoginActivity.class,new Intent(MastodonApp.context,NBWLoginActivity.class)).setup(); activities.add(first);
-		assertTrue(first.get().isFinishing()); assertTrue(LocalRequests.sent.isEmpty());
+		// Unlock gating posts entry work to the main queue; the fail-closed decision happens there.
+		ShadowLooper.idleMainLooper();
+		assertTrue(first.get().isFinishing());
+		// Public endpoint discovery is allowed on foreground; no authorization or exchange may start.
+		assertNoAuthorizationRequests();
 		Bundle saved=new Bundle(); saved.putLong("generation",42);
 		var restored=Robolectric.buildActivity(NBWLoginActivity.class,new Intent(MastodonApp.context,NBWLoginActivity.class)).create(saved); activities.add(restored);
-		assertTrue(((TextView)restored.get().findViewById(R.id.nbw_login_status)).getText().toString().contains("重新开始")); assertTrue(LocalRequests.sent.isEmpty());
+		ShadowLooper.idleMainLooper();
+		assertEquals(restored.get().getString(R.string.nbw_login_expired), ((TextView)restored.get().findViewById(R.id.nbw_login_status)).getText().toString());
+		assertNoAuthorizationRequests();
+	}
+	private static void assertNoAuthorizationRequests(){
+		for(MastodonAPIRequest<?> request:LocalRequests.sent)
+			assertTrue("Only public discovery is allowed: "+request.getClass().getSimpleName(),request instanceof org.joinmastodon.android.api.requests.nbw.GetNBWEndpoints);
 	}
 }

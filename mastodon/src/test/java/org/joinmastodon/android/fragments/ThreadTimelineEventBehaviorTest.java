@@ -126,7 +126,9 @@ public class ThreadTimelineEventBehaviorTest{
 	private final List<Object> extraListeners=new ArrayList<>();
 	private boolean previousShowCounts;
 
+	private org.joinmastodon.android.api.NBWEndpointFixtures endpoints;
 	@Before @SuppressWarnings("unchecked") public void setup() throws Exception{
+		endpoints=new org.joinmastodon.android.api.NBWEndpointFixtures();
 		ShadowChoreographer.setPaused(true);
 		MastodonApp.context=RuntimeEnvironment.getApplication(); V.setApplicationContext(MastodonApp.context);
 		org.joinmastodon.android.ui.utils.UiUtils.updateLocalizedDateFormatters(MastodonApp.context);
@@ -145,14 +147,14 @@ public class ThreadTimelineEventBehaviorTest{
 		previousShowCounts=GlobalUserPreferences.showInteractionCounts; GlobalUserPreferences.showInteractionCounts=true;
 		LocalRequests.sent.clear(); LocalNavigation.finished.clear();
 	}
-	@After public void cleanup(){
+	@After public void cleanup() throws Exception{
 		for(Object listener:extraListeners) E.unregister(listener);
 		if(lifecycle!=null) lifecycle.close();
 		if(readOnlyRepository!=null) readOnlyRepository.deactivate();
 		if(previousSession==null) sessions.remove(session.getID()); else sessions.put(session.getID(), previousSession);
 		if(previousInstance==null) instances.remove(session.domain); else instances.put(session.domain, previousInstance);
 		GlobalUserPreferences.showInteractionCounts=previousShowCounts;
-		LocalRequests.sent.clear(); LocalNavigation.finished.clear(); ShadowChoreographer.setPaused(false);
+		LocalRequests.sent.clear(); LocalNavigation.finished.clear(); ShadowChoreographer.setPaused(false); endpoints.close();
 	}
 
 	@Test public void homeEventListenerRejectsEveryReplyAndDuplicateIncludingPreloadedIds(){

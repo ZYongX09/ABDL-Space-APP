@@ -79,7 +79,10 @@ class HomeLiquidToolbarActionsContractTest {
 	fun menuModelKeepsComposePageAndFinalSpacing() {
 		val model = source("src/main/kotlin/org/joinmastodon/android/ui/compose/navigation/HomeLiquidToolbarModel.kt")
 		assertTrue(model.contains("COMPOSE;"))
-		assertTrue(model.contains("internal fun homeTimelineTopPaddingDp(liquidMode: Boolean): Int = if(liquidMode) 56 else 0"))
+		assertFalse(model.contains("homeTimelineTopPaddingDp"))
+		val homeTab = source("src/main/java/org/joinmastodon/android/fragments/HomeTabFragment.java")
+		assertTrue(homeTab.contains("glass.bottom+gap-origin[1]"))
+		assertFalse(homeTab.contains("lastTopInset"))
 		assertTrue(model.contains("internal fun homeToolbarCaptureHeightDp(menuOpen: Boolean): Int = if(menuOpen) 520 else 72"))
 	}
 

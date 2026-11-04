@@ -136,6 +136,10 @@ public abstract class StatusDisplayItem{
 	}
 
 	public static ArrayList<StatusDisplayItem> buildItems(Callbacks callbacks, Context context, Status status, String accountID, DisplayItemsParent parentObject, Map<String, Account> knownAccounts, int flags){
+		return buildItems(callbacks, context, status, accountID, parentObject, knownAccounts, flags, status);
+	}
+
+	private static ArrayList<StatusDisplayItem> buildItems(Callbacks callbacks, Context context, Status status, String accountID, DisplayItemsParent parentObject, Map<String, Account> knownAccounts, int flags, Status visibilityOwner){
 		if(callbacks==null)
 			callbacks=new NoOpCallbacks(context);
 		String parentID=parentObject.getID();
@@ -232,7 +236,7 @@ public abstract class StatusDisplayItem{
 		}
 
 		if(friendCard!=FriendCardStatusDisplayItem.Presentation.NONE)
-			contentItems.add(new FriendCardStatusDisplayItem(parentID, callbacks, context, statusForContent, accountID, (flags & FLAG_MEDIA_FORCE_HIDDEN)!=0));
+			contentItems.add(new FriendCardStatusDisplayItem(parentID, callbacks, context, statusForContent, accountID, (flags & FLAG_MEDIA_FORCE_HIDDEN)!=0, visibilityOwner));
 
 		if(novel!=NovelStatusDisplayItem.Presentation.NONE)
 			contentItems.add(new NovelStatusDisplayItem(parentID, callbacks, context, statusForContent, accountID, (flags & FLAG_MEDIA_FORCE_HIDDEN)!=0, status));
@@ -264,7 +268,7 @@ public abstract class StatusDisplayItem{
 		if(statusForContent.quote!=null){
 			if(statusForContent.quote.state==Quote.State.ACCEPTED){
 				if(statusForContent.quote.quotedStatus!=null && (flags & FLAG_IS_QUOTE)==0){
-					ArrayList<StatusDisplayItem> quoteItems=buildItems(callbacks, context, statusForContent.quote.quotedStatus, accountID, parentObject, knownAccounts, FLAG_NO_FOOTER | FLAG_NO_IN_REPLY_TO | FLAG_IS_QUOTE | (allowTranslation ? 0 : FLAG_NO_TRANSLATE));
+					ArrayList<StatusDisplayItem> quoteItems=buildItems(callbacks, context, statusForContent.quote.quotedStatus, accountID, parentObject, knownAccounts, FLAG_NO_FOOTER | FLAG_NO_IN_REPLY_TO | FLAG_IS_QUOTE | (allowTranslation ? 0 : FLAG_NO_TRANSLATE), visibilityOwner);
 					for(StatusDisplayItem item:quoteItems){
 						item.isQuote=true;
 						if(item instanceof SpoilerStatusDisplayItem spoiler){

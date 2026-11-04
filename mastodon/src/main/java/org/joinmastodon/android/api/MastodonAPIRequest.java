@@ -203,6 +203,8 @@ public abstract class MastodonAPIRequest<T> extends APIRequest<T>{
 	public boolean isSensitiveRequest(){ return false; }
 	/** First-party high-sensitivity flows can additionally exclude user-installed certificate authorities. */
 	public boolean requiresSystemTrust(){ return false; }
+	/** Opt-in only: reject non-JSON or oversized metadata on the actual byte stream. */
+	public int responseByteLimit(){ return 0; }
 
 	protected String getPathPrefix(){
 		return "/api/v1";

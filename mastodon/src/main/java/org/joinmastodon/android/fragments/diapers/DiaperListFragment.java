@@ -469,11 +469,16 @@ public class DiaperListFragment extends LoaderFragment {
 					itemHolder.absorbency.setVisibility(View.GONE);
 				}
 
+				// The live holder binding is also the return identity; rebind invalidates old sessions.
+				org.joinmastodon.android.ui.seamless.SeamlessTransitions.bindCard(itemHolder.itemView, accountID,
+						Integer.toString(diaper.id), diaper.id>0);
 				// 点击进入详情
 				itemHolder.itemView.setOnClickListener(v -> {
 					Bundle args = new Bundle();
 					args.putString("account", accountID);
 					args.putInt("diaper_id", diaper.id);
+					if(org.joinmastodon.android.ui.seamless.SeamlessTransitions.openDiaper(getActivity(),
+							itemHolder.itemView, accountID, diaper.id, args)) return;
 					Nav.go(getActivity(), DiaperDetailFragment.class, args);
 				});
 			} else if (holder instanceof EndViewHolder) {

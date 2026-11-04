@@ -225,7 +225,7 @@ public class MastodonAPIController{
 								req.onError("服务器返回空响应", response.code(), null);
 								return;
 							}
-							Reader reader=body.charStream();
+							Reader reader=boundedResponseReader(req, body);
 							if(response.isSuccessful()){
 								T respObj;
 								try{
@@ -300,6 +300,7 @@ public class MastodonAPIController{
 								}
 							}
 						}catch(Exception x){
+							if(req.responseByteLimit()>0){ req.onError("Invalid NBW metadata response",response.code(),null); return; }
 							Log.w(TAG, "onResponse: error processing response", x);
 							onFailure(call, (IOException) new IOException(x).fillInStackTrace());
 						}
@@ -311,6 +312,24 @@ public class MastodonAPIController{
 				req.onError(x.getLocalizedMessage(), 0, x);
 			}
 		}, 0);
+	}
+
+	private static Reader boundedResponseReader(MastodonAPIRequest<?> request, ResponseBody body) throws IOException{
+		int limit=request.responseByteLimit();
+		if(limit<=0) return body.charStream();
+		if(body.contentType()==null || !"application".equals(body.contentType().type()) || !"json".equals(body.contentType().subtype())
+				|| body.contentLength()>limit) throw new IOException("Invalid or oversized NBW metadata response");
+		java.io.InputStream input=new java.io.FilterInputStream(body.byteStream()){
+			private int remaining=limit;
+			@Override public int read() throws IOException{
+				int value=super.read(); if(value>=0 && --remaining<0) throw new IOException("NBW metadata response too large"); return value;
+			}
+			@Override public int read(byte[] bytes,int offset,int length) throws IOException{
+				int read=in.read(bytes,offset,Math.min(length,remaining+1));
+				if(read>0 && (remaining-=read)<0) throw new IOException("NBW metadata response too large"); return read;
+			}
+		};
+		return new java.io.InputStreamReader(input, java.nio.charset.StandardCharsets.UTF_8);
 	}
 
 	public static void runInBackground(Runnable action){

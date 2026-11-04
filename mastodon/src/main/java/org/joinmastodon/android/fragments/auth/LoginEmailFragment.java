@@ -46,6 +46,7 @@ public class LoginEmailFragment extends AppKitFragment {
     private ProgressDialog humanCheckProgress;
     private String humanCheckEmail;
     private boolean humanCheckLaunched;
+    private org.joinmastodon.android.ui.utils.NBWLoginButtonBinding nbwButtonBinding;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -148,7 +149,7 @@ public class LoginEmailFragment extends AppKitFragment {
 
         btnPasswordLogin.setOnClickListener(v -> Nav.go(getActivity(), LoginPasswordFragment.class, new Bundle()));
 
-        btnNBW.setVisibility(View.VISIBLE);
+        nbwButtonBinding = new org.joinmastodon.android.ui.utils.NBWLoginButtonBinding(btnNBW);
         btnNBW.setOnClickListener(v -> showNBWConsentSheet());
 
         btnQQ.setVisibility(BuildConfig.QQ_LOGIN_ENABLED ? View.VISIBLE : View.GONE);
@@ -258,7 +259,10 @@ public class LoginEmailFragment extends AppKitFragment {
         }
     }
 
+    @Override public void onResume() { super.onResume(); if (nbwButtonBinding != null) nbwButtonBinding.resume(); }
+    @Override public void onPause() { if (nbwButtonBinding != null) nbwButtonBinding.pause(); super.onPause(); }
     @Override public void onDestroyView() {
+        if (nbwButtonBinding != null) { nbwButtonBinding.dispose(); nbwButtonBinding = null; }
         humanCheck.detachEntry(humanCheckHandle);
         clearHumanCheck();
         super.onDestroyView();
@@ -277,13 +281,14 @@ public class LoginEmailFragment extends AppKitFragment {
     }
 
     private void showNBWConsentSheet() {
+        if (!org.joinmastodon.android.ui.utils.NBWLoginButtonBinding.canLaunch()) return;
         if (!cbAgreement.isChecked()) {
             Toast.makeText(getActivity(), R.string.nbw_login_agreement_required, Toast.LENGTH_SHORT).show();
             return;
         }
         showConsentSheet(getString(R.string.nbw_login_title), getString(R.string.nbw_login_consent_message), R.drawable.ic_nbw, false, () -> {
             android.app.Activity activity = getActivity();
-            if (activity == null || !cbAgreement.isChecked()) return;
+            if (activity == null || !cbAgreement.isChecked() || !org.joinmastodon.android.ui.utils.NBWLoginButtonBinding.canLaunch()) return;
             Intent intent = new Intent(activity, NBWLoginActivity.class);
             intent.putExtra(NBWLoginActivity.EXTRA_PERMISSION_CONFIRMED, true);
             startActivity(intent);

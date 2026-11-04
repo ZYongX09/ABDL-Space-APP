@@ -76,7 +76,7 @@ public class NBWLoginRequestHttpTest{
 	}
 	private static String startJson(){
 		var result=NBWLoginFlowTest.startResult(); JsonObject object=new JsonObject(); object.addProperty("flow",result.flow);
-		object.addProperty("authorization_url",result.authorizationUrl); object.addProperty("expires_in",600); return object.toString();
+		object.addProperty("authorization_url",result.authorizationUrl); object.addProperty("expires_in",600); object.add("endpoints",MastodonAPIController.gson.toJsonTree(result.endpoints)); return object.toString();
 	}
 	private static String exchangeJson(){
 		var result=NBWLoginFlowTest.exchangeResult(); JsonObject object=new JsonObject(); object.addProperty("action",result.action);
@@ -128,6 +128,14 @@ public class NBWLoginRequestHttpTest{
 		JsonObject mismatch=JsonParser.parseString(startJson()).getAsJsonObject(); mismatch.addProperty("flow","B".repeat(42)+"A"); send(start(),new MockResponse().setBody(mismatch.toString()),false);
 		for(String json:new String[]{startJson().replace("\"expires_in\":600","\"expires_in\":\"600\""),startJson().replace("\"expires_in\":600","\"expires_in\":600,\"expires_in\":600"),startJson().replace("\"expires_in\":600","\"expires_in\":600,\"token\":\"unexpected\"")})
 			send(start(),new MockResponse().setBody(json),false);
+	}
+	@Test public void backupPinnedResponseIsAcceptedButMissingOrContradictoryEndpointsNeverFallsBack() throws Exception{
+		JsonObject valid=JsonParser.parseString(startJson()).getAsJsonObject();
+		valid.add("endpoints",MastodonAPIController.gson.toJsonTree(NBWEndpointFixtures.endpoints("backup","endpoint-b","full")));
+		valid.addProperty("authorization_url",valid.get("authorization_url").getAsString().replace("www.newbabyworld.top","nbw.abdlcalendar.top"));
+		send(start(),new MockResponse().setBody(valid.toString()),true);
+		JsonObject missing=JsonParser.parseString(startJson()).getAsJsonObject(); missing.remove("endpoints"); send(start(),new MockResponse().setBody(missing.toString()),false);
+		valid.addProperty("authorization_url",NBWLoginFlowTest.startResult().authorizationUrl); send(start(),new MockResponse().setBody(valid.toString()),false);
 	}
 	@Test public void exchangeRejectsTokensInWrongShapeAndRedirectsWithoutFollowing() throws Exception{
 		for(String json:new String[]{"{}",exchangeJson().replace("\"login\"","\"bind\""),exchangeJson().replace("\"action\":\"login\"","\"action\":\"login\",\"token\":\"duplicate\""),exchangeJson().replace("\"action\":\"login\"","\"action\":\"login\",\"nbw_token\":\"forbidden\""),exchangeJson().replace("\"id\":42","\"id\":9007199254740992")})

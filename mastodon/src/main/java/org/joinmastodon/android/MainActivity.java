@@ -632,6 +632,7 @@ public class MainActivity extends FragmentStackActivity implements LifecycleOwne
 	protected void onResume(){
 		super.onResume();
 		lifecycleRegistry.setCurrentState(Lifecycle.State.RESUMED);
+		org.joinmastodon.android.api.session.NBWEndpointsRepository.getInstance().enterForeground(this);
 		AccountSession nbwSession=AccountSessionManager.getInstance().getLastActiveAccount();
 		if(nbwSession!=null) nbwSession.getNBWForumOptionsRepository().activate();
 		org.joinmastodon.android.security.AppSecurity.runAfterUnlock(this, ()->{
@@ -643,6 +644,7 @@ public class MainActivity extends FragmentStackActivity implements LifecycleOwne
 	protected void onPause(){
 		super.onPause();
 		lifecycleRegistry.setCurrentState(Lifecycle.State.STARTED);
+		org.joinmastodon.android.api.session.NBWEndpointsRepository.getInstance().leaveForeground(this);
 		if(chatWsClient!=null) chatWsClient.disconnect();
 	}
 

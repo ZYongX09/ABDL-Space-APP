@@ -120,7 +120,7 @@ public class HeaderStatusDisplayItem extends StatusDisplayItem{
 		if(index>0){
 			return emojiHelper.getImageRequest(index-1);
 		}
-		return avaRequest;
+		return org.joinmastodon.android.ui.utils.NBWImageRequests.current(avaRequest);
 	}
 
 	public static class Holder extends StatusDisplayItem.Holder<HeaderStatusDisplayItem> implements ImageLoaderViewHolder{
@@ -202,7 +202,7 @@ public class HeaderStatusDisplayItem extends StatusDisplayItem{
 					args.putParcelable("relationship", Parcels.wrap(relationship));
 					Nav.go((Activity) item.context, ReportReasonChoiceFragment.class, args);
 				}else if(id==R.id.open_in_browser){
-					UiUtils.launchWebBrowser(activity, item.status.url);
+					UiUtils.launchWebBrowser(activity, org.joinmastodon.android.api.NBWUrlResolver.current(item.status.url,false));
 				}else if(id==R.id.follow){
 					if(relationship==null)
 						return true;
@@ -230,7 +230,7 @@ public class HeaderStatusDisplayItem extends StatusDisplayItem{
 					args.putParcelable("targetAccount", Parcels.wrap(account));
 					Nav.go(activity, AddAccountToListsFragment.class, args);
 				}else if(id==R.id.copy_link){
-					activity.getSystemService(ClipboardManager.class).setPrimaryClip(ClipData.newPlainText(null, item.status.url));
+					activity.getSystemService(ClipboardManager.class).setPrimaryClip(ClipData.newPlainText(null, org.joinmastodon.android.api.NBWUrlResolver.current(item.status.url,false)));
 					UiUtils.maybeShowTextCopiedToast(activity);
 				}else if(id==R.id.pin){
 					new SetStatusPinned(item.status.id, !item.status.pinned)

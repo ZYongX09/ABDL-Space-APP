@@ -4,6 +4,7 @@ import org.joinmastodon.android.api.MastodonAPIRequest;
 import org.joinmastodon.android.api.requests.nbw.NBWAppRequest;
 import org.joinmastodon.android.model.NBWCapabilities;
 import org.joinmastodon.android.model.NBWForumOptions;
+import org.joinmastodon.android.model.NBWEndpoints;
 import org.joinmastodon.android.model.NBWSelection;
 import org.joinmastodon.android.ui.utils.UiUtils;
 
@@ -18,7 +19,7 @@ import me.grishka.appkit.api.ErrorResponse;
 
 /** Session-owned, account-scoped single flight. Opening an editor only observes this snapshot. */
 public final class NBWForumOptionsRepository{
-	public static final long TTL_MS=5*60*1000L;
+	public static final long TTL_MS=30*1000L;
 	public enum State{ LOADING, READY, STALE, UNAVAILABLE, LOCAL_ONLY }
 	public interface Cancelable{ void cancel(); }
 	public interface Result<T>{ void success(T value); void failure(); }
@@ -33,13 +34,15 @@ public final class NBWForumOptionsRepository{
 		public final NBWCapabilities capabilities;
 		public final NBWForumOptions options;
 		public final NBWSelection selection;
-		public final boolean consentSaving;
+		public final NBWEndpoints endpoints;
+		public final boolean consentSaving, endpointsFresh;
 		public final long generation;
-		Snapshot(State state, NBWCapabilities capabilities, NBWForumOptions options, NBWSelection selection, boolean consentSaving, long generation){
+		Snapshot(State state, NBWCapabilities capabilities, NBWForumOptions options, NBWSelection selection, boolean consentSaving, long generation, NBWEndpoints endpoints, boolean endpointsFresh){
 			this.state=state; this.capabilities=capabilities; this.options=options; this.selection=selection; this.consentSaving=consentSaving; this.generation=generation;
+			this.endpoints=endpoints; this.endpointsFresh=endpointsFresh;
 		}
-		public boolean canRead(){ return capabilities!=null && capabilities.canRead(); }
-		public boolean canWrite(){ return capabilities!=null && capabilities.canWrite(); }
+		public boolean canRead(){ return endpointsFresh && endpoints!=null && endpoints.canRead() && capabilities!=null && capabilities.canRead(); }
+		public boolean canWrite(){ return endpointsFresh && endpoints!=null && endpoints.canWrite() && capabilities!=null && capabilities.canWrite(); }
 		public boolean hasFallbackConsent(){ return capabilities!=null && Boolean.TRUE.equals(capabilities.fallback.consented); }
 	}
 
@@ -48,6 +51,10 @@ public final class NBWForumOptionsRepository{
 	private final SelectionStore store;
 	private final Runnable invalidateRemote;
 	private final Consumer<Runnable> dispatch;
+	private final NBWEndpointsRepository endpointRepository;
+	private NBWForumOptionsRepository.Cancelable endpointSubscription;
+	private NBWEndpoints endpoints;
+	private long endpointGeneration=-1;
 	private final Set<Consumer<Snapshot>> observers=new HashSet<>();
 	private final Set<Cancelable> remoteRequests=new HashSet<>();
 	private State state=State.UNAVAILABLE;
@@ -59,7 +66,10 @@ public final class NBWForumOptionsRepository{
 	private long generation=1, lastAttempt=-TTL_MS, lastOptions=-TTL_MS;
 
 	public NBWForumOptionsRepository(Transport transport, LongSupplier clock, SelectionStore store, Runnable invalidateRemote, Consumer<Runnable> dispatch){
-		this.transport=transport; this.clock=clock; this.store=store; this.invalidateRemote=invalidateRemote; this.dispatch=dispatch;
+		this(transport,clock,store,invalidateRemote,dispatch,NBWEndpointsRepository.getInstance());
+	}
+	public NBWForumOptionsRepository(Transport transport, LongSupplier clock, SelectionStore store, Runnable invalidateRemote, Consumer<Runnable> dispatch, NBWEndpointsRepository endpointRepository){
+		this.transport=transport; this.clock=clock; this.store=store; this.invalidateRemote=invalidateRemote; this.dispatch=dispatch; this.endpointRepository=endpointRepository;
 		NBWSelection stored=store.load(); selection=stored==null ? NBWSelection.ai() : stored;
 	}
 
@@ -88,7 +98,11 @@ public final class NBWForumOptionsRepository{
 		}, ()->session.getCacheController().clearNBWRemoteCache(), UiUtils::runOnUiThread);
 	}
 
-	public synchronized Snapshot getSnapshot(){ return new Snapshot(state, capabilities, options, selection, consentSaving, generation); }
+	public synchronized Snapshot getSnapshot(){
+		NBWEndpointsRepository.Snapshot routing=endpointRepository.getSnapshot();
+		return new Snapshot(state, capabilities, options, selection, consentSaving, generation, endpoints,
+				active && routing.fresh && routing.generation==endpointGeneration && java.util.Objects.equals(endpoints,routing.endpoints));
+	}
 	public synchronized Cancelable observe(Consumer<Snapshot> observer){
 		observers.add(observer); observer.accept(getSnapshot());
 		return ()->{ synchronized(NBWForumOptionsRepository.this){ observers.remove(observer); } };
@@ -101,17 +115,55 @@ public final class NBWForumOptionsRepository{
 			}
 		});
 	}
-	public synchronized void activate(){ active=true; refreshIfExpired(); }
+	public synchronized void activate(){
+		if(!active){
+			active=true;
+			endpointSubscription=endpointRepository.observe(this::routingChanged);
+		}
+		refreshIfExpired();
+	}
+	private synchronized void routingChanged(NBWEndpointsRepository.Snapshot value){
+		if(!active) return;
+		boolean changed=endpointGeneration!=value.generation || !java.util.Objects.equals(endpoints,value.endpoints);
+		if(changed){
+			invalidate(); endpoints=value.endpoints; endpointGeneration=value.generation;
+			capabilities=null; options=null; lastAttempt=lastOptions=-TTL_MS;
+		}
+		if(!value.canRead()){ state=value.loading ? State.LOADING : State.LOCAL_ONLY; emit(); return; }
+		if(!value.loading && !capabilityLoading) refreshCapabilities(); // The public lease renews early; renew authenticated policy in the same <=30s cycle.
+		else if(changed) refreshCapabilitiesIfExpired();
+		else emit();
+	}
 	public synchronized void deactivate(){
-		active=false; invalidate(); capabilities=null; options=null; state=State.LOCAL_ONLY;
+		active=false;
+		if(endpointSubscription!=null){ endpointSubscription.cancel(); endpointSubscription=null; }
+		invalidate(); capabilities=null; options=null; endpoints=null; endpointGeneration=-1; state=State.LOCAL_ONLY;
 		lastAttempt=lastOptions=-TTL_MS; emit();
 	}
 	public synchronized void refreshIfExpired(){
-		if(!active || capabilityLoading || clock.getAsLong()-lastAttempt<TTL_MS) return;
+		if(!active) return;
+		endpointRepository.refreshIfExpired(); refreshCapabilitiesIfExpired();
+	}
+	private void refreshCapabilitiesIfExpired(){
+		var routing=endpointRepository.getSnapshot();
+		long ttl=endpoints==null ? TTL_MS : Math.min(TTL_MS,endpoints.ttlSeconds*1000L);
+		if(!active || !routing.canRead() || routing.generation!=endpointGeneration || capabilityLoading || clock.getAsLong()-lastAttempt<ttl) return;
 		refreshCapabilities();
 	}
-	/** Explicit connection/consent completion or app resume, never called by Compose opening. */
-	public synchronized void refreshNow(){ if(active && !capabilityLoading) refreshCapabilities(); }
+	/** Explicit connection/consent completion. Compose opening only observes. */
+	public synchronized void refreshNow(){
+		if(!active) return;
+		endpointRepository.refreshNow(value->{ synchronized(NBWForumOptionsRepository.this){
+			if(active && value.canRead() && endpointGeneration==value.generation && !capabilityLoading) refreshCapabilities();
+		} });
+	}
+	/** The GET preflight completes before the caller may construct a new authorization transaction. */
+	public void refreshBeforeAuthorization(Consumer<Snapshot> done){
+		endpointRepository.refreshNow(value->{ synchronized(NBWForumOptionsRepository.this){
+			Snapshot snapshot=getSnapshot();
+			done.accept(value.canWrite() ? snapshot : new Snapshot(snapshot.state,snapshot.capabilities,snapshot.options,snapshot.selection,snapshot.consentSaving,snapshot.generation,snapshot.endpoints,false));
+		} });
+	}
 	private void refreshCapabilities(){
 		long ticket=generation;
 		capabilityLoading=true; lastAttempt=clock.getAsLong(); state=options==null ? State.LOADING : State.STALE; emit();
@@ -135,7 +187,7 @@ public final class NBWForumOptionsRepository{
 	private void applyCapabilities(NBWCapabilities value){
 		capabilities=value;
 		if(!value.canRead()){ options=null; state=State.LOCAL_ONLY; emit(); return; }
-		if(options==null || clock.getAsLong()-lastOptions>=TTL_MS) loadOptions();
+		if(options==null || clock.getAsLong()-lastOptions>=Math.max(1000,Math.min(TTL_MS,endpoints.ttlSeconds*1000L)-1000)) loadOptions();
 		else{ state=State.READY; emit(); }
 	}
 	private void loadOptions(){
@@ -151,7 +203,7 @@ public final class NBWForumOptionsRepository{
 			public void failure(){ synchronized(NBWForumOptionsRepository.this){ if(current(ticket)){ optionsLoading=false; optionsCall=null; localOnly(); } } }
 		});
 	}
-	private boolean current(long ticket){ return active && generation==ticket; }
+	private boolean current(long ticket){ return active && generation==ticket && endpointGeneration==endpointRepository.getSnapshot().generation; }
 	private void localOnly(){ invalidate(); capabilities=null; options=null; state=State.LOCAL_ONLY; emit(); }
 	private void invalidate(){
 		generation++;
@@ -170,7 +222,7 @@ public final class NBWForumOptionsRepository{
 	}
 	/** Only a user's affirmative/negative control calls this. No implicit default acceptance. */
 	public synchronized void setFallbackConsent(boolean accepted, Consumer<Boolean> done){
-		if(!active || consentSaving || capabilities==null || !capabilities.canWrite()){ done.accept(false); return; }
+		if(!active || consentSaving || !getSnapshot().canWrite()){ done.accept(false); return; }
 		long ticket=generation; consentSaving=true; emit();
 		consentCall=transport.consent(accepted, new Result<>(){
 			public void success(Object ignored){ synchronized(NBWForumOptionsRepository.this){
@@ -183,9 +235,9 @@ public final class NBWForumOptionsRepository{
 		});
 	}
 	public synchronized long registerRemote(Cancelable request, boolean write){
-		if(!active || capabilities==null || !(write ? capabilities.canWrite() : capabilities.canRead())) return -1;
+			if(!active || !(write ? getSnapshot().canWrite() : getSnapshot().canRead())) return -1;
 		remoteRequests.add(request); return generation;
 	}
-	public synchronized boolean isCurrentRemote(long ticket){ return current(ticket) && capabilities!=null && capabilities.canRead(); }
+		public synchronized boolean isCurrentRemote(long ticket){ return current(ticket) && getSnapshot().canRead(); }
 	public synchronized void finishRemote(Cancelable request){ remoteRequests.remove(request); }
 }
