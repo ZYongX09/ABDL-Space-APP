@@ -14,6 +14,8 @@ import android.view.WindowInsets;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.VibrationEffect;
 import android.text.SpannableStringBuilder;
 import android.text.TextUtils;
@@ -140,6 +142,18 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 	private String homeAccessToken;
 	private long homeNBWGeneration;
 	private long homeGeneration;
+	private final Handler homeHandler=new Handler(Looper.getMainLooper());
+	private long homeRecoveryGeneration=-1;
+	private final Runnable homeRoutingRecovery=this::resumeHomeAfterRoutingChange;
+	private View homeRecoveryView;
+	private final View.OnAttachStateChangeListener homeRecoveryAttachment=new View.OnAttachStateChangeListener(){
+		@Override public void onViewAttachedToWindow(View view){ scheduleHomeRoutingRecovery(); }
+		@Override public void onViewDetachedFromWindow(View view){ homeHandler.removeCallbacks(homeRoutingRecovery); }
+	};
+	private final ViewTreeObserver.OnPreDrawListener homeRecoveryVisibility=()->{
+		if(homeRecoveryGeneration>=0) scheduleHomeRoutingRecovery();
+		return true;
+	};
 	private boolean homeHeadInFlight, homeHistoryAttempted, showingHomeHistory, homeViewDestroyed;
 	private TextView homeRefreshingText;
 	private View homeRefreshingLayoutRoot;
@@ -236,17 +250,82 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 		});
 	}
 
-	private boolean isHomeIdentityCurrent(){
+	private boolean isHomeAccountCurrent(){
 		return homeSession!=null && AccountSessionManager.getInstance().tryGetAccount(accountID)==homeSession
 				&& homeToken==homeSession.token && homeToken!=null && java.util.Objects.equals(homeAccessToken, homeToken.accessToken)
+				&& accountID.equals(AccountSessionManager.getInstance().getLastActiveAccountID());
+	}
+
+	private boolean isHomeIdentityCurrent(){
+		return isHomeAccountCurrent()
 				&& homeNBWGeneration==homeSession.getNBWForumOptionsRepository().getSnapshot().generation
-				&& accountID.equals(AccountSessionManager.getInstance().getLastActiveAccountID())
 				&& (homeLease==null || homeCache.isHomeTimelineLeaseCurrent(homeLease));
+	}
+
+	private void recoverHomeAfterRoutingChange(){
+		cancelLoading();
+		showingHomeHistory=true;
+		if(list!=null && !data.isEmpty()){
+			ArrayList<Status> localHistory=new ArrayList<>(data);
+			localHistory.removeIf(status->status.id!=null && status.id.startsWith("nbw_"));
+			homeSession.filterStatuses(localHistory, getFilterContext());
+			replaceHomeHead(localHistory, null, false);
+		}
+		maxID=null;
+		preloader.setMoreAvailable(false);
+		// Initial discovery is not logout. Keep local history, reject the old head and coalesce
+		// one current /all read; a missing/disabled remote source must not strand the local feed.
+		homeRecoveryGeneration=homeGeneration;
+		scheduleHomeRoutingRecovery();
+	}
+
+	private void scheduleHomeRoutingRecovery(){
+		if(homeRecoveryGeneration<0) return;
+		View view=getView();
+		if(view!=null && homeRecoveryView!=view){
+			clearHomeRecoveryView();
+			homeRecoveryView=view;
+			view.addOnAttachStateChangeListener(homeRecoveryAttachment);
+			view.getViewTreeObserver().addOnPreDrawListener(homeRecoveryVisibility);
+		}
+		if(view!=null && view.isAttachedToWindow() && view.isShown()){
+			homeHandler.removeCallbacks(homeRoutingRecovery);
+			homeHandler.post(homeRoutingRecovery);
+		}
+	}
+
+	private void clearHomeRecoveryView(){
+		if(homeRecoveryView==null) return;
+		homeRecoveryView.removeOnAttachStateChangeListener(homeRecoveryAttachment);
+		if(homeRecoveryView.getViewTreeObserver().isAlive())
+			homeRecoveryView.getViewTreeObserver().removeOnPreDrawListener(homeRecoveryVisibility);
+		homeRecoveryView=null;
+	}
+
+	private void resumeHomeAfterRoutingChange(){
+		long generation=homeRecoveryGeneration;
+		if(generation!=homeGeneration || homeViewDestroyed || homeHeadInFlight || listMode!=ListMode.FOLLOWING
+				|| getActivity()==null || getActivity().isFinishing() || !isHomeAccountCurrent()){
+			homeRecoveryGeneration=-1;
+			clearHomeRecoveryView();
+			return;
+		}
+		View view=getView();
+		// A pager may temporarily detach or hide this view without another Fragment.onShown.
+		// Keep the same pending generation until attach/pre-draw makes the page usable again.
+		if(view==null || !view.isAttachedToWindow() || !view.isShown()){ scheduleHomeRoutingRecovery(); return; }
+		homeRecoveryGeneration=-1;
+		clearHomeRecoveryView();
+		startHomeHead(itemsPerPage*2, false);
 	}
 
 	private boolean acceptsHomeResponse(long generation){
 		if(generation!=homeGeneration || homeViewDestroyed || getActivity()==null || listMode!=ListMode.FOLLOWING) return false;
 		if(!isHomeIdentityCurrent()){
+			if(isHomeAccountCurrent() && homeNBWGeneration!=homeSession.getNBWForumOptionsRepository().getSnapshot().generation){
+				recoverHomeAfterRoutingChange();
+				return false;
+			}
 			cancelLoading();
 			if(AccountSessionManager.getInstance().tryGetAccount(accountID)!=null && list!=null){
 				showingHomeHistory=true;
@@ -482,6 +561,9 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 	@Override protected void showProgress(){ if(showingHomeHistory && !data.isEmpty()) showHomeContentImmediately(); else super.showProgress(); }
 
 	@Override protected void cancelLoading(){
+		homeHandler.removeCallbacks(homeRoutingRecovery);
+		homeRecoveryGeneration=-1;
+		clearHomeRecoveryView();
 		homeGeneration++;
 		homeHeadInFlight=false;
 		pendingHomeDelivery=null;
@@ -628,7 +710,8 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 		if(currentDonationCampaign!=null)
 			showDonationBanner(currentDonationCampaign);
 		if(pendingHomeDelivery!=null){ Runnable delivery=pendingHomeDelivery; pendingHomeDelivery=null; delivery.run(); }
-		if(showingHomeHistory && !homeHeadInFlight) startHomeHead(itemsPerPage*2, false);
+		if(homeRecoveryGeneration>=0) scheduleHomeRoutingRecovery();
+		if(showingHomeHistory && !homeHeadInFlight && homeRecoveryGeneration<0) startHomeHead(itemsPerPage*2, false);
 	}
 
 	@Override
@@ -682,6 +765,7 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 	protected void onShown(){
 		super.onShown();
 		if(!getArguments().getBoolean("noAutoLoad")){
+			if(homeRecoveryGeneration>=0){ scheduleHomeRoutingRecovery(); return; }
 			if(showingHomeHistory && !homeHeadInFlight){ startHomeHead(itemsPerPage*2, false); return; }
 			if(!loaded && !dataLoading){
 				loadData();
