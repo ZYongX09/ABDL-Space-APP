@@ -34,7 +34,7 @@ import me.grishka.appkit.utils.V;
 import static org.junit.Assert.*;
 
 @RunWith(RobolectricTestRunner.class)
-@Config(sdk={26, 35}, application=CompatibilityTestApplication.class)
+@Config(sdk={26, 35}, application=CompatibilityTestApplication.class, qualifiers="zh-rCN")
 public class SponsorCheckoutUiTest{
 	@Before public void setUp(){ V.setApplicationContext(ApplicationProvider.getApplicationContext()); }
 

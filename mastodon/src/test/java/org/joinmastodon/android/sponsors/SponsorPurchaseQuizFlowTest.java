@@ -35,7 +35,7 @@ import org.robolectric.shadow.api.Shadow;
 import org.robolectric.shadows.ShadowActivity;
 
 @RunWith(RobolectricTestRunner.class)
-@Config(sdk={26, 35}, application=CompatibilityTestApplication.class)
+@Config(sdk={26, 35}, application=CompatibilityTestApplication.class, qualifiers="zh-rCN")
 public class SponsorPurchaseQuizFlowTest{
 	@Test public void correctAnswerLaunchesWhileModalOwnsFocusAndClosesQuiz() throws Exception{
 		withFragment((activity, fragment, scroll)->{

@@ -69,7 +69,7 @@ jobs:
           [ ! -e mastodon/release.keystore ] || fail 'Release keystore must be excluded from verification checkout'
           printf 'ANDROID_HOME=%s\nANDROID_SDK_ROOT=%s\n' "$sdk" "$sdk" >> "$GITHUB_ENV"
           "$manager" --sdk_root="$sdk" \
-            'platforms;android-37' 'platforms;android-30' 'build-tools;35.0.0' < /dev/null
+            'platforms;android-37.0' 'platforms;android-30' 'build-tools;35.0.0' < /dev/null
 
       - name: Compile real release resources and preserve normal input-keyed Gradle cache
         run: python3 -I .github/ci/verify-sponsor-payment.py resources

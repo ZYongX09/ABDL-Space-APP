@@ -1,4 +1,4 @@
-# 赞助者支付宝支付渠道（2026-11-05开发中，未发布）
+# 赞助者支付宝支付渠道（2026-11-05开发交付，原证书测试包已生成，未正式发布）
 
 ## 范围
 
@@ -17,6 +17,8 @@
 爱发电仍原站外付款+兑换码，不因新付款通道移除；插入中间页后的“直接兑换”应回原中心，不新建中心或错退渠道页。
 
 ## 当前状态
+
+**最新状态：原工具链全量资源与客户端Java/Kotlin编译通过，27类209项联合回归全部通过，八张原生UI图片已逐张验收且最终图片哈希相同。原证书release测试包已生成并通过二进制核验，SHA256为6fdcded2470cd51bfd46fda367cbaf7155ebf76dee5eba713f4c43438ba3ff61。未安装、未正式发布、未真实付款。后文早期阻塞段为过程记录，以文末本地重试交付为准。**
 
 客户端生产及支付专项已落盘，验证进行中。固定官方SDK `com.alipay.sdk:alipaysdk-android:15.8.42`，官方POM/AAR来源静态核实；AAR无JNI、包含consumer ProGuard及6个官方活动，不改签名/版本/最低Android版本。实际SDK元数据与Manifest首轮检查exit0，精确移除无关RC/HK/tbopen查询后复核最终merged XML仅增加国内正式钱包visibility，原QQ/http(s)保持。
 
@@ -75,4 +77,22 @@
 
 源码定点搜索在mastodon/src、reader-core/src、novel-editor-core/src的Java/Kotlin/XML中未发现CINNAMON_BUN/CANARY、RequiresApi(37)/TargetApi(37)、SDK_INT直接比较37或-v37资源等显式API37标记；此结论不覆盖所有新平台接口，不能替代真实编译，也不能消除上述AAR最低要求。
 
-按批准门禁，compileSdk36试验未创建、三个模块编译SDK未改、未发新的远端任务；保留工具链及业务依赖不变。私有完整证据为~/.local/share/abdl-sponsor-alipay-20261105/compile36-aar-metadata-report.json。当前仍无含支付宝功能的APK或真实客户端UI结果，不自动转回升级计划或降级miuix。
+按批准门禁，compileSdk36试验未创建、三个模块编译SDK未改、未发新的远端任务；保留工具链及业务依赖不变。私有完整证据为~/.local/share/abdl-sponsor-alipay-20261105/compile36-aar-metadata-report.json。此阶段仍无含支付宝功能的APK或真实客户端UI结果，不自动转回升级计划或降级miuix。
+
+## 本地重试与完整客户端门禁（2026-11-05）
+
+用户再次要求沿用本地原配置编译。保留AGP8.9.1、Gradle8.11.1、Kotlin2.4.10、本机SDK及全部业务依赖，只在私有构建runner将资源任务调为1536MiB/G1并记录GC与产物进度；不删资源、不clean、不修改SDK元数据、不关闭其他应用。`android-resource-retry3-g1`明确全量非增量资源编译499.9秒exit0，28322份源码配置前后不变。后续资源正常UP-TO-DATE，主模块生产Kotlin/Java实际重新编译通过。
+
+首个完整test编译发现Robolectric通用Shadows.shadowOf重载触及API37已移除FingerprintManager，仅测试改成Shadow.<ShadowPackageManager>extract，保安装钱包语义。专项targeted3实际74项73pass/1fail，为off-main测试后台返回过快导致第一次idle已派发回调；仅测试加有界CountDownLatch固定阶段，不改生产或删断言。下一联合final1中支付8类74项全过；整个209项193pass/16fail，旧中文Checkout/Quiz测试14项漏配locale，ThanksController2项漏初始化文案上下文。与2c23d333生产相应代码及旧测试一致，未宣称历史基线实跑复现。
+
+仅4个测试文件修复fixture：SDK测试显式shadow+同步闸门；旧CheckoutUi/QuizFlow各补zh-rCN；ThanksController用SDK31 Robolectric应用并@Before保存设置/@After恢复MastodonApp.context。独立定点复核确认无生产改动、无断言删除/弱化。最终`android-payments-final2` **27类209项全部通过、0failure/error/skip、exit0**，28322份源码配置前后不变；不是全仓所有测试。现有套餐与爱发电原计时/题库/安全流程保持。
+
+八张真实native Canvas fixture已逐张检查，覆盖中英×深浅×320dp/1.6字体的可用／额度待核禁用两态：套餐上方、品牌图标、红实心推荐、镂空微信、长英文换行、固定底部按钮与滚动正文均正常。final2图片SHA与已审8图完全一致；仅fixture视觉验收，不是真机、支付成功或签约材料截图。
+
+同源码`android-payment-release1`在768MiB下mergeDexRelease明确D8 heap OOM，已保失败；随后`android-payment-release2-g1`用1536MiB/G1串行重试assembleRelease，556.52秒exit0，28322份源码配置与209项测试完全相同。既有正式证书SHA256 fd2098a3d3493222c247a7ba2787ec48fd8f62d38e9432ed4d6290a057dea475、非debug、CRC、16KiB ZIP原生库对齐、完整衬线字体、中英文locale、地图配置、非导出ROM宿主、支付宝官方SDK组件与阅读设置实际DEX调用链接均通过。
+
+交付文件：`/home/ZYongX/projects/ABDL-Space-3.3.0-code36-sponsor-alipay-test-20261105.apk`，169014310bytes，SHA256 `6fdcded2470cd51bfd46fda367cbaf7155ebf76dee5eba713f4c43438ba3ff61`。版本3.3.0/code36，旧NBW及其他测试包保留；未正式发布或安装。付款能力仍受后端默认关闭/未签约/额度未核约束，不把签名包构建当开通产品或真实交易成功。
+
+最终同步时Android仓库正常；后端origin仓库ZhX589/abdl-space的fetch返回403（当前凭据权限不足），停止重试，不切换凭据绕过。后端已通过验证的源码及文档保留本地，生产main/Worker825不变；实际合回与推送状态以最终交付记录为准。
+
+备用CI仅纠正已证不存在的安装包名为platforms;android-37.0，AGP/Gradle版本仍不变；未再次dispatch，旧工具链在标准远端SDK布局下的完整复现仍未证明，不把本地成功冒作GitHub已通过。

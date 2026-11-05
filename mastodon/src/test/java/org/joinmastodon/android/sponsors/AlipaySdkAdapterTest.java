@@ -15,12 +15,15 @@ import org.robolectric.RobolectricTestRunner;
 import org.robolectric.annotation.Config;
 import org.robolectric.annotation.LooperMode;
 import org.robolectric.android.controller.ActivityController;
+import org.robolectric.shadow.api.Shadow;
 import org.robolectric.shadows.ShadowLooper;
+import org.robolectric.shadows.ShadowPackageManager;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -30,7 +33,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import androidx.test.core.app.ApplicationProvider;
 
 import static org.junit.Assert.*;
-import static org.robolectric.Shadows.shadowOf;
 
 /** Fakes are per Engine instance; no real PayTask, gateway, order signing or global override is used. */
 @RunWith(RobolectricTestRunner.class)
@@ -244,9 +246,16 @@ public class AlipaySdkAdapterTest{
 			try{
 				FakeProvider provider=new FakeProvider(); Handler main=new Handler(Looper.getMainLooper());
 				AtomicReference<Thread> callbackThread=new AtomicReference<>(); AtomicReference<String> status=new AtomicReference<>();
-				AlipaySdkAdapter.Engine engine=new AlipaySdkAdapter.Engine(provider, worker, task->main.post(task));
+				CountDownLatch releaseWorker=new CountDownLatch(1);
+				AlipaySdkAdapter.Engine engine=new AlipaySdkAdapter.Engine(provider, task->worker.execute(()->{
+					try{
+						if(!releaseWorker.await(5, TimeUnit.SECONDS)) throw new AssertionError("Worker was not released");
+					}catch(InterruptedException interrupted){ Thread.currentThread().interrupt(); throw new AssertionError(interrupted); }
+					task.run();
+				}), task->main.post(task));
 				engine.pay(controller.get(), ORDER, result->{ callbackThread.set(Thread.currentThread()); status.set(result); });
 				ShadowLooper.idleMainLooper();
+				assertEquals(0, provider.payments); assertNull(status.get()); releaseWorker.countDown();
 				worker.submit(()->{}).get(5, TimeUnit.SECONDS);
 				assertEquals(1, provider.payments); assertNotSame(Thread.currentThread(), provider.paymentThread);
 				assertNull(status.get()); ShadowLooper.idleMainLooper();
@@ -273,6 +282,6 @@ public class AlipaySdkAdapterTest{
 		PackageInfo info=new PackageInfo(); info.packageName=packageName;
 		info.applicationInfo=new ApplicationInfo(); info.applicationInfo.packageName=packageName;
 		info.applicationInfo.enabled=enabled; info.applicationInfo.flags=flags;
-		shadowOf(context.getPackageManager()).installPackage(info);
+		Shadow.<ShadowPackageManager>extract(context.getPackageManager()).installPackage(info);
 	}
 }

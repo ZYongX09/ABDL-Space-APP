@@ -1,8 +1,18 @@
 package org.joinmastodon.android.sponsors;
 
+import android.content.Context;
+
+import org.joinmastodon.android.CompatibilityTestApplication;
+import org.joinmastodon.android.MastodonApp;
 import org.joinmastodon.android.model.sponsors.SponsorModels.ThanksItem;
 import org.joinmastodon.android.model.sponsors.SponsorModels.ThanksPage;
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.robolectric.RobolectricTestRunner;
+import org.robolectric.RuntimeEnvironment;
+import org.robolectric.annotation.Config;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -10,7 +20,12 @@ import java.util.List;
 import static org.junit.Assert.*;
 
 /** Executes production state machine with an intentionally uncancellable callback source and fake clock. */
+@RunWith(RobolectricTestRunner.class)
+@Config(sdk=31, application=CompatibilityTestApplication.class)
 public class SponsorThanksControllerTest{
+	private Context previousContext;
+	@Before public void setUpContext(){ previousContext=MastodonApp.context; MastodonApp.context=RuntimeEnvironment.getApplication(); }
+	@After public void restoreContext(){ MastodonApp.context=previousContext; }
 	private static class Call implements SponsorThanksController.Cancelable{
 		int offset; boolean canceled; SponsorThanksController.Result result;
 		@Override public void cancel(){ canceled=true; }
