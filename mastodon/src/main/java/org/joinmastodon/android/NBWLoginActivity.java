@@ -146,7 +146,8 @@ public class NBWLoginActivity extends Activity{
 					}
 					@Override public void onError(ErrorResponse error){
 						if(!sameOwner(owner)) return;
-						flow.cancel(owner); fail(R.string.nbw_login_failed);
+						int message=flow.installationFailure(owner, error);
+						if(flow.isCurrent(owner)) render(); else fail(message);
 					}
 				}, ()->sameOwner(owner));
 				flow.installation(owner, installation);
@@ -170,7 +171,8 @@ public class NBWLoginActivity extends Activity{
 		if(terminal) return;
 		NBWLoginFlow.Snapshot snapshot=flow.snapshot(handle);
 		if(snapshot==null){ fail(R.string.nbw_login_expired); return; }
-		status.setText(snapshot.message);
+		if(snapshot.serviceResourcePause!=null) snapshot.serviceResourcePause.bind(status);
+		else{ org.joinmastodon.android.api.ServiceResourcePause.unbind(status); status.setText(snapshot.message); }
 		boolean busy=snapshot.phase==NBWLoginFlow.Phase.STARTING || snapshot.phase==NBWLoginFlow.Phase.EXCHANGING || snapshot.phase==NBWLoginFlow.Phase.INSTALLING;
 		progress.setVisibility(busy ? View.VISIBLE : View.GONE);
 		retry.setVisibility(snapshot.canRetry() ? View.VISIBLE : View.GONE);
@@ -180,6 +182,7 @@ public class NBWLoginActivity extends Activity{
 	private void fail(int message){
 		terminal=true; preflightGeneration++; handler.removeCallbacks(expiry);
 		flow.cancel(handle);
+		org.joinmastodon.android.api.ServiceResourcePause.unbind(status);
 		status.setText(message); progress.setVisibility(View.GONE); retry.setVisibility(View.GONE);
 	}
 	private void cancel(){ flow.cancel(handle); terminal=true; handler.removeCallbacks(expiry); finish(); }

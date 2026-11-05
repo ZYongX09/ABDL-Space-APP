@@ -277,7 +277,13 @@ public abstract class MastodonAPIRequest<T> extends APIRequest<T>{
 
 	void onError(ErrorResponse err){
 		if(!nbwRemoteRequest){
-			if(!canceled) invokeErrorCallback(err);
+			// Recheck at actual UI delivery, including cancellation while an error body is read.
+			uiThreadHandler.post(()->{
+				if(canceled || callbackDelivered) return;
+				callbackDelivered=true;
+				onRequestDone();
+				if(callback!=null) callback.onError(err);
+			});
 			return;
 		}
 		uiThreadHandler.post(()->{

@@ -220,6 +220,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	private boolean crisisWarningDismissed;
 	private static final String[] CRISIS_KEYWORDS={"自杀", "自残", "死亡", "抑郁", "双向", "双相", "ADHD", "PTSD", "童年创伤", "不想活", "不想活了", "不想再活", "活不下去", "活着没意思", "活着没有意义", "想死", "去死", "求死", "寻死", "轻生", "结束生命", "结束自己的生命", "了结自己", "离开这个世界", "永远消失", "绝望", "没必要活", "没有活下去的理由", "不值得活", "死了算了", "一死了之", "结束一切", "解脱了", "撑不下去了", "不想醒来", "希望永远睡过去", "割腕", "割脉", "拿刀割自己", "划伤自己", "跳楼", "跳河", "撞车", "卧轨", "吞药", "服毒", "上吊", "自我伤害", "伤害自己", "伤害我自己"};
 	private boolean localPublishInFlight;
+	private org.joinmastodon.android.auth.IndependentAuthResponse.Owner publishOwner;
 	private ComposeAutocompleteSpan currentAutocompleteSpan;
 	private FrameLayout mainEditTextWrap;
 	private ComposeLanguageAlertViewController.SelectedOption postLang;
@@ -830,6 +831,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 	}
 
 	@Override public void onDestroyView(){
+		publishOwner=null;
 		removeBackCallback(nbwMenuBackCallback);
 		removeBackCallback(locationMenuBackCallback);
 		if(novelController!=null){ novelController.dispose(); novelController=null; }
@@ -1209,6 +1211,7 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 			return;
 		if(localPublishInFlight) return;
 		Runnable publishAction=()->{
+			publishOwner=new org.joinmastodon.android.auth.IndependentAuthResponse.Owner(this);
 			localPublishInFlight=true;
 			sendingOverlay=new View(getActivity());
 			WindowManager.LayoutParams overlayParams=new WindowManager.LayoutParams();
@@ -1373,17 +1376,25 @@ public class ComposeFragment extends MastodonToolbarFragment implements ComposeE
 			wm.removeView(sendingOverlay);
 		sendingOverlay=null;
 		removeBackCallback(sendingBackButtonBlocker);
-		V.setVisibilityAnimated(sendProgress, View.GONE);
-		publishButton.setEnabled(true);
+		if(sendProgress!=null) V.setVisibilityAnimated(sendProgress, View.GONE);
+		if(publishButton!=null) publishButton.setEnabled(true);
+		var owner=publishOwner; publishOwner=null;
+		if(owner==null || !owner.foreground()) return;
+		var pause=org.joinmastodon.android.api.ServiceResourcePause.fromError(error);
+		if(pause!=null){
+			// Preserve the draft/idempotency key. Recovery is an explicit later user action, never replay a write.
+			pause.show(getActivity());
+			return;
+		}
 		if(error instanceof MastodonErrorResponse me){
-			String message=me.error;
+			String message=me.localizedMessage(getActivity());
 			String mediaDebugInfo=mediaViewController.getUploadedAttachmentDebugInfo();
 			if(!TextUtils.isEmpty(mediaDebugInfo))
 				message+="\n\n"+getString(R.string.general_upload_debug)+"\n"+mediaDebugInfo;
 			new M3AlertDialogBuilder(getActivity())
 					.setTitle(R.string.post_failed)
 					.setMessage(message)
-					.setPositiveButton(R.string.retry, (dlg, btn)->publish())
+					.setPositiveButton(R.string.retry, (dlg, btn)->{ if(owner.foreground()) publish(); })
 					.setNegativeButton(R.string.cancel, null)
 					.show();
 		}else{

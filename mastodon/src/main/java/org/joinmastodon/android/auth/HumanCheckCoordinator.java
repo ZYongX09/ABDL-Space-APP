@@ -44,12 +44,17 @@ public final class HumanCheckCoordinator{
 	public static final class Snapshot{
 		public final Phase phase;
 		public final int message;
+		public final org.joinmastodon.android.api.ServiceResourcePause serviceResourcePause;
+		public void bindMessage(android.widget.TextView text){
+			if(serviceResourcePause!=null) serviceResourcePause.bind(text);
+			else{ org.joinmastodon.android.api.ServiceResourcePause.unbind(text); text.setText(message); }
+		}
 		public final long remainingMillis, attempt;
 		// Opaque challenge identity only; never a mailbox, verifier, widget token or authorization value.
 		public final String challengeId, pageUrl;
 		public final boolean canStart, canQuery, busy;
 		private Snapshot(Pending p){
-			phase=p.phase; message=p.message; attempt=p.attempt; challengeId=p.challengeId;
+			phase=p.phase; message=p.message; serviceResourcePause=p.serviceResourcePause; attempt=p.attempt; challengeId=p.challengeId;
 			pageUrl=p.challengeId==null ? null : HumanCheckRequest.pageUrl(p.challengeId);
 			remainingMillis=Math.max(0, p.deadline-SystemClock.elapsedRealtime());
 			canStart=p.phase==Phase.PROMPT && p.request==null && p.verifier!=null;
@@ -87,6 +92,7 @@ public final class HumanCheckCoordinator{
 		HumanCheckRequest request;
 		Phase phase=Phase.SENDING;
 		int message=R.string.human_check_sending;
+		org.joinmastodon.android.api.ServiceResourcePause serviceResourcePause;
 		boolean ready, suppressed, delivered, admitted, resultIssued, expired;
 		Pending(long generation, long owner, String email, Action action, Listener listener){
 			this.generation=generation; entryOwner=owner; this.email=email; this.action=action; entryListener=listener;
@@ -203,6 +209,7 @@ public final class HumanCheckCoordinator{
 		pending.verifier=pending.email=pending.challengeId=null; return true;
 	}
 	private void send(Pending p, HumanCheckRequest request, long attempt){
+		p.serviceResourcePause=null;
 		if(p.request!=null) p.request.cancel();
 		p.request=request; long serial=++p.serial;
 		request.setCallback(new Callback<>(){
@@ -248,10 +255,11 @@ public final class HumanCheckCoordinator{
 		notifyChanged(p);
 	}
 	private void failure(Pending p, HumanCheckRequest request, Failure error){
+		p.serviceResourcePause=error.serviceResourcePause;
 		if(request.endpoint==HumanCheckRequest.Endpoint.CANCEL){ p.phase=Phase.CANCEL_UNKNOWN; p.message=R.string.human_check_cancel_pending; }
 		else if(request.endpoint==HumanCheckRequest.Endpoint.CHALLENGE_CANCEL){ p.phase=Phase.PROMPT; p.message=error.message; }
 		else if((request.endpoint==HumanCheckRequest.Endpoint.SEND_CODE || request.endpoint==HumanCheckRequest.Endpoint.COMPLETE || request.endpoint==HumanCheckRequest.Endpoint.STATUS)
-				&& (error.status>=500 || "HUMAN_CHECK_DELIVERY_UNKNOWN".equals(error.code))){
+				&& (error.status>=500 || error.serviceResourcePause!=null || "HUMAN_CHECK_DELIVERY_UNKNOWN".equals(error.code))){
 			p.admitted=true; p.phase=Phase.UNKNOWN; p.message=R.string.human_check_unknown;
 		}
 		else if(request.endpoint==HumanCheckRequest.Endpoint.SEND_CODE && error.status==403 && "HUMAN_CHECK_REQUIRED".equals(error.code)

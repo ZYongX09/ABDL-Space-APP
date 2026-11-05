@@ -133,7 +133,7 @@ public class HumanCheckActivity extends Activity{
 		boolean inModal=snapshot.phase==Phase.CREATING || snapshot.phase==Phase.LOADING || snapshot.phase==Phase.READY || snapshot.phase==Phase.VERIFYING;
 		if(inModal){
 			ensureModal(snapshot.attempt);
-			modalStatus.setText(snapshot.message);
+			snapshot.bindMessage(modalStatus);
 			modalProgress.setVisibility(snapshot.phase==Phase.READY ? View.GONE : View.VISIBLE);
 			if(snapshot.phase==Phase.LOADING && webView==null && snapshot.pageUrl!=null){
 				loadComponent(snapshot);
@@ -142,7 +142,7 @@ public class HumanCheckActivity extends Activity{
 			}
 			if(snapshot.phase==Phase.READY || snapshot.phase==Phase.VERIFYING){ handler.removeCallbacks(slow); handler.removeCallbacks(timeout); }
 		}else destroyModal();
-		status.setText(snapshot.message);
+		snapshot.bindMessage(status);
 		status.setVisibility(snapshot.message==R.string.human_check_description ? View.GONE : View.VISIBLE);
 		progress.setVisibility(snapshot.busy && !inModal ? View.VISIBLE : View.GONE);
 		start.setText(snapshot.canQuery ? R.string.human_check_query : R.string.human_check_start);

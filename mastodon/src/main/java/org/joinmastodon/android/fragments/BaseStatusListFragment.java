@@ -1235,8 +1235,10 @@ public abstract class BaseStatusListFragment<T extends DisplayItemsParent> exten
 			@Override public boolean visible(){ return resourceVisible(status); }
 			@Override public void changed(){ updateTranslation(status); }
 			@Override public void error(ErrorResponse error){
-				if(!translationHostCurrent()) return;
-				if(error instanceof org.joinmastodon.android.api.requests.translation.TranslationRequest.TranslationError translated) translated.showToast(getActivity());
+					if(!translationHostCurrent() || !resourceVisible(status)) return;
+					var pause=org.joinmastodon.android.api.ServiceResourcePause.fromError(error);
+					if(pause!=null) pause.show(getActivity());
+					else if(error instanceof org.joinmastodon.android.api.requests.translation.TranslationRequest.TranslationError translated) translated.showToast(getActivity());
 				else android.widget.Toast.makeText(getActivity(), R.string.post_translation_failed, android.widget.Toast.LENGTH_LONG).show();
 			}
 		};

@@ -20,6 +20,8 @@ public class MastodonErrorResponse extends ErrorResponse{
 	public final int httpStatus;
 	public final Throwable underlyingException;
 	public final int messageResource;
+	/** Optional first-party presentation metadata; never changes status, class or retry semantics. */
+	public ServiceResourcePause serviceResourcePause;
 
 	public MastodonErrorResponse(String error, int httpStatus, Throwable exception){
 		this.error=error;
@@ -41,29 +43,30 @@ public class MastodonErrorResponse extends ErrorResponse{
 		}
 	}
 
+	public String localizedMessage(Context context){
+		ServiceResourcePause pause=ServiceResourcePause.fromError(this);
+		if(pause!=null) return pause.message(context);
+		return messageResource>0 ? context.getString(messageResource, error) : error;
+	}
+
 	@Override
 	public void bindErrorView(View view){
 		TextView text=view.findViewById(R.id.error_text);
-		String message;
-		if(messageResource>0){
-			message=view.getContext().getString(messageResource, error);
+		ServiceResourcePause pause=ServiceResourcePause.fromError(this);
+		if(pause!=null){
+			pause.bind(text);
 		}else{
-			message=error;
+			ServiceResourcePause.unbind(text);
+			text.setText(localizedMessage(view.getContext()));
 		}
-		text.setText(message);
 	}
 
 	@Override
 	public void showToast(Context context){
-		if(context==null)
-			return;
-		String message;
-		if(messageResource>0){
-			message=context.getString(messageResource, error);
-		}else{
-			message=error;
-		}
-		Toast.makeText(context, message, Toast.LENGTH_SHORT).show();
+		if(context==null) return;
+		ServiceResourcePause pause=ServiceResourcePause.fromError(this);
+		if(pause!=null){ pause.show(context); return; }
+		Toast.makeText(context, localizedMessage(context), Toast.LENGTH_SHORT).show();
 	}
 
 	/** V2 remote failures never launch OAuth or interrupt a local publishing flow. */

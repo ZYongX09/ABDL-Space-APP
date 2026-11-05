@@ -140,6 +140,21 @@ public class NBWLoginFlowTest{
 		ShadowSystemClock.advanceBy(Duration.ofMillis(NBWLoginFlow.COMPLETION_TTL_MS));
 		assertFalse(flow.isCurrent(handle)); assertNull(flow.exchange(handle,true));
 	}
+	@Test public void servicePauseMetadataIsTerminalDisplayOnlyAndNeverReplaysCompletionProof() throws Exception{
+		NBWLoginFlow.Handle handle=ready(); var exchange=flow.exchange(handle, true);
+		var error=new NBWLoginRequest.LoginError(503, "D1_DAILY_QUOTA_EXHAUSTED");
+		var response=new okhttp3.Response.Builder().request(new okhttp3.Request.Builder().url("https://api.abdl-space.top/api/app/nbw/login/exchange").build())
+				.protocol(okhttp3.Protocol.HTTP_1_1).code(503).message("paused").build();
+		error.setServiceResourcePause(org.joinmastodon.android.api.ServiceResourcePause.fromResponse(response, "{\"error\":\"paused\",\"code\":\"D1_DAILY_QUOTA_EXHAUSTED\"}"));
+		assertNotNull(error.serviceResourcePause); assertFalse(error.retryable);
+		flow.failure(handle, exchange, error);
+		assertEquals(NBWLoginFlow.Phase.FAILED, flow.snapshot(handle).phase);
+		assertSame(error.serviceResourcePause, flow.snapshot(handle).serviceResourcePause);
+		assertFalse(flow.snapshot(handle).canRetry()); assertNull(flow.exchange(handle, true)); assertNull(flow.exchange(handle, false));
+		flow.detach(handle, true); var fresh=flow.attach(handle.generation);
+		assertNotNull(fresh); assertFalse(flow.isCurrent(handle)); assertSame(error.serviceResourcePause, flow.snapshot(fresh).serviceResourcePause);
+		assertNull(flow.exchange(fresh, true)); assertFalse(flow.acceptExchange(fresh, exchange, exchangeResult()));
+	}
 	@Test public void transportFailureRetriesSameFlowButUnboundReauthAndUnknownErrorsCannotInstall() throws Exception{
 		for(String code:new String[]{"NBW_LOGIN_NOT_BOUND", "NBW_LOGIN_REAUTH_REQUIRED", "NBW_LOGIN_REJECTED", "NBW_LOGIN_INVALID_FLOW", "NBW_LOGIN_UNAVAILABLE", "unrecognized raw token"}){
 			NBWLoginFlow.Handle handle=ready(); var exchange=flow.exchange(handle, true);

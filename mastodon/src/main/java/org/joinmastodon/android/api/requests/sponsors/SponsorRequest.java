@@ -74,6 +74,10 @@ public class SponsorRequest<T> extends MastodonAPIRequest<T>{
 			try{ return body.has(key) && !body.get(key).isJsonNull() ? body.get(key).getAsString() : fallback; }
 			catch(RuntimeException ignored){ return fallback; }
 		}
-		@Override public void showToast(Context context){ if(context!=null) Toast.makeText(context, error, Toast.LENGTH_LONG).show(); }
+		@Override public void showToast(Context context){
+			if(context==null) return;
+			if(serviceResourcePause!=null) serviceResourcePause.show(context);
+			else Toast.makeText(context, error, Toast.LENGTH_LONG).show();
+		}
 	}
 }

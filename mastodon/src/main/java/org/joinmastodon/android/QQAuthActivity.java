@@ -16,6 +16,8 @@ import org.joinmastodon.android.api.MastodonAPIController;
 import org.joinmastodon.android.api.session.AccountSession;
 import org.joinmastodon.android.api.session.AccountSessionManager;
 import org.joinmastodon.android.auth.AuthSessionInstaller;
+import org.joinmastodon.android.auth.IndependentAuthResponse;
+import org.joinmastodon.android.api.ServiceResourcePause;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -45,6 +47,8 @@ public class QQAuthActivity extends Activity{
 	private String accountID;
 	private Call exchangeCall;
 	private boolean finished;
+	private IndependentAuthResponse.Owner exchangeOwner;
+	private boolean resumed;
 
 	private final IUiListener loginListener=new IUiListener(){
 		@Override
@@ -127,6 +131,7 @@ public class QQAuthActivity extends Activity{
 	}
 
 	private void exchangeAuthorizationCode(String authorizationCode){
+		if(finished || exchangeCall!=null) return;
 		setProgressMessage(R.string.qq_finishing_auth);
 		JSONObject json=new JSONObject();
 		try{
@@ -147,13 +152,14 @@ public class QQAuthActivity extends Activity{
 			}
 			builder.header("Authorization", "Bearer "+session.token.accessToken);
 		}
+		exchangeOwner=new IndependentAuthResponse.Owner(this);
 		exchangeCall=MastodonAPIController.getHttpClient().newCall(builder.build());
 		exchangeCall.enqueue(new Callback(){
 			@Override
 			public void onFailure(Call call, IOException error){
 				if(call.isCanceled()) return;
 				runOnUiThread(()->{
-					if(isFinishing() || isDestroyed()) return;
+					if(!acceptExchangeOwner()) return;
 					showMessageAndFinish(R.string.qq_network_error);
 				});
 			}
@@ -161,15 +167,29 @@ public class QQAuthActivity extends Activity{
 			@Override
 			public void onResponse(Call call, Response response) throws IOException{
 				final int status=response.code();
-				final okhttp3.ResponseBody body=response.body();
-				final String responseBody=body==null ? "" : body.string();
-				response.close();
+				final IndependentAuthResponse result=IndependentAuthResponse.read(response);
+				if(call.isCanceled()) return;
 				runOnUiThread(()->{
-					if(isFinishing() || isDestroyed()) return;
-					handleExchangeResponse(status, responseBody);
+					if(!acceptExchangeOwner()) return;
+					if(result.pause!=null){ showPause(result.pause); return; }
+					handleExchangeResponse(status, result.text);
 				});
 			}
 		});
+	}
+
+	private boolean acceptExchangeOwner(){
+		if(isFinishing() || isDestroyed()) return false;
+		if(exchangeOwner!=null && exchangeOwner.current()) return true;
+		// A stale response must neither affect another account nor strand this screen's progress.
+		finished=true;
+		if(exchangeCall!=null) exchangeCall.cancel();
+		exchangeCall=null;
+		exchangeOwner=null;
+		dismissProgress();
+		setResult(Activity.RESULT_CANCELED);
+		finish();
+		return false;
 	}
 
 	private void handleExchangeResponse(int httpStatus, String responseBody){
@@ -199,7 +219,7 @@ public class QQAuthActivity extends Activity{
 				return;
 			}
 			dismissProgress();
-			Toast.makeText(this, R.string.qq_bind_success, Toast.LENGTH_SHORT).show();
+			if(resumed) Toast.makeText(this, R.string.qq_bind_success, Toast.LENGTH_SHORT).show();
 			setResult(RESULT_BINDING_CHANGED);
 			finish();
 			return;
@@ -222,8 +242,11 @@ public class QQAuthActivity extends Activity{
 
 			@Override
 			public void onError(ErrorResponse error){
+				if(!acceptExchangeOwner()) return;
 				dismissProgress();
-				Toast.makeText(QQAuthActivity.this, R.string.qq_login_failed, Toast.LENGTH_LONG).show();
+				var pause=ServiceResourcePause.fromError(error);
+				if(pause!=null){ showPause(pause); return; }
+				if(resumed) Toast.makeText(QQAuthActivity.this, R.string.qq_login_failed, Toast.LENGTH_LONG).show();
 				finish();
 			}
 		});
@@ -247,6 +270,22 @@ public class QQAuthActivity extends Activity{
 		return null;
 	}
 
+	private void showPause(ServiceResourcePause pause){
+		finished=true;
+		dismissProgress();
+		setResult(Activity.RESULT_CANCELED);
+		// Do not finish behind the dialog or replay this one-time authorization code.
+		android.widget.TextView message=new android.widget.TextView(this);
+		message.setPadding(32, 32, 32, 32); message.setTextSize(16); pause.bind(message);
+		android.widget.LinearLayout content=new android.widget.LinearLayout(this);
+		content.setOrientation(android.widget.LinearLayout.VERTICAL);
+		android.widget.ScrollView scroll=new android.widget.ScrollView(this); scroll.addView(message);
+		content.addView(scroll, new android.widget.LinearLayout.LayoutParams(-1, 0, 1));
+		android.widget.Button close=new android.widget.Button(this); close.setText(R.string.cancel); close.setOnClickListener(v->finish()); content.addView(close);
+		setContentView(content);
+		if(exchangeOwner!=null && resumed && exchangeOwner.current()) pause.show(this);
+	}
+
 	private void setProgressMessage(int stringRes){
 		if(progress!=null) progress.setMessage(getString(stringRes));
 	}
@@ -255,7 +294,7 @@ public class QQAuthActivity extends Activity{
 		if(finished) return;
 		finished=true;
 		dismissProgress();
-		Toast.makeText(this, stringRes, Toast.LENGTH_LONG).show();
+		if(resumed) Toast.makeText(this, stringRes, Toast.LENGTH_LONG).show();
 		setResult(Activity.RESULT_CANCELED);
 		finish();
 	}
@@ -268,6 +307,9 @@ public class QQAuthActivity extends Activity{
 			progress=null;
 		}
 	}
+
+	@Override protected void onResume(){ super.onResume(); resumed=true; }
+	@Override protected void onPause(){ resumed=false; super.onPause(); }
 
 	@Override
 	protected void onDestroy(){

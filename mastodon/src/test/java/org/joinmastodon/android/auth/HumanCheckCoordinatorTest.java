@@ -93,6 +93,21 @@ public class HumanCheckCoordinatorTest{
 		flow.query(again); callback(last()).onError(new HumanCheckRequest.Failure(503,"EMAIL_DELIVERY_UNAVAILABLE")); assertEquals(Phase.UNKNOWN,flow.snapshot(again).phase);
 		assertEquals(HumanCheckRequest.Endpoint.STATUS,last().endpoint);
 	}
+	@Test public void servicePausePreservesUnknownAdmissionAndDescriptorWithoutAnotherSend() throws Exception{
+		Handle entry=begin(); var send=last();
+		var failure=new HumanCheckRequest.Failure(503, "D1_DAILY_QUOTA_EXHAUSTED");
+		var response=new okhttp3.Response.Builder().request(new okhttp3.Request.Builder().url(HumanCheckRequest.ORIGIN+HumanCheckRequest.PREFIX+"/send-code").build())
+				.protocol(okhttp3.Protocol.HTTP_1_1).code(503).message("paused").build();
+		failure.setServiceResourcePause(org.joinmastodon.android.api.ServiceResourcePause.fromResponse(response, "{\"error\":\"paused\",\"code\":\"D1_DAILY_QUOTA_EXHAUSTED\"}"));
+		assertNotNull(failure.serviceResourcePause); callback(send).onError(failure);
+		var snapshot=flow.snapshot(entry); assertEquals(Phase.UNKNOWN, snapshot.phase); assertTrue(snapshot.canQuery);
+		assertSame(failure.serviceResourcePause, snapshot.serviceResourcePause);
+		assertFalse(flow.consumeSent(entry, EMAIL, Action.SEND, entry.generation, entry.owner));
+		Handle again=flow.begin(EMAIL, Action.SEND, ()->{}); assertNotNull(again); assertEquals(1, sent.size());
+		assertNull(flow.begin("other@example.test", Action.SEND, ()->{}));
+		flow.query(again); assertEquals(HumanCheckRequest.Endpoint.STATUS, last().endpoint); assertEquals(2, sent.size());
+		assertNull(flow.snapshot(again).serviceResourcePause);
+	}
 	@Test public void cancelAfterDispatchNeverTurnsLateSentIntoSuccess() throws Exception{
 		Handle entry=begin(), ui=loading(entry); event(ui,"ready"); event(ui,"verified"); HumanCheckRequest complete=last();
 		flow.cancel(ui); HumanCheckRequest cancel=last(); sent(complete); callback(cancel).onError(new HumanCheckRequest.Failure(409,"HUMAN_CHECK_DELIVERY_UNKNOWN"));

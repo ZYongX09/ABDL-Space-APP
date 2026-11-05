@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+	<string name="service_resource_pause_title">Service temporarily paused</string>
+	<string name="service_resource_pause_message">To prevent network attacks from wasting service resources, we provide a limited amount of resources each day. Today’s service resources have been exhausted and service is paused. Service is expected to resume %1$s at 8:00 AM (China Standard Time).</string>
+	<string name="service_resource_pause_at_time">To prevent network attacks from wasting service resources, we provide a limited amount of resources each day. Today’s service resources have been exhausted and service is paused. Service is expected to resume %1$s at %2$s (China Standard Time).</string>
+	<string name="service_resource_pause_waiting">To prevent network attacks from wasting service resources, we provide a limited amount of resources each day. Today’s service resources have been exhausted and service is paused. The estimated recovery time has passed. Please retry to check whether service has resumed.</string>
+	<string name="service_resource_pause_today">today</string>
+	<string name="service_resource_pause_tomorrow">tomorrow</string>
+</resources>

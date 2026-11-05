@@ -140,8 +140,8 @@ public class AppVersionReportingHttpTest {
         assertEquals(List.of(String.valueOf(BuildConfig.VERSION_CODE)), recorded.getHeaders().values("X-App-Version-Code"));
         assertEquals(List.of("1"), recorded.getHeaders().values("X-ABDL-App-AI"));
         assertEquals(List.of("2"), recorded.getHeaders().values("X-ABDL-NBW-Protocol"));
-        assertEquals("3.3.0-beta", BuildConfig.VERSION_NAME);
-        assertEquals(35, BuildConfig.VERSION_CODE);
+        assertEquals("3.3.0", BuildConfig.VERSION_NAME);
+        assertEquals(36, BuildConfig.VERSION_CODE);
         assertTrue(recorded.getHeader("User-Agent").matches("^MastodonAndroid/.*"));
         if(conflict) assertEquals("preserved", recorded.getHeader("X-Caller-Header"));
         AccountSession session=(AccountSession)field(MastodonAPIController.class, "session").get(controller);

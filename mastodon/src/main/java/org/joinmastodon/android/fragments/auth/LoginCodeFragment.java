@@ -25,6 +25,7 @@ import com.google.gson.Gson;
 import org.joinmastodon.android.MainActivity;
 import org.joinmastodon.android.R;
 import org.joinmastodon.android.api.requests.accounts.GetOwnAccount;
+import org.joinmastodon.android.auth.IndependentAuthResponse;
 import org.joinmastodon.android.api.session.AccountSessionManager;
 import org.joinmastodon.android.model.Account;
 import org.joinmastodon.android.model.Application;
@@ -143,7 +144,9 @@ public class LoginCodeFragment extends AppKitFragment {
     }
 
     private void verifyCode(String code) {
+        final IndependentAuthResponse.Owner owner = new IndependentAuthResponse.Owner(this);
         verifying = true;
+        org.joinmastodon.android.api.ServiceResourcePause.unbind(tvError);
         tvError.setVisibility(View.GONE);
 
         ProgressDialog progress = new ProgressDialog(getActivity());
@@ -160,23 +163,30 @@ public class LoginCodeFragment extends AppKitFragment {
             .enqueue(new okhttp3.Callback() {
                 @Override
                 public void onFailure(Call call, IOException e) {
-                    if (getActivity() == null) return;
-                    getActivity().runOnUiThread(() -> {
+                    if (call.isCanceled()) return;
+                    owner.activity.runOnUiThread(() -> {
                         progress.dismiss();
+                        if (!owner.current()) return;
                         verifying = false;
                         pinView.clearPin();
-                        Toast.makeText(getActivity(), getString(R.string.general_network_error, e.getMessage()), Toast.LENGTH_SHORT).show();
+                        if (owner.foreground()) Toast.makeText(getActivity(), getString(R.string.general_network_error, e.getMessage()), Toast.LENGTH_SHORT).show();
                     });
                 }
 
                 @Override
                 public void onResponse(Call call, Response response) throws IOException {
-                    final String responseBody = (response.body() != null) ? response.body().string() : "";
-                    if (getActivity() == null) return;
-
-                    getActivity().runOnUiThread(() -> {
+                    final IndependentAuthResponse result = IndependentAuthResponse.read(response);
+                    if (call.isCanceled()) return;
+                    owner.activity.runOnUiThread(() -> {
                         progress.dismiss();
-                        VerifyResponse verifyResp = new Gson().fromJson(responseBody, VerifyResponse.class);
+                        if (!owner.current()) return;
+                        if (result.pause != null) {
+                            verifying = false; pinView.clearPin();
+                            result.pause.bind(tvError); tvError.setVisibility(View.VISIBLE);
+                            if (owner.foreground()) result.pause.show(getActivity());
+                            return;
+                        }
+                        VerifyResponse verifyResp = result.parse(VerifyResponse.class);
 
                         if (response.isSuccessful() && verifyResp != null) {
                             if ("login".equals(verifyResp.action) && verifyResp.token != null) {
@@ -187,7 +197,7 @@ public class LoginCodeFragment extends AppKitFragment {
                                     .setCallback(new Callback<Account>() {
                                         @Override
                                         public void onSuccess(Account account) {
-                                            if (getActivity() == null) return;
+                                            if (!owner.current()) return;
 
                                             InstanceV2 instance = new InstanceV2();
                                             instance.domain = "abdl-space.top";
@@ -213,9 +223,10 @@ public class LoginCodeFragment extends AppKitFragment {
 
                                         @Override
                                         public void onError(ErrorResponse error) {
+                                            if (!owner.current()) return;
                                             verifying = false;
                                             pinView.clearPin();
-                                            error.showToast(getActivity());
+                                            if (owner.foreground()) error.showToast(getActivity());
                                         }
                                     })
                                     .exec("abdl-space.top", token);
@@ -227,14 +238,13 @@ public class LoginCodeFragment extends AppKitFragment {
                             } else {
                                 verifying = false;
                                 pinView.clearPin();
-                                Toast.makeText(getActivity(), getString(R.string.general_verification_failed, responseBody), Toast.LENGTH_SHORT).show();
+                                if (owner.foreground()) Toast.makeText(getActivity(), getString(R.string.general_verification_failed, result.errorMessage(getString(R.string.general_code_invalid))), Toast.LENGTH_SHORT).show();
                             }
                         } else {
                             verifying = false;
                             pinView.clearPin();
-                            String errorMsg = verifyResp != null && verifyResp.error != null
-                                ? verifyResp.error : getString(R.string.general_code_invalid);
-                            Toast.makeText(getActivity(), errorMsg, Toast.LENGTH_SHORT).show();
+                            String errorMsg = result.errorMessage(getString(R.string.general_code_invalid));
+                            if (owner.foreground()) Toast.makeText(getActivity(), errorMsg, Toast.LENGTH_SHORT).show();
                         }
                     });
                 }
@@ -256,7 +266,7 @@ public class LoginCodeFragment extends AppKitFragment {
     }
 
     private void renderHumanCheck() {
-        if (getActivity() == null || getView() == null || humanCheckHandle == null) return;
+        if (getActivity() == null || getView() == null || !isResumed() || isHidden() || humanCheckHandle == null) return;
         var snapshot = humanCheck.snapshot(humanCheckHandle);
         if (snapshot == null) { clearHumanCheck(); tvResend.setEnabled(true); return; }
         boolean waiting = snapshot.phase == org.joinmastodon.android.auth.HumanCheckCoordinator.Phase.SENDING;
@@ -273,9 +283,9 @@ public class LoginCodeFragment extends AppKitFragment {
             finishHumanCheckSent(humanCheckHandle.generation, humanCheckHandle.owner);
         } else if (snapshot.canQuery) {
             tvResend.setText(R.string.human_check_query); tvResend.setEnabled(true);
-            tvError.setText(snapshot.message); tvError.setVisibility(View.VISIBLE);
+            snapshot.bindMessage(tvError); tvError.setVisibility(View.VISIBLE);
         } else if (!snapshot.busy && !humanCheckLaunched) {
-            tvError.setText(snapshot.message); tvError.setVisibility(View.VISIBLE);
+            snapshot.bindMessage(tvError); tvError.setVisibility(View.VISIBLE);
             clearHumanCheck(); tvResend.setEnabled(true);
         }
     }
@@ -328,6 +338,8 @@ public class LoginCodeFragment extends AppKitFragment {
             }
         }.start();
     }
+
+    @Override public void onResume() { super.onResume(); renderHumanCheck(); }
 
     @Override
     public void onDestroyView() {

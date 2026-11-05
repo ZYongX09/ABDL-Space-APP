@@ -22,6 +22,7 @@ import org.joinmastodon.android.MainActivity;
 import org.joinmastodon.android.R;
 import org.joinmastodon.android.api.MastodonAPIController;
 import org.joinmastodon.android.api.requests.accounts.GetOwnAccount;
+import org.joinmastodon.android.auth.IndependentAuthResponse;
 import org.joinmastodon.android.api.requests.oauth.CreateOAuthApp;
 import org.joinmastodon.android.api.session.AccountSessionManager;
 import org.joinmastodon.android.model.Account;
@@ -111,6 +112,7 @@ public class LoginFragment extends ToolbarFragment {
 		String password = passwordEdit.getText().toString();
 		if (TextUtils.isEmpty(login) || TextUtils.isEmpty(password)) return;
 
+		final IndependentAuthResponse.Owner owner=new IndependentAuthResponse.Owner(this);
 		loginButton.setEnabled(false);
 
 		ProgressDialog progress = new ProgressDialog(getActivity());
@@ -128,22 +130,28 @@ public class LoginFragment extends ToolbarFragment {
 			.enqueue(new okhttp3.Callback() {
 				@Override
 				public void onFailure(Call call, IOException e) {
-					if (getActivity() == null) return;
-					getActivity().runOnUiThread(() -> {
+					if (call.isCanceled()) return;
+					owner.activity.runOnUiThread(() -> {
 						progress.dismiss();
-						if (loginButton != null) loginButton.setEnabled(true);
-						Toast.makeText(getActivity(), getString(R.string.general_network_error, e.getMessage()), Toast.LENGTH_SHORT).show();
+						if (!owner.current()) return;
+						updateButtonState();
+						if (owner.foreground()) Toast.makeText(getActivity(), getString(R.string.general_network_error, e.getMessage()), Toast.LENGTH_SHORT).show();
 					});
 				}
 
 				@Override
 				public void onResponse(Call call, Response response) throws IOException {
-					final String responseBody = (response.body() != null) ? response.body().string() : "";
-					if (getActivity() == null) return;
-
-					getActivity().runOnUiThread(() -> {
+					final IndependentAuthResponse result=IndependentAuthResponse.read(response);
+					if (call.isCanceled()) return;
+					owner.activity.runOnUiThread(() -> {
+						if (!owner.current()) { progress.dismiss(); return; }
+						if (result.pause!=null) {
+							progress.dismiss(); updateButtonState();
+							if (owner.foreground()) result.pause.show(getActivity());
+							return;
+						}
 						if (response.isSuccessful()) {
-							AuthResponse authResponse = new Gson().fromJson(responseBody, AuthResponse.class);
+							AuthResponse authResponse = result.parse(AuthResponse.class);
 							if (authResponse != null && authResponse.token != null) {
 								Token token = new Token();
 								token.accessToken = authResponse.token;
@@ -153,7 +161,7 @@ public class LoginFragment extends ToolbarFragment {
 										@Override
 										public void onSuccess(Account account) {
 											progress.dismiss();
-											if (getActivity() == null) return;
+											if (!owner.current()) return;
 
 											InstanceV2 instance = new InstanceV2();
 											instance.domain = domain;
@@ -177,21 +185,21 @@ public class LoginFragment extends ToolbarFragment {
 										@Override
 										public void onError(ErrorResponse error) {
 											progress.dismiss();
-											if (loginButton != null) loginButton.setEnabled(true);
-											if (getActivity() == null) return;
-											error.showToast(getActivity());
+											if (!owner.current()) return;
+											updateButtonState();
+											if (owner.foreground()) error.showToast(getActivity());
 										}
 									})
 									.exec(domain, token);
 							} else {
 								progress.dismiss();
 								if (loginButton != null) loginButton.setEnabled(true);
-								Toast.makeText(getActivity(), getString(R.string.general_login_failed, responseBody), Toast.LENGTH_SHORT).show();
+								if (owner.foreground()) Toast.makeText(getActivity(), getString(R.string.general_login_failed, result.errorMessage(getString(R.string.error))), Toast.LENGTH_LONG).show();
 							}
 						} else {
 							progress.dismiss();
 							if (loginButton != null) loginButton.setEnabled(true);
-							Toast.makeText(getActivity(), getString(R.string.general_login_failed, responseBody), Toast.LENGTH_SHORT).show();
+							if (owner.foreground()) Toast.makeText(getActivity(), getString(R.string.general_login_failed, result.errorMessage(getString(R.string.error))), Toast.LENGTH_LONG).show();
 						}
 					});
 				}

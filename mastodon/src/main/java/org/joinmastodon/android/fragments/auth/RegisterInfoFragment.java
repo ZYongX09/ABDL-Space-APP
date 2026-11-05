@@ -19,6 +19,7 @@ import com.google.gson.Gson;
 import org.joinmastodon.android.MainActivity;
 import org.joinmastodon.android.R;
 import org.joinmastodon.android.api.requests.accounts.GetOwnAccount;
+import org.joinmastodon.android.auth.IndependentAuthResponse;
 import org.joinmastodon.android.api.session.AccountSessionManager;
 import org.joinmastodon.android.fragments.settings.NBWPostRegisterActivity;
 import org.joinmastodon.android.model.Account;
@@ -207,6 +208,7 @@ public class RegisterInfoFragment extends AppKitFragment {
             return;
         }
 
+        final IndependentAuthResponse.Owner owner = new IndependentAuthResponse.Owner(this);
         btnRegister.setEnabled(false);
         ProgressDialog progress = new ProgressDialog(getActivity());
         progress.setMessage(getString(R.string.general_registering));
@@ -223,23 +225,29 @@ public class RegisterInfoFragment extends AppKitFragment {
             .enqueue(new okhttp3.Callback() {
                 @Override
                 public void onFailure(Call call, IOException e) {
-                    if (getActivity() == null) return;
-                    getActivity().runOnUiThread(() -> {
+                    if (call.isCanceled()) return;
+                    owner.activity.runOnUiThread(() -> {
                         progress.dismiss();
-                        if (btnRegister != null) btnRegister.setEnabled(true);
-                        Toast.makeText(getActivity(), getString(R.string.general_network_error, e.getMessage()), Toast.LENGTH_SHORT).show();
+                        if (!owner.current()) return;
+                        updateButtonState();
+                        if (owner.foreground()) Toast.makeText(getActivity(), getString(R.string.general_network_error, e.getMessage()), Toast.LENGTH_SHORT).show();
                     });
                 }
 
                 @Override
                 public void onResponse(Call call, Response response) throws IOException {
-                    final String responseBody = (response.body() != null) ? response.body().string() : "";
-                    if (getActivity() == null) return;
-
-                    getActivity().runOnUiThread(() -> {
+                    final IndependentAuthResponse result = IndependentAuthResponse.read(response);
+                    if (call.isCanceled()) return;
+                    owner.activity.runOnUiThread(() -> {
                         progress.dismiss();
+                        if (!owner.current()) return;
+                        if (result.pause != null) {
+                            updateButtonState();
+                            if (owner.foreground()) result.pause.show(getActivity());
+                            return;
+                        }
                         if (response.isSuccessful()) {
-                            RegisterResponse regResp = new Gson().fromJson(responseBody, RegisterResponse.class);
+                            RegisterResponse regResp = result.parse(RegisterResponse.class);
                             if (regResp != null && regResp.token != null) {
                                 // 注册成功 → 自动登录
                                 Token token = new Token();
@@ -249,7 +257,7 @@ public class RegisterInfoFragment extends AppKitFragment {
                                     .setCallback(new Callback<Account>() {
                                         @Override
                                         public void onSuccess(Account account) {
-                                            if (getActivity() == null) return;
+                                            if (!owner.current()) return;
 
                                             InstanceV2 instance = new InstanceV2();
                                             instance.domain = "abdl-space.top";
@@ -287,18 +295,19 @@ public class RegisterInfoFragment extends AppKitFragment {
 
                                         @Override
                                         public void onError(ErrorResponse error) {
-                                            if (btnRegister != null) btnRegister.setEnabled(true);
-                                            error.showToast(getActivity());
+                                            if (!owner.current()) return;
+                                            updateButtonState();
+                                            if (owner.foreground()) error.showToast(getActivity());
                                         }
                                     })
                                     .exec("abdl-space.top", token);
                             } else {
                                 if (btnRegister != null) btnRegister.setEnabled(true);
-                                Toast.makeText(getActivity(), getString(R.string.general_registration_failed, responseBody), Toast.LENGTH_SHORT).show();
+                                if (owner.foreground()) Toast.makeText(getActivity(), getString(R.string.general_registration_failed, result.errorMessage(getString(R.string.error))), Toast.LENGTH_LONG).show();
                             }
                         } else {
                             if (btnRegister != null) btnRegister.setEnabled(true);
-                            Toast.makeText(getActivity(), getString(R.string.general_registration_failed, responseBody), Toast.LENGTH_SHORT).show();
+                            if (owner.foreground()) Toast.makeText(getActivity(), getString(R.string.general_registration_failed, result.errorMessage(getString(R.string.error))), Toast.LENGTH_LONG).show();
                         }
                     });
                 }

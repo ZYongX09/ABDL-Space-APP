@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+	<string name="service_resource_pause_title">服务已暂停</string>
+	<string name="service_resource_pause_message">为了避免网络攻击造成服务资源浪费，我们每天限量提供服务资源；今日服务资源已耗尽，服务已暂停，预计%1$s早上8时重新恢复服务。</string>
+	<string name="service_resource_pause_at_time">为了避免网络攻击造成服务资源浪费，我们每天限量提供服务资源；今日服务资源已耗尽，服务已暂停，预计%1$s北京时间%2$s重新恢复服务。</string>
+	<string name="service_resource_pause_waiting">为了避免网络攻击造成服务资源浪费，我们每天限量提供服务资源；今日服务资源已耗尽，服务已暂停。预计恢复时间已到，请重试以确认服务是否恢复。</string>
+	<string name="service_resource_pause_today">今天</string>
+	<string name="service_resource_pause_tomorrow">明天</string>
+</resources>

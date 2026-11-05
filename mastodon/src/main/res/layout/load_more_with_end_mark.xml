@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
 			 android:layout_width="match_parent"
-			 android:layout_height="76dip">
+				 android:layout_height="wrap_content"
+				 android:minHeight="76dip">
 	
 	<ProgressBar
 		android:id="@+id/load_more_progress"
@@ -13,27 +14,26 @@
 	<LinearLayout
 		android:id="@+id/load_more_error"
 		android:layout_width="match_parent"
-		android:layout_height="76dip"
-		android:orientation="horizontal"
+		android:layout_height="wrap_content"
+		android:minHeight="76dip"
+		android:orientation="vertical"
 		android:padding="16dip">
 
 		<TextView
 			android:id="@+id/error_text"
 			android:layout_width="match_parent"
 			android:layout_height="wrap_content"
-			android:layout_weight="1"
-			android:layout_gravity="center_vertical"
-			android:textSize="14dip"
+			android:textSize="14sp"
 			android:textColor="#71757A"
-			android:text="Some error text"
-			android:singleLine="true"/>
+			android:accessibilityLiveRegion="polite"/>
 
 		<TextView
 			android:id="@+id/error_retry"
 			android:layout_width="wrap_content"
 			android:layout_height="wrap_content"
-			android:layout_gravity="center_vertical"
-			android:text="Retry?"
+			android:layout_gravity="end"
+			android:minHeight="48dp"
+			android:text="@string/thread_loading_retry"
 			android:textAllCaps="true"
 			android:background="?android:attr/selectableItemBackground"
 			android:padding="12dip"/>

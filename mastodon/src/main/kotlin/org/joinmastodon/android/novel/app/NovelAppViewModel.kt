@@ -273,11 +273,14 @@ class NovelAppViewModel(
     override fun onCleared() { epoch++; jobs.values.forEach { it.cancel() }; jobs.clear(); super.onCleared() }
 }
 
-private fun Exception.userMessage(): String = when (this) {
+private fun Exception.userMessage(): String {
+    if (this is NovelAppApiException) serviceResourcePause?.let { return NovelPauseMessages.retain(it) }
+    return when (this) {
     is NovelAppApiException -> when (status) {
         401 -> "novel_i18n_session_expired"; 403 -> "novel_i18n_action_forbidden"; 404 -> "novel_i18n_work_unavailable"
         409 -> "novel_i18n_version_updated"; 429 -> "novel_i18n_rate_limited"
         else -> "novel_i18n_request_incomplete"
     }
     else -> "novel_i18n_connection_failed"
+    }
 }

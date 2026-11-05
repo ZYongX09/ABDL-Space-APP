@@ -8,7 +8,15 @@ import android.view.ViewGroup
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.runtime.mutableStateOf
+import org.joinmastodon.android.api.ServiceResourcePause
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -44,6 +52,7 @@ abstract class FriendCardBaseFragment : ToolbarFragment() {
     private var contentView: ComposeView? = null
     protected var shown = false
     protected var globalError: String? = null
+    private var serviceResourcePause by mutableStateOf<ServiceResourcePause?>(null)
     protected var activeDialog: android.app.Dialog? = null
     private var boundSession: org.joinmastodon.android.api.session.AccountSession? = null
     protected fun changed() { revision++ }
@@ -63,7 +72,16 @@ abstract class FriendCardBaseFragment : ToolbarFragment() {
                 MiuixAppTheme {
                     Box(Modifier.fillMaxSize().background(MiuixTheme.colorScheme.background)) {
                         if (!accountValid()) FriendCardNotice(getString(R.string.fc_account_unavailable_help), null, null)
-                        else Screen(redraw)
+                        else Column(Modifier.fillMaxSize()) {
+                            serviceResourcePause?.let { pause ->
+                                AndroidView(
+                                    factory = { context -> android.widget.ScrollView(context).apply { addView(android.widget.TextView(context).apply { setTextSize(16f); setPadding(24, 16, 24, 16) }) } },
+                                    update = { scroll -> pause.bind(scroll.getChildAt(0) as android.widget.TextView) },
+                                    modifier = Modifier.fillMaxWidth().heightIn(max = 240.dp).padding(horizontal = 8.dp),
+                                )
+                            }
+                            Box(Modifier.weight(1f)) { Screen(redraw) }
+                        }
                     }
                 }
             }
@@ -72,6 +90,7 @@ abstract class FriendCardBaseFragment : ToolbarFragment() {
     @Composable protected abstract fun Screen(revision: Int)
     override fun onShown() {
         super.onShown(); shown = true
+        serviceResourcePause = null
         if (accountValid()) refresh() else changed()
     }
     protected abstract fun refresh()
@@ -84,12 +103,20 @@ abstract class FriendCardBaseFragment : ToolbarFragment() {
         requests.add(request)
         request.setCallback(object : Callback<T> {
             override fun onSuccess(result: T) { requests.remove(request); if (token == generation && shown && accountValid()) success(result) }
-            override fun onError(error: ErrorResponse) { requests.remove(request); if (token == generation && shown && accountValid()) failure(error) }
+            override fun onError(error: ErrorResponse) {
+                requests.remove(request)
+                if (token == generation && shown && accountValid()) {
+                    ServiceResourcePause.fromError(error)?.let { serviceResourcePause = it }
+                    failure(error)
+                }
+            }
         })
         request.exec(account)
     }
-    protected fun message(error: ErrorResponse): String = when (error) {
-        is MastodonErrorResponse -> if (error.httpStatus == 404 || error.httpStatus == 501) getString(R.string.friend_cards_unavailable) else error.error?.takeIf { it.isNotBlank() } ?: getString(R.string.fc_request_failed)
+    protected fun message(error: ErrorResponse): String = when {
+        // Full live pause text is bound above the screen; never freeze calendar words in draft/UI strings.
+        ServiceResourcePause.fromError(error) != null -> getString(R.string.fc_request_failed)
+        error is MastodonErrorResponse -> if (error.httpStatus == 404 || error.httpStatus == 501) getString(R.string.friend_cards_unavailable) else error.error?.takeIf { it.isNotBlank() } ?: getString(R.string.fc_request_failed)
         else -> getString(R.string.fc_request_failed)
     }
     protected fun definitive(error: ErrorResponse) = error is MastodonErrorResponse && error.httpStatus in 400..499 && error.httpStatus !in listOf(408, 425, 429)

@@ -91,7 +91,10 @@ public final class HumanCheckRequest extends MastodonAPIRequest<HumanCheckReques
 					try(response){
 						if(isCanceled()) return;
 						Reply reply=readResponse(response, endpoint, operationId);
-						if(reply.code!=null) finishError(new Failure(response.code(), reply.code, reply.operationId, reply.expiresIn));
+						if(reply.code!=null){
+							Failure failure=new Failure(response.code(), reply.code, reply.operationId, reply.expiresIn);
+							failure.setServiceResourcePause(reply.serviceResourcePause); finishError(failure);
+						}
 						else{ call=null; if(!isCanceled()) dispatchSuccess(reply); }
 					}catch(Exception invalid){ finishError(new Failure(0, "PROTOCOL")); }
 				}
@@ -133,6 +136,7 @@ public final class HumanCheckRequest extends MastodonAPIRequest<HumanCheckReques
 		public final String state, operationId, challengeId, challengeUrl, code;
 		public final int expiresIn;
 		public final boolean cancelled;
+		private org.joinmastodon.android.api.ServiceResourcePause serviceResourcePause;
 		private final Set<String> keys;
 		private Reply(Map<String, String> values){
 			keys=Set.copyOf(values.keySet()); state=values.get("state"); operationId=values.get("operation_id");
@@ -144,14 +148,17 @@ public final class HumanCheckRequest extends MastodonAPIRequest<HumanCheckReques
 	/** Reject duplicates, coercion, unknown fields, nested shapes and token-bearing payloads. */
 	public static final class ReplyAdapter extends TypeAdapter<Reply>{
 		@Override public Reply read(JsonReader reader) throws IOException{
-			Map<String, String> values=readFlatObject(reader, Set.of("state", "operation_id", "message", "challenge_id", "challenge_url", "expires_in", "cancelled", "error", "code"));
+			Map<String, String> values=readFlatObject(reader, Set.of("state", "operation_id", "message", "challenge_id", "challenge_url", "expires_in", "cancelled", "error", "code", "reset_at", "server_time", "reset_source"));
 			Reply reply=new Reply(values);
 			if(reply.operationId!=null && !uuid4(reply.operationId) || reply.challengeId!=null && !canonical43(reply.challengeId)
 					|| reply.challengeUrl!=null && !validPageUrl(reply.challengeUrl, reply.challengeId)) throw invalid();
 			if(reply.code!=null){
 				Set<String> expected="HUMAN_CHECK_REQUIRED".equals(reply.code) && reply.operationId!=null
 						? Set.of("error", "code", "operation_id", "expires_in") : Set.of("error", "code");
-				if(!reply.keys.equals(expected) || !knownCode(reply.code)) throw invalid();
+					if("D1_DAILY_QUOTA_EXHAUSTED".equals(reply.code)){
+						// This extension is error-only and flat: duplicate/unknown/nested/non-string members still fail.
+						if(!reply.keys.containsAll(Set.of("error", "code")) || !Set.of("error", "code", "reset_at", "server_time", "reset_source").containsAll(reply.keys)) throw invalid();
+					}else if(!reply.keys.equals(expected) || !knownCode(reply.code)) throw invalid();
 			}else if(reply.challengeId!=null){
 				if(!reply.keys.equals(Set.of("challenge_id", "challenge_url", "expires_in"))) throw invalid();
 			}else if(values.containsKey("cancelled")){
@@ -170,7 +177,7 @@ public final class HumanCheckRequest extends MastodonAPIRequest<HumanCheckReques
 		reader.beginObject(); Map<String, String> values=new HashMap<>(); int count=0;
 		while(reader.hasNext()){
 			String key=reader.nextName();
-			if(!allowed.contains(key) || values.containsKey(key) || ++count>10) throw invalid();
+			if(!allowed.contains(key) || values.containsKey(key) || ++count>12) throw invalid();
 			JsonToken token=reader.peek(); String value;
 			if("expires_in".equals(key)){
 				if(token!=JsonToken.NUMBER || !(value=reader.nextString()).matches("[1-9][0-9]{0,2}") || Integer.parseInt(value)>300) throw invalid();
@@ -213,7 +220,12 @@ public final class HumanCheckRequest extends MastodonAPIRequest<HumanCheckReques
 		if(buffer.size()>MAX_BYTES) throw invalid();
 		byte[] bytes=buffer.readByteArray();
 		String json=StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT).onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(bytes)).toString();
-		Reply reply=parse(json); validateReply(reply, response.code(), endpoint, operation); return reply;
+		Reply reply=parse(json); validateReply(reply, response.code(), endpoint, operation);
+		if("D1_DAILY_QUOTA_EXHAUSTED".equals(reply.code)){
+			reply.serviceResourcePause=org.joinmastodon.android.api.ServiceResourcePause.fromResponse(response, json);
+			if(reply.serviceResourcePause==null) throw invalid();
+		}
+		return reply;
 	}
 	public static void validateReply(Reply reply, int status, Endpoint endpoint, String operation) throws IOException{
 		if(reply==null || reply.operationId!=null && !operation.equals(reply.operationId)) throw invalid();
@@ -240,11 +252,15 @@ public final class HumanCheckRequest extends MastodonAPIRequest<HumanCheckReques
 			case "HUMAN_CHECK_EXPIRED", "HUMAN_CHECK_CANCELLED", "HUMAN_CHECK_POLICY_CHANGED", "HUMAN_CHECK_DELIVERY_UNKNOWN" -> status==409;
 			case "AUTH_RATE_LIMITED", "HUMAN_CHECK_RATE_LIMITED" -> status==429;
 			case "HUMAN_CHECK_UNAVAILABLE", "EMAIL_DELIVERY_UNAVAILABLE" -> status==503;
+			case "D1_DAILY_QUOTA_EXHAUSTED" -> status==503 || status==429;
 			default -> false;
 		};
 	}
 	private static IOException invalid(){ return new IOException("Invalid human-check response"); }
-	public static final class Failure extends ErrorResponse{
+	public static final class Failure extends ErrorResponse implements org.joinmastodon.android.api.ServiceResourcePause.ErrorMetadata{
+		public org.joinmastodon.android.api.ServiceResourcePause serviceResourcePause;
+		@Override public void setServiceResourcePause(org.joinmastodon.android.api.ServiceResourcePause pause){ serviceResourcePause=pause; }
+		@Override public org.joinmastodon.android.api.ServiceResourcePause getServiceResourcePause(){ return serviceResourcePause; }
 		public final int status, message, expiresIn;
 		public final String code, operationId;
 		public Failure(int status, String code){ this(status, code, null, 0); }
@@ -262,7 +278,15 @@ public final class HumanCheckRequest extends MastodonAPIRequest<HumanCheckReques
 				default -> R.string.human_check_failed;
 			};
 		}
-		@Override public void bindErrorView(View view){ if(view instanceof TextView text) text.setText(message); }
-		@Override public void showToast(Context context){ Toast.makeText(context, message, Toast.LENGTH_LONG).show(); }
+		@Override public void bindErrorView(View view){
+			if(view instanceof TextView text){
+				if(serviceResourcePause!=null) serviceResourcePause.bind(text);
+				else{ org.joinmastodon.android.api.ServiceResourcePause.unbind(text); text.setText(message); }
+			}
+		}
+		@Override public void showToast(Context context){
+			if(context==null) return;
+			if(serviceResourcePause!=null) serviceResourcePause.show(context); else Toast.makeText(context, message, Toast.LENGTH_LONG).show();
+		}
 	}
 }

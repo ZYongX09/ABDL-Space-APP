@@ -100,6 +100,8 @@ public final class SeamlessDetailActivity extends FragmentStackActivity implemen
 					case FRIEND_CARD -> new FriendCardDetailFragment();
 					default -> throw new IllegalStateException("Unknown detail route");
 				};
+				// Match Nav.go's AppKit toolbar contract even though this detail is the Activity root.
+				rootArgs.putBoolean("_can_go_back", true);
 				root.setArguments(rootArgs);
 				showFragment(root);
 			});

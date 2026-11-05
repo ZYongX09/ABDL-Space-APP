@@ -48,7 +48,16 @@ public abstract class TranslationRequest<T> extends MastodonAPIRequest<T>{
 			if(httpStatus==409) return R.string.post_translation_preferences_conflict;
 			return R.string.post_translation_failed;
 		}
-		@Override public void showToast(Context context){ if(context!=null) Toast.makeText(context, localizedMessage(), Toast.LENGTH_LONG).show(); }
-		@Override public void bindErrorView(View view){ ((TextView)view.findViewById(R.id.error_text)).setText(localizedMessage()); }
+		@Override public String localizedMessage(Context context){ return serviceResourcePause!=null ? serviceResourcePause.message(context) : context.getString(localizedMessage()); }
+		@Override public void showToast(Context context){
+			if(context==null) return;
+			if(serviceResourcePause!=null) serviceResourcePause.show(context);
+			else Toast.makeText(context, localizedMessage(), Toast.LENGTH_LONG).show();
+		}
+		@Override public void bindErrorView(View view){
+			TextView text=view.findViewById(R.id.error_text);
+			if(serviceResourcePause!=null) serviceResourcePause.bind(text);
+			else{ org.joinmastodon.android.api.ServiceResourcePause.unbind(text); text.setText(localizedMessage()); }
+		}
 	}
 }

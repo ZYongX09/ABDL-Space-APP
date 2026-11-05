@@ -1,22 +1,68 @@
 package org.joinmastodon.android.novel.app
 
 import android.content.Context
+import android.os.SystemClock
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.delay
+import org.joinmastodon.android.api.ServiceResourcePause
+import java.util.UUID
 import org.joinmastodon.android.R
 import org.joinmastodon.noveleditor.EditorMessages
 import org.joinmastodon.noveleditor.ImportException
 
 /** Display-only resolution. Stable codes may be stored; user text and frozen metadata are untouched. */
 internal fun novelMessage(context: Context, message: String): String {
+    NovelPauseMessages.find(message)?.let { return it.message(context) }
+    if (NovelPauseMessages.isKey(message)) return context.getString(R.string.novel_en_request_incomplete)
     val resource = novelMessageResources[message] ?: return EditorMessages.localize(context, message)
     return context.getString(resource)
 }
 
 @Composable
-internal fun novelMessage(message: String): String = novelMessage(LocalContext.current, message)
+internal fun novelMessage(message: String): String {
+    val context = LocalContext.current
+    val pause = NovelPauseMessages.find(message) ?: return novelMessage(context, message)
+    val owner = LocalLifecycleOwner.current
+    // Only displayed pause text subscribes; no network, mutation, draft cache or background timer.
+    val text by produceState(pause.message(context), pause, context, owner) {
+        owner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            while (true) { value = pause.message(context); delay(1000) }
+        }
+    }
+    return text
+}
 
-internal fun Exception.novelUserMessage(context: Context, fallback: Int): String = when (this) {
+/** Bounded process-only handles: never store an Activity, bearer, raw body or localized calendar word. */
+internal object NovelPauseMessages {
+    private const val PREFIX = "novel_pause:"
+    private const val TTL = 48 * 60 * 60 * 1000L
+    private const val LIMIT = 64
+    private data class Entry(val pause: ServiceResourcePause, val created: Long)
+    private val entries = linkedMapOf<String, Entry>()
+    @Synchronized fun retain(pause: ServiceResourcePause): String {
+        trim()
+        val key = PREFIX + UUID.randomUUID()
+        entries[key] = Entry(pause, SystemClock.elapsedRealtime())
+        while (entries.size > LIMIT) entries.remove(entries.keys.first())
+        return key
+    }
+    @Synchronized fun find(key: String): ServiceResourcePause? { trim(); return entries[key]?.pause }
+    fun isKey(key: String) = key.startsWith(PREFIX)
+    private fun trim() {
+        val now = SystemClock.elapsedRealtime()
+        entries.entries.removeAll { now < it.value.created || now - it.value.created >= TTL }
+    }
+}
+
+internal fun Exception.novelUserMessage(context: Context, fallback: Int): String {
+    if (this is NovelAppApiException) serviceResourcePause?.let { return NovelPauseMessages.retain(it) }
+    return when (this) {
     is org.joinmastodon.android.novel.app.editor.NovelCoverUploadException -> org.joinmastodon.android.novel.app.editor.coverFailureMessage(context, failure)
     is ImportException -> userMessage(context)
     is NovelAppApiException -> context.getString(when (status) {
@@ -28,6 +74,7 @@ internal fun Exception.novelUserMessage(context: Context, fallback: Int): String
         else -> R.string.novel_en_request_incomplete
     })
     else -> message?.let { novelMessage(context, it) } ?: context.getString(fallback)
+    }
 }
 
 // Filled from explicit resource IDs, not reflection or Android resource-name lookup.

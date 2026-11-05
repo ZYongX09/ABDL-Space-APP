@@ -42,14 +42,15 @@ public final class NBWLoginFlow{
 		public final long generation, owner;
 		private Handle(long generation, long owner){ this.generation=generation; this.owner=owner; }
 	}
-	public enum Phase{ NEW, STARTING, WAITING, EXCHANGING, INSTALLING }
+	public enum Phase{ NEW, STARTING, WAITING, EXCHANGING, INSTALLING, FAILED }
 	public static final class Snapshot{
 		public final Phase phase;
 		public final int message;
+		public final org.joinmastodon.android.api.ServiceResourcePause serviceResourcePause;
 		public final long remainingMillis;
 		private final boolean hasCompletionCode;
 		private Snapshot(Pending p){
-			phase=p.phase; message=p.message; hasCompletionCode=p.completionCode!=null;
+			phase=p.phase; message=p.message; serviceResourcePause=p.serviceResourcePause; hasCompletionCode=p.completionCode!=null;
 			long now=SystemClock.elapsedRealtime();
 			remainingMillis=Math.max(0, Math.min(TTL_MS-(now-p.created), hasCompletionCode || phase==Phase.INSTALLING ? COMPLETION_TTL_MS-(now-p.completionReceived) : TTL_MS));
 		}
@@ -84,6 +85,7 @@ public final class NBWLoginFlow{
 		boolean hintHandled;
 		Phase phase=Phase.NEW;
 		int message=R.string.nbw_login_starting;
+		org.joinmastodon.android.api.ServiceResourcePause serviceResourcePause;
 		MastodonAPIRequest<?> request;
 		Pending(long generation, long owner){
 			this.generation=generation; this.owner=owner; created=SystemClock.elapsedRealtime(); verifier=newVerifier();
@@ -145,6 +147,10 @@ public final class NBWLoginFlow{
 		if(isCurrent(handle) && pending.phase==Phase.INSTALLING) pending.request=request;
 		else if(request!=null) request.cancel();
 	}
+	public synchronized int installationFailure(Handle handle, ErrorResponse error){
+		if(!isCurrent(handle) || pending.phase!=Phase.INSTALLING) return R.string.nbw_login_expired;
+		return failure(handle, pending.request, error);
+	}
 	/** Unknown HTTP errors are terminal. Only explicit pending/service failures or transport failure retry. */
 	public synchronized int failure(Handle handle, MastodonAPIRequest<?> request, ErrorResponse error){
 		if(!isCurrent(handle) || pending.request!=request) return R.string.nbw_login_expired;
@@ -153,6 +159,13 @@ public final class NBWLoginFlow{
 		if(error instanceof NBWLoginRequest.LoginError known){ message=known.message; retry=known.retryable; }
 		else if(error instanceof MastodonErrorResponse transport && transport.httpStatus<=0){ message=R.string.nbw_login_network_error; retry=true; }
 		pending.request=null;
+		var pause=org.joinmastodon.android.api.ServiceResourcePause.fromError(error);
+		if(pause!=null){
+			// Do not keep a completion code or make an exchange retryable because a display descriptor exists.
+			pending.verifier=pending.flow=pending.completionCode=null;
+			pending.phase=Phase.FAILED; pending.message=message; pending.serviceResourcePause=pause;
+			return message;
+		}
 		if(retry && (pending.phase==Phase.STARTING || pending.phase==Phase.EXCHANGING)){
 			pending.phase=pending.phase==Phase.STARTING ? Phase.NEW : Phase.WAITING; pending.message=message;
 		}else clear();
@@ -167,7 +180,7 @@ public final class NBWLoginFlow{
 	}
 	private void releaseRequest(boolean recreating){
 		MastodonAPIRequest<?> request=pending.request; pending.request=null;
-		if(recreating && (pending.phase==Phase.WAITING || pending.phase==Phase.EXCHANGING)){
+		if(recreating && (pending.phase==Phase.WAITING || pending.phase==Phase.EXCHANGING || pending.phase==Phase.FAILED)){
 			if(pending.phase==Phase.EXCHANGING){ pending.phase=Phase.WAITING; pending.message=R.string.nbw_login_network_error; }
 		}else clear();
 		if(request!=null) request.cancel();

@@ -30,6 +30,7 @@ import org.joinmastodon.android.QQAuthActivity;
 import org.joinmastodon.android.NBWLoginActivity;
 import org.joinmastodon.android.R;
 import org.joinmastodon.android.api.requests.accounts.GetOwnAccount;
+import org.joinmastodon.android.auth.IndependentAuthResponse;
 import org.joinmastodon.android.api.session.AccountSessionManager;
 import org.joinmastodon.android.model.Account;
 import org.joinmastodon.android.model.Application;
@@ -185,6 +186,7 @@ public class LoginPasswordFragment extends AppKitFragment {
         String password = passwordEdit.getText().toString();
         if (TextUtils.isEmpty(email) || TextUtils.isEmpty(password)) return;
 
+        final IndependentAuthResponse.Owner owner = new IndependentAuthResponse.Owner(this);
         btnLogin.setEnabled(false);
         ProgressDialog progress = new ProgressDialog(getActivity());
         progress.setMessage(getString(R.string.loading));
@@ -200,22 +202,28 @@ public class LoginPasswordFragment extends AppKitFragment {
             .enqueue(new okhttp3.Callback() {
                 @Override
                 public void onFailure(Call call, IOException e) {
-                    if (getActivity() == null) return;
-                    getActivity().runOnUiThread(() -> {
+                    if (call.isCanceled()) return;
+                    owner.activity.runOnUiThread(() -> {
                         progress.dismiss();
-                        if (btnLogin != null) btnLogin.setEnabled(true);
-                        Toast.makeText(getActivity(), getString(R.string.general_network_error, e.getMessage()), Toast.LENGTH_SHORT).show();
+                        if (!owner.current()) return;
+                        if (btnLogin != null) updateButtonState();
+                        if (owner.foreground()) Toast.makeText(getActivity(), getString(R.string.general_network_error, e.getMessage()), Toast.LENGTH_SHORT).show();
                     });
                 }
 
                 @Override
                 public void onResponse(Call call, Response response) throws IOException {
-                    final String responseBody = (response.body() != null) ? response.body().string() : "";
-                    if (getActivity() == null) return;
-
-                    getActivity().runOnUiThread(() -> {
+                    final IndependentAuthResponse result = IndependentAuthResponse.read(response);
+                    if (call.isCanceled()) return;
+                    owner.activity.runOnUiThread(() -> {
+                        if (!owner.current()) { progress.dismiss(); return; }
+                        if (result.pause != null) {
+                            progress.dismiss(); updateButtonState();
+                            if (owner.foreground()) result.pause.show(getActivity());
+                            return;
+                        }
                         if (response.isSuccessful()) {
-                            AuthResponse authResponse = new Gson().fromJson(responseBody, AuthResponse.class);
+                            AuthResponse authResponse = result.parse(AuthResponse.class);
                             if (authResponse != null && authResponse.token != null) {
                                 Token token = new Token();
                                 token.accessToken = authResponse.token;
@@ -225,7 +233,7 @@ public class LoginPasswordFragment extends AppKitFragment {
                                         @Override
                                         public void onSuccess(Account account) {
                                             progress.dismiss();
-                                            if (getActivity() == null) return;
+                                            if (!owner.current()) return;
 
                                             InstanceV2 instance = new InstanceV2();
                                             instance.domain = "abdl-space.top";
@@ -253,21 +261,21 @@ public class LoginPasswordFragment extends AppKitFragment {
                                         @Override
                                         public void onError(ErrorResponse error) {
                                             progress.dismiss();
-                                            if (btnLogin != null) btnLogin.setEnabled(true);
-                                            if (getActivity() == null) return;
-                                            error.showToast(getActivity());
+                                            if (!owner.current()) return;
+                                            updateButtonState();
+                                            if (owner.foreground()) error.showToast(getActivity());
                                         }
                                     })
                                     .exec("abdl-space.top", token);
                             } else {
                                 progress.dismiss();
                                 if (btnLogin != null) btnLogin.setEnabled(true);
-                                Toast.makeText(getActivity(), getString(R.string.general_login_failed, responseBody), Toast.LENGTH_SHORT).show();
+                                if (owner.foreground()) Toast.makeText(getActivity(), getString(R.string.general_login_failed, result.errorMessage(getString(R.string.error))), Toast.LENGTH_LONG).show();
                             }
                         } else {
                             progress.dismiss();
                             if (btnLogin != null) btnLogin.setEnabled(true);
-                            Toast.makeText(getActivity(), getString(R.string.general_login_failed, responseBody), Toast.LENGTH_SHORT).show();
+                            if (owner.foreground()) Toast.makeText(getActivity(), getString(R.string.general_login_failed, result.errorMessage(getString(R.string.error))), Toast.LENGTH_LONG).show();
                         }
                     });
                 }

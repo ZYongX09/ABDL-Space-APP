@@ -194,9 +194,7 @@ public class MastodonAPIController{
 						}
 						if(BuildConfig.DEBUG && !req.isSensitiveRequest())
 							Log.d(TAG, logTag(session)+hreq+" received response: "+response);
-						synchronized(req){
-							req.okhttpCall=null;
-						}
+						// Keep the call cancellable until its (bounded) body has finished reading.
 						if(BuildConfig.DEBUG){
 							String deprecationHeader=response.header("Deprecation");
 							if(deprecationHeader!=null && deprecationHeader.startsWith("@")){
@@ -225,8 +223,8 @@ public class MastodonAPIController{
 								req.onError("服务器返回空响应", response.code(), null);
 								return;
 							}
-							Reader reader=boundedResponseReader(req, body);
 							if(response.isSuccessful()){
+								Reader reader=boundedResponseReader(req, body);
 								T respObj;
 								try{
 									if(BuildConfig.DEBUG && !req.isSensitiveRequest()){
@@ -267,43 +265,24 @@ public class MastodonAPIController{
 
 								req.onSuccess(respObj);
 							}else{
+								ErrorResponse error;
 								try{
-									JsonObject error=JsonParser.parseReader(reader).getAsJsonObject();
-									if(!req.isSensitiveRequest()) Log.w(TAG, logTag(session)+response+" received error: "+error);
-									ErrorResponse customError=req.deserializeError(error, response.code());
-									if(customError!=null){
-										req.onError(customError);
-									}else if(error.has("details")){
-										MastodonDetailedErrorResponse err=new MastodonDetailedErrorResponse(error.get("error").getAsString(), response.code(), null);
-										HashMap<String, List<MastodonDetailedErrorResponse.FieldError>> details=new HashMap<>();
-										JsonObject errorDetails=error.getAsJsonObject("details");
-										for(String key:errorDetails.keySet()){
-											ArrayList<MastodonDetailedErrorResponse.FieldError> fieldErrors=new ArrayList<>();
-											for(JsonElement el:errorDetails.getAsJsonArray(key)){
-												JsonObject eobj=el.getAsJsonObject();
-												MastodonDetailedErrorResponse.FieldError fe=new MastodonDetailedErrorResponse.FieldError();
-												fe.description=eobj.get("description").getAsString();
-												fe.error=eobj.get("error").getAsString();
-												fieldErrors.add(fe);
-											}
-											details.put(key, fieldErrors);
-										}
-										err.detailedErrors=details;
-										req.onError(err);
-									}else{
-										req.onError(error.get("error").getAsString(), response.code(), null);
-									}
-								}catch(JsonIOException|JsonSyntaxException x){
-									req.onError(response.code()+" "+response.message(), response.code(), x);
-								}catch(Exception x){
-									req.onError("Error parsing an API error", response.code(), x);
+									JsonObject json=ServiceResourcePause.parseErrorObject(readErrorBody(req, body));
+									error=decodeError(req, response, json);
+								}catch(IOException invalid){ error=null; }
+								if(!req.canceled && req.acceptsRemoteResponse()){
+									if(error!=null) req.onError(error);
+									else req.onError("HTTP "+response.code(), response.code(), null);
 								}
 							}
 						}catch(Exception x){
 							if(req.responseByteLimit()>0){ req.onError("Invalid NBW metadata response",response.code(),null); return; }
 							Log.w(TAG, "onResponse: error processing response", x);
 							onFailure(call, (IOException) new IOException(x).fillInStackTrace());
+						}finally{
+							synchronized(req){ if(req.okhttpCall==call) req.okhttpCall=null; }
 						}
+
 					}
 				});
 			}catch(Exception x){
@@ -312,6 +291,64 @@ public class MastodonAPIController{
 				req.onError(x.getLocalizedMessage(), 0, x);
 			}
 		}, 0);
+	}
+
+	/** Read at most limit+1 actual bytes, once. The owning response closes/cancels the remainder. */
+	static String readErrorBody(MastodonAPIRequest<?> request, ResponseBody body) throws IOException{
+		int requested=request.responseByteLimit();
+		int limit=requested>0 ? Math.min(requested, ServiceResourcePause.MAX_ERROR_BYTES) : ServiceResourcePause.MAX_ERROR_BYTES;
+		if(body.contentLength()>limit) throw new IOException("Error response too large");
+		if(requested>0 && (body.contentType()==null || !"application".equals(body.contentType().type()) || !"json".equals(body.contentType().subtype()))) throw new IOException("Invalid error content type");
+		java.io.ByteArrayOutputStream output=new java.io.ByteArrayOutputStream();
+		java.io.InputStream input=body.byteStream();
+		byte[] chunk=new byte[2048];
+		int count;
+		while((count=input.read(chunk, 0, Math.min(chunk.length, limit+1-output.size())))!=-1){
+			output.write(chunk, 0, count);
+			if(output.size()>limit) throw new IOException("Error response too large");
+		}
+		byte[] bytes=output.toByteArray();
+		try{
+			return java.nio.charset.StandardCharsets.UTF_8.newDecoder()
+					.onMalformedInput(java.nio.charset.CodingErrorAction.REPORT)
+					.onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT)
+					.decode(java.nio.ByteBuffer.wrap(bytes)).toString();
+		}catch(java.nio.charset.CharacterCodingException invalid){ throw new IOException("Invalid error encoding"); }
+	}
+
+	/** Preserve the original typed/custom error; presentation is additional metadata only. */
+	static ErrorResponse decodeError(MastodonAPIRequest<?> request, Response response, JsonObject body){
+		if(body==null) return null;
+		ServiceResourcePause pause=ServiceResourcePause.fromResponse(response, body);
+		ErrorResponse result;
+		try{
+			result=request.deserializeError(body, response.code());
+			if(result==null && body.has("details")){
+				MastodonDetailedErrorResponse detailed=new MastodonDetailedErrorResponse(errorText(body), response.code(), null);
+				HashMap<String, List<MastodonDetailedErrorResponse.FieldError>> details=new HashMap<>();
+				JsonObject errorDetails=body.getAsJsonObject("details");
+				for(String key:errorDetails.keySet()){
+					ArrayList<MastodonDetailedErrorResponse.FieldError> fields=new ArrayList<>();
+					for(JsonElement element:errorDetails.getAsJsonArray(key)){
+						JsonObject object=element.getAsJsonObject();
+						MastodonDetailedErrorResponse.FieldError field=new MastodonDetailedErrorResponse.FieldError();
+						field.description=object.get("description").getAsString(); field.error=object.get("error").getAsString(); fields.add(field);
+					}
+					details.put(key, fields);
+				}
+				detailed.detailedErrors=details; result=detailed;
+			}
+		}catch(RuntimeException malformed){ result=null; }
+		if(result==null) result=new MastodonErrorResponse(errorText(body), response.code(), null);
+		ServiceResourcePause.attach(result, pause);
+		return result;
+	}
+
+	private static String errorText(JsonObject body){
+		JsonElement value=body.get("error");
+		if(value==null || !value.isJsonPrimitive() || !value.getAsJsonPrimitive().isString()) return "API request failed";
+		String text=value.getAsString();
+		return text.indexOf('<')>=0 || text.indexOf('>')>=0 ? "API request failed" : text;
 	}
 
 	private static Reader boundedResponseReader(MastodonAPIRequest<?> request, ResponseBody body) throws IOException{

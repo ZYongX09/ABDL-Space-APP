@@ -14,7 +14,7 @@
 
 ABDL Space Android 客户端与网页端共用账户和社区数据，在 Mastodon 兼容接口之上接入纸尿裤评价、交友、私信、相册、小说阅读与社区安全等业务。它不是网页套壳，也不是只连接任意 Mastodon 实例即可使用全部扩展功能的通用客户端；业务功能需要配套的 ABDL Space 后端。
 
-当前正式版为 **3.2.0（内部版本号 34）**，最低支持 Android 8.0。普通用户可从[官网下载页](https://abdl-space.top/app)或 [GitHub Release](https://github.com/ZYongX09/ABDL-Space-APP/releases/tag/v3.2.0) 获取使用既有正式签名的安装包；完整变更见 [3.2.0 更新日志](docs/release-3.2.0.md)。开发线版本已更新为 **3.3.0-beta（35）**，不等于正式发布，反馈修复与验证边界见 [beta35 开发记录](docs/beta35-feedback-2026-11-03.md)。
+当前正式版为 **3.2.0（内部版本号 34）**，最低支持 Android 8.0。普通用户可从[官网下载页](https://abdl-space.top/app)或 [GitHub Release](https://github.com/ZYongX09/ABDL-Space-APP/releases/tag/v3.2.0) 获取使用既有正式签名的安装包；完整变更见 [3.2.0 更新日志](docs/release-3.2.0.md)。开发线版本已更新为 **3.3.0（36）**，不等于正式发布；D1资源暂停提示与旧版兼容范围见 [code36 开发记录](docs/d1-service-pause-code36-2026-11-04.md)，此前反馈修复见 [beta35 开发记录](docs/beta35-feedback-2026-11-03.md)。
 
 `main` 保存正式发布源码，`develop` 用于后续开发，具体版本配置见 [应用构建配置](mastodon/build.gradle)。源码合并、构建、上传安装包和更新线上版本信息是独立步骤，推送 `main` 不会自动完成官网发布。
 

@@ -16,6 +16,7 @@ import okhttp3.Request
 import okhttp3.RequestBody
 import okhttp3.Response
 import org.joinmastodon.android.api.MastodonAPIController
+import org.joinmastodon.android.api.ServiceResourcePause
 import org.joinmastodon.android.api.session.AccountSession
 import org.joinmastodon.android.novel.app.models.ChapterBody
 import org.joinmastodon.android.novel.app.models.NovelJson
@@ -36,8 +37,9 @@ class NovelRequestCancellation {
     @Synchronized internal fun detach(call: Call) { calls.remove(call) }
 }
 
-class NovelAppApiException(
+class NovelAppApiException @JvmOverloads constructor(
     val status: Int, val code: String, val payload: JSONObject?, message: String,
+    val serviceResourcePause: ServiceResourcePause? = null,
 ) : IOException(message)
 
 /** Injectable transport seam. Suspend cancellation always cancels its HTTP call. */
@@ -153,10 +155,15 @@ class NovelAppApi private constructor(
     private fun decode(response: Response): JSONObject = response.use {
         if (it.priorResponse() != null || it.code() in 300..399) throw IOException("Novel API redirects are not allowed")
         val body = it.body() ?: throw IOException("Novel API returned no response")
-        if (body.contentLength() > MAX_RESPONSE_BYTES) throw IOException("Novel response exceeds 10 MiB")
+        val limit = if (it.isSuccessful) MAX_RESPONSE_BYTES else MAX_ERROR_BYTES
+        if (body.contentLength() > limit) throw IOException("Novel response exceeds its size limit")
         val source = body.source()
-        if (source.request(MAX_RESPONSE_BYTES + 1L) && source.buffer().size() > MAX_RESPONSE_BYTES) throw IOException("Novel response exceeds 10 MiB")
+        if (source.request(limit + 1L) && source.buffer().size() > limit) throw IOException("Novel response exceeds its size limit")
         val text = source.readUtf8()
+        if (!it.isSuccessful) {
+            val pause = ServiceResourcePause.fromResponse(it, text)
+            if (pause != null) throw NovelAppApiException(it.code(), "D1_DAILY_QUOTA_EXHAUSTED", null, "Novel service resources paused", pause)
+        }
         val parsed = runCatching { JSONObject(text) }.getOrNull()
         if (!it.isSuccessful) throw NovelAppApiException(it.code(), parsed?.optString("code")?.ifBlank { "http_${it.code()}" } ?: "http_${it.code()}", parsed, parsed?.optString("error")?.ifBlank { null } ?: "Novel request failed (${it.code()})")
         return parsed ?: throw IOException("Novel API returned invalid JSON")
@@ -166,6 +173,7 @@ class NovelAppApi private constructor(
         const val BASE_URL = "https://api.abdl-space.top/api/v1/novels/app"
         const val MAX_REQUEST_BYTES = 2 * 1024 * 1024
         const val MAX_RESPONSE_BYTES = 10 * 1024 * 1024
+        const val MAX_ERROR_BYTES = 32 * 1024
         private val JSON = MediaType.parse("application/json; charset=utf-8")
         @JvmStatic fun segment(value: String): String { require(value.isNotBlank()); return URLEncoder.encode(value, "UTF-8").replace("+", "%20") }
         @JvmStatic fun query(vararg values: Pair<String, String?>): String = values.filter { !it.second.isNullOrBlank() }.joinToString("&", prefix = "?") { segment(it.first) + "=" + segment(it.second!!) }.let { if (it == "?") "" else it }

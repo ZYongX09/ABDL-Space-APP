@@ -199,7 +199,7 @@ public class LoginEmailFragment extends AppKitFragment {
     }
 
     private void renderHumanCheck() {
-        if (getActivity() == null || getView() == null || humanCheckHandle == null) return;
+        if (getActivity() == null || getView() == null || !isResumed() || isHidden() || humanCheckHandle == null) return;
         var snapshot = humanCheck.snapshot(humanCheckHandle);
         if (snapshot == null) { clearHumanCheck(); updateButtonState(); return; }
         boolean waiting = snapshot.phase == org.joinmastodon.android.auth.HumanCheckCoordinator.Phase.SENDING;
@@ -222,9 +222,11 @@ public class LoginEmailFragment extends AppKitFragment {
         } else if (snapshot.canQuery) {
             btnSendCode.setText(R.string.human_check_query); btnSendCode.setEnabled(true);
             emailEdit.setEnabled(false);
-            Toast.makeText(getActivity(), snapshot.message, Toast.LENGTH_LONG).show();
+            if (snapshot.serviceResourcePause != null) snapshot.serviceResourcePause.show(getActivity());
+            else Toast.makeText(getActivity(), snapshot.message, Toast.LENGTH_LONG).show();
         } else if (!snapshot.busy && !humanCheckLaunched) {
-            Toast.makeText(getActivity(), snapshot.message, Toast.LENGTH_LONG).show();
+            if (snapshot.serviceResourcePause != null) snapshot.serviceResourcePause.show(getActivity());
+            else Toast.makeText(getActivity(), snapshot.message, Toast.LENGTH_LONG).show();
             clearHumanCheck(); updateButtonState();
         }
     }
@@ -259,7 +261,7 @@ public class LoginEmailFragment extends AppKitFragment {
         }
     }
 
-    @Override public void onResume() { super.onResume(); if (nbwButtonBinding != null) nbwButtonBinding.resume(); }
+    @Override public void onResume() { super.onResume(); if (nbwButtonBinding != null) nbwButtonBinding.resume(); renderHumanCheck(); }
     @Override public void onPause() { if (nbwButtonBinding != null) nbwButtonBinding.pause(); super.onPause(); }
     @Override public void onDestroyView() {
         if (nbwButtonBinding != null) { nbwButtonBinding.dispose(); nbwButtonBinding = null; }

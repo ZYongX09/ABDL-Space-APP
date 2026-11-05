@@ -39,6 +39,7 @@ public class MastodonApp extends Application{
 		super.onCreate();
 		org.joinmastodon.android.ui.utils.AppLanguageManager.install(this);
 		context=getApplicationContext();
+		org.joinmastodon.android.api.ServiceResourcePause.install(this);
 		String processName=getCurrentProcessName();
 		if(BuildConfig.DEBUG && getPackageName().equals(processName)){
 			WebView.setWebContentsDebuggingEnabled(true);

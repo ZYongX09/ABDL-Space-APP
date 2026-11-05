@@ -125,6 +125,28 @@ public class HumanCheckRequestHttpTest{
 		run(send(),new MockResponse().setResponseCode(302).setHeader("Location","https://abdl-space.top/api/auth/send-code").setBody("{}"),false,sendKeys());
 		assertNull(server.takeRequest(100,TimeUnit.MILLISECONDS));
 	}
+	@Test public void servicePauseExtensionRequiresStrictTrustedErrorEnvelope() throws Exception{
+		String json="{\"error\":\"paused\",\"code\":\"D1_DAILY_QUOTA_EXHAUSTED\",\"reset_at\":\"2026-11-05T00:00:00Z\",\"server_time\":\"2026-11-04T12:00:00Z\",\"reset_source\":\"estimated_utc_midnight\"}";
+		try(Response response=pausedResponse(503, json, HumanCheckRequest.ORIGIN)){
+			var reply=HumanCheckRequest.readResponse(response, Endpoint.SEND_CODE, OP);
+			assertEquals("D1_DAILY_QUOTA_EXHAUSTED", reply.code); assertNull(reply.state); assertNull(reply.operationId);
+		}
+		for(String invalid:new String[]{json.replace("\"paused\"", "\"paused\",\"code\":\"D1_DAILY_QUOTA_EXHAUSTED\""), json.replace("\"paused\"", "{}"), json.replace("\"paused\"", "\"paused\",\"token\":\"secret\""), json.replace("\"2026-11-05T00:00:00Z\"", "0"), json+"{}"}){
+			try(Response response=pausedResponse(503, invalid, HumanCheckRequest.ORIGIN)){
+				assertThrows(IOException.class, ()->HumanCheckRequest.readResponse(response, Endpoint.SEND_CODE, OP));
+			}
+		}
+		try(Response response=pausedResponse(200, json, HumanCheckRequest.ORIGIN)){
+			assertThrows(IOException.class, ()->HumanCheckRequest.readResponse(response, Endpoint.SEND_CODE, OP));
+		}
+		try(Response response=pausedResponse(503, json, "https://untrusted.example")){
+			assertThrows(IOException.class, ()->HumanCheckRequest.readResponse(response, Endpoint.SEND_CODE, OP));
+		}
+	}
+	private static Response pausedResponse(int status, String body, String origin){
+		return new Response.Builder().request(new Request.Builder().url(origin+HumanCheckRequest.PREFIX+"/send-code").build())
+				.protocol(Protocol.HTTP_1_1).code(status).message("paused").body(ResponseBody.create(MediaType.parse("application/json"), body)).build();
+	}
 	@Test public void processingUnknownAndErrorMessagesUseOnlyLocalResources() throws Exception{
 		run(send(),new MockResponse().setResponseCode(202).setBody("{\"state\":\"processing\",\"operation_id\":\""+OP+"\"}"),true,sendKeys());
 		for(String code:new String[]{"HUMAN_CHECK_POLICY_CHANGED","HUMAN_CHECK_DELIVERY_UNKNOWN","HUMAN_CHECK_EXPIRED","HUMAN_CHECK_CANCELLED"}){

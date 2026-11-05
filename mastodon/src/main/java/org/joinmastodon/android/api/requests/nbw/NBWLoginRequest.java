@@ -199,7 +199,10 @@ public final class NBWLoginRequest<T> extends MastodonAPIRequest<T>{
 			code=body.get("code").getAsString();
 		return new LoginError(status, code);
 	}
-	public static final class LoginError extends ErrorResponse{
+	public static final class LoginError extends ErrorResponse implements org.joinmastodon.android.api.ServiceResourcePause.ErrorMetadata{
+		public org.joinmastodon.android.api.ServiceResourcePause serviceResourcePause;
+		@Override public void setServiceResourcePause(org.joinmastodon.android.api.ServiceResourcePause pause){ serviceResourcePause=pause; }
+		@Override public org.joinmastodon.android.api.ServiceResourcePause getServiceResourcePause(){ return serviceResourcePause; }
 		public final int message;
 		public final boolean retryable;
 		public LoginError(int status, String code){
@@ -213,7 +216,15 @@ public final class NBWLoginRequest<T> extends MastodonAPIRequest<T>{
 			else if(status==503 && "NBW_LOGIN_UNAVAILABLE".equals(code)){ text=R.string.nbw_login_unavailable; }
 			message=text; retryable=retry;
 		}
-		@Override public void bindErrorView(View view){ if(view instanceof TextView text) text.setText(message); }
-		@Override public void showToast(Context context){ Toast.makeText(context, message, Toast.LENGTH_LONG).show(); }
+		@Override public void bindErrorView(View view){
+			if(view instanceof TextView text){
+				if(serviceResourcePause!=null) serviceResourcePause.bind(text);
+				else{ org.joinmastodon.android.api.ServiceResourcePause.unbind(text); text.setText(message); }
+			}
+		}
+		@Override public void showToast(Context context){
+			if(context==null) return;
+			if(serviceResourcePause!=null) serviceResourcePause.show(context); else Toast.makeText(context, message, Toast.LENGTH_LONG).show();
+		}
 	}
 }
