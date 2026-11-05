@@ -43,7 +43,7 @@
 - 此辅助验证使用过滤后的旧release相邻类缓存，未证明相邻缓存与全仓源码一致；SDK仅真实字节码静态编译并从JUnit运行classpath排除。没有真实HTTP、SharedPreferences、Activity生命周期、SDK付款或UI验收，不替代Gradle完整客户端门禁。原Gradle支付8类实际仍未执行，仍无APK/截图、未合develop/main。
 - 结果：`~/.local/share/abdl-sponsor-alipay-20261105/aux-payment-javac-junit/20261105T102725Z-gk_pdbmx/result.json`（auxiliary_only=true、full_android_gate=false）；诊断`resource-diagnosis-followup.json`。代码检查点Android b9e0c28f、Backend231cbfc已推功能分支；本补充仅记录验证事实，不改生产或收款配置。
 
-## GitHub验证备用方案（2026-11-05，尚未运行）
+## GitHub验证备用方案（2026-11-05，已有环境阶段失败，尚无客户端测试结果）
 
 用户要求继续尝试编译，必要时使用GitHub自动化。本地`android-resource-retry2`以1536MiB堆、`--info`限时重试；确认全量非增量资源动作，8分钟仍未完成，489秒按上限停止。最低可用内存约185MiB，memory full avg10最高68%；只终止具有本轮唯一归属标记的daemon，未关闭其他应用。结果在私有证据目录`android-resource-retry2-bounded-result.json`。
 
@@ -62,3 +62,15 @@
 用户明确确认后，使用账号ZYongX09手动dispatch功能分支精确f002b3d416c96d1b6125940c62eb04797a5d63d4。实际GitHub created_at为2026-11-05T12:25:40Z，比本机紧邻发起命令时UTC记录早9秒；以CLI直接返回run URL和实际event/headSha/headBranch验证关联，不把本机created过滤空结果误作没有运行。
 
 该次checkout/JDK/目录步骤成功，SDK环境准备的静默test exit1，未进入资源编译或任何测试；无报告可上传。进一步仅查Git跟踪文件名，确认仓库已有mastodon/release.keystore，因此原无签名文件检查必失败；未读取/解码/使用该文件，未确认其身份。后续CI改用非cone sparse-checkout，在工作树排除所有keystore/jks/local.properties/secrets.properties/.secret/.env文件；不修改既有文件或仓库历史，不把排除工作树当作历史泄露整改。SDK路径与工具检查增加明确诊断、兼容已有PATH sdkmanager，仍不自动接受SDK许可。新提交须重新确认精确目标后运行，不能将第一次环境失败计作客户端编译结果。
+
+### 第二次远端运行及不升级工具链方案（42028812902）
+
+用户确认精确f5f373dfffa33dee81c3fdf0f5c4a37a97b336ef后dispatch42028812902；隔离检出/JDK通过，sdkmanager明确找不到platforms;android-37，未进入资源或测试。Google官方目录实际包为platforms;android-37.0 revision2。官方platform-37.0_r02.zip的SHA1验证通过，其android.jar SHA256 bf1b4387cc7ca94fc6ef684f040d9d16fbf16248e181819f020736ea2053f177与本机一致，不是需要降级API或替换平台内容。
+
+现有AGP8.9.1/sdklib31.9.1将api-level字符串37.0经Integer.parseInt失败后读为0；目录正确也不能正常匹配android-37。官方API37.0兼容表要求AGP9.1.1/Gradle9.3.1。提出的工具链升级计划未获批准，**没有升级AGP/Gradle或修改SDK元数据**。
+
+用户随后批准先验证compileSdk36替代路线，附加门禁为：若现有依赖必须要求37，停止，不降级依赖、不绕过检查。实际对冻结解析记录中113个AAR逐项核对SHA，均找到匹配缓存；90个有AAR元数据，发现以下7项miuix0.9.3均minCompileSdk=37：miuix-preference-android、miuix-ui-android、miuix-icons-android、miuix-blur-android、miuix-core-android、miuix-squircle-android、miuix-shader-android。前四项是mastodon/build.gradle的implementation直接依赖，另三项为传递模块；不能把整份release/test联合记录误称为单独release清单，但上述直接依赖足以否定仅降compileSdk36且依赖不变的方案。相比之下WebKit1.18.0要求33/AGP7.2，ComposeFoundation1.11.2要求35/AGP8.6，RoomRuntime2.8.3要求34/AGP8.1，并非本次阻塞。
+
+源码定点搜索在mastodon/src、reader-core/src、novel-editor-core/src的Java/Kotlin/XML中未发现CINNAMON_BUN/CANARY、RequiresApi(37)/TargetApi(37)、SDK_INT直接比较37或-v37资源等显式API37标记；此结论不覆盖所有新平台接口，不能替代真实编译，也不能消除上述AAR最低要求。
+
+按批准门禁，compileSdk36试验未创建、三个模块编译SDK未改、未发新的远端任务；保留工具链及业务依赖不变。私有完整证据为~/.local/share/abdl-sponsor-alipay-20261105/compile36-aar-metadata-report.json。当前仍无含支付宝功能的APK或真实客户端UI结果，不自动转回升级计划或降级miuix。
