@@ -67,7 +67,9 @@
 
 用户确认精确f5f373dfffa33dee81c3fdf0f5c4a37a97b336ef后dispatch42028812902；隔离检出/JDK通过，sdkmanager明确找不到platforms;android-37，未进入资源或测试。Google官方目录实际包为platforms;android-37.0 revision2。官方platform-37.0_r02.zip的SHA1验证通过，其android.jar SHA256 bf1b4387cc7ca94fc6ef684f040d9d16fbf16248e181819f020736ea2053f177与本机一致，不是需要降级API或替换平台内容。
 
-现有AGP8.9.1/sdklib31.9.1将api-level字符串37.0经Integer.parseInt失败后读为0；目录正确也不能正常匹配android-37。官方API37.0兼容表要求AGP9.1.1/Gradle9.3.1。提出的工具链升级计划未获批准，**没有升级AGP/Gradle或修改SDK元数据**。
+官方API37.0兼容表要求AGP9.1.1/Gradle9.3.1，但“官方支持要求”不等于旧工具链在所有现有环境下都不能运行。旧sdklib31.9.1的某一解析分支确实会将37.0读为0，先前据此断言“目录正确也不能匹配、必须升级”过强，现撤回：实际AGP8.9.1还优先尝试SDK直接加载，按target hash定位平台目录并校验localPackage.path，在部分分支保留target版本，不能只凭一个解析函数推断整体行为。本机android-37目录／platforms;android-37包标识与官方android-37.0布局不同；静态机制能够解释存在差异，但尚未跟踪证明本轮实际采用哪个分支，不推断环境修改者或时间。
+
+更直接的实际证据是：本轮现有工具链的checkReleaseAarMetadata和processReleaseMainManifest真实exit0（sdk-manifest-resolve1-result.json，145.55秒）。此前NBW／D1 assemble也真实成功，主模块资源、Java/Kotlin及AAR检查当次主要UP-TO-DATE，而D8、DEX合并及打包实际执行。由此不能说“以前全靠缓存所以旧AGP根本不能编译”，也不能把增量组装当干净环境的完整复现证明。当前本地新增资源后的明确失败是资源编译OOM／换页；远端两次尚未进入AGP编译，第二次只是SDK安装包名不存在。因此“保持当前API37及依赖时必须升级AGP”的绝对判断不成立，仍需单独验证环境可复现性。提出的工具链升级计划未获批准，**没有升级AGP/Gradle或修改SDK元数据**。
 
 用户随后批准先验证compileSdk36替代路线，附加门禁为：若现有依赖必须要求37，停止，不降级依赖、不绕过检查。实际对冻结解析记录中113个AAR逐项核对SHA，均找到匹配缓存；90个有AAR元数据，发现以下7项miuix0.9.3均minCompileSdk=37：miuix-preference-android、miuix-ui-android、miuix-icons-android、miuix-blur-android、miuix-core-android、miuix-squircle-android、miuix-shader-android。前四项是mastodon/build.gradle的implementation直接依赖，另三项为传递模块；不能把整份release/test联合记录误称为单独release清单，但上述直接依赖足以否定仅降compileSdk36且依赖不变的方案。相比之下WebKit1.18.0要求33/AGP7.2，ComposeFoundation1.11.2要求35/AGP8.6，RoomRuntime2.8.3要求34/AGP8.1，并非本次阻塞。
 
