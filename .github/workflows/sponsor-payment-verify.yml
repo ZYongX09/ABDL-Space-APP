@@ -1,0 +1,71 @@
+name: Sponsor payment verification (no signing or deployment)
+run-name: Sponsor payment verification ${{ github.sha }}
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feat/sponsor-alipay-ci-20261105
+    paths:
+      - .github/workflows/sponsor-payment-verify.yml
+      - .github/ci/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sponsor-payment-verification-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    if: github.repository == 'ZYongX09/ABDL-Space-APP'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    env:
+      GRADLE_USER_HOME: ${{ runner.temp }}/sponsor-gradle-home
+      SPONSOR_CI_EVIDENCE_DIR: ${{ runner.temp }}/sponsor-verification
+      SPONSOR_CI_BUILD_CACHE: ${{ runner.temp }}/sponsor-resource-cache
+      ABDL_MAP_ENV_FILE: ${{ runner.temp }}/no-map-credentials.env
+    steps:
+      - name: Check out exact candidate without persisted credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Check hosted SDK and prepare isolated evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$ANDROID_HOME"
+          test -x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          test -f "$ANDROID_HOME/licenses/android-sdk-license"
+          test ! -e local.properties
+          test ! -e mastodon/release.keystore
+          mkdir -p "$SPONSOR_CI_EVIDENCE_DIR" "$SPONSOR_CI_BUILD_CACHE"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            'platforms;android-37' 'platforms;android-30' 'build-tools;35.0.0' < /dev/null
+
+      - name: Compile real release resources and preserve normal input-keyed Gradle cache
+        run: python3 -I .github/ci/verify-sponsor-payment.py resources
+
+      - name: Compile release production and test code and run 27 selected classes
+        run: python3 -I .github/ci/verify-sponsor-payment.py tests
+
+      - name: Save reports and native UI fixtures (not a signed package)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sponsor-payment-verification-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/sponsor-verification/
+            mastodon/build/test-results/testReleaseUnitTest/*.xml
+            mastodon/build/reports/tests/testReleaseUnitTest/
+          if-no-files-found: error
+          retention-days: 7

@@ -1,0 +1,14 @@
+{
+  "artifacts": {
+    "com.alipay.sdk:alipaysdk-android:15.8.42": "a6c301708b59a3a7cda843cf02e7b3b0b44afd96819f0a18890322e9868abf28",
+    "me.grishka.appkit:appkit:1.4.8": "7837cdace971c2901202c25af4f71df520f96b78f9d689f8ebeb94b333cbfe60"
+  },
+  "tracked_files": {
+    "mastodon/libs/AMap3DMap_AMapSearch_AMapLocation-11.3.100-9.8.1-11.3.101.jar": "b73e0d442931b6daa47332c2b8feb16ce9de4f429ef17bebe0c7b129a1da300a",
+    "mastodon/libs/open_sdk_3.5.19_r9483ffc7_lite.jar": "9d57fe61ff9026d34ac84bc63dc719f61da6aa40533a299cc6f73d4ce9df7af8",
+    "mastodon/src/main/res/font/noto_serif_sc_variable.ttf": "050080d9255a86808f2945bffac582b31ef32bc36411ce29563b4961670c66f9",
+    "jiguang-sdk/jiguang_sdk/jiguang/libs/jcore-android-5.4.0.aar": "c612ef70f1629d130297f1ca8be53e2682f553161c80732ffc92b0187bc5f6e6",
+    "jiguang-sdk/jiguang_sdk/jiguang/libs/joperate-android-2.2.0.jar": "0401d6cde23d3256c16cc9df021decf28fc902b3059831d64060b73a4551f43d",
+    "jiguang-sdk/jiguang_sdk/jiguang/libs/jpush-android-6.1.0.jar": "13de1b723002c615892933f0dc369dd37bb6bf3b04affe8b24340468dfcf3bea"
+  }
+}

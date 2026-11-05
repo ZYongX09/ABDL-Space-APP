@@ -42,3 +42,15 @@
 - 在独立私有目录用本机JDK21的javac --release17重新编译当前SponsorPaymentCoordinator、SponsorPaymentModels、SponsorPaymentRequest、AlipaySdkAdapter及相邻SponsorRequest/SponsorModels六份生产源码，原样编译现有fixture与两类JUnit；javac/JUnit各限256MiB、串行执行，**19/19辅助逻辑测试通过**。类加载来源与源码/真实依赖SHA固定，无生产源码或测试修改。
 - 此辅助验证使用过滤后的旧release相邻类缓存，未证明相邻缓存与全仓源码一致；SDK仅真实字节码静态编译并从JUnit运行classpath排除。没有真实HTTP、SharedPreferences、Activity生命周期、SDK付款或UI验收，不替代Gradle完整客户端门禁。原Gradle支付8类实际仍未执行，仍无APK/截图、未合develop/main。
 - 结果：`~/.local/share/abdl-sponsor-alipay-20261105/aux-payment-javac-junit/20261105T102725Z-gk_pdbmx/result.json`（auxiliary_only=true、full_android_gate=false）；诊断`resource-diagnosis-followup.json`。代码检查点Android b9e0c28f、Backend231cbfc已推功能分支；本补充仅记录验证事实，不改生产或收款配置。
+
+## GitHub验证备用方案（2026-11-05，尚未运行）
+
+用户要求继续尝试编译，必要时使用GitHub自动化。本地`android-resource-retry2`以1536MiB堆、`--info`限时重试；确认全量非增量资源动作，8分钟仍未完成，489秒按上限停止。最低可用内存约185MiB，memory full avg10最高68%；只终止具有本轮唯一归属标记的daemon，未关闭其他应用。结果在私有证据目录`android-resource-retry2-bounded-result.json`。
+
+原两份`build_and_deploy*.yml`含签名及Google Play发布，不用于本任务。新增独立`sponsor-payment-verify.yml`和`.github/ci/`验证脚本，触发只限专用`feat/sponsor-alipay-ci-20261105`分支的CI文件push或手动；普通支付feature/develop/main不因本文件自动构建或部署。此流程不读取repository secrets，不调用assemble/bundle/Fastlane、不生成debug/安装包；不上传原证书私钥，也不启用真实支付。
+
+远端先以JDK21覆写本机专用java.home、使用SDK37/30，核验受跟踪字体/地图/QQ/极光文件与支付宝/AppKit依赖SHA，真实运行release资源任务，再执行固定27类赞助支付及D1/NBW/ROM相邻回归。测试有失败、跳过、未执行、源文件变化或缺少8张payment原生UI fixture均保失败；fixture仍需人工视觉核验，不当真机/签约截图。资源成功后仅导出正常输入寻址Gradle build-cache条目，供本地标准Gradle决定是否命中；不覆盖部分输出、不跳过任务，不保证跨环境缓存必命中。
+
+本地Python/YAML/27类清单与受跟踪二进制SHA校验通过；真实Gradle依赖记录任务exit0、支付宝/AppKit哈希匹配，独立build-cache init加载help exit0。依赖记录通过artifactView.componentFilter在解析产物前排除project AAR，不提前读取未生成模块文件。以上仅配置验证，不是资源编译或客户端运行验收。
+
+截至准备时GitHub CLI已安装但未登录，**未启动Actions或得到远端测试结论**。配置仅保存至现有支付功能分支，不推专用CI触发分支；需用户在本机完成`gh auth login --hostname github.com --git-protocol https --web`，再核验账号、仓库、workflow、ref和精确提交后确认启动；无需在聊天提供token/密码/设备码。原证书release APK仍待完整客户端门禁和本地签名核验，main/develop及生产不变。

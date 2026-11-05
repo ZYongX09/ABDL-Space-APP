@@ -1,0 +1,32 @@
+{
+  "scope": "Sponsor payment and selected adjacent regressions; not the entire repository",
+  "classes": [
+    "org.joinmastodon.android.SponsorCenterSourceContractTest",
+    "org.joinmastodon.android.SponsorOriginalGateContractTest",
+    "org.joinmastodon.android.api.ServiceResourcePauseHttpTest",
+    "org.joinmastodon.android.api.ServiceResourcePauseJsonTest",
+    "org.joinmastodon.android.api.ServiceResourcePauseTimeTest",
+    "org.joinmastodon.android.api.SponsorPaymentHttpTest",
+    "org.joinmastodon.android.api.SponsorThanksHttpTest",
+    "org.joinmastodon.android.fragments.HomeTimelineNBWStartupTest",
+    "org.joinmastodon.android.fragments.sponsors.SponsorPaymentNavigationTest",
+    "org.joinmastodon.android.fragments.sponsors.SponsorThanksFragmentTest",
+    "org.joinmastodon.android.sponsors.AlipaySdkAdapterShadowTest",
+    "org.joinmastodon.android.sponsors.AlipaySdkAdapterTest",
+    "org.joinmastodon.android.sponsors.AlipaySdkSourceContractTest",
+    "org.joinmastodon.android.sponsors.SponsorCheckoutUiTest",
+    "org.joinmastodon.android.sponsors.SponsorModelsValidTemplateTest",
+    "org.joinmastodon.android.sponsors.SponsorOriginalTicketsTest",
+    "org.joinmastodon.android.sponsors.SponsorPaymentCoordinatorTest",
+    "org.joinmastodon.android.sponsors.SponsorPaymentGuideTest",
+    "org.joinmastodon.android.sponsors.SponsorPaymentModelsTest",
+    "org.joinmastodon.android.sponsors.SponsorPaymentUiTest",
+    "org.joinmastodon.android.sponsors.SponsorPurchaseQuizFlowTest",
+    "org.joinmastodon.android.sponsors.SponsorPurchaseSafetyTest",
+    "org.joinmastodon.android.sponsors.SponsorRedemptionRetryTest",
+    "org.joinmastodon.android.sponsors.SponsorThanksControllerTest",
+    "org.joinmastodon.android.sponsors.SponsorUiLayoutTest",
+    "org.joinmastodon.android.ui.displayitems.NBWMediaHttpDeliveryTest",
+    "org.joinmastodon.android.ui.seamless.SeamlessToolbarNavigationTest"
+  ]
+}

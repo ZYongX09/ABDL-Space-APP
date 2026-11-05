@@ -1,0 +1,12 @@
+def resourceCacheDirectory = System.getenv('SPONSOR_CI_BUILD_CACHE')
+if (!resourceCacheDirectory) throw new GradleException('SPONSOR_CI_BUILD_CACHE is required')
+
+settingsEvaluated { settings ->
+    settings.buildCache {
+        local {
+            directory = new File(resourceCacheDirectory)
+            enabled = true
+            push = true
+        }
+    }
+}
