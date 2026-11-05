@@ -270,6 +270,9 @@ configurations.all {
 }
 
 dependencies {
+	// Alipay's official Maven Central AAR (Alipay Android Standard SDK); fixed, not a dynamic version.
+	// Its manifest and consumer ProGuard rules merge from the AAR; it contains no native libraries.
+	implementation 'com.alipay.sdk:alipaysdk-android:15.8.42'
 	implementation 'com.baidu.lbsyun:BaiduMapSDK_Map:8.2.0'
 	implementation files('libs/AMap3DMap_AMapSearch_AMapLocation-11.3.100-9.8.1-11.3.101.jar')
 	implementation files('libs/open_sdk_3.5.19_r9483ffc7_lite.jar')

@@ -215,6 +215,10 @@ public class SponsorPurchaseFragment extends MastodonToolbarFragment{
 		footer.setVisibility(View.GONE); tick();
 	}
 	private void openCenter(){
+		if(getArguments().getBoolean("paymentMethodParent", false)){
+			Bundle result=new Bundle(); result.putBoolean(SponsorPaymentMethodFragment.RESULT_OPEN_CENTER, true);
+			setResult(true, result); Nav.finish(this); return;
+		}
 		if(getArguments().getBoolean("returnToCenter", false)){ Nav.finish(this); return; }
 		Bundle args=new Bundle(); args.putString("account", accountID); Nav.go(getActivity(), SponsorCenterFragment.class, args);
 	}

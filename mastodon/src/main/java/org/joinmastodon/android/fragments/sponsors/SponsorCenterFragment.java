@@ -564,7 +564,7 @@ public class SponsorCenterFragment extends LoaderFragment{
 		if(!enabled() || busy || refreshing || selectedPlanID==null || me.sponsor.permanent) return;
 		Bundle args=new Bundle(); args.putString("account", accountID); args.putString("plan", selectedPlanID);
 		args.putBoolean("returnToCenter", true);
-		Nav.go(getActivity(), SponsorPurchaseFragment.class, args);
+		Nav.go(getActivity(), SponsorPaymentMethodFragment.class, args);
 	}
 	private void redeem(){
 		if(busy || refreshing || !enabled() || me.sponsor.permanent || codeInput==null) return;

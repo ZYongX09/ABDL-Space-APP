@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="sponsor_payment_title">Payment method</string>
+    <string name="sponsor_payment_choose_channel">Choose a payment method</string>
+    <string name="sponsor_payment_alipay">Alipay</string>
+    <string name="sponsor_payment_afdian">Afdian aggregated payment</string>
+    <string name="sponsor_payment_recommended">Recommended</string>
+    <string name="sponsor_payment_wechat">WeChat supported</string>
+    <string name="sponsor_payment_continue">Continue to payment</string>
+    <string name="sponsor_payment_choose_hint">Choose a payment method, then continue to payment.</string>
+    <string name="sponsor_payment_checking">Verifying the plan and payment methods…</string>
+    <string name="sponsor_payment_creating">Creating an order on the server…</string>
+    <string name="sponsor_payment_processing">Processing…</string>
+    <string name="sponsor_payment_checking_order">Checking the original order with the server…</string>
+    <string name="sponsor_payment_refresh">Verify again</string>
+    <string name="sponsor_payment_check_order">Check original order</string>
+    <string name="sponsor_payment_server_confirmation">The server confirms the amount and sponsor benefits. A payment app result does not mean membership is active. If the outcome is unclear, check the original order instead of paying again.</string>
+    <string name="sponsor_payment_disabled">This payment method is not enabled.</string>
+    <string name="sponsor_payment_limits_unverified">Alipay merchant payment limits have not been verified. This method is unavailable.</string>
+    <string name="sponsor_payment_not_configured">This payment method has not been configured.</string>
+    <string name="sponsor_payment_amount_unsupported">Alipay does not support this plan amount. Please choose Afdian.</string>
+    <string name="sponsor_payment_wallet_unavailable">Alipay is unavailable on this device. Install or update the Alipay app and try again.</string>
+    <string name="sponsor_payment_legacy_backend">The server does not currently support the new payment service. Only the freshly verified Afdian link is available.</string>
+    <string name="sponsor_payment_plan_changed">The plan or configuration changed. Go back and select the plan again.</string>
+    <string name="sponsor_payment_already_permanent">This account already has permanent sponsor membership. No further purchase is needed.</string>
+    <string name="sponsor_payment_session_changed">The account changed. Close this page and open it again.</string>
+    <string name="sponsor_payment_unknown">The original order outcome is unclear. Check that order; do not pay again or switch payment methods.</string>
+    <string name="sponsor_payment_pending">The original order is awaiting confirmation. Check the order, or request that it be closed before selecting another payment method.</string>
+    <string name="sponsor_payment_sdk_active">Alipay has opened. The original order will be checked when you return. Do not pay again.</string>
+    <string name="sponsor_payment_settlement_pending">The server confirmed payment and is activating your benefits. Check the original order; do not pay again.</string>
+    <string name="sponsor_payment_membership_pending">Refreshing sponsor benefits confirmed by the server. Do not pay again.</string>
+    <string name="sponsor_payment_manual_review">This paid order needs manual membership review. Keep the order details and contact an administrator. Do not pay again.</string>
+    <string name="sponsor_payment_refund_review">This order is under refund review. Contact an administrator and do not pay again.</string>
+    <string name="sponsor_payment_granted">Sponsor benefits confirmed</string>
+    <string name="sponsor_payment_storage_failed">Order recovery data could not be saved or read safely. Payment is disabled. Try again later or contact an administrator.</string>
+    <string name="sponsor_payment_unavailable">This payment method is unavailable. Verify again. An unconfirmed order will never be recreated automatically.</string>
+    <string name="sponsor_payment_close_switch">Close original order and choose another method</string>
+    <string name="sponsor_payment_close_explanation">The server will check and attempt to close the unpaid order. Choose another payment method only after closure is confirmed. Leaving this page or cancelling a callback does not reverse a transaction. Paid or uncertain orders cannot switch methods.</string>
+    <string name="sponsor_payment_close_confirm">Request order closure</string>
+    <string name="sponsor_payment_closing">Asking the server to check and close the original order…</string>
+    <string name="sponsor_payment_closed">The server confirmed that the original order is closed. Please select a payment method again.</string>
+    <string name="sponsor_payment_channel_difference">Alipay sponsor benefits activate after the server confirms payment. Afdian still uses the original redemption-code process: obtain your code after payment and redeem it in Sponsor center.</string>
+</resources>

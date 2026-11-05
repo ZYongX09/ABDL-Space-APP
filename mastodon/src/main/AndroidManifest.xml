@@ -36,6 +36,16 @@
 	<permission android:name="${applicationId}.permission.C2D_MESSAGE" android:protectionLevel="signature"/>
 
 	<queries>
+		<!-- Native CNY checkout checks only the installed, production mainland Alipay wallet. -->
+		<package android:name="com.eg.android.AlipayGphone" />
+		<!-- Exclude only the Alipay AAR's unrelated sandbox/regional/Taobao visibility entries. -->
+		<package android:name="com.eg.android.AlipayGphoneRC" tools:node="remove" />
+		<package android:name="hk.alipay.wallet" tools:node="remove" />
+		<package android:name="hk.alipay.walletRC" tools:node="remove" />
+		<intent tools:node="remove">
+			<action android:name="*" />
+			<data android:scheme="tbopen" />
+		</intent>
 		<intent>
 			<action android:name="android.intent.action.PROCESS_TEXT" />
 			<data android:mimeType="text/plain" />
