@@ -43,7 +43,7 @@ public class NBWLoginActivity extends Activity{
 	public static Intent completionIntent(Activity activity, long generation){
 		return new Intent(activity, NBWLoginActivity.class).setAction(ACTION_COMPLETE)
 				.putExtra(EXTRA_GENERATION, generation)
-				.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP);
+				.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT|Intent.FLAG_ACTIVITY_SINGLE_TOP);
 	}
 	@Override protected void onCreate(@Nullable Bundle state){
 		UiUtils.setUserPreferredTheme(this);
@@ -64,12 +64,12 @@ public class NBWLoginActivity extends Activity{
 		if(intent.getData()!=null){ fail(R.string.nbw_login_expired); return; }
 		if(state!=null){
 			handle=flow.attach(state.getLong(EXTRA_GENERATION, 0));
-			if(handle==null){ fail(R.string.nbw_login_expired); return; }
+			if(handle==null || !flow.reattachBrowserOwner(handle, this) && !flow.canRestoreStartFailure(handle)){ fail(R.string.nbw_login_expired); return; }
 			render(); // Never repeat a browser launch or exchange merely because the Activity was rebuilt.
 		}else if(ACTION_COMPLETE.equals(intent.getAction())){
-			handle=flow.attach(intent.getLongExtra(EXTRA_GENERATION, 0));
-			if(handle==null){ fail(R.string.nbw_login_expired); return; }
-			exchange(false);
+			// A callback must reach the existing/recreated owner through its captured AppTask.
+			// Creating a second coordinator from a generation-only Intent must not steal the proof.
+			fail(R.string.nbw_login_expired);
 		}else if(intent.getBooleanExtra(EXTRA_PERMISSION_CONFIRMED, false)){
 			beginFresh();
 		}else{
@@ -84,7 +84,7 @@ public class NBWLoginActivity extends Activity{
 			if(intent.getData()!=null){ return; }
 			if(ACTION_COMPLETE.equals(intent.getAction())){
 				long generation=intent.getLongExtra(EXTRA_GENERATION, 0);
-				if(handle==null || handle.generation!=generation) return;
+				if(handle==null || handle.generation!=generation || !flow.isBrowserOwner(handle, this)) return;
 				exchange(false);
 			}else if(intent.getBooleanExtra(EXTRA_PERMISSION_CONFIRMED, false)){
 				terminal=false; beginFresh();
@@ -114,6 +114,7 @@ public class NBWLoginActivity extends Activity{
 				if(!sameOwner(owner)) return;
 				Uri authorization=flow.acceptStart(owner, request, result);
 				if(authorization==null){ fail(R.string.nbw_login_failed); return; }
+				if(!flow.rememberBrowserOwner(owner, NBWLoginActivity.this)){ fail(R.string.nbw_login_expired); return; }
 				render();
 				try{
 					// No WebView, cookies, password form, real-device identifier or legacy mobile callback.

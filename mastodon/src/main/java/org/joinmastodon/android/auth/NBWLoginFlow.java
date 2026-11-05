@@ -1,6 +1,9 @@
 package org.joinmastodon.android.auth;
 
+import android.app.Activity;
 import android.net.Uri;
+
+import org.joinmastodon.android.NBWLoginActivity;
 import android.os.SystemClock;
 import android.util.Base64;
 
@@ -82,7 +85,8 @@ public final class NBWLoginFlow{
 		long owner;
 		String verifier, flow, completionCode;
 		long completionReceived;
-		boolean hintHandled;
+		boolean hintHandled, completionRouted;
+		NBWCallbackTaskRouter.Owner returnOwner;
 		Phase phase=Phase.NEW;
 		int message=R.string.nbw_login_starting;
 		org.joinmastodon.android.api.ServiceResourcePause serviceResourcePause;
@@ -104,6 +108,31 @@ public final class NBWLoginFlow{
 		if(pending==null) return null;
 		pending.owner=++owner;
 		return new Handle(pending.generation, pending.owner);
+	}
+	/** Bind the real browser-launching Activity, not a task id from an Intent. */
+	public synchronized boolean rememberBrowserOwner(Handle handle, Activity activity){
+		if(!isCurrent(handle) || pending.phase!=Phase.WAITING || pending.returnOwner!=null) return false;
+		pending.returnOwner=NBWCallbackTaskRouter.capture(activity);
+		return pending.returnOwner!=null;
+	}
+	public synchronized boolean reattachBrowserOwner(Handle handle, Activity activity){
+		return isCurrent(handle) && pending.returnOwner!=null && pending.returnOwner.reattach(activity);
+	}
+	/** A saved display-only start failure has no browser return address and cannot exchange. */
+	public synchronized boolean canRestoreStartFailure(Handle handle){
+		return isCurrent(handle) && pending.returnOwner==null && pending.phase==Phase.FAILED && pending.serviceResourcePause!=null;
+	}
+	public synchronized boolean isBrowserOwner(Handle handle, Activity activity){
+		return isCurrent(handle) && pending.returnOwner!=null && pending.returnOwner.owns(activity);
+	}
+	/** Acceptance is one-use. A second hint must not foreground, transfer ownership, or retry exchange. */
+	public synchronized boolean routeCompletion(Activity callback, Uri uri){
+		if(!validPending() || pending.returnOwner==null || pending.completionRouted) return false;
+		long accepted=acceptCompletion(uri);
+		if(accepted==0) return false;
+		pending.completionRouted=true;
+		if(NBWCallbackTaskRouter.restore(callback, pending.returnOwner, NBWLoginActivity.completionIntent(callback, accepted))) return true;
+		clear(); return false;
 	}
 	public synchronized boolean isCurrent(Handle handle){ return owns(handle) && validPending(); }
 	public synchronized Snapshot snapshot(Handle handle){ return isCurrent(handle) ? new Snapshot(pending) : null; }

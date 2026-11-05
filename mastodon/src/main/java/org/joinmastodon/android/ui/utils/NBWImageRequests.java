@@ -32,12 +32,15 @@ public final class NBWImageRequests{
 		private final long generation, sessionGeneration;
 		private final org.joinmastodon.android.api.session.AccountSession session;
 		private final org.joinmastodon.android.model.Token token;
-		private final String accessToken, suffix;
+		private final String accessToken, suffix, diskCacheKey;
 		ScopedRequest(ImageLoaderRequest original,String resolved,NBWEndpointsRepository.Snapshot routing,org.joinmastodon.android.api.session.AccountSession session){
 			super(original.desiredConfig,original.desiredMaxWidth,original.desiredMaxHeight,original.processingSteps,Uri.parse(resolved));
 			this.session=session; token=session==null ? null : session.token; accessToken=token==null ? null : token.accessToken;
 			generation=routing.generation; sessionGeneration=session==null ? -1 : session.getNBWForumOptionsRepository().getSnapshot().generation;
 			suffix="/nbw-"+generation+"-"+routing.endpoints.revision+"-"+System.identityHashCode(session)+"-"+sessionGeneration;
+			// DiskLruCache treats its key as a file name: hash the full scope, never append a path separator.
+			// Cache naming only, not authentication. Okio uses a local MessageDigest, unlike AppKit's shared digest.
+			diskCacheKey=okio.ByteString.encodeUtf8(super.getDiskCacheKey()+suffix).md5().hex();
 		}
 		boolean current(){
 			var routing=NBWEndpointsRepository.getInstance().getSnapshot();
@@ -54,6 +57,6 @@ public final class NBWImageRequests{
 		@Override public int hashCode(){ return java.util.Objects.hash(super.hashCode(),generation,sessionGeneration,System.identityHashCode(session),System.identityHashCode(token),accessToken,suffix); }
 		@Override public boolean sourcesEqual(ImageLoaderRequest other){ return other instanceof ScopedRequest scoped && sameScope(scoped) && super.sourcesEqual(other); }
 		@Override public String getMemoryCacheKey(){ return super.getMemoryCacheKey()+suffix; }
-		@Override public String getDiskCacheKey(){ return super.getDiskCacheKey()+suffix; }
+		@Override public String getDiskCacheKey(){ return diskCacheKey; }
 	}
 }

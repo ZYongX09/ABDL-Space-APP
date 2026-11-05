@@ -60,19 +60,16 @@ public class OAuthActivity extends Activity{
 		if(org.joinmastodon.android.auth.NBWLoginFlow.hasCompletionMarker(uri)){
 			getIntent().setData(null); // Do not retain a completion code in an Activity intent or saved state.
 			if(org.joinmastodon.android.auth.NBWLoginFlow.isCompletionCallback(uri)){
-				long generation=org.joinmastodon.android.auth.NBWLoginFlow.getInstance().acceptCompletion(uri);
-				if(generation!=0) startActivity(NBWLoginActivity.completionIntent(this, generation));
-				else Toast.makeText(this, R.string.nbw_login_expired, Toast.LENGTH_LONG).show();
+				if(!org.joinmastodon.android.auth.NBWLoginFlow.getInstance().routeCompletion(this, uri))
+					Toast.makeText(this, R.string.nbw_login_expired, Toast.LENGTH_LONG).show();
 			}
 			// Only the one-use completion code enters the pending login; never a token or binding result.
 			finish(); return;
 		}
 		if(uri.getQueryParameter("nbw_v2")!=null){
-			if("abdl-space://callback?nbw_v2=authorized".equals(uri.toString())){
-				String launched=NBWPostRegisterActivity.consumeAuthorizationLaunch(this);
-				AccountSession owner=launched==null ? null : AccountSessionManager.getInstance().tryGetAccount(launched);
-				if(owner!=null) owner.getNBWForumOptionsRepository().refreshNow();
-			}
+			getIntent().setData(null);
+			if("abdl-space://callback?nbw_v2=authorized".equals(uri.toString()))
+				NBWPostRegisterActivity.restoreAuthorizationOwner(this);
 			// This callback is not a login code, grant, token, or proof of a binding.
 			finish(); return;
 		}

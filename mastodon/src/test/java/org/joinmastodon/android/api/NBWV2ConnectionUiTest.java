@@ -26,6 +26,9 @@ import androidx.core.view.ViewCompat;
 import org.joinmastodon.android.CompatibilityTestApplication;
 import org.joinmastodon.android.GlobalUserPreferences;
 import org.joinmastodon.android.MastodonApp;
+import org.joinmastodon.android.NBWCallbackTaskFixtures;
+import org.joinmastodon.android.NBWLoginActivityTest;
+import org.joinmastodon.android.OAuthActivity;
 import org.joinmastodon.android.R;
 import org.joinmastodon.android.api.requests.nbw.NBWAppRequest;
 import org.joinmastodon.android.api.requests.statuses.CreateStatus;
@@ -75,7 +78,8 @@ import okio.Buffer;
 
 /** Inflates and exercises the real connection activity; only authenticated HTTP transport is captured. */
 @RunWith(RobolectricTestRunner.class)
-@Config(sdk=28, application=CompatibilityTestApplication.class, qualifiers="zh-rCN-w393dp-h852dp-notnight-mdpi")
+@Config(sdk=28, application=CompatibilityTestApplication.class, qualifiers="zh-rCN-w393dp-h852dp-notnight-mdpi",
+		shadows={NBWCallbackTaskFixtures.TaskActivity.class,NBWCallbackTaskFixtures.TaskDispatch.class,NBWLoginActivityTest.UnlockedGate.class})
 @LooperMode(LooperMode.Mode.PAUSED)
 public class NBWV2ConnectionUiTest{
 	private static final String ANDROID="http://schemas.android.com/apk/res/android";
@@ -91,6 +95,7 @@ public class NBWV2ConnectionUiTest{
 	private CapturingTransport transport;
 	private CapturingController controller;
 	private final List<ActivityController<NBWPostRegisterActivity>> activities=new ArrayList<>();
+	private final List<ActivityController<OAuthActivity>> callbacks=new ArrayList<>();
 
 	private static final class Pending<T> implements NBWForumOptionsRepository.Cancelable{
 		final NBWForumOptionsRepository.Result<T> callback;
@@ -146,10 +151,12 @@ public class NBWV2ConnectionUiTest{
 		field(AccountSession.class, "nbwForumOptionsRepository").set(session, repository);
 		controller=new CapturingController(session); field(AccountSession.class, "apiController").set(session, controller);
 		MastodonApp.context.getSharedPreferences("nbw_v2_authorization", 0).edit().clear().commit();
+		field(NBWPostRegisterActivity.class,"authorizationTicket").set(null,null); NBWCallbackTaskFixtures.reset();
 	}
 
 	@After public void cleanup() throws Exception{
 		for(ActivityController<NBWPostRegisterActivity> activity:activities) activity.close();
+		for(ActivityController<OAuthActivity> callback:callbacks) callback.close();
 		repository.deactivate(); ShadowLooper.idleMainLooper(); endpoints.close();
 		if(previousSession==null) sessions.remove(session.getID()); else sessions.put(session.getID(), previousSession);
 		if(previousInstance==null) instances.remove(session.domain); else instances.put(session.domain, previousInstance);
@@ -157,6 +164,7 @@ public class NBWV2ConnectionUiTest{
 		GlobalUserPreferences.theme=previousTheme; GlobalUserPreferences.color=previousColor;
 		GlobalUserPreferences.useCustomTabs=previousCustomTabs;
 		MastodonApp.context.getSharedPreferences("nbw_v2_authorization", 0).edit().clear().commit();
+		field(NBWPostRegisterActivity.class,"authorizationTicket").set(null,null); NBWCallbackTaskFixtures.reset();
 	}
 
 	@Test @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -263,6 +271,72 @@ public class NBWV2ConnectionUiTest{
 		assertTrue(connect.isEnabled()); assertFalse(page.isFinishing()); assertTrue(transport.consents.isEmpty());
 	}
 
+	@Test public void authorizedCallbackRestoresCapturedSettingsOrRegistrationTaskAndOnlyRefreshesMetadata() throws Exception{
+		publishCapabilities("full",false);
+		for(boolean settings:new boolean[]{true,false}) for(int routerTask:new int[]{71,91}){
+			NBWCallbackTaskFixtures.dispatches.clear();
+			NBWPostRegisterActivity page=open(settings); launchAuthorization(page);
+			var lifecycle=activities.get(activities.size()-1); lifecycle.pause(); NBWCallbackTaskFixtures.task(71).browserOnTop();
+			int requests=controller.requests.size(), reads=transport.capabilities.size();
+			Intent hint=new Intent(Intent.ACTION_VIEW,android.net.Uri.parse("abdl-space://callback?nbw_v2=authorized"))
+					.putExtra("taskId",999).putExtra("account","external-account").putExtra("show_back",!settings);
+			Intent navigation=routeAuthorization(hint,routerTask); assertNotNull(navigation);
+			assertEquals(1,NBWCallbackTaskFixtures.dispatches.size());
+			var dispatch=NBWCallbackTaskFixtures.dispatches.get(0); assertEquals(71,dispatch.taskId); assertSame(page,dispatch.owner);
+			assertEquals(java.util.Set.of("account","show_back"),navigation.getExtras().keySet());
+			assertEquals(session.getID(),navigation.getStringExtra("account")); assertEquals(settings,navigation.getBooleanExtra("show_back",!settings));
+			assertEquals(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT|Intent.FLAG_ACTIVITY_SINGLE_TOP,navigation.getFlags());
+			assertFalse(page.isFinishing()); assertFalse(page.isDestroyed()); assertTrue(transport.capabilities.size()>reads);
+			assertEquals(requests,controller.requests.size()); assertTrue(transport.consents.isEmpty());
+			assertFalse("Callback hint is not a grant",repository.getSnapshot().capabilities.hasGrant());
+			int refreshed=transport.capabilities.size(); assertNull(routeAuthorization(new Intent(Intent.ACTION_VIEW,android.net.Uri.parse("abdl-space://callback?nbw_v2=authorized")),routerTask));
+			assertEquals(refreshed,transport.capabilities.size()); assertEquals(1,NBWCallbackTaskFixtures.dispatches.size());
+			lifecycle.resume(); page.findViewById(R.id.btn_skip).performClick();
+			Intent next=Shadow.<ShadowActivity>extract(page).getNextStartedActivity();
+			if(settings) assertNull(next); else{ assertNotNull(next); assertEquals(org.joinmastodon.android.MainActivity.class.getName(),next.getComponent().getClassName()); }
+			lifecycle.close(); activities.remove(lifecycle);
+		}
+	}
+	@Test public void malformedAuthorizationHintCannotConsumeTheValidReturnTicket() throws Exception{
+		publishCapabilities("full",false); NBWPostRegisterActivity page=open(true); launchAuthorization(page);
+		for(String uri:List.of("abdl-space://callback?nbw_v2=authorized&account=other","abdl-space://callback/?nbw_v2=authorized",
+				"https://callback?nbw_v2=authorized","abdl-space://callback?nbw_v2=authorized&nbw_v2=authorized"))
+			assertNull(routeAuthorization(new Intent(Intent.ACTION_VIEW,android.net.Uri.parse(uri)),91));
+		assertNotNull(routeAuthorization(new Intent(Intent.ACTION_VIEW,android.net.Uri.parse("abdl-space://callback?nbw_v2=authorized")),91));
+		assertEquals(1,NBWCallbackTaskFixtures.dispatches.size()); assertSame(page,NBWCallbackTaskFixtures.dispatches.get(0).owner);
+	}
+	@Test public void bindingOwnerRecreationReattachesSameTaskWithoutAuthorizationReplay() throws Exception{
+		publishCapabilities("full",false); NBWPostRegisterActivity first=open(false); launchAuthorization(first);
+		var old=activities.get(activities.size()-1); android.os.Bundle state=new android.os.Bundle();
+		old.saveInstanceState(state).pause().stop().destroy(); activities.remove(old);
+		assertTrue(state.containsKey("nbwAuthorizationGeneration")); assertFalse(state.toString().contains("accessToken"));
+		Intent intent=new Intent(MastodonApp.context,NBWPostRegisterActivity.class).putExtra("account",session.getID()).putExtra("show_back",false);
+		var rebuilt=Robolectric.buildActivity(NBWPostRegisterActivity.class,intent); NBWCallbackTaskFixtures.pin(rebuilt,71);
+		rebuilt.create(state).start().resume(); activities.add(rebuilt);
+		int requests=controller.requests.size(); assertNull(Shadow.<ShadowActivity>extract(rebuilt.get()).getNextStartedActivity());
+		assertNotNull(routeAuthorization(new Intent(Intent.ACTION_VIEW,android.net.Uri.parse("abdl-space://callback?nbw_v2=authorized")),91));
+		assertEquals(requests,controller.requests.size()); assertSame(rebuilt.get(),NBWCallbackTaskFixtures.dispatches.get(0).owner);
+		assertEquals(View.GONE,rebuilt.get().findViewById(R.id.btn_back).getVisibility());
+	}
+	@Test public void missingDeniedForeignTaskCancelExpiryAccountAndTokenChangeFailClosed() throws Exception{
+		publishCapabilities("full",false);
+		for(int invalidation=0;invalidation<8;invalidation++){
+			NBWCallbackTaskFixtures.dispatches.clear(); NBWPostRegisterActivity page=open(true); launchAuthorization(page);
+			int reads=transport.capabilities.size(),requests=controller.requests.size();
+			if(invalidation==0) NBWCallbackTaskFixtures.remove(71);
+			else if(invalidation==1) NBWCallbackTaskFixtures.task(71).denied=true;
+			else if(invalidation==2) NBWCallbackTaskFixtures.task(71).root=new android.content.ComponentName("external.package","external.Root");
+			else if(invalidation==3) page.findViewById(R.id.btn_skip).performClick();
+			else if(invalidation==4) org.robolectric.shadows.ShadowSystemClock.advanceBy(java.time.Duration.ofMinutes(10));
+			else if(invalidation==5) field(AccountSessionManager.class,"lastActiveAccountID").set(AccountSessionManager.getInstance(),"other-account");
+			else if(invalidation==6){ org.joinmastodon.android.model.Token changed=new org.joinmastodon.android.model.Token(); changed.accessToken="changed"; session.token=changed; }
+			else field(NBWPostRegisterActivity.class,"authorizationTicket").set(null,null); // Process loss.
+			assertNull(routeAuthorization(new Intent(Intent.ACTION_VIEW,android.net.Uri.parse("abdl-space://callback?nbw_v2=authorized")),91));
+			assertEquals(reads,transport.capabilities.size()); assertEquals(requests,controller.requests.size()); assertTrue(NBWCallbackTaskFixtures.dispatches.isEmpty());
+			field(AccountSessionManager.class,"lastActiveAccountID").set(AccountSessionManager.getInstance(),session.getID()); session.token=null;
+			var lifecycle=activities.remove(activities.size()-1); lifecycle.close(); NBWCallbackTaskFixtures.reset();
+		}
+	}
 	@Test public void bindingStartRejectsThirdPartyAndWrongSnapshotEvenWhenTransportBypassesDeserialization() throws Exception{
 		publishCapabilities("full",false); NBWPostRegisterActivity page=open(true);
 		page.findViewById(R.id.btn_nbw_connect).performClick(); var request=controller.requests.get(0);
@@ -349,9 +423,27 @@ public class NBWV2ConnectionUiTest{
 		}
 	}
 
+	private void launchAuthorization(NBWPostRegisterActivity page) throws Exception{
+		int count=controller.requests.size(); page.findViewById(R.id.btn_nbw_connect).performClick();
+		assertEquals(count+1,controller.requests.size());
+		authorizationResult(controller.requests.get(count)).onSuccess(NBWEndpointFixtures.authorizationStart()); ShadowLooper.idleMainLooper();
+		Intent browser=Shadow.<ShadowActivity>extract(page).getNextStartedActivity(); assertNotNull(browser); assertEquals(Intent.ACTION_VIEW,browser.getAction());
+		// Finish the preflight metadata read so the callback's explicit refresh is observable.
+		for(Pending<NBWCapabilities> pending:new ArrayList<>(transport.capabilities))
+			if(!pending.completed && !pending.canceled) pending.success(NBWV2RepositoryTest.capabilities("full"));
+		ShadowLooper.idleMainLooper();
+	}
+	private Intent routeAuthorization(Intent hint, int task){
+		int before=NBWCallbackTaskFixtures.dispatches.size();
+		var callback=Robolectric.buildActivity(OAuthActivity.class,hint); NBWCallbackTaskFixtures.pin(callback,task); callbacks.add(callback); callback.create();
+		assertTrue(callback.get().isFinishing()); assertNull(callback.get().getIntent().getData());
+		assertNull("Router never starts a new connection owner in its own task",Shadow.<ShadowActivity>extract(callback.get()).getNextStartedActivity());
+		return before==NBWCallbackTaskFixtures.dispatches.size() ? null : NBWCallbackTaskFixtures.dispatches.get(before).intent;
+	}
 	private NBWPostRegisterActivity open(boolean settings){
 		Intent intent=new Intent(MastodonApp.context, NBWPostRegisterActivity.class).putExtra("account", session.getID()).putExtra("show_back", settings);
-		ActivityController<NBWPostRegisterActivity> lifecycle=Robolectric.buildActivity(NBWPostRegisterActivity.class, intent); activities.add(lifecycle); lifecycle.setup(); return lifecycle.get();
+		ActivityController<NBWPostRegisterActivity> lifecycle=Robolectric.buildActivity(NBWPostRegisterActivity.class, intent);
+		NBWCallbackTaskFixtures.pin(lifecycle,71); activities.add(lifecycle); lifecycle.setup(); return lifecycle.get();
 	}
 	private void publishCapabilities(String mode, boolean granted){
 		repository.activate(); repository.refreshNow();

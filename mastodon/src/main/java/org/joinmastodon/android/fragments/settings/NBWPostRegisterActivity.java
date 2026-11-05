@@ -23,6 +23,7 @@ import org.joinmastodon.android.api.requests.nbw.NBWAppRequest;
 import org.joinmastodon.android.api.session.AccountSession;
 import org.joinmastodon.android.api.session.AccountSessionManager;
 import org.joinmastodon.android.api.session.NBWForumOptionsRepository;
+import org.joinmastodon.android.auth.NBWCallbackTaskRouter;
 import org.joinmastodon.android.ui.compose.NBWClassificationController;
 import org.joinmastodon.android.ui.utils.UiUtils;
 import org.joinmastodon.android.ui.views.SpaceBackgroundView;
@@ -41,15 +42,21 @@ public class NBWPostRegisterActivity extends Activity{
 	private Button connect, settings;
 	private boolean starting;
 	private long preflight;
+	private static final String STATE_AUTHORIZATION="nbwAuthorizationGeneration";
 	private static AuthorizationTicket authorizationTicket;
+	private static long nextAuthorization;
+	private long authorizationGeneration;
 	private static final class AuthorizationTicket{
 		final AccountSession session;
 		final org.joinmastodon.android.model.Token token;
 		final String accessToken;
-		final long generation, started;
-		AuthorizationTicket(AccountSession session){
-			this.session=session; token=session.token; accessToken=token==null ? null : token.accessToken;
+		final long generation, started, navigationGeneration;
+		final boolean showBack;
+		final NBWCallbackTaskRouter.Owner owner;
+		AuthorizationTicket(NBWPostRegisterActivity activity, NBWCallbackTaskRouter.Owner owner){
+			session=activity.session; token=session.token; accessToken=token==null ? null : token.accessToken;
 			generation=session.getNBWForumOptionsRepository().getSnapshot().generation; started=android.os.SystemClock.elapsedRealtime();
+			navigationGeneration=++nextAuthorization; showBack=activity.getIntent().getBooleanExtra("show_back", false); this.owner=owner;
 		}
 	}
 
@@ -60,6 +67,11 @@ public class NBWPostRegisterActivity extends Activity{
 		session=id==null ? AccountSessionManager.getInstance().getLastActiveAccount() : AccountSessionManager.getInstance().tryGetAccount(id);
 		if(session==null){ finish(); return; }
 		repository=session.getNBWForumOptionsRepository();
+		if(savedInstanceState!=null){
+			long saved=savedInstanceState.getLong(STATE_AUTHORIZATION, 0);
+			AuthorizationTicket ticket=authorizationTicket;
+			if(ticket!=null && ticket.navigationGeneration==saved && validAuthorization(ticket) && ticket.session==session && ticket.owner.reattach(this)) authorizationGeneration=saved;
+		}
 		Window window=getWindow();
 		window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
 		window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
@@ -95,6 +107,7 @@ public class NBWPostRegisterActivity extends Activity{
 	}
 
 	private void completeConnectionPage(){
+		cancelAuthorizationLaunch();
 		// Registration closes its MainActivity before opening this page. Settings keeps it.
 		if(!getIntent().getBooleanExtra("show_back", false)){
 			Intent intent=new Intent(this, MainActivity.class);
@@ -138,7 +151,7 @@ public class NBWPostRegisterActivity extends Activity{
 				authorizationRequest=null; starting=false;
 				try{ result.postprocess(); }catch(Exception invalid){ render(repository.getSnapshot()); status.setText(R.string.nbw_v2_connection_failed); return; }
 				if(!java.util.Objects.equals(snapshot.endpoints,result.endpoints)){ render(repository.getSnapshot()); status.setText(R.string.nbw_v2_connection_failed); return; }
-				rememberAuthorizationLaunch(NBWPostRegisterActivity.this, session.getID());
+				if(!rememberAuthorizationLaunch()){ render(repository.getSnapshot()); status.setText(R.string.nbw_v2_connection_failed); return; }
 				UiUtils.launchWebBrowser(NBWPostRegisterActivity.this, result.authorizationUrl);
 				render(repository.getSnapshot());
 			}); }
@@ -162,7 +175,12 @@ public class NBWPostRegisterActivity extends Activity{
 		org.joinmastodon.android.api.session.NBWEndpointsRepository.getInstance().leaveForeground(this);
 		super.onPause();
 	}
+	@Override protected void onSaveInstanceState(Bundle state){
+		if(authorizationGeneration!=0) state.putLong(STATE_AUTHORIZATION, authorizationGeneration);
+		super.onSaveInstanceState(state);
+	}
 	@Override protected void onDestroy(){
+		if(isFinishing()) cancelAuthorizationLaunch();
 		preflight++;
 		org.joinmastodon.android.api.session.NBWEndpointsRepository.getInstance().leaveForeground(this);
 		if(authorizationRequest!=null) authorizationRequest.cancel();
@@ -170,23 +188,45 @@ public class NBWPostRegisterActivity extends Activity{
 		if(classification!=null) classification.dispose();
 		super.onDestroy();
 	}
-	public static void rememberAuthorizationLaunch(Context context, String account){
-		AccountSession session=AccountSessionManager.getInstance().tryGetAccount(account);
-		authorizationTicket=session==null ? null : new AuthorizationTicket(session);
+	private boolean rememberAuthorizationLaunch(){
+		NBWCallbackTaskRouter.Owner owner=NBWCallbackTaskRouter.capture(this);
+		if(owner==null || !currentSession()) return false;
+		authorizationTicket=new AuthorizationTicket(this, owner); authorizationGeneration=authorizationTicket.navigationGeneration;
 		// Retire pre-upgrade persisted hints. Proof and session ownership are process-only.
-		context.getSharedPreferences("nbw_v2_authorization", MODE_PRIVATE).edit().clear().commit();
+		getSharedPreferences("nbw_v2_authorization", MODE_PRIVATE).edit().clear().commit();
+		return true;
 	}
-	/** Callback is only a metadata-refresh hint. Server owns single-use flow and binding identity. */
-	public static String consumeAuthorizationLaunch(Context context){
-		AuthorizationTicket ticket=authorizationTicket; authorizationTicket=null;
-		context.getSharedPreferences("nbw_v2_authorization", MODE_PRIVATE).edit().clear().commit();
-		if(ticket==null) return null;
+	private void cancelAuthorizationLaunch(){
+		if(authorizationTicket!=null && authorizationTicket.navigationGeneration==authorizationGeneration) authorizationTicket=null;
+		authorizationGeneration=0;
+	}
+	private static boolean validAuthorization(AuthorizationTicket ticket){
+		if(ticket==null) return false;
 		long age=android.os.SystemClock.elapsedRealtime()-ticket.started;
 		var manager=AccountSessionManager.getInstance(); String account=ticket.session.getID();
-		if(age<0 || age>10*60*1000L || manager.tryGetAccount(account)!=ticket.session || !account.equals(manager.getLastActiveAccountID())
-				|| ticket.session.token!=ticket.token || !java.util.Objects.equals(ticket.accessToken,ticket.token==null ? null : ticket.token.accessToken)
-				|| ticket.generation!=ticket.session.getNBWForumOptionsRepository().getSnapshot().generation) return null;
-		return account;
+		return age>=0 && age<10*60*1000L && manager.tryGetAccount(account)==ticket.session && account.equals(manager.getLastActiveAccountID())
+				&& ticket.session.token==ticket.token && java.util.Objects.equals(ticket.accessToken,ticket.token==null ? null : ticket.token.accessToken)
+				&& ticket.generation==ticket.session.getNBWForumOptionsRepository().getSnapshot().generation;
+	}
+	/** Callback is only a metadata-refresh hint. It cannot grant a binding or start another authorization. */
+	public static boolean restoreAuthorizationOwner(Activity callback){
+		AuthorizationTicket ticket=authorizationTicket; authorizationTicket=null;
+		callback.getSharedPreferences("nbw_v2_authorization", MODE_PRIVATE).edit().clear().commit();
+		if(!validAuthorization(ticket)) return false;
+		Intent navigation=new Intent(callback, NBWPostRegisterActivity.class)
+				.putExtra("account", ticket.session.getID()).putExtra("show_back", ticket.showBack);
+		if(!NBWCallbackTaskRouter.restore(callback, ticket.owner, navigation)) return false;
+		ticket.session.getNBWForumOptionsRepository().refreshNow();
+		return true;
+	}
+	/** Legacy call sites cannot manufacture a return address from a Context/account hint. */
+	@Deprecated public static void rememberAuthorizationLaunch(Context context, String account){
+		if(context instanceof NBWPostRegisterActivity activity && activity.session!=null && activity.session.getID().equals(account)) activity.rememberAuthorizationLaunch();
+	}
+	@Deprecated public static String consumeAuthorizationLaunch(Context context){
+		AuthorizationTicket ticket=authorizationTicket; authorizationTicket=null;
+		context.getSharedPreferences("nbw_v2_authorization", MODE_PRIVATE).edit().clear().commit();
+		return validAuthorization(ticket) ? ticket.session.getID() : null;
 	}
 
 	/** Retired helpers remain source-compatible only; they cannot authorize or bind V2. */

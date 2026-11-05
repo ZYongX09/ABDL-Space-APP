@@ -312,16 +312,20 @@ public class NBWV2LifecycleIntegrationTest{
 		for(MastodonAPIRequest<?> request:controller.requests) assertEquals("/api/app/nbw/authorization/start", request.getURL().getPath());
 	}
 	@Test public void authorizationTicketIsSingleUseScopedAndExpiresWithoutBindingState(){
-		NBWPostRegisterActivity.rememberAuthorizationLaunch(MastodonApp.context, session.getID());
+		ready(); NBWPostRegisterActivity page=openConnectionPage(true);
+		// Context/account alone cannot manufacture an owner return address.
+		NBWPostRegisterActivity.rememberAuthorizationLaunch(MastodonApp.context,session.getID());
+		assertNull(NBWPostRegisterActivity.consumeAuthorizationLaunch(MastodonApp.context));
+		NBWPostRegisterActivity.rememberAuthorizationLaunch(page, session.getID());
 		assertEquals(session.getID(), NBWPostRegisterActivity.consumeAuthorizationLaunch(MastodonApp.context));
 		assertNull(NBWPostRegisterActivity.consumeAuthorizationLaunch(MastodonApp.context));
-		NBWPostRegisterActivity.rememberAuthorizationLaunch(MastodonApp.context, session.getID());
+		NBWPostRegisterActivity.rememberAuthorizationLaunch(page, session.getID());
 		org.robolectric.shadows.ShadowSystemClock.advanceBy(java.time.Duration.ofMinutes(11));
 		assertNull(NBWPostRegisterActivity.consumeAuthorizationLaunch(MastodonApp.context)); assertTrue(authorizationTicket().getAll().isEmpty());
-		NBWPostRegisterActivity.rememberAuthorizationLaunch(MastodonApp.context, session.getID());
+		NBWPostRegisterActivity.rememberAuthorizationLaunch(page, session.getID());
 		repository.deactivate();
 		assertNull(NBWPostRegisterActivity.consumeAuthorizationLaunch(MastodonApp.context));
-		NBWPostRegisterActivity.rememberAuthorizationLaunch(MastodonApp.context, session.getID());
+		NBWPostRegisterActivity.rememberAuthorizationLaunch(page, session.getID());
 		sessions.remove(session.getID()); assertNull(NBWPostRegisterActivity.consumeAuthorizationLaunch(MastodonApp.context)); sessions.put(session.getID(), session);
 	}
 	@Test public void queuedRecentSearchWriteAndDeliveryCannotResurrectOldEndpointOrAccount() throws Exception{
