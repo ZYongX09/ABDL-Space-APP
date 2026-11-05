@@ -34,3 +34,11 @@
 继续时先确保有足够可用物理内存，在相同分支沿用已有缓存串行运行release资源编译→支付8类专项→赞助及相邻联合回归→原证书assembleRelease/二进制核验。不要并行重工具，不为截图启用真实支付或设置未经核实的额度。代码、沙箱、签约仍属未生产可用候选，不请求用户提供尚不存在的支付页截图。
 
 诊断与恢复脚本：`~/.local/share/abdl-sponsor-alipay-20261105/`；关键`android-payments-targeted1.log`、`android-production-compile1-stopped.json`、`android-resource-retry1-stopped.json`及pressure记录。尚无本轮APK，不把上轮NBW包6f352765当作已含支付宝功能的包。
+
+## 只读诊断与辅助验证补充（2026-11-05 18:29 CST）
+
+- AGP8.9.1实际字节码复核：资源请求在服务关闭时按worker数分组，以noIsolation在Gradle同一堆逐文件编译；未找到可证有效的独立batch-size或等价native XML分流参数。部分映射26578项中仅4604个目标存在；merger.xml可先于编译队列完成写入，不是成功检查点，不手动拼接或强制跳过资源任务。
+- 上轮NBW6f352765和D1db383d07成功出包的mergeReleaseResources均为UP-TO-DATE；两次1024MiB/SerialGC成功不能证明本轮全量资源重编译可在相同内存完成。旧资源归档与当前源码未证匹配，不作替代。诊断后没有重复启动同环境的长时间资源编译，也没有关闭用户其他进程。
+- 在独立私有目录用本机JDK21的javac --release17重新编译当前SponsorPaymentCoordinator、SponsorPaymentModels、SponsorPaymentRequest、AlipaySdkAdapter及相邻SponsorRequest/SponsorModels六份生产源码，原样编译现有fixture与两类JUnit；javac/JUnit各限256MiB、串行执行，**19/19辅助逻辑测试通过**。类加载来源与源码/真实依赖SHA固定，无生产源码或测试修改。
+- 此辅助验证使用过滤后的旧release相邻类缓存，未证明相邻缓存与全仓源码一致；SDK仅真实字节码静态编译并从JUnit运行classpath排除。没有真实HTTP、SharedPreferences、Activity生命周期、SDK付款或UI验收，不替代Gradle完整客户端门禁。原Gradle支付8类实际仍未执行，仍无APK/截图、未合develop/main。
+- 结果：`~/.local/share/abdl-sponsor-alipay-20261105/aux-payment-javac-junit/20261105T102725Z-gk_pdbmx/result.json`（auxiliary_only=true、full_android_gate=false）；诊断`resource-diagnosis-followup.json`。代码检查点Android b9e0c28f、Backend231cbfc已推功能分支；本补充仅记录验证事实，不改生产或收款配置。
