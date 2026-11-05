@@ -27,6 +27,15 @@ jobs:
         uses: actions/checkout@v4
         with:
           persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /*
+            !**/*.keystore
+            !**/*.jks
+            !**/local.properties
+            !**/secrets.properties
+            !**/*.secret
+            !**/.env*
 
       - name: Set up JDK 21
         uses: actions/setup-java@v4
@@ -46,13 +55,20 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test -n "$ANDROID_HOME"
-          test -x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
-          test -f "$ANDROID_HOME/licenses/android-sdk-license"
-          test ! -e local.properties
-          test ! -e mastodon/release.keystore
           mkdir -p "$SPONSOR_CI_EVIDENCE_DIR" "$SPONSOR_CI_BUILD_CACHE"
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+          fail() { printf '%s\n' "$1" | tee "$SPONSOR_CI_EVIDENCE_DIR/environment-error.txt"; exit 1; }
+          sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          [ -n "$sdk" ] || fail 'No Android SDK path on hosted runner'
+          manager="$sdk/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$manager" ]; then
+            manager="$(command -v sdkmanager || true)"
+          fi
+          [ -n "$manager" ] && [ -x "$manager" ] || fail 'Hosted runner has no executable sdkmanager'
+          [ -f "$sdk/licenses/android-sdk-license" ] || fail 'Existing Android SDK license required; no automatic acceptance'
+          [ ! -e local.properties ] || fail 'Unexpected local.properties in verification checkout'
+          [ ! -e mastodon/release.keystore ] || fail 'Release keystore must be excluded from verification checkout'
+          printf 'ANDROID_HOME=%s\nANDROID_SDK_ROOT=%s\n' "$sdk" "$sdk" >> "$GITHUB_ENV"
+          "$manager" --sdk_root="$sdk" \
             'platforms;android-37' 'platforms;android-30' 'build-tools;35.0.0' < /dev/null
 
       - name: Compile real release resources and preserve normal input-keyed Gradle cache

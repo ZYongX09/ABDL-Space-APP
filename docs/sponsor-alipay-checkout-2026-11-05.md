@@ -56,3 +56,9 @@
 准备阶段GitHub CLI尚未登录，未主动dispatch或推专用CI触发分支。用户登录后已实际核验账号ZYongX09、PUBLIC仓库ZYongX09/ABDL-Space-APP；发现090950ee推送虽未匹配构建分支，仍产生GitHub配置校验失败记录42020182557（jobs为空，没有构建或部署）。此前“未启动Actions”的准确含义应为未执行任何job，不能声称GitHub没有生成run记录。
 
 定位到作业级env不允许runner上下文，而初版使用runner.temp；本地YAML语法检查未覆盖GitHub上下文可用性。已改为step内使用RUNNER_TEMP写入GITHUB_ENV，不改变main/develop、原支付源码或原发布流程。修正版推现有支付feature不触发构建；启动前仍核验账号、仓库、workflow、ref及精确提交并取得确认。原证书release APK仍待真实远端编译测试、UI验收和本地签名核验；不能用配置修正或空jobs失败冒作客户端结果。
+
+### 首次已确认远端运行（42027029576）
+
+用户明确确认后，使用账号ZYongX09手动dispatch功能分支精确f002b3d416c96d1b6125940c62eb04797a5d63d4。实际GitHub created_at为2026-11-05T12:25:40Z，比本机紧邻发起命令时UTC记录早9秒；以CLI直接返回run URL和实际event/headSha/headBranch验证关联，不把本机created过滤空结果误作没有运行。
+
+该次checkout/JDK/目录步骤成功，SDK环境准备的静默test exit1，未进入资源编译或任何测试；无报告可上传。进一步仅查Git跟踪文件名，确认仓库已有mastodon/release.keystore，因此原无签名文件检查必失败；未读取/解码/使用该文件，未确认其身份。后续CI改用非cone sparse-checkout，在工作树排除所有keystore/jks/local.properties/secrets.properties/.secret/.env文件；不修改既有文件或仓库历史，不把排除工作树当作历史泄露整改。SDK路径与工具检查增加明确诊断、兼容已有PATH sdkmanager，仍不自动接受SDK许可。新提交须重新确认精确目标后运行，不能将第一次环境失败计作客户端编译结果。
