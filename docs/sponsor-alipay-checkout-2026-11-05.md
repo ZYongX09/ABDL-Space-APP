@@ -53,4 +53,6 @@
 
 本地Python/YAML/27类清单与受跟踪二进制SHA校验通过；真实Gradle依赖记录任务exit0、支付宝/AppKit哈希匹配，独立build-cache init加载help exit0。依赖记录通过artifactView.componentFilter在解析产物前排除project AAR，不提前读取未生成模块文件。以上仅配置验证，不是资源编译或客户端运行验收。
 
-截至准备时GitHub CLI已安装但未登录，**未启动Actions或得到远端测试结论**。配置仅保存至现有支付功能分支，不推专用CI触发分支；需用户在本机完成`gh auth login --hostname github.com --git-protocol https --web`，再核验账号、仓库、workflow、ref和精确提交后确认启动；无需在聊天提供token/密码/设备码。原证书release APK仍待完整客户端门禁和本地签名核验，main/develop及生产不变。
+准备阶段GitHub CLI尚未登录，未主动dispatch或推专用CI触发分支。用户登录后已实际核验账号ZYongX09、PUBLIC仓库ZYongX09/ABDL-Space-APP；发现090950ee推送虽未匹配构建分支，仍产生GitHub配置校验失败记录42020182557（jobs为空，没有构建或部署）。此前“未启动Actions”的准确含义应为未执行任何job，不能声称GitHub没有生成run记录。
+
+定位到作业级env不允许runner上下文，而初版使用runner.temp；本地YAML语法检查未覆盖GitHub上下文可用性。已改为step内使用RUNNER_TEMP写入GITHUB_ENV，不改变main/develop、原支付源码或原发布流程。修正版推现有支付feature不触发构建；启动前仍核验账号、仓库、workflow、ref及精确提交并取得确认。原证书release APK仍待真实远端编译测试、UI验收和本地签名核验；不能用配置修正或空jobs失败冒作客户端结果。

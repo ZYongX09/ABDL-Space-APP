@@ -22,11 +22,6 @@ jobs:
     if: github.repository == 'ZYongX09/ABDL-Space-APP'
     runs-on: ubuntu-24.04
     timeout-minutes: 75
-    env:
-      GRADLE_USER_HOME: ${{ runner.temp }}/sponsor-gradle-home
-      SPONSOR_CI_EVIDENCE_DIR: ${{ runner.temp }}/sponsor-verification
-      SPONSOR_CI_BUILD_CACHE: ${{ runner.temp }}/sponsor-resource-cache
-      ABDL_MAP_ENV_FILE: ${{ runner.temp }}/no-map-credentials.env
     steps:
       - name: Check out exact candidate without persisted credentials
         uses: actions/checkout@v4
@@ -38,6 +33,14 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+
+      - name: Define isolated verification directories
+        shell: bash
+        run: |
+          printf 'GRADLE_USER_HOME=%s/sponsor-gradle-home\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
+          printf 'SPONSOR_CI_EVIDENCE_DIR=%s/sponsor-verification\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
+          printf 'SPONSOR_CI_BUILD_CACHE=%s/sponsor-resource-cache\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
+          printf 'ABDL_MAP_ENV_FILE=%s/no-map-credentials.env\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
 
       - name: Check hosted SDK and prepare isolated evidence
         shell: bash
