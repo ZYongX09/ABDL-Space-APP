@@ -151,6 +151,24 @@ public class SponsorPaymentCoordinatorTest{
 		h.coordinator.pause(); h.coordinator.resume(); h.clock.next();
 		assertEquals(1, h.sdk.calls); assertEquals(1, h.source.creates); assertEquals(SponsorPaymentCoordinator.MAX_QUERIES+1, h.source.queries);
 	}
+	@Test public void returningFromWalletReconcilesOnceAndExplicitRetryKeepsTheFullBudget(){
+		Harness h=new Harness(); h.create(); h.sdk.callback.accept("6001");
+		for(int i=0;i<SponsorPaymentCoordinator.MAX_QUERIES;i++){
+			h.source.query.success(order("PENDING_PAYMENT", "PENDING")); h.clock.next();
+		}
+		int settled=h.source.queries; assertTrue(h.clock.jobs.isEmpty());
+		// Going in and out of the wallet repeatedly must not replay the automatic burst.
+		for(int i=0;i<3;i++){
+			h.coordinator.pause(); h.coordinator.resume();
+			assertEquals(settled+i+1, h.source.queries);
+			h.source.query.success(order("PENDING_PAYMENT", "PENDING")); h.clock.next();
+			assertTrue("A resume must not restart the automatic burst", h.clock.jobs.isEmpty());
+		}
+		// An explicit refresh/retry is the user's own request, so it keeps the full bounded budget.
+		h.coordinator.retry(); assertEquals(settled+4, h.source.queries);
+		h.source.query.success(order("PENDING_PAYMENT", "PENDING")); h.clock.next();
+		assertEquals(settled+5, h.source.queries);
+	}
 	@Test public void malformedRecoveryNeverIssuesAnyRequestAndPreservesRecord(){
 		for(SponsorPaymentCoordinator.Pending bad:List.of(
 				new SponsorPaymentCoordinator.Pending("other-owner", "65adffb9-98bf-46b0-9fca-59a3bc6afdd0", "fixture-order-01"),

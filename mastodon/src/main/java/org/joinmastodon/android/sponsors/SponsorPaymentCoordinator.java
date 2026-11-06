@@ -206,7 +206,7 @@ public final class SponsorPaymentCoordinator{
 		if(!valid()) return;
 		active=true;
 		if(busy) return;
-		if(catalog==null && !confirmed) loadFresh(false); else if(blocking()) beginQuery(); else if(!confirmed) loadFresh(false);
+		if(catalog==null && !confirmed) loadFresh(false); else if(blocking()) reconcileOnce(); else if(!confirmed) loadFresh(false);
 	}
 	/** SDK opens another Activity: do not suppress its successful callback just because of pause. */
 	public void pause(){ active=false; scheduler.remove(queryTask); }
@@ -375,6 +375,15 @@ public final class SponsorPaymentCoordinator{
 	private void beginQuery(){
 		if(!valid()) return;
 		queries=0; scheduler.remove(queryTask);
+		if(!busy) query();
+	}
+	/** Returning from the wallet reconciles at most once: it must not replay the whole automatic
+	 * burst on every back gesture. A full budget stays with the explicit refresh/retry action and
+	 * with the SDK callback that follows a real payment attempt. */
+	private void reconcileOnce(){
+		if(!valid()) return;
+		queries=MAX_QUERIES-1;
+		scheduler.remove(queryTask);
 		if(!busy) query();
 	}
 	private void query(){
