@@ -17,4 +17,9 @@
 	<string name="sandbox_close_title">关闭这笔测试订单并重新选择</string>
 	<string name="sandbox_close_message">仅请求服务端关闭原单。返回 CLOSED 且允许切换后才能重新选择；未知 / 已付款状态不会清单，也不会自动再次付款。</string>
 	<string name="sandbox_close_confirm">请求关闭原单</string>
+	<string name="sandbox_paid_question">您是否已完成支付？</string>
+	<string name="sandbox_paid_message">后台仍显示这笔 ¥0.01 测试订单待支付。\n\n选择“未完成支付”会请求后端关闭该订单，之后可以重新发起；选择“已完成支付”会让后端再核对一次。</string>
+	<string name="sandbox_not_paid">未完成支付</string>
+	<string name="sandbox_paid">已完成支付</string>
+	<string name="sandbox_backend_unpaid">后台显示订单未完成</string>
 </resources>

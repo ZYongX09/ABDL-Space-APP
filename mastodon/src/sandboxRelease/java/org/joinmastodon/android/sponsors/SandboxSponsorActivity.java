@@ -7,6 +7,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.view.View;
 import android.view.WindowManager;
+import android.widget.Toast;
 
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
@@ -15,6 +16,7 @@ import androidx.core.view.WindowInsetsCompat;
 
 import org.joinmastodon.android.R;
 import org.joinmastodon.android.model.sponsors.SponsorModels.Me;
+import org.joinmastodon.android.model.sponsors.SponsorPaymentModels;
 
 /** Dedicated launcher: no production Activity/Fragment/session, Intent imports or automatic pairing. */
 public final class SandboxSponsorActivity extends Activity implements SandboxSponsorUi.Actions{
@@ -25,6 +27,9 @@ public final class SandboxSponsorActivity extends Activity implements SandboxSpo
 	private SponsorPaymentCoordinator coordinator;
 	private SponsorPaymentCoordinator.Cancelable pairCall;
 	private AlertDialog closeDialog;
+	private AlertDialog paidDialog;
+	private String askedOrderId;
+	private boolean awaitingPaidCheck;
 	private boolean resumed, pairing;
 	private long pairGeneration;
 	private final Runnable expiry=this::expired;
@@ -91,7 +96,37 @@ public final class SandboxSponsorActivity extends Activity implements SandboxSpo
 	private void render(){
 		if(ui==null || coordinator==null) return;
 		ui.render(coordinator);
-		if(session.lease()==null) handler.post(expiry);
+		if(session.lease()==null){ handler.post(expiry); return; }
+		reportPaidCheck();
+		askIfPaid();
+	}
+	/** Returning to the page asks the server once, then makes the doubt explicit instead of
+	 * silently re-querying the order. One question per order; the answer is the user's choice. */
+	private void askIfPaid(){
+		if(!resumed || paidDialog!=null || coordinator==null || coordinator.busy() || coordinator.sdkActive() || coordinator.confirmed()) return;
+		SponsorPaymentModels.Order order=coordinator.order();
+		if(order==null || !"PENDING".equals(order.fulfillmentState)) return;
+		if(!"PENDING_PAYMENT".equals(order.paymentState) && !"UNKNOWN".equals(order.paymentState)) return;
+		if(order.orderId.equals(askedOrderId)) return;
+		askedOrderId=order.orderId;
+		paidDialog=new AlertDialog.Builder(this).setTitle(R.string.sandbox_paid_question).setMessage(R.string.sandbox_paid_message)
+				.setNegativeButton(R.string.sandbox_not_paid, (dialog, which)->{ if(coordinator!=null && resumed) coordinator.switchChannel(); })
+				.setPositiveButton(R.string.sandbox_paid, (dialog, which)->{
+					// Only one authoritative re-check; a still-unpaid answer is reported, never assumed.
+					awaitingPaidCheck=true;
+					if(coordinator!=null && resumed) coordinator.retry();
+					else awaitingPaidCheck=false;
+				}).create();
+		paidDialog.setOnDismissListener(ignored->paidDialog=null);
+		paidDialog.show();
+	}
+	private void reportPaidCheck(){
+		if(!awaitingPaidCheck || coordinator==null || coordinator.busy()) return;
+		awaitingPaidCheck=false;
+		SponsorPaymentModels.Order order=coordinator.order();
+		if(coordinator.confirmed() || order!=null && "GRANTED".equals(order.fulfillmentState)) return;
+		if(order!=null && ("PENDING_PAYMENT".equals(order.paymentState) || "UNKNOWN".equals(order.paymentState)))
+			Toast.makeText(this, R.string.sandbox_backend_unpaid, Toast.LENGTH_LONG).show();
 	}
 	private void watchExpiry(){
 		handler.removeCallbacks(expiry);
@@ -111,8 +146,9 @@ public final class SandboxSponsorActivity extends Activity implements SandboxSpo
 		closeDialog.setOnDismissListener(ignored->closeDialog=null); closeDialog.show();
 	}
 	private void dismissClose(){ if(closeDialog!=null){ AlertDialog old=closeDialog; closeDialog=null; old.dismiss(); } }
+	private void dismissPaid(){ if(paidDialog!=null){ AlertDialog old=paidDialog; paidDialog=null; old.dismiss(); } }
 	private void destroyCoordinator(){
-		dismissClose(); handler.removeCallbacks(expiry);
+		dismissClose(); dismissPaid(); handler.removeCallbacks(expiry);
 		if(coordinator!=null) coordinator.destroy(); coordinator=null;
 	}
 	@Override protected void onResume(){
@@ -121,7 +157,7 @@ public final class SandboxSponsorActivity extends Activity implements SandboxSpo
 		watchExpiry();
 	}
 	@Override protected void onPause(){
-		resumed=false; dismissClose(); handler.removeCallbacks(expiry);
+		resumed=false; dismissClose(); dismissPaid(); handler.removeCallbacks(expiry);
 		if(coordinator!=null) coordinator.pause();
 		super.onPause();
 	}
