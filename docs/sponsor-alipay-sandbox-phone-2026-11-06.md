@@ -32,7 +32,11 @@ SDK所有状态都只触发原单查询，成功须后端GRANTED加新鲜Me，�
 
 最终冻结新增5类23项：SandboxProtocolTest、SandboxSessionTest、SandboxSponsorSourceTest、SandboxSponsorUiTest、SandboxIsolationContractTest。原27类209项正式支付及相邻回归仍单独`testReleaseUnitTest`，不删断言迁就沙箱。两张native Canvas计划验证320dp/1.6字体浅色配对、深色未付款页面，不伪装真钱包或交易成功。
 
-首次实际sandbox源码和测试编译已运行1838.95秒，资源/清单处理完成后停留在compileSandboxReleaseKotlin，30分钟有界监控主动结束exit143，前后28339份清单源码不变、无源码错误输出；不当作编译通过。冻结后实际清单为7 Activity、零provider/service/receiver、onlyRC，只有INTERNET/ACCESS_NETWORK_STATE权限，官方optional legacy library保留。后端验证后已同源码增量重试，开始时28339份源码与首次逐hash相同；第二轮Gradle实际exit0、1136.43秒，主Java和单测Java/Kotlin均编译完成。期间因确认target35独立Activity系统栏/键盘遮挡缺口，另补仅该入口Insets处理，wrapper前后指纹变化保留，不把第二轮当最终冻结门禁。最终source/tests冻结后须重新执行回归与assemble；不clean或改依赖。最终签名APK证书、SHA256及公网服务交付状态按真实结果归档，不提前声称APK、安装或手机支付完成。资源不足时仅停止本轮进程，不clean缓存/旧包或关闭用户进程。
+首次实际sandbox源码和测试编译已运行1838.95秒，资源/清单处理完成后停留在compileSandboxReleaseKotlin，30分钟有界监控主动结束exit143，前后28339份清单源码不变、无源码错误输出；不当作编译通过。冻结后实际清单为7 Activity、零provider/service/receiver、onlyRC，只有INTERNET/ACCESS_NETWORK_STATE权限，官方optional legacy library保留。后端验证后已同源码增量重试，开始时28339份源码与首次逐hash相同；第二轮Gradle实际exit0、1136.43秒，主Java和单测Java/Kotlin均编译完成。期间因确认target35独立Activity系统栏/键盘遮挡缺口，另补仅该入口Insets处理，wrapper前后指纹变化保留，不把第二轮当最终冻结门禁。最终source/tests冻结后实际结果：沙箱专用回归 **24/24通过**（协议5、会话6、受限Source7、原生UI/Insets3、隔离contract3），原27类 **209/209通过**，前两者签名前后源码28339份清单均不变。打包首轮在1277秒因本机磁盘保底主动停止（无源码错误）；经用户单独授权只删除可再生的release重复中间产物后，同源码增量重打 **exit0／229.7秒**。
+
+交付APK：`ABDL-Space-3.3.0-code36-sponsor-alipay-sandbox-test-20261106.apk`，169031900字节，SHA256 `81b4453baed58e98a63fe5ef95de168993188de6b6aefcd1e274a6283991e245`；包名`top.abdl_space.app.sandbox`、3.3.0-sandbox/code36、非debug、既有证书`fd2098a3…`，与正式包可并装。二进制核验：16KiB对齐、CRC、仅沙箱Application+7 Activity（官方SDK六项属性逐字保留+optional legacy）、零provider/service/receiver、仅RC钱包可见性、禁备份、无地图凭据、固定HTTPS origin已编入。AGP/Gradle/Kotlin/SDK及依赖未升级，正式src/main与src/test未改。
+
+**仍未验证：真实设备安装/启动、SDK沙箱钱包调起与回跳、0.01元沙箱交易、异步通知验签与一次履约。** 本记录不把编译、二进制核验或HTTP健康当手机支付通过；APK未由Agent安装。安全深扫在提交推送时未取得完整结论，不能据此宣称项目安全。资源不足时仅停止本轮进程，不clean缓存/旧包或关闭用户进程。
 
 ## 后端和交付
 
