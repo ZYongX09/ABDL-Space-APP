@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+	xmlns:tools="http://schemas.android.com/tools">
+
+	<!-- Replace, not merge: main explicitly removes RC visibility, and its production queries
+	     must not undo this variant's sandbox-only wallet capability check. -->
+	<queries tools:node="replace">
+		<package android:name="com.eg.android.AlipayGphoneRC" />
+	</queries>
+
+	<uses-permission tools:node="removeAll" />
+	<uses-permission android:name="android.permission.INTERNET" />
+	<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+	<!-- Old-target SDK manifests may implicitly add this permission during merge. -->
+	<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" tools:node="remove" />
+	<permission tools:node="removeAll" />
+
+	<!-- Providers execute BEFORE Application.onCreate. A whole-application allowlist removes
+	     all main/library push, maps, WorkManager/Startup, updater, OAuth, share and App Links,
+	     including future library providers, instead of attempting to disable them too late. -->
+	<application
+		tools:node="replace"
+		android:name="org.joinmastodon.android.sponsors.SandboxApplication"
+		android:label="@string/sandbox_app_name"
+		android:icon="@mipmap/ic_launcher"
+		android:theme="@style/Theme.Mastodon.AutoLightDark"
+		android:supportsRtl="true"
+		android:debuggable="false"
+		android:largeHeap="false"
+		android:allowBackup="false"
+		android:fullBackupContent="false"
+		android:dataExtractionRules="@xml/sandbox_data_extraction_rules"
+		android:usesCleartextTraffic="false"
+		android:networkSecurityConfig="@xml/sandbox_network_security_config">
+		<activity
+			android:name="org.joinmastodon.android.sponsors.SandboxSponsorActivity"
+			android:exported="true"
+			android:label="@string/sandbox_app_name"
+			android:windowSoftInputMode="adjustResize">
+			<intent-filter>
+				<action android:name="android.intent.action.MAIN" />
+				<category android:name="android.intent.category.LAUNCHER" />
+			</intent-filter>
+		</activity>
+
+		<uses-library android:name="org.apache.http.legacy" android:required="false" />
+
+		<!-- Official 15.8.42 AAR activity attributes copied unchanged. The allowlist above
+		     replaces the library application as well, so all six must be explicitly retained. -->
+		<activity
+			android:name="com.alipay.sdk.app.H5PayActivity"
+			android:configChanges="orientation|keyboardHidden|navigation|screenSize|locale|keyboard|screenLayout|density|fontScale|layoutDirection|smallestScreenSize"
+			android:exported="false"
+			android:theme="@android:style/Theme.NoTitleBar" />
+		<activity
+			android:name="com.alipay.sdk.app.H5AuthActivity"
+			android:configChanges="orientation|keyboardHidden|navigation|screenSize|locale|keyboard|screenLayout|density|fontScale|layoutDirection|smallestScreenSize"
+			android:exported="false"
+			android:theme="@android:style/Theme.NoTitleBar" />
+		<activity
+			android:name="com.alipay.sdk.app.PayResultActivity"
+			android:configChanges="orientation|keyboardHidden|navigation|screenSize|locale|keyboard|screenLayout|density|fontScale|layoutDirection|smallestScreenSize"
+			android:exported="true"
+			android:launchMode="singleInstance"
+			android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+		<activity
+			android:name="com.alipay.sdk.app.AlipayResultActivity"
+			android:configChanges="orientation|keyboardHidden|navigation|screenSize|locale|keyboard|screenLayout|density|fontScale|layoutDirection|smallestScreenSize"
+			android:exported="true"
+			android:launchMode="singleTask"
+			android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+		<activity
+			android:name="com.alipay.sdk.app.H5OpenAuthActivity"
+			android:configChanges="orientation|keyboardHidden|navigation|screenSize|locale|keyboard|screenLayout|density|fontScale|layoutDirection|smallestScreenSize"
+			android:exported="false"
+			android:screenOrientation="behind"
+			android:windowSoftInputMode="adjustResize|stateHidden" />
+		<activity
+			android:name="com.alipay.sdk.app.APayEntranceActivity"
+			android:configChanges="orientation|keyboardHidden|navigation|screenSize|locale|keyboard|screenLayout|density|fontScale|layoutDirection|smallestScreenSize"
+			android:exported="false"
+			android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+	</application>
+</manifest>

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+	<string name="sandbox_app_name">ABDL 支付沙箱 · 非正式</string>
+	<string name="sandbox_warning">仅支付宝沙箱测试 · ¥0.01 / 1 天\n不登录正式账号、不授予正式权益。仅安装并登录沙箱钱包时使用；SDK 返回不代表到账。</string>
+	<string name="sandbox_origin">固定测试服务：%1$s</string>
+	<string name="sandbox_pair_hint">输入本地控制文件中的一次性配对码</string>
+	<string name="sandbox_pair">配对 / 重新配对</string>
+	<string name="sandbox_pairing">正在配对；不会保存配对码或访问令牌。</string>
+	<string name="sandbox_unpaired">尚未配对。进程重启后须重新输入配对码；原订单恢复记录不会删除。</string>
+	<string name="sandbox_paired">已配对沙箱用户 %1$s\nrun_id：%2$s</string>
+	<string name="sandbox_pair_failed">配对未完成，请核对配对码、有效期及固定测试服务后重试。不会切换服务或清理原订单。</string>
+	<string name="sandbox_owner_changed">拒绝切换配对身份：原 owner 仍有未决订单或恢复记录异常。请恢复相同 origin / run_id / user_id 后查询原单；未知订单不得清除。</string>
+	<string name="sandbox_recovery_required">检测到原订单恢复记录。必须重新配对到相同测试服务与身份；不会重新付款或清空记录。</string>
+	<string name="sandbox_expired">配对已失效，请重新配对到相同测试服务与身份；原订单仍保留。</string>
+	<string name="sandbox_afdian_disabled">沙箱禁止爱发电及其他站外购买，仅测试原生支付宝沙箱。</string>
+	<string name="sandbox_local_granted">服务端已确认本地测试权益，并重新读取沙箱 Me。此结果不是正式账号权益。</string>
+	<string name="sandbox_close_title">关闭这笔测试订单并重新选择</string>
+	<string name="sandbox_close_message">仅请求服务端关闭原单。返回 CLOSED 且允许切换后才能重新选择；未知 / 已付款状态不会清单，也不会自动再次付款。</string>
+	<string name="sandbox_close_confirm">请求关闭原单</string>
+</resources>

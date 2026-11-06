@@ -5,6 +5,25 @@ plugins {
 	id 'org.jetbrains.kotlin.plugin.compose'
 }
 
+// Sandbox invocations must not even open the production map .env file. Use explicit variant task
+// names; a mixed sandbox/production invocation is rejected instead of changing release inputs.
+def sandboxTaskRequested = gradle.startParameter.taskNames.any {
+	it.toLowerCase(java.util.Locale.ROOT).contains('sandbox')
+}
+def productionTaskRequested = gradle.startParameter.taskNames.any {
+	def name = it.tokenize(':').last().toLowerCase(java.util.Locale.ROOT)
+	!name.contains('sandbox') && (name.contains('release') || name.contains('debug') || name.contains('nightly'))
+}
+if (sandboxTaskRequested && productionTaskRequested) {
+	throw new GradleException('Run sandboxRelease and production variant tasks in separate invocations.')
+}
+def sandboxOrigin = (project.findProperty('sandboxOrigin') ?: '').toString()
+// Only the public, verified Quick Tunnel origin belongs in the APK. No path, port, userinfo,
+// trailing slash, IP address, production host, pairing code or token is accepted here.
+def validSandboxOrigin = {
+	sandboxOrigin ==~ /https:\/\/[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.trycloudflare\.com/
+}
+
 // Map credentials land in the manifest as placeholders, so a build that cannot see them still
 // succeeds and silently ships a package with a dead map tab (see docs/android-friend-map-native-sdk.md).
 // Resolution order is environment variable, then the user-level file below, so a plain
@@ -31,8 +50,9 @@ def readMapCredentialsFile = { File file ->
 	}
 	return credentials
 }
-def mapCredentialsFromFile = readMapCredentialsFile(mapCredentialsFile())
+def mapCredentialsFromFile = sandboxTaskRequested ? [:] : readMapCredentialsFile(mapCredentialsFile())
 def mapCredential = { String name ->
+	if (sandboxTaskRequested) return ''
 	def value = System.getenv(name)
 	if (!value) value = mapCredentialsFromFile[name]
 	value = value ?: ''
@@ -127,6 +147,22 @@ android {
 			minifyEnabled false
 			shrinkResources false
 			proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+		}
+		sandboxRelease {
+			initWith release
+			matchingFallbacks = ['release']
+			applicationIdSuffix '.sandbox'
+			versionNameSuffix '-sandbox'
+			debuggable false
+			signingConfig signingConfigs.release
+			buildConfigField "boolean", "QQ_LOGIN_ENABLED", "false"
+			buildConfigField "boolean", "BAIDU_MAP_CONFIGURED", "false"
+			buildConfigField "boolean", "AMAP_CONFIGURED", "false"
+			// Invalid/missing input is never emitted into Java; the task gate below fails closed.
+			buildConfigField "String", "SANDBOX_ORIGIN", '"' + (validSandboxOrigin() ? sandboxOrigin : '') + '"'
+			manifestPlaceholders += [BAIDU_MAP_ANDROID_AK: '', AMAP_ANDROID_KEY: '',
+				JPUSH_PKGNAME: 'top.abdl_space.app.sandbox', JPUSH_APPKEY: '', JPUSH_CHANNEL: '',
+				oAuthScheme: 'abdl-space-sandbox-disabled']
 		}
 		debug {
 			buildConfigField "boolean", "QQ_LOGIN_ENABLED", "true"
@@ -368,6 +404,24 @@ dependencies {
 
 	// JPush SDK
 	implementation project(':jiguang-sdk:jiguang_sdk:jiguang')
+}
+
+// Configuration of ordinary release/sync remains possible without sandboxOrigin. Every sandbox
+// task (including test/compile/manifest/package) requires an explicit valid public origin and the
+// isolated invocation above, so task abbreviations/aggregate builds cannot accidentally import maps.
+tasks.register('assertSandboxConfiguration') {
+	group = 'verification'
+	description = 'Checks the fixed public sandbox origin and isolated map-free invocation.'
+	doLast {
+		if (!sandboxTaskRequested || !validSandboxOrigin()) {
+			throw new GradleException('Use an explicit sandboxRelease task and -PsandboxOrigin=https://<verified-host>.trycloudflare.com (public origin only).')
+		}
+	}
+}
+tasks.configureEach { task ->
+	if (task.name != 'assertSandboxConfiguration' && task.name.toLowerCase(java.util.Locale.ROOT).contains('sandbox')) {
+		task.dependsOn 'assertSandboxConfiguration'
+	}
 }
 
 // --- Map credential guardrails -------------------------------------------------------------------
