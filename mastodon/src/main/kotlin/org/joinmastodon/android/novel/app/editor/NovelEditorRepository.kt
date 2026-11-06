@@ -61,6 +61,13 @@ internal data class NovelMetadata(
 internal fun JSONObject.stringOrNull(key: String): String? = if (isNull(key)) null else optString(key).takeIf { it.isNotBlank() }
 internal fun JSONObject.strings(key: String): List<String> = optJSONArray(key)?.let { a -> (0 until a.length()).map { a.getString(it) } }.orEmpty()
 internal data class EditorDirectory(val structure: EditorModels.WorkStructure, val metadata: NovelMetadata, val remote: Map<String, NovelEditorStorage.RemoteChapter>, val server: JSONObject? = null, val conflict: String? = null)
+internal const val MAX_SUBMISSION_CHAPTERS = 1000
+internal val PUBLISHED_REMOTE_STATUSES = setOf("published", "approved")
+/** The server snapshot is the current release plus this update's explicit selection. */
+internal fun inheritedPublishedChapterCount(remote: Map<String, NovelEditorStorage.RemoteChapter>, selected: Collection<String>): Int {
+    val selectedIds = selected.toSet()
+    return remote.count { (id, chapter) -> id !in selectedIds && chapter.status() in PUBLISHED_REMOTE_STATUSES }
+}
 internal class NovelOwnerConflict(message: String) : IllegalStateException(message)
 internal class NovelReviewInProgress : IllegalStateException("novel_i18n_review_in_progress")
 
@@ -102,6 +109,11 @@ internal class NovelEditorRepository(val context: Context, val accountId: String
         try { s.updateWorkInfo(id, metadata.title, metadata.description); s.putAppMetadata(id, metadata.json().toString(), old?.serverId(), old?.releaseId()); s.writableDatabase.setTransactionSuccessful() }
         finally { s.writableDatabase.endTransaction() }
     } }
+    /** Debounced local draft: persists form fields without requiring a publishable form or uploading anything. */
+    suspend fun saveMetadataDraft(id: String, metadata: NovelMetadata) = local { s ->
+        val old = s.appMetadata(id)
+        s.putAppMetadata(id, metadata.json().toString(), old?.serverId(), old?.releaseId())
+    }
     /** Persist only cover changes immediately; unfinished form fields and old repost metadata stay editable. */
     suspend fun saveCover(id: String, metadata: NovelMetadata) = local { storage ->
         val old = storage.appMetadata(id)
@@ -194,8 +206,11 @@ internal class NovelEditorRepository(val context: Context, val accountId: String
     }
     suspend fun prepare(workId: String, selected: List<String>): String {
         require(selected.isNotEmpty()) { "novel_i18n_select_chapters" }
+        require(selected.size <= MAX_SUBMISSION_CHAPTERS) { "novel_i18n_candidate_too_large" }
         val directory = refreshOwner(workId)
         directory.conflict?.let { throw NovelOwnerConflict(it) }
+        // Published chapters inherited from the current release count toward the same 1,000 chapter snapshot.
+        require(selected.size + inheritedPublishedChapterCount(directory.remote, selected) <= MAX_SUBMISSION_CHAPTERS) { "novel_i18n_candidate_too_large" }
         val reviews = directory.server?.optJSONArray("reviews") ?: JSONArray()
         if ((0 until reviews.length()).any { reviews.getJSONObject(it).optString("status") in setOf("uploading", "pending", "reviewing") }) throw NovelReviewInProgress()
         check(local { it.pendingAppSubmission(workId) } == null) { "novel_i18n_frozen_submission_exists" }

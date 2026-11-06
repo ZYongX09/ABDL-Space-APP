@@ -146,6 +146,38 @@ class NovelEditorScreenshotTest {
         assertNoUpload()
     }
 
+    @Test fun existingWorkUpdateButtonOpensSelectionWithOnlyPublishedChaptersPreselected() {
+        openWork()
+        compose.runOnUiThread { controller.showMetadata() }
+        show()
+        compose.onNodeWithText("更新并发布").assertIsEnabled().performClick()
+        compose.assertDialogShowing()
+        // Fixture statuses: 2 published, 1 pending, 1 rejected, 2 drafts; private drafts must not be preselected.
+        compose.onNodeWithText("确认提交 2 章").assertIsEnabled()
+        click("取消")
+        assertNoUpload()
+    }
+
+    @Test fun existingWorkWithoutPublishedChaptersCannotConfirmAnUpdate() {
+        compose.runOnUiThread {
+            val created = NovelEditorStorage(app, account).use { storage ->
+                storage.createWork(metadata.title, metadata.description, "fiction").also {
+                    storage.putAppMetadata(it.workId(), metadata.json().toString(), null, null)
+                    storage.checkpoint(it.chapterId(), body, 0, 0, 0, true)
+                }
+            }
+            work = created
+            controller.open(created.workId(), null, "edit")
+            controller.showMetadata()
+        }
+        show()
+        compose.onNodeWithText("更新并发布").assertIsEnabled().performClick()
+        compose.assertDialogShowing()
+        compose.onNodeWithText("确认提交 0 章").assertIsNotEnabled()
+        click("取消")
+        assertNoUpload()
+    }
+
     @Test fun manuscriptRendersTheRealAttachedEditTextAndSaveDoesNotUpload() {
         openWork(editor = true); show()
         compose.onNodeWithText("小说编辑").assertIsDisplayed()

@@ -273,6 +273,12 @@
     <string name="novel_en_selected_text_limit">所选正文超过 20 MiB，请减少所选章节</string>
     <string name="novel_en_chapter_json_limit">此章节 JSON 超过 2 MiB，请拆分后明确重新提交</string>
     <string name="novel_en_encoded_chapters_limit">所选章节编码过大</string>
+    <string name="novel_en_candidate_too_large">本次更新将超过 1000 章上限（含服务器上继续保留的已发布章节），请减少所选章节后重试</string>
+    <string name="novel_en_request_too_large">本次上传内容超过服务器限制，请减少所选章节后重试</string>
+    <string name="novel_en_invalid_chapters">部分所选章节缺失、为空或已失效，请刷新后重新选章</string>
+    <string name="novel_en_response_validation_failed">服务器未通过本次资料校验，请检查作品资料和所选章节后重试</string>
+    <string name="novel_en_conflict_rejected">服务器拒绝了本次操作，请刷新作品后重试；本机内容仍保留</string>
+    <string name="novel_en_submission_in_review_conflict">本次提交已在审核中或已结束，当前无法修改，请先刷新审核状态</string>
     <string name="novel_en_submission_finished">本次提交已结束，请明确重新选择章节提交</string>
     <string name="novel_en_review_not_pending">服务器尚未进入审核状态</string>
     <string name="novel_en_submission_cannot_cancel">本次提交已进入审核或已结束，请先刷新状态</string>
@@ -403,6 +409,8 @@
     <string name="novel_en_batch_submit">批量提交</string>
     <string name="novel_en_new_chapter_action">" 新建章节"</string>
     <string name="novel_en_write_first_chapter">写第一章  →</string>
+    <string name="novel_en_update_and_publish">更新并发布</string>
+    <string name="novel_en_published_update_frozen">已提交审核，当前修改已冻结</string>
     <string name="novel_en_save_local_metadata">保存本地资料</string>
     <string name="novel_en_acknowledge">知道了</string>
     <string name="novel_en_refresh_review">刷新审核状态</string>

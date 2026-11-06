@@ -48,6 +48,7 @@ internal fun NovelCreationScreen(state: NovelEditorState, controller: NovelEdito
     var submit by remember { mutableStateOf(false) }
     var conflictConfirm by remember { mutableStateOf(false) }
     var submitSelected by remember { mutableStateOf(setOf<String>()) }
+    var publishing by remember { mutableStateOf(false) }
     val defaultExportName = stringResource(R.string.novel_en_default_export_name)
     val export = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { it?.let(controller::exportTo) }
     var bodyFocused by remember(state.page, state.chapterId, state.editToken) { mutableStateOf(false) }
@@ -91,7 +92,10 @@ internal fun NovelCreationScreen(state: NovelEditorState, controller: NovelEdito
                     FilledTonalButton(onClick = { submitSelected = emptySet(); submit = true }, enabled = !state.busy, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { NovelActionLabel(stringResource(R.string.novel_en_batch_submit)) }
                     Button(onClick = controller::newChapter, enabled = !state.busy, modifier = Modifier.weight(1.4f).heightIn(min = 48.dp)) { Icon(NovelIcons.Plus, null); NovelActionLabel(stringResource(R.string.novel_en_new_chapter_action), Modifier.weight(1f, fill = false)) }
                 }
-                "metadata" -> Button(onClick = controller::storeMetadata, enabled = !state.busy, modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(20.dp).heightIn(min = 48.dp)) { Text(if (state.workId == null) stringResource(R.string.novel_en_write_first_chapter) else stringResource(R.string.novel_en_save_local_metadata)) }
+                "metadata" -> Button(onClick = {
+                    if (state.workId == null) controller.storeMetadata()
+                    else controller.updateAndPublish { published -> submitSelected = published.toSet(); publishing = true; submit = true }
+                }, enabled = !state.busy, modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(20.dp).heightIn(min = 48.dp)) { Text(if (state.workId == null) stringResource(R.string.novel_en_write_first_chapter) else stringResource(R.string.novel_en_update_and_publish)) }
             }
         },
     ) { padding ->
@@ -128,7 +132,7 @@ internal fun NovelCreationScreen(state: NovelEditorState, controller: NovelEdito
         AlertDialog(onDismissRequest = { confirmation = null }, title = { Text(stringResource(R.string.novel_en_confirm_again)) }, text = { Text(text) }, confirmButton = { TextButton(onClick = { confirmation = null; when { action.startsWith("chapter:") -> controller.deleteChapter(action.substringAfter(':')); action == "export" -> export.launch("${state.metadata.title.ifBlank { defaultExportName }}.txt"); action == "retry" -> controller.submit(emptyList(), true); action == "cancelSubmission" -> controller.cancelSubmission(); else -> controller.workAction(action, onDelete) } }) { Text(stringResource(R.string.novel_en_confirm)) } }, dismissButton = { TextButton(onClick = { confirmation = null }) { Text(stringResource(R.string.novel_en_cancel)) } })
     }
     if (conflictConfirm && state.conflict != null) AlertDialog(onDismissRequest = { conflictConfirm = false }, title = { Text(stringResource(R.string.novel_en_keep_local_reselect)) }, text = { Text(stringResource(R.string.novel_en_keep_local_explanation)) }, confirmButton = { TextButton(onClick = { conflictConfirm = false; submitSelected = emptySet(); controller.keepLocalAfterConflict() }, enabled = !state.busy) { Text(stringResource(R.string.novel_en_keep_local_confirm)) } }, dismissButton = { TextButton(onClick = { conflictConfirm = false }) { Text(stringResource(R.string.novel_en_cancel_keep_editing)) } })
-    if (submit) AlertDialog(onDismissRequest = { submit = false }, title = { Text(stringResource(R.string.novel_en_submit_selected_title)) }, text = {
+    if (submit) AlertDialog(onDismissRequest = { submit = false; publishing = false }, title = { Text(stringResource(R.string.novel_en_submit_selected_title)) }, text = {
         Column {
             Text(stringResource(R.string.novel_en_submit_selected_explanation), fontSize = 12.sp)
             LazyColumn(Modifier.heightIn(max = 320.dp)) {
@@ -137,7 +141,12 @@ internal fun NovelCreationScreen(state: NovelEditorState, controller: NovelEdito
                 }
             }
         }
-    }, confirmButton = { TextButton(enabled = submitSelected.isNotEmpty(), onClick = { submit = false; controller.submit(state.directory?.structure?.chapters().orEmpty().filter { it.id() in submitSelected }.map { it.id() }) }) { Text(pluralStringResource(R.plurals.novel_en_confirm_submit_count, submitSelected.size, submitSelected.size)) } }, dismissButton = { TextButton(onClick = { submit = false }) { Text(stringResource(R.string.novel_en_cancel)) } })
+    }, confirmButton = { TextButton(enabled = submitSelected.isNotEmpty() && !state.busy, onClick = {
+        submit = false
+        val selected = state.directory?.structure?.chapters().orEmpty().filter { it.id() in submitSelected }.map { it.id() }
+        controller.submit(selected, successNotice = if (publishing) R.string.novel_en_published_update_frozen else R.string.novel_en_submitted_for_review)
+        publishing = false
+    }) { Text(pluralStringResource(R.plurals.novel_en_confirm_submit_count, submitSelected.size, submitSelected.size)) } }, dismissButton = { TextButton(onClick = { submit = false; publishing = false }) { Text(stringResource(R.string.novel_en_cancel)) } })
 }
 
 @Composable

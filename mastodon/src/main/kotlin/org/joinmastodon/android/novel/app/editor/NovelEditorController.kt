@@ -1,6 +1,7 @@
 package org.joinmastodon.android.novel.app.editor
 
 import org.joinmastodon.android.novel.app.novelUserMessage
+import org.joinmastodon.android.novel.app.isReleaseConflict
 
 import org.joinmastodon.android.R
 
@@ -13,6 +14,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -55,6 +57,10 @@ internal class NovelEditorController(application: Application, val repository: N
     private val mutable = MutableStateFlow(NovelEditorState())
     val state = mutable.asStateFlow()
     private val saveLock = Mutex()
+    private val metadataLock = Mutex()
+    private var metadataDirty = false
+    private var metadataRevision = 0L
+    private var metadataSaveJob: Job? = null
     private var editing: EditorSession? = null
     private var editToken = 0L
     private var importOriginal: ImportModels.Result? = null
@@ -117,7 +123,48 @@ internal class NovelEditorController(application: Application, val repository: N
         update { it.copy(directory = directory, conflict = directory.conflict) }
     }
     fun clearError() = update { it.copy(error = null, notice = null) }
-    fun metadata(value: NovelMetadata) = update { it.copy(metadata = value) }
+    fun metadata(value: NovelMetadata) {
+        update { it.copy(metadata = value) }
+        // Debounced local draft only: never uploads metadata or cover bytes.
+        if (mutable.value.workId == null || mutable.value.page != "metadata") return
+        metadataDirty = true
+        metadataRevision++
+        scheduleMetadataDraftSave()
+    }
+    private fun scheduleMetadataDraftSave() {
+        metadataSaveJob?.cancel()
+        metadataSaveJob = viewModelScope.launch {
+            delay(METADATA_SAVE_DEBOUNCE_MS)
+            try { flushMetadataDraft() }
+            catch (cancel: CancellationException) { throw cancel }
+            catch (_: Exception) { /* Keep dirty so leaving or publishing retries the local save. */ }
+        }
+    }
+    private suspend fun flushMetadataDraft(): Boolean = metadataLock.withLock {
+        if (!metadataDirty) return@withLock true
+        val id = mutable.value.workId ?: return@withLock true
+        val revision = metadataRevision
+        val data = mutable.value.metadata
+        repository.saveMetadataDraft(id, data)
+        if (revision == metadataRevision) {
+            metadataDirty = false
+            update { it.copy(directory = it.directory?.copy(metadata = data)) }
+        }
+        true
+    }
+    private suspend fun flushMetadataDraftNow(): Boolean {
+        metadataSaveJob?.cancel(); metadataSaveJob = null
+        return flushMetadataDraft()
+    }
+    private fun markMetadataSaved() {
+        metadataDirty = false
+        metadataSaveJob?.cancel(); metadataSaveJob = null
+    }
+    /** Only chapters already published on the server are preselected; private drafts are never included silently. */
+    fun defaultPublishSelection(): List<String> {
+        val directory = mutable.value.directory ?: return emptyList()
+        return directory.structure.chapters().map { it.id() }.filter { directory.remote[it]?.status()?.let { status -> status in PUBLISHED_REMOTE_STATUSES } == true }
+    }
     /** Reapply an unsaved small form after the existing open operation has restored the directory. */
     fun restoreFormWhenReady(value: NovelMetadata) {
         viewModelScope.launch {
@@ -140,22 +187,50 @@ internal class NovelEditorController(application: Application, val repository: N
         update { it.copy(metadata = metadata) }
     }
     fun uploadCover() = operation {
-        val path = requireNotNull(mutable.value.metadata.localCover) { repository.context.getString(R.string.novel_en_cover_required) }
+        uploadPendingCoverOnce(required = true)
+        update { it.copy(notice = repository.context.getString(R.string.novel_en_cover_uploaded_local_text)) }
+    }
+    /** Upload a pending local cover at most once. Failure leaves coverUrl/localCover/coverPending intact. */
+    private suspend fun uploadPendingCoverOnce(required: Boolean): Boolean {
+        val current = mutable.value.metadata
+        val path = current.localCover
+        if (path == null) {
+            require(!required) { repository.context.getString(R.string.novel_en_cover_required) }
+            return true
+        }
+        if (!current.coverPending) return true
         repository.requireActive()
         val url = coverUploader.upload(File(path))
         repository.requireActive()
         require(okhttp3.HttpUrl.parse(url)?.isHttps == true) { repository.context.getString(R.string.novel_en_cover_url_invalid) }
         // Do not replace a newer selection with a late response.
-        if (mutable.value.metadata.localCover != path) return@operation
+        if (mutable.value.metadata.localCover != path) return false
         val metadata = mutable.value.metadata.copy(coverUrl = url, coverPending = false)
         mutable.value.workId?.let { repository.saveCover(it, metadata) }
-        update { it.copy(metadata = metadata, notice = repository.context.getString(R.string.novel_en_cover_uploaded_local_text)) }
+        update { it.copy(metadata = metadata) }
+        return true
     }
     fun storeMetadata() = operation {
         val data = mutable.value.metadata
         val id = mutable.value.workId
         if (id == null) { val created = repository.create(data); showDirectory(created); openChapterNow(repository.directory(created).structure.chapters().first().id()) }
-        else { repository.saveMetadata(id, data); showDirectory(id) }
+        else { metadataLock.withLock { repository.saveMetadata(id, data) }; markMetadataSaved(); showDirectory(id) }
+    }
+    /** Existing works: validate, upload a pending cover once, save locally, then let the UI choose chapters. */
+    fun updateAndPublish(onSelectChapters: (List<String>) -> Unit) = operation {
+        val id = requireNotNull(mutable.value.workId)
+        // 1. Validation must fail before any cover or manuscript upload.
+        mutable.value.metadata.validate()
+        // 2. Exactly one cover upload attempt, and only while it is still pending.
+        markMetadataSaved()
+        uploadPendingCoverOnce(required = false)
+        // 3. Persist the validated form (including the uploaded cover URL) locally.
+        val data = mutable.value.metadata
+        metadataLock.withLock { repository.saveMetadata(id, data) }
+        markMetadataSaved()
+        update { it.copy(metadata = data, directory = it.directory?.copy(metadata = data)) }
+        // 4. Default selection is published chapters only; the confirm action stays disabled when empty.
+        onSelectChapters(defaultPublishSelection())
     }
     fun openChapter(id: String) = operation { if (save()) openChapterNow(id) }
     private suspend fun openChapterNow(id: String) {
@@ -213,15 +288,30 @@ internal class NovelEditorController(application: Application, val repository: N
             true
         } finally { update { it.copy(saving = false) } }
     }
-    fun backgroundSave() { viewModelScope.launch { save() } }
-    fun leaveEditor(after: () -> Unit) = operation { if (save()) { val id = mutable.value.workId; if (mutable.value.page == "editor" && id != null) showDirectory(id) else after() } }
+    fun backgroundSave() { viewModelScope.launch {
+        save()
+        try { flushMetadataDraft() }
+        catch (cancel: CancellationException) { throw cancel }
+        catch (_: Exception) { /* The explicit save actions retry the kept draft. */ }
+    } }
+    fun leaveEditor(after: () -> Unit) = operation {
+        if (!save()) return@operation
+        // A metadata page may be left before the debounce fires; persist it locally, never remotely.
+        flushMetadataDraftNow()
+        val id = mutable.value.workId
+        if (mutable.value.page == "editor" && id != null) showDirectory(id) else after()
+    }
     fun preview(after: (String, String?) -> Unit) = operation { if (save()) after(requireNotNull(mutable.value.workId), mutable.value.chapterId) }
     fun newChapter() = operation { if (save()) { val id = requireNotNull(mutable.value.workId); val chapter = repository.local { s -> val st = s.structure(id); s.addChapter(id, st.volumes().first().id(), repository.context.getString(R.string.novel_en_new_chapter_title, st.chapters().size + 1)) }; val directory = repository.directory(id); update { it.copy(directory = directory) }; openChapterNow(chapter.id()) } }
     fun reorder(ids: List<String>) = operation { repository.local { it.reorderChapters(requireNotNull(mutable.value.workId), ids) }; showDirectory(requireNotNull(mutable.value.workId)) }
     fun deleteChapter(id: String) = operation { repository.local { it.softDeleteChapter(id) }; showDirectory(requireNotNull(mutable.value.workId)) }
-    fun submit(selected: List<String>, retry: Boolean = false) = operation {
+    fun submit(selected: List<String>, retry: Boolean = false, successNotice: Int = R.string.novel_en_submitted_for_review) = operation {
         if (!save()) return@operation
+        // An unfinished metadata form is kept locally; prepare below still validates the frozen fields.
+        flushMetadataDraftNow()
         val work = requireNotNull(mutable.value.workId)
+        // Fallback for editor/batch submit: a pending cover is uploaded once before the attempt starts.
+        if (!retry && selected.isNotEmpty()) uploadPendingCoverOnce(required = false)
         try {
             val id = if (retry) requireNotNull(repository.local { it.pendingAppSubmission(work) }) { repository.context.getString(R.string.novel_en_no_submission_retry) } else repository.prepare(work, selected)
             NovelSubmissionSender(repository).send(id)
@@ -231,11 +321,12 @@ internal class NovelEditorController(application: Application, val repository: N
             refreshDirectoryNow(work)
             if (e is org.joinmastodon.android.novel.app.NovelAppApiException && e.status == 409) {
                 try { refreshOwnerNow(work) } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { /* Keep the frozen attempt and drafts for explicit retry. */ }
-                throw IllegalStateException(repository.context.getString(R.string.novel_en_submission_conflict), e)
+                // Only a real release/version conflict deserves the generic "version updated" flow.
+                if (e.isReleaseConflict()) throw IllegalStateException(repository.context.getString(R.string.novel_en_submission_conflict), e)
             }
             throw e
         }
-        if (showDirectory(work)) update { it.copy(notice = repository.context.getString(R.string.novel_en_submitted_for_review)) }
+        if (showDirectory(work)) update { it.copy(notice = repository.context.getString(successNotice)) }
     }
     fun cancelSubmission() = operation {
         if (!save()) return@operation
@@ -301,4 +392,5 @@ internal class NovelEditorController(application: Application, val repository: N
     private fun recoveryFile(chapter: String) = AtomicFile(File(root.apply { mkdirs() }, "recovery-${EditorText.sha256(chapter)}.json"))
     private fun backup(chapter: String, frame: EditorSession.Frame) { val file = recoveryFile(chapter); val stream = file.startWrite(); try { stream.write(JSONObject().put("title", frame.title()).put("body", frame.body()).put("start", frame.start()).put("end", frame.end()).put("scroll", frame.scroll()).toString().toByteArray()); file.finishWrite(stream) } catch (e: Exception) { file.failWrite(stream); throw e } }
     private fun recover(chapter: String): EditorSession.Frame? { val file = recoveryFile(chapter); if (!file.baseFile.exists()) return null; val j = JSONObject(file.openRead().bufferedReader().use { it.readText() }); return EditorSession.Frame(j.getString("title"), j.getString("body"), j.getInt("start"), j.getInt("end"), j.getInt("scroll")) }
+    private companion object { const val METADATA_SAVE_DEBOUNCE_MS = 800L }
 }

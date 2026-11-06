@@ -28,7 +28,6 @@ import org.joinmastodon.android.novel.app.design.NovelTypography
 @Composable
 internal fun NovelMetadataForm(data: NovelMetadata, change: (NovelMetadata) -> Unit, busy: Boolean, controller: NovelEditorController) {
     val coverPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { it?.let(controller::chooseCover) }
-    var coverConfirmation by remember { mutableStateOf(false) }
     var rules by remember { mutableStateOf(false) }
     val chooseCoverDescription = stringResource(R.string.novel_en_choose_change_cover)
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
@@ -39,7 +38,6 @@ internal fun NovelMetadataForm(data: NovelMetadata, change: (NovelMetadata) -> U
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) { Text(stringResource(R.string.novel_en_cover_requirements), fontSize = 11.sp, color = NovelTheme.colors.textSecondary); Text(if (data.coverPending) stringResource(R.string.novel_en_cover_pending_preview) else if (data.coverUrl != null) stringResource(R.string.novel_en_cover_uploaded) else stringResource(R.string.novel_en_cover_default_notice), fontSize = 10.sp, color = NovelTheme.colors.textSecondary) }
         }
         if (data.localCover != null || data.coverUrl != null) Row {
-            TextButton(onClick = { coverConfirmation = true }, enabled = data.localCover != null && data.coverPending && !busy) { Text(stringResource(R.string.novel_en_explicit_cover_upload)) }
             TextButton(onClick = controller::removeCover, enabled = !busy) { Text(stringResource(R.string.novel_en_remove_cover)) }
         }
         MetadataField(stringResource(R.string.novel_en_work_title_label), data.title, 30, busy, { change(data.copy(title = it)) }, true, stringResource(R.string.novel_en_work_title_hint))
@@ -65,7 +63,6 @@ internal fun NovelMetadataForm(data: NovelMetadata, change: (NovelMetadata) -> U
         TextButton(onClick = { rules = true }) { Text(stringResource(R.string.novel_en_read_publishing_rules), fontSize = 12.sp) }
         Text(stringResource(R.string.novel_en_metadata_local_only), fontSize = 11.sp, color = NovelTheme.colors.textSecondary)
     }
-    if (coverConfirmation) AlertDialog(onDismissRequest = { coverConfirmation = false }, title = { Text(stringResource(R.string.novel_en_upload_cover)) }, text = { Text(stringResource(R.string.novel_en_cover_upload_confirmation)) }, confirmButton = { TextButton(onClick = { coverConfirmation = false; controller.uploadCover() }) { Text(stringResource(R.string.novel_en_confirm_upload)) } }, dismissButton = { TextButton(onClick = { coverConfirmation = false }) { Text(stringResource(R.string.novel_en_cancel)) } })
     if (rules) AlertDialog(onDismissRequest = { rules = false }, title = { Text(stringResource(R.string.novel_en_publishing_guidelines), fontFamily = NovelTypography.serif) }, text = { Text(stringResource(R.string.novel_en_metadata_rules_body)) }, confirmButton = { TextButton(onClick = { rules = false }) { Text(stringResource(R.string.novel_en_read_acknowledged)) } })
 }
 

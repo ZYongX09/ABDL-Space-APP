@@ -65,15 +65,32 @@ internal fun Exception.novelUserMessage(context: Context, fallback: Int): String
     return when (this) {
     is org.joinmastodon.android.novel.app.editor.NovelCoverUploadException -> org.joinmastodon.android.novel.app.editor.coverFailureMessage(context, failure)
     is ImportException -> userMessage(context)
-    is NovelAppApiException -> context.getString(when (status) {
-        401 -> R.string.novel_en_session_expired
-        403 -> R.string.novel_en_action_forbidden
-        404 -> R.string.novel_en_work_unavailable
-        409 -> R.string.novel_en_version_updated
-        429 -> R.string.novel_en_rate_limited
-        else -> R.string.novel_en_request_incomplete
-    })
+    is NovelAppApiException -> context.getString(novelApiErrorResource())
     else -> message?.let { novelMessage(context, it) } ?: context.getString(fallback)
+    }
+}
+
+/** Only an explicit release/version conflict is the "version changed" experience; other 409s stay specific. */
+internal val novelReleaseConflictCodes = setOf("version_conflict", "release_conflict", "owner_changed", "stale_release", "release_mismatch")
+internal fun NovelAppApiException.isReleaseConflict(): Boolean = code in novelReleaseConflictCodes
+
+/** Server codes are more accurate than a status-only guess; 413/422 remain distinguishable. */
+internal fun NovelAppApiException.novelApiErrorResource(): Int = when (code) {
+    "candidate_too_large" -> R.string.novel_en_candidate_too_large
+    "request_too_large" -> R.string.novel_en_request_too_large
+    "invalid_chapters" -> R.string.novel_en_invalid_chapters
+    "invalid_metadata" -> R.string.novel_en_response_validation_failed
+    "submission_frozen", "submission_in_review", "review_in_progress" -> R.string.novel_en_submission_in_review_conflict
+    else -> when {
+        isReleaseConflict() -> R.string.novel_en_version_updated
+        status == 401 -> R.string.novel_en_session_expired
+        status == 403 -> R.string.novel_en_action_forbidden
+        status == 404 -> R.string.novel_en_work_unavailable
+        status == 409 -> R.string.novel_en_conflict_rejected
+        status == 413 -> R.string.novel_en_request_too_large
+        status == 422 -> R.string.novel_en_response_validation_failed
+        status == 429 -> R.string.novel_en_rate_limited
+        else -> R.string.novel_en_request_incomplete
     }
 }
 
@@ -322,6 +339,12 @@ internal val novelMessageResources: Map<String, Int> = mapOf(
     "novel_i18n_selected_text_limit" to R.string.novel_en_selected_text_limit,
     "novel_i18n_chapter_json_limit" to R.string.novel_en_chapter_json_limit,
     "novel_i18n_encoded_chapters_limit" to R.string.novel_en_encoded_chapters_limit,
+    "novel_i18n_candidate_too_large" to R.string.novel_en_candidate_too_large,
+    "novel_i18n_request_too_large" to R.string.novel_en_request_too_large,
+    "novel_i18n_invalid_chapters" to R.string.novel_en_invalid_chapters,
+    "novel_i18n_response_validation_failed" to R.string.novel_en_response_validation_failed,
+    "novel_i18n_conflict_rejected" to R.string.novel_en_conflict_rejected,
+    "novel_i18n_submission_in_review_conflict" to R.string.novel_en_submission_in_review_conflict,
     "novel_i18n_submission_finished" to R.string.novel_en_submission_finished,
     "novel_i18n_review_not_pending" to R.string.novel_en_review_not_pending,
     "novel_i18n_submission_cannot_cancel" to R.string.novel_en_submission_cannot_cancel,
@@ -442,6 +465,8 @@ internal val novelMessageResources: Map<String, Int> = mapOf(
     "novel_i18n_batch_submit" to R.string.novel_en_batch_submit,
     "novel_i18n_new_chapter_action" to R.string.novel_en_new_chapter_action,
     "novel_i18n_write_first_chapter" to R.string.novel_en_write_first_chapter,
+    "novel_i18n_update_and_publish" to R.string.novel_en_update_and_publish,
+    "novel_i18n_published_update_frozen" to R.string.novel_en_published_update_frozen,
     "novel_i18n_save_local_metadata" to R.string.novel_en_save_local_metadata,
     "novel_i18n_acknowledge" to R.string.novel_en_acknowledge,
     "novel_i18n_refresh_review" to R.string.novel_en_refresh_review,

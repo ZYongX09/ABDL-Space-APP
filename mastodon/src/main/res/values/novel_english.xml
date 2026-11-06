@@ -273,6 +273,12 @@
     <string name="novel_en_selected_text_limit">Selected text exceeds 20 MiB. Select fewer chapters.</string>
     <string name="novel_en_chapter_json_limit">This chapter exceeds 2 MiB when encoded. Split it and explicitly submit again.</string>
     <string name="novel_en_encoded_chapters_limit">Encoded chapters are too large.</string>
+    <string name="novel_en_candidate_too_large">This update would exceed the 1,000-chapter limit, including published chapters that stay on the server. Deselect chapters and try again.</string>
+    <string name="novel_en_request_too_large">This upload is too large for the server. Select fewer chapters and try again.</string>
+    <string name="novel_en_invalid_chapters">Some selected chapters are missing, empty, or no longer valid. Refresh and select chapters again.</string>
+    <string name="novel_en_response_validation_failed">The server rejected these details. Check the work details and the selected chapters, then try again.</string>
+    <string name="novel_en_conflict_rejected">The server rejected this action. Refresh the work and try again. Local content is kept.</string>
+    <string name="novel_en_submission_in_review_conflict">This submission is already in review or has ended and cannot be changed now. Refresh its status first.</string>
     <string name="novel_en_submission_finished">This submission has ended. Select chapters and submit again.</string>
     <string name="novel_en_review_not_pending">The server has not confirmed review status yet.</string>
     <string name="novel_en_submission_cannot_cancel">This submission is in review or has ended. Refresh its status first.</string>
@@ -403,6 +409,8 @@
     <string name="novel_en_batch_submit">Batch submit</string>
     <string name="novel_en_new_chapter_action">" New chapter"</string>
     <string name="novel_en_write_first_chapter">Write chapter one  →</string>
+    <string name="novel_en_update_and_publish">Update and publish</string>
+    <string name="novel_en_published_update_frozen">Submitted for review. Your current changes are frozen until this review ends.</string>
     <string name="novel_en_save_local_metadata">Save local details</string>
     <string name="novel_en_acknowledge">Got it</string>
     <string name="novel_en_refresh_review">Refresh review status</string>
