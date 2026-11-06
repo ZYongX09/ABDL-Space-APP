@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+	<string name="payment_result_title">付款成功</string>
+	<string name="payment_result_subtitle">感谢你的支持，赞助者权益已生效</string>
+	<string name="payment_result_completed">交易完成</string>
+	<string name="payment_result_method">支付方式</string>
+	<string name="payment_result_method_alipay">支付宝</string>
+	<string name="payment_result_trade_no">交易号</string>
+	<string name="payment_result_center">赞助者中心 →</string>
+	<string name="payment_result_home">返回首页</string>
+	<string name="sponsor_payment_result_title">赞助</string>
+</resources>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+	<string name="payment_result_title">Payment Successful</string>
+	<string name="payment_result_subtitle">Thank you for your support, sponsor benefits are now active</string>
+	<string name="payment_result_completed">Completed</string>
+	<string name="payment_result_method">Payment Method</string>
+	<string name="payment_result_method_alipay">Alipay</string>
+	<string name="payment_result_trade_no">Transaction No.</string>
+	<string name="payment_result_center">Sponsor Center →</string>
+	<string name="payment_result_home">Back to Home</string>
+	<string name="sponsor_payment_result_title">Sponsor</string>
+</resources>
