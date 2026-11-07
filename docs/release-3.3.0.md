@@ -34,6 +34,18 @@
 
 小说、支付渠道与一镜到底动画均按功能测试范围提供；实际可用性取决于后端接口、支付开通状态、机型/系统版本和账户权限。
 
+## 正式发布结果
+
+- GitHub Release 于 **2026-11-07T09:34:32Z** 发布：[v3.3.0](https://github.com/ZYongX09/ABDL-Space-APP/releases/tag/v3.3.0)，非 draft、非 prerelease，设为 latest。
+- `v3.3.0` 为注释标签，固定指向正式源码提交 `b7047889391b226e0a18ccc710890b19700005bc`；后续补写记录不移动标签、不重新构建 APK。
+- R2 对象 `abdl-space-img/apk/ABDL-Space-3.3.0-36.apk`：**完整回下载** 169,036,758 字节，SHA256 与本地一致；响应为 `application/vnd.android.package-archive`、`attachment; filename="ABDL-Space-3.3.0-36.apk"`、`public, max-age=31536000, immutable`。
+- GitHub 附件同样做了**完整回下载**：169,036,758 字节，SHA256 一致；本次文件名不含括号，GitHub 未做规范化。
+- 版本数据于 **2026-11-07T09:58:22.088Z** 登记；API 直连、主站代理、移动站代理三个 `GET /api/v1/version` 的版本名、内部号、下载 URL、字节数与用户原文日志完全一致。
+- `main` 与 `develop` 均为 `b7047889`，`develop ⊇ main`；本轮未改后端代码、未重新构建 APK。
+- 未做浏览器渲染验收与真机覆盖升级验收。
+
+私有发布证据：`~/.local/share/abdl-space-release/20261107-app-3.3.0/`。
+
 ## 发布规则
 
 `develop` 是开发集成分支，`main` 是正式源码分支；开发线始终包含正式线全部提交，`develop` → `main` 不使用 squash。安装包不入 Git，R2 上传完整回下载与 SHA256/大小核验后才登记线上版本。旧版安装包与标签不覆盖，不运行已弃用的 Google Play/Actions 发布流程。
