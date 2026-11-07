@@ -103,10 +103,10 @@ public class SponsorPaymentMethodFragment extends MastodonToolbarFragment{
 		if(!"GRANTED".equals(o.fulfillmentState)) return;
 		var receipt=new PaymentReceipt(o.orderId, o.amountMinor, o.currency, o.planName, o.channel, o.tradeNo, o.paidAt!=null ? o.paidAt : 0);
 		handler.post(()->{
+			android.os.Bundle args=new android.os.Bundle();
+			args.putSerializable("receipt", receipt);
 			Nav.finish(this);
-			Nav.go(getActivity(), SponsorPaymentResultFragment.class, args -> {
-				args.putSerializable("receipt", receipt);
-			});
+			Nav.go(getActivity(), SponsorPaymentResultFragment.class, args);
 		});
 	}
 	private void navigateAfdian(){
