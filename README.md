@@ -3,18 +3,18 @@
   <h1>ABDL Space · Android</h1>
   <p>面向中文 ABDL 社区的原生客户端，基于 Moshidon（Mastodon fork）二次开发</p>
   <p>
-    <img src="https://img.shields.io/badge/Release-3.2.0%20%2834%29-blue?style=flat-square" alt="正式版本 3.2.0 (34)" />
+    <img src="https://img.shields.io/badge/Release-3.3.0%20%2836%29-blue?style=flat-square" alt="正式版本 3.3.0 (36)" />
     <img src="https://img.shields.io/badge/Android-8.0%2B-green?style=flat-square&logo=android&logoColor=white" alt="Android 8.0 及以上" />
     <img src="https://img.shields.io/badge/License-GPL--3.0-red?style=flat-square" alt="GPL-3.0" />
   </p>
-  <p><a href="https://abdl-space.top/app">官网下载与安装说明</a> · <a href="https://github.com/ZYongX09/ABDL-Space-APP/releases/tag/v3.2.0">3.2.0 更新日志与安装包</a> · <a href="https://abdl-space.top">社区网站</a></p>
+  <p><a href="https://abdl-space.top/app">官网下载与安装说明</a> · <a href="https://github.com/ZYongX09/ABDL-Space-APP/releases/tag/v3.3.0">3.3.0 更新日志与安装包</a> · <a href="https://abdl-space.top">社区网站</a></p>
 </div>
 
 ## 项目简介
 
 ABDL Space Android 客户端与网页端共用账户和社区数据，在 Mastodon 兼容接口之上接入纸尿裤评价、交友、私信、相册、小说阅读与社区安全等业务。它不是网页套壳，也不是只连接任意 Mastodon 实例即可使用全部扩展功能的通用客户端；业务功能需要配套的 ABDL Space 后端。
 
-当前正式版为 **3.2.0（内部版本号 34）**，最低支持 Android 8.0。普通用户可从[官网下载页](https://abdl-space.top/app)或 [GitHub Release](https://github.com/ZYongX09/ABDL-Space-APP/releases/tag/v3.2.0) 获取使用既有正式签名的安装包；完整变更见 [3.2.0 更新日志](docs/release-3.2.0.md)。开发线版本已更新为 **3.3.0（36）**，不等于正式发布；NBW授权回跳与配图修复见 [NBW 修复记录](docs/nbw-callback-media-2026-11-05.md)，D1资源暂停提示与旧版兼容范围见 [code36 开发记录](docs/d1-service-pause-code36-2026-11-04.md)，此前反馈修复见 [beta35 开发记录](docs/beta35-feedback-2026-11-03.md)。
+当前正式版为 **3.3.0（内部版本号 36）**，最低支持 Android 8.0。普通用户可从[官网下载页](https://abdl-space.top/app)或 [GitHub Release](https://github.com/ZYongX09/ABDL-Space-APP/releases/tag/v3.3.0) 获取使用既有正式签名的安装包；完整变更见 [3.3.0 更新日志](docs/release-3.3.0.md)。本版新增小说功能测试版、支付宝官方支付渠道、四个品牌系统的一镜到底动画、帖子 AI 翻译与首屏缓存优化；支付结果页只在后端确认发放成功后展示，小说提审、真实支付与动画效果仍以对应后端、账号权限和机型系统为准。开发线继续在 `develop` 上迭代；此前的 NBW 回跳修复见 [NBW 修复记录](docs/nbw-callback-media-2026-11-05.md)，D1 资源暂停提示与旧版兼容范围见 [code36 开发记录](docs/d1-service-pause-code36-2026-11-04.md)。
 
 `main` 保存正式发布源码，`develop` 用于后续开发，具体版本配置见 [应用构建配置](mastodon/build.gradle)。源码合并、构建、上传安装包和更新线上版本信息是独立步骤，推送 `main` 不会自动完成官网发布。
 
@@ -47,6 +47,17 @@ ABDL Space Android 客户端与网页端共用账户和社区数据，在 Mastod
 新版邮箱首次发送及重发验证码使用独立人机协议，由配套管理端配置关闭/按风险/每次验证，默认关闭。服务器要求验证后先显示主题一致的原生安全提示页；仅点击“开始验证”才创建居中验证弹窗并立即显示加载动画。提示页返回、弹窗关闭、初始化完成和页面加载完成均不是验证通过；只有服务端确认邮件发送成功才进入验证码页或启动重发倒计时。未知发送结果只查询，不自动重发，不回退旧接口。
 
 配套后端已于 2026-10-28 上线：main `ab9651b`、Worker 791 承接 100% 流量，0097 已单次登记，不要重放。生产策略仍默认关闭；本仓 App 与两站管理卡仍未正式发布，旧 App/网页接口保留，不强制升级。未修改 widget/密钥/允许域名/WAF。原生请求 proof 仅进程内保存；WebView 仅固定 HTTPS 页面、origin/主 frame 限定消息桥和必要 Cloudflare 资源。TLS 错误始终取消；WebView 沿用既有 App 证书信任策略，本轮不全局调整用户 CA 行为。受控 API/Canvas 回归不能代替真实 Turnstile、邮件送达或真机验收。实现入口为 [HumanCheckActivity](mastodon/src/main/java/org/joinmastodon/android/HumanCheckActivity.java)，完整交互及开发发布边界见 [App 人机验证](docs/app-human-check.md)，服务端合同见后端仓 `docs/app-human-check.md`。
+
+### 3.3.0 重点功能
+
+- **小说（功能测试版）**：本地导入与阅读、私有云书库、公共书城与创作者编辑流程；作品基本信息与封面在点击“更新并发布”时统一提交并进入提审，不再单独提供“明确上传封面”按钮。
+- **支付宝官方支付渠道**：赞助者支付方式新增支付宝；服务端确认发放成功后进入付款结果页，展示交易号、金额、套餐与支付方式。
+- **一镜到底动画**：首发兼容小米、荣耀、OPPO、VIVO 四个品牌系统（特定机型与系统版本生效）。
+- **帖子 AI 翻译**：针对特定语言的帖子提供翻译入口，依赖后端翻译策略与上游配置。
+- **启动与加载体验**：首屏缓存缩短冷启动等待，部分页面增加流光加载动画。
+- **英文适配**：补充英文文案与布局适配。
+
+小说、支付结果页与品牌动画按功能测试范围提供；真实支付、投稿提审与机型效果需按各自后端、账号权限和设备验收。
 
 ### 3.2.0 重点功能
 
@@ -229,7 +240,7 @@ AAB 输出目录为 `mastodon/build/outputs/bundle/release/`。这两种打包�
 3. 通过既有版本发布入口登记版本名、内部版本号、下载 URL、准确字节数和更新日志；核对版本 API、主站/移动站下载页及 GitHub 附件一致。
 4. 将发布记录同步回 `develop`，保证 `develop` 包含 `main` 的全部提交；不要因补写记录重复部署后端或重新生成不同的 APK。
 
-3.2.0 正式文件名为 `ABDL-Space-3.2.0(34).apk`，大小 **151,512,653 字节**，SHA256 为 `c214272180dd1f3ad087bf895ddb35bf27e58375921f0df189eaf0498fc4c7cc`。构建或上传成功仍不能替代真实设备的覆盖升级、地图授权、登录与业务验收；Google Play draft、beta、Actions artifact 和开发测试包也不等于官网正式上线。
+3.3.0 正式文件名为 `ABDL-Space-3.3.0-36.apk`，大小 **169,036,758 字节**，SHA256 为 `a137079dd8b571e2f9cb48ccbc0b55918160e9bcd873567e7e114b70a8d7cab6`。构建或上传成功仍不能替代真实设备的覆盖升级、真实支付、小说提审与动画效果验收；Google Play draft、beta、Actions artifact 和开发测试包也不等于官网正式上线。
 
 ## 分支与贡献
 
