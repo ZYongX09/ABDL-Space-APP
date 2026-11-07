@@ -15,8 +15,11 @@ import org.joinmastodon.android.api.session.AccountSession;
 import org.joinmastodon.android.api.session.AccountSessionManager;
 import org.joinmastodon.android.fragments.MastodonToolbarFragment;
 import org.joinmastodon.android.model.sponsors.SponsorModels.Me;
+import org.joinmastodon.android.model.sponsors.SponsorPaymentModels.Order;
 import org.joinmastodon.android.sponsors.SponsorPaymentCoordinator;
+import org.joinmastodon.android.sponsors.SponsorPaymentResultFragment;
 import org.joinmastodon.android.sponsors.SponsorPaymentUi;
+import org.joinmastodon.android.sponsors.PaymentReceipt;
 import org.joinmastodon.android.sponsors.SponsorRefresh;
 
 import me.grishka.appkit.Nav;
@@ -54,6 +57,7 @@ public class SponsorPaymentMethodFragment extends MastodonToolbarFragment{
 			@Override public void granted(Me state){
 				if(!sessionValid() || ui==null) return;
 				SponsorRefresh.apply(accountID, state);
+				navigateToResult();
 			}
 			@Override public void openAfdian(){ navigateAfdian(); }
 		});
@@ -93,6 +97,18 @@ public class SponsorPaymentMethodFragment extends MastodonToolbarFragment{
 		closeDialog.setOnDismissListener(ignored->closeDialog=null); closeDialog.show();
 	}
 	private void dismissClose(){ if(closeDialog!=null){ AlertDialog old=closeDialog; closeDialog=null; old.dismiss(); } }
+	private void navigateToResult(){
+		if(coordinator==null || coordinator.order()==null) return;
+		Order o=coordinator.order();
+		if(!"GRANTED".equals(o.fulfillmentState)) return;
+		var receipt=new PaymentReceipt(o.orderId, o.amountMinor, o.currency, o.planName, o.channel, o.tradeNo, o.paidAt!=null ? o.paidAt : 0);
+		handler.post(()->{
+			Nav.finish(this);
+			Nav.go(getActivity(), SponsorPaymentResultFragment.class, args -> {
+				args.putSerializable("receipt", receipt);
+			});
+		});
+	}
 	private void navigateAfdian(){
 		if(!resumed || !shown || !sessionValid() || leaving) return;
 		leaving=true; coordinator.pause();

@@ -49,6 +49,9 @@ public final class SponsorPaymentModels{
 		/** Never put this field in saved state, preferences, analytics or logs. */
 		public String orderStr;
 		public Me me;
+		/** Receipt-only display fields; the backend includes them only on GRANTED. */
+		public String tradeNo, planName, channel;
+		public Long paidAt;
 		@Override public void postprocess() throws ObjectValidationException{
 			if(!validOrderId(orderId) || planId==null || planId.isBlank() || planId.length()>200 || planVersion<1
 					|| amountMinor<1 || amountMinor>MAX_SAFE_INTEGER || !"CNY".equals(currency) || expiresAt<=0
