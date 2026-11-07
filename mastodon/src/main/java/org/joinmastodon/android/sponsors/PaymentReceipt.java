@@ -1,7 +1,7 @@
 package org.joinmastodon.android.sponsors;
 
 /** Read-only receipt data for the payment result page; never a trust input or SDK result. */
-public final class PaymentReceipt{
+public final class PaymentReceipt implements java.io.Serializable{
 	public final String orderId, productName, currency, channel;
 	public final long amountMinor, paidAt;
 	public final String tradeNo;
