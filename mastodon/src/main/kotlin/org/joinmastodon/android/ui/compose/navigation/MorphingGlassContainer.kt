@@ -1,15 +1,18 @@
 package org.joinmastodon.android.ui.compose.navigation
 
+import android.os.Build
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -22,9 +25,9 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -63,6 +66,7 @@ import top.yukonga.miuix.kmp.blur.drawBackdrop
 import org.joinmastodon.android.ui.compose.utils.rememberGraphicsEffectsSupported
 import kotlin.math.hypot
 import kotlin.math.max
+import kotlin.math.min
 
 /** Shared by the rendered toolbar menus, outside-touch gate and drag selection. */
 internal object ToolbarMenuGeometry {
@@ -82,6 +86,12 @@ internal object ToolbarMenuGeometry {
 		return (rowY / (ROW_HEIGHT_DP * density)).toInt().takeIf { it in 0 until rowCount }
 	}
 }
+
+/** Content blur while the rows reveal; RenderEffect is API 31+, the glass path is 33+. */
+private fun rowsBlurEffect(radiusPx: Float): androidx.compose.ui.graphics.RenderEffect? =
+	if(radiusPx > .5f && Build.VERSION.SDK_INT >= 31)
+		androidx.compose.ui.graphics.BlurEffect(radiusPx, radiusPx, androidx.compose.ui.graphics.TileMode.Clamp)
+	else null
 
 @Composable
 internal fun MorphingGlassContainer(
@@ -108,13 +118,16 @@ internal fun MorphingGlassContainer(
 	onLayoutCoordinates: (androidx.compose.ui.layout.LayoutCoordinates) -> Unit = {},
 	pressInput: GlassPressInput? = null,
 	closedContent: @Composable BoxScope.() -> Unit,
-	expandedContent: @Composable BoxScope.(progress: Float) -> Unit,
+	expandedContent: @Composable BoxScope.() -> Unit,
 ) {
 	val containerMorph = remember { Animatable(if(expanded) 1f else 0f) }
 	// 0..1 birth scale: the panel is born as a small disc at the finger and springs to full size.
 	val birthScale = remember { Animatable(1f) }
 	// Vertical kick while the panel hands over from the trigger, matching the reference timeline.
 	val kickOffset = remember { Animatable(0f) }
+	// Optical channels: the lens and the portal zoom are released ~70-84ms into the morph.
+	val lensProgress = remember { Animatable(1f) }
+	val portalProgress = remember { Animatable(0f) }
 	val enterFraction = remember { Animatable(if(expanded) 1f else 0f) }
 	val enterAlpha = remember { Animatable(if(expanded) 1f else 0f) }
 	val animatedExpandedHeight by animateDpAsState(
@@ -143,6 +156,8 @@ internal fun MorphingGlassContainer(
 	val closedHeightPx = with(LocalDensity.current) { closedHeight.toPx() }
 	val expandedWidthPx = with(LocalDensity.current) { expandedWidth.toPx() }
 	val expandedHeightPx = with(LocalDensity.current) { expandedHeight.toPx() }
+	// Short menus zoom harder through the portal (1.65x), tall ones settle at 1.2x.
+	val portalZoom = 1.65f + (1.2f - 1.65f) * ((expandedHeightPx / density - 215f) / 305f).coerceIn(0f, 1f)
 
 	// Single frame loop: advances the press springs and wakes on the next pointer event.
 	LaunchedEffect(press) {
@@ -178,20 +193,31 @@ internal fun MorphingGlassContainer(
 		)
 		val ejectSpec = folmeSpring<Float>(damping = .75f, response = .32f)
 		val kickSpec = folmeSpring<Float>(damping = 1f, response = .14f)
+		val blurOutSpec = folmeSpring<Float>(damping = .8f, response = .315f)
+		val lensOutSpec = folmeSpring<Float>(
+			damping = 1f,
+			response = if(expanded) .42f else .28f,
+		)
 		val alphaSpec = tween<Float>(
 			durationMillis = if(expanded) menuSpec.alphaEnterDurationMs else menuSpec.alphaExitDurationMs,
 			easing = SinOutEasing,
 		)
 		launch {
-			if(expanded) {
+			if(expanded && !reduceMotion) {
 				val diameter = max(expandedWidthPx * .5f * 44.dp.value * density / max(expandedWidthPx, expandedHeightPx), 1f)
-				birthScale.snapTo((diameter / closedWidthPx).coerceIn(.01f, 1f))
+				// Clamp the birth scale: an extreme inverse scale makes the backdrop effect sample a
+				// huge area on low-end GPUs even though the drawn dot is only a few pixels.
+				birthScale.snapTo((diameter / closedWidthPx).coerceIn(.35f, 1f))
 				birthScale.animateTo(1f, ejectSpec)
 			}else{
 				birthScale.snapTo(1f)
 			}
 		}
 		launch {
+			if(reduceMotion) {
+				kickOffset.snapTo(0f)
+				return@launch
+			}
 			if(kickPrimed[0]) {
 				// The reference applies -80dp at retarget and clears it 70ms later.
 				val heightFactor = ((expandedHeightPx / density - 60f) / 140f).coerceIn(.5f, 1f)
@@ -202,6 +228,23 @@ internal fun MorphingGlassContainer(
 			}else{
 				kickPrimed[0] = true
 			}
+		}
+		launch {
+			// Lens/portal: on while the glass hands over, released 84ms after opening (70ms on close).
+			if(reduceMotion) {
+				lensProgress.snapTo(0f)
+				portalProgress.snapTo(0f)
+				return@launch
+			}
+			if(expanded) {
+				lensProgress.snapTo(1f)
+				portalProgress.snapTo(1f)
+				delay(84)
+			}else{
+				delay(70)
+			}
+			launch { lensProgress.animateTo(0f, lensOutSpec) }
+			portalProgress.animateTo(0f, blurOutSpec)
 		}
 		launch { containerMorph.animateTo(target, morphSpec) }
 		launch { enterFraction.animateTo(target, fractionSpring) }
@@ -223,7 +266,6 @@ internal fun MorphingGlassContainer(
 	val height = lerp(closedHeight.value, animatedExpandedHeight.value, cp).dp
 	val radius = lerp(closedHeight.value / 2f, 28f, cp).dp
 	val shape = RoundedCornerShape(radius)
-	val contentScale = menuSpec.enterScaleFrom + (1f - menuSpec.enterScaleFrom) * enterFraction.value.coerceIn(0f, 1f)
 	val squircleEnabled = isSquircleEnabled()
 	val graphicsSupported = rememberGraphicsEffectsSupported()
 	Box(
@@ -272,31 +314,19 @@ internal fun MorphingGlassContainer(
 						vibrancy()
 						val blurRadius = homeLiquidToolbarVisualSpec().blurRadiusDp.dp.toPx()
 						blur(blurRadius, blurRadius)
+						// Lens strength follows the optical channel (on at hand-over, released at
+						// ~84ms) instead of the whole geometry progress; at 0 the effect is skipped.
+						val lensFactor = lensProgress.value.coerceIn(0f, 1f)
 						lens(
-							refractionHeight = lerp(18.dp.toPx(), 10.dp.toPx(), cp),
-							refractionAmount = lerp(20.dp.toPx(), 12.dp.toPx(), cp),
+							refractionHeight = 18.dp.toPx() * lensFactor,
+							refractionAmount = 20.dp.toPx() * lensFactor,
 						)
 					},
 					highlight = {
 						val glow = press.jelly.glowValue
 						outlineHighlight.value.copy(alpha = (lerp(0.82f, 0.68f, cp) + glow * 0.12f).coerceAtMost(1f))
 					},
-					onDrawSurface = {
-						drawRect(surface)
-						@Suppress("UNUSED_VARIABLE") val pressTick = press.tick
-						val glow = press.jelly.glowValue
-						if(glow > .01f) {
-							val lightRadius = (if(cp > .01f) 80f else 38f) * density
-							drawRect(
-								brush = Brush.radialGradient(
-									colors = listOf(Color.White.copy(alpha = .12f * glow), Color.Transparent),
-									center = Offset(press.jelly.lightPositionX, press.jelly.lightPositionY),
-									radius = lightRadius,
-								),
-								size = size,
-							)
-						}
-					},
+					onDrawSurface = { drawRect(surface) },
 				) else Modifier.background(surface.copy(alpha = 1f), shape),
 			)
 			// Clip inner content only; the outer glass highlight must remain outside this clip.
@@ -353,6 +383,25 @@ internal fun MorphingGlassContainer(
 			.clickable(interactionSource = interactionSource, indication = null, onClick = onClick),
 		contentAlignment = Alignment.TopStart,
 	) {
+		// Press light lives outside the backdrop node: drawing it inside onDrawSurface would
+		// re-record the glass display list and re-run blur+lens on every press frame.
+		Box(Modifier.fillMaxSize().clip(shape)) {
+			Canvas(Modifier.fillMaxSize()) {
+				@Suppress("UNUSED_VARIABLE") val pressTick = press.tick
+				val glow = press.jelly.glowValue
+				if(glow > .01f) {
+					val lightRadius = (if(containerMorph.value > .01f) 80f else 38f) * density
+					drawRect(
+						brush = Brush.radialGradient(
+							colors = listOf(Color.White.copy(alpha = .12f * glow), Color.Transparent),
+							center = Offset(press.jelly.lightPositionX, press.jelly.lightPositionY),
+							radius = lightRadius,
+						),
+						size = size,
+					)
+				}
+			}
+		}
 		Box(
 			modifier = Modifier.graphicsLayer {
 				alpha = (1f - cp * 1.8f).coerceIn(0f, 1f)
@@ -363,20 +412,26 @@ internal fun MorphingGlassContainer(
 		Box(
 			modifier = Modifier
 				.graphicsLayer {
+					val reveal = enterFraction.value.coerceIn(0f, 1f)
+					val portal = 1f + (portalZoom - 1f) * portalProgress.value
 					alpha = enterAlpha.value.coerceIn(0f, 1f)
-					scaleX = contentScale
-					scaleY = contentScale
+					val scale = (menuSpec.enterScaleFrom + (1f - menuSpec.enterScaleFrom) * reveal) * portal
+					scaleX = scale
+					scaleY = scale
 					transformOrigin = TransformOrigin(
 						pivotFractionX = anchorFractionX,
 						pivotFractionY = 0f,
 					)
+					// Rows blur while they reveal (18dp -> 0); off once settled to avoid a
+					// permanent full-surface blur on low-end GPUs.
+					renderEffect = rowsBlurEffect(18.dp.toPx() * (1f - reveal))
 				}
 				.menuClipRevealFromTop(
 					fractionProgress = { enterFraction.value },
 					cornerRadius = menuSpec.cornerRadiusDp.dp,
 					squircleEnabled = squircleEnabled,
 				),
-			content = { expandedContent(enterFraction.value.coerceIn(0f, 1f)) },
+			content = { expandedContent() },
 		)
 	}
 }

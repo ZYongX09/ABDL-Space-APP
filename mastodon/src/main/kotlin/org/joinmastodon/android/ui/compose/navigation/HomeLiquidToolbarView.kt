@@ -470,8 +470,8 @@ private fun isMenuVisible(): Boolean = menuPageState!=HomeToolbarMenuPage.NONE |
 					}
 					}
 				},
-				expandedContent = { progress ->
-					MenuContent(page = HomeToolbarMenuPage.TIMELINES, progress = progress, highlightedIndex = highlightedMenuIndexState)
+				expandedContent = {
+					MenuContent(page = HomeToolbarMenuPage.TIMELINES, highlightedIndex = highlightedMenuIndexState)
 				},
 			)
 
@@ -516,7 +516,7 @@ val trailingExpanded = menuPageState==HomeToolbarMenuPage.ROOT || menuPageState=
 					}
 					}
 				},
-				expandedContent = { progress -> MenuContent(menuPageState, progress, highlightedMenuIndexState) },
+				expandedContent = { MenuContent(menuPageState, highlightedMenuIndexState) },
 			)
 
 			// 发帖按钮：与"更多菜单"使用同一形态变化组件（MorphingGlassContainer）。
@@ -559,8 +559,8 @@ val trailingExpanded = menuPageState==HomeToolbarMenuPage.ROOT || menuPageState=
 							ResourceIcon(R.drawable.ic_fluent_edit_24_regular, 24, contentColor)
 						}
 					},
-					expandedContent = { progress ->
-						MenuContent(HomeToolbarMenuPage.COMPOSE, progress, highlightedMenuIndexState)
+					expandedContent = {
+						MenuContent(HomeToolbarMenuPage.COMPOSE, highlightedMenuIndexState)
 					},
 				)
 			}
@@ -568,9 +568,9 @@ val trailingExpanded = menuPageState==HomeToolbarMenuPage.ROOT || menuPageState=
 	}
 
 	@Composable
-	private fun MenuContent(page: HomeToolbarMenuPage, progress: Float, highlightedIndex: Int?) {
+	private fun MenuContent(page: HomeToolbarMenuPage, highlightedIndex: Int?) {
 		if(page==HomeToolbarMenuPage.TIMELINES || page==HomeToolbarMenuPage.ROOT || page==HomeToolbarMenuPage.COMPOSE) {
-			MenuPage(page, progress, highlightedIndex)
+			MenuPage(page, highlightedIndex)
 			return
 		}
 		AnimatedContent(
@@ -588,11 +588,11 @@ val trailingExpanded = menuPageState==HomeToolbarMenuPage.ROOT || menuPageState=
 				).using(SizeTransform(clip = false))
 			},
 			label = "toolbarMenuPage",
-		) { animatedPage -> MenuPage(animatedPage, progress, highlightedIndex) }
+		) { animatedPage -> MenuPage(animatedPage, highlightedIndex) }
 	}
 
 	@Composable
-	private fun MenuPage(animatedPage: HomeToolbarMenuPage, progress: Float, highlightedIndex: Int?) {
+	private fun MenuPage(animatedPage: HomeToolbarMenuPage, highlightedIndex: Int?) {
 		val offset = if(animatedPage==HomeToolbarMenuPage.LISTS || animatedPage==HomeToolbarMenuPage.HASHTAGS) 1 else 0
 		Column(
 			Modifier
