@@ -334,6 +334,9 @@ private fun isMenuVisible(): Boolean = menuPageState!=HomeToolbarMenuPage.NONE |
 			val density = view.resources.displayMetrics.density
 			val activePage = menuPageState.takeIf { it!=HomeToolbarMenuPage.NONE } ?: pendingMenuPageState
 			val top = statusBarInsetState + ToolbarMenuGeometry.TOP_OFFSET_DP * density
+			// The panel starts below the trigger pill and its liquid gap; the gate must cover
+			// the whole union or row taps near the bottom would be treated as outside taps.
+			val panelTop = top + (ToolbarMenuGeometry.TRIGGER_HEIGHT_DP + ToolbarMenuGeometry.PANEL_GAP_DP) * density
 			val rowCount = when(activePage) {
 				HomeToolbarMenuPage.TIMELINES -> timelinesState.size
 				HomeToolbarMenuPage.COMPOSE -> composeMenuState.size
@@ -342,7 +345,7 @@ private fun isMenuVisible(): Boolean = menuPageState!=HomeToolbarMenuPage.NONE |
 				HomeToolbarMenuPage.HASHTAGS -> hashtagsState.size + 1
 				HomeToolbarMenuPage.NONE -> 1
 			}
-			val bottom = top + ToolbarMenuGeometry.heightDp(rowCount) * density
+			val bottom = panelTop + ToolbarMenuGeometry.heightDp(rowCount) * density
 			if(y !in top..bottom) return false
 			return when(activePage) {
 				HomeToolbarMenuPage.TIMELINES -> x in 12f*density..260f*density

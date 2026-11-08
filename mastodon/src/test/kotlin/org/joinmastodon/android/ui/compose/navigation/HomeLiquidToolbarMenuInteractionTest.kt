@@ -81,7 +81,7 @@ class HomeLiquidToolbarMenuInteractionTest {
 		openCompose(72)
 		val first = composeRowCenter(toolbar.view.context.getString(R.string.compose_menu_post))
 		val density = toolbar.view.resources.displayMetrics.density
-		val secondRowY = 72 + (ToolbarMenuGeometry.TOP_OFFSET_DP + ToolbarMenuGeometry.CONTENT_TOP_PADDING_DP + ToolbarMenuGeometry.ROW_HEIGHT_DP + 2) * density
+		val secondRowY = 72 + (ToolbarMenuGeometry.TOP_OFFSET_DP + ToolbarMenuGeometry.TRIGGER_HEIGHT_DP + ToolbarMenuGeometry.PANEL_GAP_DP + ToolbarMenuGeometry.CONTENT_TOP_PADDING_DP + ToolbarMenuGeometry.ROW_HEIGHT_DP + 2) * density
 		compose.runOnIdle {
 			val downTime = SystemClock.uptimeMillis()
 			dispatch(MotionEvent.ACTION_DOWN, first.x, first.y, downTime, downTime)
@@ -114,6 +114,7 @@ private fun composeRowCenter(title: String): Offset {
 		val density = toolbar.view.resources.displayMetrics.density
 		tap(toolbar.view.width - 140 * density, inset + 32 * density)
 		compose.waitForIdle()
+
 	}
 
 	private fun tap(x: Float, y: Float) {

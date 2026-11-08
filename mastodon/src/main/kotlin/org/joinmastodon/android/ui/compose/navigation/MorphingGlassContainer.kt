@@ -25,9 +25,17 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathFillType
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -41,8 +49,10 @@ import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalViewConfiguration
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
 import androidx.compose.runtime.withFrameNanos
@@ -75,6 +85,9 @@ internal object ToolbarMenuGeometry {
 	const val CONTENT_BOTTOM_PADDING_DP = 6
 	const val ROW_HEIGHT_DP = 48
 	const val MAX_HEIGHT_DP = 420
+	/** The trigger pill keeps its own band above the panel, with a small liquid gap. */
+	const val TRIGGER_HEIGHT_DP = 48
+	const val PANEL_GAP_DP = 8
 
 	fun heightDp(rowCount: Int): Int =
 		(CONTENT_TOP_PADDING_DP + rowCount.coerceAtLeast(1) * ROW_HEIGHT_DP + CONTENT_BOTTOM_PADDING_DP)
@@ -92,6 +105,41 @@ private fun rowsBlurEffect(radiusPx: Float): androidx.compose.ui.graphics.Render
 	if(radiusPx > .5f && Build.VERSION.SDK_INT >= 31)
 		androidx.compose.ui.graphics.BlurEffect(radiusPx, radiusPx, androidx.compose.ui.graphics.TileMode.Clamp)
 	else null
+
+/**
+ * Trigger lobe + menu panel + a curved neck, filled as one path. While the neck is present the
+ * lens shader is skipped (it only understands a single rounded rect) which matches the reference:
+ * its own lens is released ~84ms in, long before the neck detaches at ~210ms.
+ */
+private class TwoLobeGlassShape(
+	private val pill: Rect,
+	private val pillRadius: Float,
+	private val panel: Rect,
+	private val panelRadius: Float,
+	private val neckHalfWidth: Float,
+) : Shape {
+	override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
+		val path = Path()
+		val pillVisible = pill.height > .5f
+		val panelVisible = panel.height > .5f
+		if(pillVisible) path.addRoundRect(RoundRect(pill.left, pill.top, pill.right, pill.bottom, CornerRadius(pillRadius)))
+		if(panelVisible) path.addRoundRect(RoundRect(panel.left, panel.top, panel.right, panel.bottom, CornerRadius(panelRadius)))
+		if(pillVisible && panelVisible && neckHalfWidth > .5f && pill.bottom < panel.top){
+			val topX = pill.center.x
+			val bottomX = panel.center.x
+			val topHalf = neckHalfWidth
+			val bottomHalf = neckHalfWidth * .82f
+			val midY = (pill.bottom + panel.top) / 2f
+			path.moveTo(topX - topHalf, pill.bottom)
+			path.cubicTo(topX - topHalf * .55f, midY, bottomX - bottomHalf, midY, bottomX - bottomHalf, panel.top)
+			path.lineTo(bottomX + bottomHalf, panel.top)
+			path.cubicTo(bottomX + bottomHalf, midY, topX + topHalf * .55f, midY, topX + topHalf, pill.bottom)
+			path.close()
+		}
+		path.fillType = PathFillType.NonZero
+		return Outline.Generic(path)
+	}
+}
 
 @Composable
 internal fun MorphingGlassContainer(
@@ -121,11 +169,11 @@ internal fun MorphingGlassContainer(
 	expandedContent: @Composable BoxScope.() -> Unit,
 ) {
 	val containerMorph = remember { Animatable(if(expanded) 1f else 0f) }
-	// 0..1 birth scale: the panel is born as a small disc at the finger and springs to full size.
-	val birthScale = remember { Animatable(1f) }
-	// Vertical kick while the panel hands over from the trigger, matching the reference timeline.
+	// 0..1 panel presence: drives the panel height and the trigger's shrink/offset.
+	val panelProgress = remember { Animatable(if(expanded) 1f else 0f) }
+	// 0..1 neck strength: rises with the panel, detaches ~210ms after opening.
+	val neckProgress = remember { Animatable(if(expanded) 1f else 0f) }
 	val kickOffset = remember { Animatable(0f) }
-	// Optical channels: the lens and the portal zoom are released ~70-84ms into the morph.
 	val lensProgress = remember { Animatable(1f) }
 	val portalProgress = remember { Animatable(0f) }
 	val enterFraction = remember { Animatable(if(expanded) 1f else 0f) }
@@ -146,17 +194,17 @@ internal fun MorphingGlassContainer(
 	val expandedState = rememberUpdatedState(expanded)
 	val itemCountState = rememberUpdatedState(selectionItemCount)
 	val density = LocalDensity.current.density
+	val densityObj = LocalDensity.current
 	val press = pressInput ?: remember { GlassPressInput() }
 	val reduceMotion = GlobalUserPreferences.reduceMotion
 	val deformRect = remember { GlassRect() }
-	// The first composition must not play the hand-off kick; only later state changes should.
 	val kickPrimed = remember { booleanArrayOf(false) }
 
-	val closedWidthPx = with(LocalDensity.current) { closedWidth.toPx() }
-	val closedHeightPx = with(LocalDensity.current) { closedHeight.toPx() }
-	val expandedWidthPx = with(LocalDensity.current) { expandedWidth.toPx() }
-	val expandedHeightPx = with(LocalDensity.current) { expandedHeight.toPx() }
-	// Short menus zoom harder through the portal (1.65x), tall ones settle at 1.2x.
+	val closedWidthPx = with(densityObj) { closedWidth.toPx() }
+	val closedHeightPx = with(densityObj) { closedHeight.toPx() }
+	val expandedWidthPx = with(densityObj) { expandedWidth.toPx() }
+	val expandedHeightPx = with(densityObj) { expandedHeight.toPx() }
+	val gapPx = with(densityObj) { ToolbarMenuGeometry.PANEL_GAP_DP.dp.toPx() }
 	val portalZoom = 1.65f + (1.2f - 1.65f) * ((expandedHeightPx / density - 215f) / 305f).coerceIn(0f, 1f)
 
 	// Single frame loop: advances the press springs and wakes on the next pointer event.
@@ -180,8 +228,6 @@ internal fun MorphingGlassContainer(
 		onExpansionStarted()
 		if(expanded) withFrameNanos { }
 		val target = if(expanded) 1f else 0f
-		// Reference timing: opening uses the eject spring (.75, .32s), closing the absorb
-		// spring (.8, .35s). Both are damping-ratio + response, which folmeSpring matches.
 		val morphSpec = folmeSpring<Float>(
 			damping = if(expanded) .75f else .8f,
 			response = if(expanded) .32f else .35f,
@@ -191,27 +237,24 @@ internal fun MorphingGlassContainer(
 			response = .3f,
 			visibilityThreshold = menuSpec.fractionVisibilityThreshold,
 		)
-		val ejectSpec = folmeSpring<Float>(damping = .75f, response = .32f)
 		val kickSpec = folmeSpring<Float>(damping = 1f, response = .14f)
 		val blurOutSpec = folmeSpring<Float>(damping = .8f, response = .315f)
-		val lensOutSpec = folmeSpring<Float>(
-			damping = 1f,
-			response = if(expanded) .42f else .28f,
-		)
+		val lensOutSpec = folmeSpring<Float>(damping = 1f, response = if(expanded) .42f else .28f)
+		val smoothingRelease = folmeSpring<Float>(damping = 1f, response = .42f)
 		val alphaSpec = tween<Float>(
 			durationMillis = if(expanded) menuSpec.alphaEnterDurationMs else menuSpec.alphaExitDurationMs,
 			easing = SinOutEasing,
 		)
+		launch { panelProgress.animateTo(target, morphSpec) }
 		launch {
-			if(expanded && !reduceMotion) {
-				val diameter = max(expandedWidthPx * .5f * 44.dp.value * density / max(expandedWidthPx, expandedHeightPx), 1f)
-				// Clamp the birth scale: an extreme inverse scale makes the backdrop effect sample a
-				// huge area on low-end GPUs even though the drawn dot is only a few pixels.
-				birthScale.snapTo((diameter / closedWidthPx).coerceIn(.35f, 1f))
-				birthScale.animateTo(1f, ejectSpec)
-			}else{
-				birthScale.snapTo(1f)
+			if(reduceMotion) {
+				neckProgress.snapTo(0f)
+				return@launch
 			}
+			neckProgress.snapTo(1f)
+			// The reference releases the metaball neck 210ms after opening (70ms when closing).
+			delay(if(expanded) 210 else 70)
+			neckProgress.animateTo(0f, smoothingRelease)
 		}
 		launch {
 			if(reduceMotion) {
@@ -219,7 +262,6 @@ internal fun MorphingGlassContainer(
 				return@launch
 			}
 			if(kickPrimed[0]) {
-				// The reference applies -80dp at retarget and clears it 70ms later.
 				val heightFactor = ((expandedHeightPx / density - 60f) / 140f).coerceIn(.5f, 1f)
 				val anchorY = (press.jelly.lightPositionY.coerceIn(0f, closedHeightPx) / max(expandedHeightPx, 1f)).coerceIn(0f, 1f)
 				kickOffset.snapTo(-80f * density * heightFactor * (2f * anchorY - 1f))
@@ -230,7 +272,6 @@ internal fun MorphingGlassContainer(
 			}
 		}
 		launch {
-			// Lens/portal: on while the glass hands over, released 84ms after opening (70ms on close).
 			if(reduceMotion) {
 				lensProgress.snapTo(0f)
 				portalProgress.snapTo(0f)
@@ -249,23 +290,53 @@ internal fun MorphingGlassContainer(
 		launch { containerMorph.animateTo(target, morphSpec) }
 		launch { enterFraction.animateTo(target, fractionSpring) }
 		enterAlpha.animateTo(target, alphaSpec)
-		// Matches miuix ListPopupLayout: snap residual tracks to a clean baseline after exit so
-		// the next enter starts from zero without drifting on the spring's residual velocity.
 		if(!expanded) {
 			containerMorph.snapTo(0f)
+			panelProgress.snapTo(0f)
+			neckProgress.snapTo(0f)
 			enterFraction.snapTo(0f)
 			enterAlpha.snapTo(0f)
 			kickOffset.snapTo(0f)
-			birthScale.snapTo(1f)
 		}
 		onExpansionFinished(expanded)
 	}
 
 	val cp = containerMorph.value.coerceIn(0f, 1f)
+	val pp = panelProgress.value.coerceIn(0f, 1f)
+	val neck = neckProgress.value.coerceIn(0f, 1f)
 	val width = lerp(closedWidth.value, expandedWidth.value, cp).dp
-	val height = lerp(closedHeight.value, animatedExpandedHeight.value, cp).dp
+	val height = closedHeight + (ToolbarMenuGeometry.PANEL_GAP_DP.dp + animatedExpandedHeight) * pp
+	val boxWidthPx = with(densityObj) { width.toPx() }
+	val boxHeightPx = with(densityObj) { height.toPx() }
+	val kick = kickOffset.value
+
+	// Trigger lobe: shrinks toward the press point as the panel grows.
+	val pillScale = 1f - .45f * pp
+	val pillW = closedWidthPx * pillScale
+	val pillH = closedHeightPx * pillScale
+	val basePillCenterX = when {
+		anchorFractionX >= 1f -> boxWidthPx - closedWidthPx / 2f
+		anchorFractionX > .01f -> boxWidthPx / 2f
+		else -> closedWidthPx / 2f
+	}
+	val pressX = press.jelly.lightPositionX.coerceIn(0f, closedWidthPx)
+	val pillShift = (pressX - closedWidthPx / 2f) * .35f * pp
+	val pillCenterX = basePillCenterX + pillShift
+	val pillRect = Rect(pillCenterX - pillW / 2f, (closedHeightPx - pillH) / 2f, pillCenterX + pillW / 2f, (closedHeightPx + pillH) / 2f)
+	val panelTopPx = closedHeightPx + gapPx * pp + kick
+	val panelRect = Rect(0f, panelTopPx, boxWidthPx, boxHeightPx + kick)
+	val neckHalfWidth = min(pillW, boxWidthPx) * .46f * neck
+
+	val twoLobe = pp > .01f || neck > .01f
 	val radius = lerp(closedHeight.value / 2f, 28f, cp).dp
-	val shape = RoundedCornerShape(radius)
+	val panelTopState = rememberUpdatedState(panelTopPx)
+	val glassShape: Shape = if(twoLobe)
+		TwoLobeGlassShape(pillRect, pillH / 2f, panelRect, 28.dp.value * density, neckHalfWidth)
+	else
+		RoundedCornerShape(radius)
+	// Clip/hit-test with a plain rounded box: a compound Outline.Generic clips out the rows on
+	// some API levels, and the panel content never paints outside the box anyway.
+	val shape: Shape = RoundedCornerShape(radius)
 	val squircleEnabled = isSquircleEnabled()
 	val graphicsSupported = rememberGraphicsEffectsSupported()
 	Box(
@@ -274,48 +345,31 @@ internal fun MorphingGlassContainer(
 			.height(height)
 			.onGloballyPositioned { onBoundsChanged(it.positionInRoot(), it.size) }
 			.graphicsLayer {
-				// Draw-time read of the press frame; keeps press/jelly out of recomposition.
 				@Suppress("UNUSED_VARIABLE") val pressTick = press.tick
-				val boxWidth = size.width.toFloat()
-				val boxHeight = size.height.toFloat()
-				if(boxWidth <= 0f || boxHeight <= 0f) return@graphicsLayer
-				deformRect.set(0f, 0f, boxWidth, boxHeight)
-				if(cp > .01f) {
+				val boxW = size.width.toFloat()
+				val boxH = size.height.toFloat()
+				if(boxW <= 0f || boxH <= 0f) return@graphicsLayer
+				deformRect.set(0f, 0f, boxW, boxH)
+				if(pp > .01f) {
 					press.jelly.deformMenu(deformRect, if(anchorFractionX >= .5f) -1f else 1f, 1f, density, 1f)
 				}else{
 					press.jelly.deformControl(deformRect, density, 1f)
 				}
-				// Birth origin in the closed box, remapped per anchor so the world point stays put
-				// while the layout box grows from its anchored edge.
-				val pressX = press.jelly.lightPositionX.coerceIn(0f, closedWidthPx)
-				val pressY = press.jelly.lightPositionY.coerceIn(0f, closedHeightPx)
-				val originX = when {
-					anchorFractionX >= 1f -> boxWidth - (closedWidthPx - pressX)
-					anchorFractionX > .01f -> boxWidth / 2f + (pressX - closedWidthPx / 2f)
-					else -> pressX
-				}
-				val scaleIn = birthScale.value
-				val left = originX + (deformRect.left - originX) * scaleIn
-				val top = pressY + (deformRect.top - pressY) * scaleIn
-				scaleX = deformRect.width * scaleIn / boxWidth
-				scaleY = deformRect.height * scaleIn / boxHeight
-				translationX = left
-				translationY = top + kickOffset.value
+				scaleX = deformRect.width / boxW
+				scaleY = deformRect.height / boxH
+				translationX = deformRect.left
+				translationY = deformRect.top
 				transformOrigin = TransformOrigin(0f, 0f)
 			}
-			// Observe inside the real graphics layer so window bounds include its live transform,
-			// not the padding or the full-screen capture/touch host outside the glass.
 			.onGloballyPositioned { onLayoutCoordinates(it) }
 			.then(
 				if(graphicsSupported) Modifier.drawBackdrop(
 					backdrop = backdrop,
-					shape = { shape },
+					shape = { glassShape },
 					effects = {
 						vibrancy()
 						val blurRadius = homeLiquidToolbarVisualSpec().blurRadiusDp.dp.toPx()
 						blur(blurRadius, blurRadius)
-						// Lens strength follows the optical channel (on at hand-over, released at
-						// ~84ms) instead of the whole geometry progress; at 0 the effect is skipped.
 						val lensFactor = lensProgress.value.coerceIn(0f, 1f)
 						lens(
 							refractionHeight = 18.dp.toPx() * lensFactor,
@@ -329,7 +383,6 @@ internal fun MorphingGlassContainer(
 					onDrawSurface = { drawRect(surface) },
 				) else Modifier.background(surface.copy(alpha = 1f), shape),
 			)
-			// Clip inner content only; the outer glass highlight must remain outside this clip.
 			.clip(shape)
 			.then(if(enableDragSelection) Modifier.pointerInput(Unit) {
 				awaitEachGesture {
@@ -355,9 +408,10 @@ internal fun MorphingGlassContainer(
 							if(!dragged && hypot(totalDx, totalDy)>viewConfiguration.touchSlop) dragged = true
 							if(!reduceMotion) press.move(change.position.x, change.position.y)
 							val canSelect = dragged && expandedState.value && itemCountState.value>0
+							val menuTop = panelTopState.value
 							val index = if(canSelect) ToolbarMenuGeometry.rowAt(
-								x = change.position.x, y = change.position.y,
-								width = size.width.toFloat(), height = size.height.toFloat(),
+								x = change.position.x, y = change.position.y - menuTop,
+								width = size.width.toFloat(), height = size.height.toFloat() - menuTop,
 								density = density, rowCount = itemCountState.value,
 							) else null
 							if(index!=highlighted) {
@@ -390,7 +444,7 @@ internal fun MorphingGlassContainer(
 				@Suppress("UNUSED_VARIABLE") val pressTick = press.tick
 				val glow = press.jelly.glowValue
 				if(glow > .01f) {
-					val lightRadius = (if(containerMorph.value > .01f) 80f else 38f) * density
+					val lightRadius = (if(pp > .01f) 80f else 38f) * density
 					drawRect(
 						brush = Brush.radialGradient(
 							colors = listOf(Color.White.copy(alpha = .12f * glow), Color.Transparent),
@@ -404,7 +458,7 @@ internal fun MorphingGlassContainer(
 		}
 		Box(
 			modifier = Modifier.graphicsLayer {
-				alpha = (1f - cp * 1.8f).coerceIn(0f, 1f)
+				alpha = (1f - pp * 2.2f).coerceIn(0f, 1f)
 				translationY = -6.dp.toPx() * cp
 			},
 			content = closedContent,
@@ -412,6 +466,7 @@ internal fun MorphingGlassContainer(
 		Box(
 			modifier = Modifier
 				.graphicsLayer {
+					translationY = panelTopPx
 					val reveal = enterFraction.value.coerceIn(0f, 1f)
 					val portal = 1f + (portalZoom - 1f) * portalProgress.value
 					alpha = enterAlpha.value.coerceIn(0f, 1f)
@@ -422,8 +477,6 @@ internal fun MorphingGlassContainer(
 						pivotFractionX = anchorFractionX,
 						pivotFractionY = 0f,
 					)
-					// Rows blur while they reveal (18dp -> 0); off once settled to avoid a
-					// permanent full-surface blur on low-end GPUs.
 					renderEffect = rowsBlurEffect(18.dp.toPx() * (1f - reveal))
 				}
 				.menuClipRevealFromTop(
