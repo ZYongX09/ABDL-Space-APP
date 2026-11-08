@@ -150,6 +150,8 @@ class HomeLiquidToolbarController(
 	private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop.toFloat()
 	private val leadingGlassBounds = RectF()
 	private val glassCoordinates = arrayOfNulls<LayoutCoordinates>(3)
+	/** The leading pill is dispatched by the full-screen host, so its press feeds this channel. */
+	internal val leadingPress = GlassPressInput()
 	private var leadingGlassTouch = false
 	private var leadingGlassLongPress = false
 	private var leadingGlassMoved = false
@@ -181,10 +183,12 @@ class HomeLiquidToolbarController(
 					MotionEvent.ACTION_MOVE -> {
 						if(hypot(event.x-leadingGlassDownX, event.y-leadingGlassDownY)>touchSlop)
 							leadingGlassMoved = true
+						leadingPress.move(event.x - leadingGlassBounds.left, event.y - leadingGlassBounds.top)
 						return true
 					}
 					MotionEvent.ACTION_UP -> {
 						leadingGlassTouch = false
+						leadingPress.release()
 						removeCallbacks(markLeadingLongPress)
 						leadingGlassVelocityTracker?.computeCurrentVelocity(1000)
 						val upwardFling = isUpwardToolbarFling(leadingGlassVelocityTracker?.yVelocity ?: 0f, minimumFlingVelocity)
@@ -201,6 +205,7 @@ class HomeLiquidToolbarController(
 					}
 					MotionEvent.ACTION_CANCEL -> {
 						leadingGlassTouch = false
+						leadingPress.release()
 						removeCallbacks(markLeadingLongPress)
 						leadingGlassVelocityTracker?.recycle()
 						leadingGlassVelocityTracker = null
@@ -218,6 +223,7 @@ class HomeLiquidToolbarController(
 						leadingGlassMoved = false
 						leadingGlassDownX = event.x
 						leadingGlassDownY = event.y
+						leadingPress.down(event.x - leadingGlassBounds.left, event.y - leadingGlassBounds.top)
 						leadingGlassVelocityTracker?.recycle()
 						leadingGlassVelocityTracker = VelocityTracker.obtain().also { it.addMovement(event) }
 						removeCallbacks(markLeadingLongPress)
@@ -446,6 +452,7 @@ private fun isMenuVisible(): Boolean = menuPageState!=HomeToolbarMenuPage.NONE |
 				onUpwardFling = { closeMenu() },
 				onBoundsChanged = { position, size -> leadingGlassBounds.set(position.x, position.y, position.x + size.width, position.y + size.height) },
 				onLayoutCoordinates = { glassCoordinates[0] = it },
+				pressInput = leadingPress,
 				closedContent = {
 					Row(Modifier.height(48.dp).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
 					ResourceIcon(if(showNewPostsState) R.drawable.ic_fluent_arrow_up_16_filled else currentTimeline?.iconRes ?: R.drawable.ic_fluent_home_24_regular, 24, contentColor)

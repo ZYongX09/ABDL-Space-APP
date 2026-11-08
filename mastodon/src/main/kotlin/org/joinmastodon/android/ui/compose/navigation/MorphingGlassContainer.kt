@@ -8,7 +8,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.height
@@ -19,9 +18,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.TransformOrigin
@@ -34,6 +35,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.unit.Dp
@@ -41,20 +43,26 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
 import androidx.compose.runtime.withFrameNanos
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.anim.SinOutEasing
 import top.yukonga.miuix.kmp.anim.folmeSpring
 import top.yukonga.miuix.kmp.squircle.isSquircleEnabled
+import org.joinmastodon.android.GlobalUserPreferences
 import org.joinmastodon.android.ui.compose.navigation.liquid.iosIndicatorSpecular
 import org.joinmastodon.android.ui.compose.navigation.liquid.lens
 import org.joinmastodon.android.ui.compose.navigation.liquid.rememberGravityRotatedHighlight
 import org.joinmastodon.android.ui.compose.navigation.liquid.vibrancy
+import org.joinmastodon.android.ui.compose.navigation.motion.GlassRect
 import org.joinmastodon.android.ui.compose.ui.isInDarkTheme
 import top.yukonga.miuix.kmp.blur.Backdrop
 import top.yukonga.miuix.kmp.blur.blur
 import top.yukonga.miuix.kmp.blur.drawBackdrop
 import org.joinmastodon.android.ui.compose.utils.rememberGraphicsEffectsSupported
 import kotlin.math.hypot
+import kotlin.math.max
 
 /** Shared by the rendered toolbar menus, outside-touch gate and drag selection. */
 internal object ToolbarMenuGeometry {
@@ -98,11 +106,15 @@ internal fun MorphingGlassContainer(
 	onUpwardFling: () -> Unit = {},
 	onBoundsChanged: (Offset, IntSize) -> Unit = { _, _ -> },
 	onLayoutCoordinates: (androidx.compose.ui.layout.LayoutCoordinates) -> Unit = {},
+	pressInput: GlassPressInput? = null,
 	closedContent: @Composable BoxScope.() -> Unit,
 	expandedContent: @Composable BoxScope.(progress: Float) -> Unit,
 ) {
 	val containerMorph = remember { Animatable(if(expanded) 1f else 0f) }
-	val containerScale = remember { Animatable(if(expanded) 1f else 1f) }
+	// 0..1 birth scale: the panel is born as a small disc at the finger and springs to full size.
+	val birthScale = remember { Animatable(1f) }
+	// Vertical kick while the panel hands over from the trigger, matching the reference timeline.
+	val kickOffset = remember { Animatable(0f) }
 	val enterFraction = remember { Animatable(if(expanded) 1f else 0f) }
 	val enterAlpha = remember { Animatable(if(expanded) 1f else 0f) }
 	val animatedExpandedHeight by animateDpAsState(
@@ -112,9 +124,7 @@ internal fun MorphingGlassContainer(
 	)
 	val menuSpec = homeLiquidToolbarMenuAnimationSpec()
 	val interactionSource = remember { MutableInteractionSource() }
-	val pressed by interactionSource.collectIsPressedAsState()
-	val pressScale = remember { Animatable(1f) }
-		val outlineHighlight = rememberIsolatedGlassHighlight(iosIndicatorSpecular, extraDegrees = -45f)
+	val outlineHighlight = rememberIsolatedGlassHighlight(iosIndicatorSpecular, extraDegrees = -45f)
 	val isDark = isInDarkTheme()
 	val surfaceAlpha = homeLiquidToolbarVisualSpec().surfaceAlpha
 	val surface = if(isDark) Color.Black.copy(alpha = surfaceAlpha) else Color.White.copy(alpha = surfaceAlpha)
@@ -122,46 +132,78 @@ internal fun MorphingGlassContainer(
 	val viewConfiguration = LocalViewConfiguration.current
 	val expandedState = rememberUpdatedState(expanded)
 	val itemCountState = rememberUpdatedState(selectionItemCount)
+	val density = LocalDensity.current.density
+	val press = pressInput ?: remember { GlassPressInput() }
+	val reduceMotion = GlobalUserPreferences.reduceMotion
+	val deformRect = remember { GlassRect() }
+	// The first composition must not play the hand-off kick; only later state changes should.
+	val kickPrimed = remember { booleanArrayOf(false) }
 
-	LaunchedEffect(pressed) {
-		pressScale.animateTo(
-			targetValue = if(pressed) 0.965f else 1f,
-			animationSpec = spring(dampingRatio = 0.72f, stiffness = 650f),
-		)
+	val closedWidthPx = with(LocalDensity.current) { closedWidth.toPx() }
+	val closedHeightPx = with(LocalDensity.current) { closedHeight.toPx() }
+	val expandedWidthPx = with(LocalDensity.current) { expandedWidth.toPx() }
+	val expandedHeightPx = with(LocalDensity.current) { expandedHeight.toPx() }
+
+	// Single frame loop: advances the press springs and wakes on the next pointer event.
+	LaunchedEffect(press) {
+		var last = 0L
+		while(isActive) {
+			if(!press.needsFrame) {
+				val seen = press.request
+				snapshotFlow { press.request }.first { it != seen }
+				last = 0L
+			}
+			val now = withFrameNanos { it }
+			val dt = if(last == 0L) 1f / 60f else ((now - last) / 1_000_000_000f).coerceIn(0f, .05f)
+			last = now
+			press.jelly.advance(if(reduceMotion) 1f else dt)
+			press.tick++
+		}
 	}
+
 	LaunchedEffect(expanded) {
 		onExpansionStarted()
 		if(expanded) withFrameNanos { }
 		val target = if(expanded) 1f else 0f
-		// Container outline morph: bouncy spring so the glass resize overshoots visibly.
-		val containerSpring = folmeSpring<Float>(
-			damping = menuSpec.containerSpringDamping,
-			response = menuSpec.containerSpringResponseSec,
+		// Reference timing: opening uses the eject spring (.75, .32s), closing the absorb
+		// spring (.8, .35s). Both are damping-ratio + response, which folmeSpring matches.
+		val morphSpec = folmeSpring<Float>(
+			damping = if(expanded) .75f else .8f,
+			response = if(expanded) .32f else .35f,
 		)
-		// Container整体 scale 弹性：展开时从 containerMorphScaleFrom 弹到 1.0 带明显过冲，
-		// 让玻璃本身有"弹出"的弹性感（不只是内部文字）。
-		val containerScaleSpring = folmeSpring<Float>(
-			damping = menuSpec.containerMorphScaleDamping,
-			response = menuSpec.containerMorphScaleResponseSec,
-		)
-		// Inner content reveal: miuix-style spring with visible overshoot.
 		val fractionSpring = folmeSpring<Float>(
-			damping = menuSpec.fractionSpringDamping,
-			response = menuSpec.fractionSpringResponseSec,
+			damping = 1f,
+			response = .3f,
 			visibilityThreshold = menuSpec.fractionVisibilityThreshold,
 		)
-		// Inner content alpha: miuix-identical tweens.
+		val ejectSpec = folmeSpring<Float>(damping = .75f, response = .32f)
+		val kickSpec = folmeSpring<Float>(damping = 1f, response = .14f)
 		val alphaSpec = tween<Float>(
 			durationMillis = if(expanded) menuSpec.alphaEnterDurationMs else menuSpec.alphaExitDurationMs,
 			easing = SinOutEasing,
 		)
-		launch { containerMorph.animateTo(target, containerSpring) }
 		launch {
 			if(expanded) {
-				containerScale.snapTo(menuSpec.containerMorphScaleFrom)
+				val diameter = max(expandedWidthPx * .5f * 44.dp.value * density / max(expandedWidthPx, expandedHeightPx), 1f)
+				birthScale.snapTo((diameter / closedWidthPx).coerceIn(.01f, 1f))
+				birthScale.animateTo(1f, ejectSpec)
+			}else{
+				birthScale.snapTo(1f)
 			}
-			containerScale.animateTo(1f, containerScaleSpring)
 		}
+		launch {
+			if(kickPrimed[0]) {
+				// The reference applies -80dp at retarget and clears it 70ms later.
+				val heightFactor = ((expandedHeightPx / density - 60f) / 140f).coerceIn(.5f, 1f)
+				val anchorY = (press.jelly.lightPositionY.coerceIn(0f, closedHeightPx) / max(expandedHeightPx, 1f)).coerceIn(0f, 1f)
+				kickOffset.snapTo(-80f * density * heightFactor * (2f * anchorY - 1f))
+				if(expanded) delay(70)
+				kickOffset.animateTo(0f, kickSpec)
+			}else{
+				kickPrimed[0] = true
+			}
+		}
+		launch { containerMorph.animateTo(target, morphSpec) }
 		launch { enterFraction.animateTo(target, fractionSpring) }
 		enterAlpha.animateTo(target, alphaSpec)
 		// Matches miuix ListPopupLayout: snap residual tracks to a clean baseline after exit so
@@ -170,6 +212,8 @@ internal fun MorphingGlassContainer(
 			containerMorph.snapTo(0f)
 			enterFraction.snapTo(0f)
 			enterAlpha.snapTo(0f)
+			kickOffset.snapTo(0f)
+			birthScale.snapTo(1f)
 		}
 		onExpansionFinished(expanded)
 	}
@@ -188,12 +232,34 @@ internal fun MorphingGlassContainer(
 			.height(height)
 			.onGloballyPositioned { onBoundsChanged(it.positionInRoot(), it.size) }
 			.graphicsLayer {
-				scaleX = pressScale.value * containerScale.value
-				scaleY = pressScale.value * containerScale.value
-				transformOrigin = androidx.compose.ui.graphics.TransformOrigin(
-					pivotFractionX = anchorFractionX,
-					pivotFractionY = 0f,
-				)
+				// Draw-time read of the press frame; keeps press/jelly out of recomposition.
+				@Suppress("UNUSED_VARIABLE") val pressTick = press.tick
+				val boxWidth = size.width.toFloat()
+				val boxHeight = size.height.toFloat()
+				if(boxWidth <= 0f || boxHeight <= 0f) return@graphicsLayer
+				deformRect.set(0f, 0f, boxWidth, boxHeight)
+				if(cp > .01f) {
+					press.jelly.deformMenu(deformRect, if(anchorFractionX >= .5f) -1f else 1f, 1f, density, 1f)
+				}else{
+					press.jelly.deformControl(deformRect, density, 1f)
+				}
+				// Birth origin in the closed box, remapped per anchor so the world point stays put
+				// while the layout box grows from its anchored edge.
+				val pressX = press.jelly.lightPositionX.coerceIn(0f, closedWidthPx)
+				val pressY = press.jelly.lightPositionY.coerceIn(0f, closedHeightPx)
+				val originX = when {
+					anchorFractionX >= 1f -> boxWidth - (closedWidthPx - pressX)
+					anchorFractionX > .01f -> boxWidth / 2f + (pressX - closedWidthPx / 2f)
+					else -> pressX
+				}
+				val scaleIn = birthScale.value
+				val left = originX + (deformRect.left - originX) * scaleIn
+				val top = pressY + (deformRect.top - pressY) * scaleIn
+				scaleX = deformRect.width * scaleIn / boxWidth
+				scaleY = deformRect.height * scaleIn / boxHeight
+				translationX = left
+				translationY = top + kickOffset.value
+				transformOrigin = TransformOrigin(0f, 0f)
 			}
 			// Observe inside the real graphics layer so window bounds include its live transform,
 			// not the padding or the full-screen capture/touch host outside the glass.
@@ -211,8 +277,26 @@ internal fun MorphingGlassContainer(
 							refractionAmount = lerp(20.dp.toPx(), 12.dp.toPx(), cp),
 						)
 					},
-					highlight = { outlineHighlight.value.copy(alpha = lerp(0.82f, 0.68f, cp)) },
-					onDrawSurface = { drawRect(surface) },
+					highlight = {
+						val glow = press.jelly.glowValue
+						outlineHighlight.value.copy(alpha = (lerp(0.82f, 0.68f, cp) + glow * 0.12f).coerceAtMost(1f))
+					},
+					onDrawSurface = {
+						drawRect(surface)
+						@Suppress("UNUSED_VARIABLE") val pressTick = press.tick
+						val glow = press.jelly.glowValue
+						if(glow > .01f) {
+							val lightRadius = (if(cp > .01f) 80f else 38f) * density
+							drawRect(
+								brush = Brush.radialGradient(
+									colors = listOf(Color.White.copy(alpha = .12f * glow), Color.Transparent),
+									center = Offset(press.jelly.lightPositionX, press.jelly.lightPositionY),
+									radius = lightRadius,
+								),
+								size = size,
+							)
+						}
+					},
 				) else Modifier.background(surface.copy(alpha = 1f), shape),
 			)
 			// Clip inner content only; the outer glass highlight must remain outside this clip.
@@ -220,6 +304,7 @@ internal fun MorphingGlassContainer(
 			.then(if(enableDragSelection) Modifier.pointerInput(Unit) {
 				awaitEachGesture {
 					val down = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.pressed } ?: return@awaitEachGesture
+					if(!reduceMotion) press.down(down.position.x, down.position.y)
 					val startedExpanded = expandedState.value
 					val requestedExpansion = !startedExpanded && shouldExpandFromClosed(down.position, size)
 					if(requestedExpansion) onExpansionRequested()
@@ -238,6 +323,7 @@ internal fun MorphingGlassContainer(
 							totalDx += delta.x
 							totalDy += delta.y
 							if(!dragged && hypot(totalDx, totalDy)>viewConfiguration.touchSlop) dragged = true
+							if(!reduceMotion) press.move(change.position.x, change.position.y)
 							val canSelect = dragged && expandedState.value && itemCountState.value>0
 							val index = if(canSelect) ToolbarMenuGeometry.rowAt(
 								x = change.position.x, y = change.position.y,
@@ -255,6 +341,7 @@ internal fun MorphingGlassContainer(
 								if(shouldCollapseTrailingMenu(velocityY, viewConfiguration.minimumFlingVelocity)) onUpwardFling()
 								else if(dragged) index?.let(onSelectionConfirmed)
 								else if(!requestedExpansion && !startedExpanded) onClosedTap(change.position, size)
+								if(!reduceMotion) press.release()
 								break
 							}
 						}
