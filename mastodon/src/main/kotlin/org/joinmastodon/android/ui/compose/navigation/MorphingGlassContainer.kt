@@ -87,7 +87,7 @@ internal object ToolbarMenuGeometry {
 	const val MAX_HEIGHT_DP = 420
 	/** The trigger pill keeps its own band above the panel, with a small liquid gap. */
 	const val TRIGGER_HEIGHT_DP = 48
-	const val PANEL_GAP_DP = 8
+	const val PANEL_GAP_DP = 2
 
 	fun heightDp(rowCount: Int): Int =
 		(CONTENT_TOP_PADDING_DP + rowCount.coerceAtLeast(1) * ROW_HEIGHT_DP + CONTENT_BOTTOM_PADDING_DP)
@@ -116,7 +116,8 @@ private class TwoLobeGlassShape(
 	private val pillRadius: Float,
 	private val panel: Rect,
 	private val panelRadius: Float,
-	private val neckHalfWidth: Float,
+	private val neckTopHalf: Float,
+	private val neckBottomHalf: Float,
 ) : Shape {
 	override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
 		val path = Path()
@@ -124,16 +125,17 @@ private class TwoLobeGlassShape(
 		val panelVisible = panel.height > .5f
 		if(pillVisible) path.addRoundRect(RoundRect(pill.left, pill.top, pill.right, pill.bottom, CornerRadius(pillRadius)))
 		if(panelVisible) path.addRoundRect(RoundRect(panel.left, panel.top, panel.right, panel.bottom, CornerRadius(panelRadius)))
-		if(pillVisible && panelVisible && neckHalfWidth > .5f && pill.bottom < panel.top){
+		if(pillVisible && panelVisible && neckTopHalf > .5f && pill.bottom <= panel.top){
 			val topX = pill.center.x
 			val bottomX = panel.center.x
-			val topHalf = neckHalfWidth
-			val bottomHalf = neckHalfWidth * .82f
+			val topHalf = neckTopHalf
+			val bottomHalf = neckBottomHalf
 			val midY = (pill.bottom + panel.top) / 2f
+			// Concave waist: leave the pill at its own edge, widen toward the panel.
 			path.moveTo(topX - topHalf, pill.bottom)
-			path.cubicTo(topX - topHalf * .55f, midY, bottomX - bottomHalf, midY, bottomX - bottomHalf, panel.top)
+			path.cubicTo(topX - topHalf * .72f, midY, bottomX - bottomHalf * .88f, midY, bottomX - bottomHalf, panel.top)
 			path.lineTo(bottomX + bottomHalf, panel.top)
-			path.cubicTo(bottomX + bottomHalf, midY, topX + topHalf * .55f, midY, topX + topHalf, pill.bottom)
+			path.cubicTo(bottomX + bottomHalf * .88f, midY, topX + topHalf * .72f, midY, topX + topHalf, pill.bottom)
 			path.close()
 		}
 		path.fillType = PathFillType.NonZero
@@ -311,7 +313,7 @@ internal fun MorphingGlassContainer(
 	val kick = kickOffset.value
 
 	// Trigger lobe: shrinks toward the press point as the panel grows.
-	val pillScale = 1f - .45f * pp
+	val pillScale = 1f - .1f * pp
 	val pillW = closedWidthPx * pillScale
 	val pillH = closedHeightPx * pillScale
 	val basePillCenterX = when {
@@ -320,18 +322,19 @@ internal fun MorphingGlassContainer(
 		else -> closedWidthPx / 2f
 	}
 	val pressX = press.jelly.lightPositionX.coerceIn(0f, closedWidthPx)
-	val pillShift = (pressX - closedWidthPx / 2f) * .35f * pp
+	val pillShift = (pressX - closedWidthPx / 2f) * .15f * pp
 	val pillCenterX = basePillCenterX + pillShift
 	val pillRect = Rect(pillCenterX - pillW / 2f, (closedHeightPx - pillH) / 2f, pillCenterX + pillW / 2f, (closedHeightPx + pillH) / 2f)
 	val panelTopPx = closedHeightPx + gapPx * pp + kick
 	val panelRect = Rect(0f, panelTopPx, boxWidthPx, boxHeightPx + kick)
-	val neckHalfWidth = min(pillW, boxWidthPx) * .46f * neck
+	val neckTopHalf = min(pillW, boxWidthPx) * .5f * neck
+	val neckBottomHalf = min(boxWidthPx, pillW * 1.9f) * .5f * neck
 
 	val twoLobe = pp > .01f || neck > .01f
 	val radius = lerp(closedHeight.value / 2f, 28f, cp).dp
 	val panelTopState = rememberUpdatedState(panelTopPx)
 	val glassShape: Shape = if(twoLobe)
-		TwoLobeGlassShape(pillRect, pillH / 2f, panelRect, 28.dp.value * density, neckHalfWidth)
+		TwoLobeGlassShape(pillRect, pillH / 2f, panelRect, 28.dp.value * density, neckTopHalf, neckBottomHalf)
 	else
 		RoundedCornerShape(radius)
 	// Clip/hit-test with a plain rounded box: a compound Outline.Generic clips out the rows on
@@ -458,7 +461,7 @@ internal fun MorphingGlassContainer(
 		}
 		Box(
 			modifier = Modifier.graphicsLayer {
-				alpha = (1f - pp * 2.2f).coerceIn(0f, 1f)
+				alpha = 1f
 				translationY = -6.dp.toPx() * cp
 			},
 			content = closedContent,
