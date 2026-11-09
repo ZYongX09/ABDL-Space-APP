@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -28,6 +29,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.GraphicsLayerScope
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -207,7 +209,7 @@ internal fun MorphingGlassContainer(
 				val diameter = max(expandedWidthPx * .5f * 44.dp.value * density / max(expandedWidthPx, expandedHeightPx), 1f)
 				// Clamp the birth scale: an extreme inverse scale makes the backdrop effect sample a
 				// huge area on low-end GPUs even though the drawn dot is only a few pixels.
-				birthScale.snapTo((diameter / closedWidthPx).coerceIn(.35f, 1f))
+				birthScale.snapTo((diameter / closedWidthPx).coerceIn(.5f, 1f))
 				birthScale.animateTo(1f, ejectSpec)
 			}else{
 				birthScale.snapTo(1f)
@@ -268,41 +270,47 @@ internal fun MorphingGlassContainer(
 	val shape = RoundedCornerShape(radius)
 	val squircleEnabled = isSquircleEnabled()
 	val graphicsSupported = rememberGraphicsEffectsSupported()
+	// Whole-surface motion: miuix applies this block to the glass and inverts it when sampling the
+	// backdrop, so the blur never samples outside the captured strip. A plain graphicsLayer left
+	// that inversion out and produced black blocks at the screen edge while the trailing menu grew.
+	val motionBlock: GraphicsLayerScope.() -> Unit = {
+		// Draw-time read of the press frame; keeps press/jelly out of recomposition.
+		@Suppress("UNUSED_VARIABLE") val pressTick = press.tick
+		val boxWidth = size.width.toFloat()
+		val boxHeight = size.height.toFloat()
+		if(boxWidth > 0f && boxHeight > 0f) {
+			deformRect.set(0f, 0f, boxWidth, boxHeight)
+			if(cp > .01f) {
+				press.jelly.deformMenu(deformRect, if(anchorFractionX >= .5f) -1f else 1f, 1f, density, 1f)
+			}else{
+				press.jelly.deformControl(deformRect, density, 1f)
+			}
+			// Birth origin in the closed box, remapped per anchor so the world point stays put
+			// while the layout box grows from its anchored edge.
+			val pressX = press.jelly.lightPositionX.coerceIn(0f, closedWidthPx)
+			val pressY = press.jelly.lightPositionY.coerceIn(0f, closedHeightPx)
+			val originX = when {
+				anchorFractionX >= 1f -> boxWidth - (closedWidthPx - pressX)
+				anchorFractionX > .01f -> boxWidth / 2f + (pressX - closedWidthPx / 2f)
+				else -> pressX
+			}
+			val scaleIn = birthScale.value
+			val left = originX + (deformRect.left - originX) * scaleIn
+			val top = pressY + (deformRect.top - pressY) * scaleIn
+			scaleX = deformRect.width * scaleIn / boxWidth
+			scaleY = deformRect.height * scaleIn / boxHeight
+			translationX = left
+			translationY = top + kickOffset.value
+			transformOrigin = TransformOrigin(0f, 0f)
+		}
+	}
 	Box(
 		modifier = modifier
 			.width(width)
 			.height(height)
 			.onGloballyPositioned { onBoundsChanged(it.positionInRoot(), it.size) }
-			.graphicsLayer {
-				// Draw-time read of the press frame; keeps press/jelly out of recomposition.
-				@Suppress("UNUSED_VARIABLE") val pressTick = press.tick
-				val boxWidth = size.width.toFloat()
-				val boxHeight = size.height.toFloat()
-				if(boxWidth <= 0f || boxHeight <= 0f) return@graphicsLayer
-				deformRect.set(0f, 0f, boxWidth, boxHeight)
-				if(cp > .01f) {
-					press.jelly.deformMenu(deformRect, if(anchorFractionX >= .5f) -1f else 1f, 1f, density, 1f)
-				}else{
-					press.jelly.deformControl(deformRect, density, 1f)
-				}
-				// Birth origin in the closed box, remapped per anchor so the world point stays put
-				// while the layout box grows from its anchored edge.
-				val pressX = press.jelly.lightPositionX.coerceIn(0f, closedWidthPx)
-				val pressY = press.jelly.lightPositionY.coerceIn(0f, closedHeightPx)
-				val originX = when {
-					anchorFractionX >= 1f -> boxWidth - (closedWidthPx - pressX)
-					anchorFractionX > .01f -> boxWidth / 2f + (pressX - closedWidthPx / 2f)
-					else -> pressX
-				}
-				val scaleIn = birthScale.value
-				val left = originX + (deformRect.left - originX) * scaleIn
-				val top = pressY + (deformRect.top - pressY) * scaleIn
-				scaleX = deformRect.width * scaleIn / boxWidth
-				scaleY = deformRect.height * scaleIn / boxHeight
-				translationX = left
-				translationY = top + kickOffset.value
-				transformOrigin = TransformOrigin(0f, 0f)
-			}
+			// The blur path receives the transform through layerBlock; only the fallback needs a layer.
+			.graphicsLayer { if(!graphicsSupported) motionBlock() }
 			// Observe inside the real graphics layer so window bounds include its live transform,
 			// not the padding or the full-screen capture/touch host outside the glass.
 			.onGloballyPositioned { onLayoutCoordinates(it) }
@@ -327,6 +335,7 @@ internal fun MorphingGlassContainer(
 						outlineHighlight.value.copy(alpha = (lerp(0.82f, 0.68f, cp) + glow * 0.12f).coerceAtMost(1f))
 					},
 					onDrawSurface = { drawRect(surface) },
+					layerBlock = motionBlock,
 				) else Modifier.background(surface.copy(alpha = 1f), shape),
 			)
 			// Clip inner content only; the outer glass highlight must remain outside this clip.
@@ -411,6 +420,9 @@ internal fun MorphingGlassContainer(
 		)
 		Box(
 			modifier = Modifier
+				// Fixed final size: the rows are measured once and only clipped/scaled while the
+				// glass grows, instead of re-flowing on every animation frame.
+				.requiredSize(expandedWidth, animatedExpandedHeight)
 				.graphicsLayer {
 					val reveal = enterFraction.value.coerceIn(0f, 1f)
 					val portal = 1f + (portalZoom - 1f) * portalProgress.value
