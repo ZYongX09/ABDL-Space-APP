@@ -31,7 +31,17 @@
 - 新增presentation/config用例；新增3项 `NovelCoverCapturedScrollTest`，实际生产采样宿主、RenderNode普通记录、交付底部采样条以及随后可见根节点像素；逐步滚动/metadata操作/重新创建、采样开关对照、无采样直接编辑页。
 - 第一轮生产编译通过，但新增测试有两处在SideEffect内读取Composable主题，测试编译失败，未执行用例；修正为先读取再提交副作用，重新执行。
 - 第二轮统一测试44项中42通过、2失败；失败为新增测试误假设软件根绘制不会刷新嵌套硬件display list，实际根绘制会调用dirty layers的 `updateDisplayList` 并可能在硬件记录Canvas上再遍历capture。断言改为启用时仅允许0或1次额外发布、关闭时严格0；保留显式记录帧+1、注册身份、透明度与每个封面像素检查，没有关闭采样或改业务以通过测试。
-- 修正观察顺序后三项逐步滚动/采样开关/直接编辑对照专项3/3通过。最终九组同源码回归、构建及签名/字节信息完成后补记。
+- 修正观察顺序后三项逐步滚动/采样开关/直接编辑对照专项3/3通过。最终业务源码 `50b431bc37ec6beea40db19e354b623ad58b0663` 的九组 **62/62通过，0失败/错误/跳过**：presentation3、Compose9、捕获滚动3、既有页面采样2、binding15、HTTP取消7、loader5、时间线cache15/render3。
+- 同次 `testReleaseUnitTest + assembleRelease` 成功（25分44秒），地图配置校验通过；仅将已构建APK复制到交付路径，不重新签名或用其他构建替换。打包后只补写文档，不修改业务源码。
+
+## 测试包交付
+
+- 路径：`/home/ZYongX/projects/ABDL-Space-3.3.0-code36-novel-cover-render-v2-20261111.apk`。
+- 大小：**169,066,390 字节**。
+- SHA256：`c221c106b016e5d14e852b72567e3572aaa4c06b8e21fc7ea09b4edb01e0de44`。
+- `top.abdl_space.app` / `3.3.0` / `36`，最低API26，target35；APK V2签名校验通过，证书SHA256 `fd2098a3d3493222c247a7ba2787ec48fd8f62d38e9432ed4d6290a057dea475`；ZIP完整性通过。
+- 旧 `ABDL-Space-3.3.0-code36-novel-cover-fix-20261111.apk`（169,062,922字节，`554569de…`）及 v5 `ABDL-Space-3.3.0-code36-glass-perf-v5-20261109.apk`（169,059,134字节，`396c9f9e…`）均保留，未删除或覆盖。
+- 再次与 `2dac60b4` 比较确认：玻璃导航、HomeFragment/HomeTabFragment、全局BackdropCaptureFrameLayout、reader-core和mastodon构建配置无差异；本轮生产源码仅改小说共用封面层。
 
 ## 验收边界
 
