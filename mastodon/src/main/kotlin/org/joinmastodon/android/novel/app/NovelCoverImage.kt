@@ -1,7 +1,9 @@
 package org.joinmastodon.android.novel.app
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.net.Uri
 import android.graphics.drawable.Animatable
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
@@ -9,9 +11,22 @@ import android.os.Handler
 import android.os.Looper
 import android.view.View
 import android.widget.ImageView
+import androidx.compose.foundation.Canvas as ComposeCanvas
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import com.squareup.otto.Subscribe
 import java.security.MessageDigest
 import java.util.UUID
@@ -181,7 +196,7 @@ internal class NovelCoverRequest(
     private val attempt: String = "",
     internal val generation: Long = scopeOwner.generation(coverKey.entity),
     private val completedDiskKey: String? = null,
-) : UrlImageLoaderRequest(coverKey.url, 500, 700) {
+) : UrlImageLoaderRequest(Bitmap.Config.ARGB_8888, 500, 700, emptyList(), Uri.parse(coverKey.url)) {
     private val source = MessageDigest.getInstance("SHA-256").digest(
         listOf(scopeOwner.namespace, coverKey.entity, coverKey.projection, coverKey.url, generation.toString())
             .joinToString("") { "${it.length}:$it" }.toByteArray(Charsets.UTF_8)
@@ -414,18 +429,101 @@ internal class NovelCoverImageView(context: Context) : ImageView(context) {
     override fun onDraw(canvas: Canvas) { binding.validate(); super.onDraw(canvas) }
 }
 
+/** Composition-owned presentation; the loader/binding remain shared with the native lifecycle tests. */
+internal class NovelCoverPresentation {
+    var image by mutableStateOf<Drawable?>(null); private set
+    var attached = false; private set
+    var coordinates: LayoutCoordinates? = null
+    val binding = NovelCoverBinding(show = { value, _ -> image = value })
+
+    fun attach(scope: NovelCoverScope?, entity: String, key: NovelCoverKey?, loader: NovelCoverLoader) {
+        attached = true
+        binding.bind(scope, entity, key, loader)
+        binding.attach()
+    }
+    fun release() {
+        attached = false
+        coordinates = null
+        binding.release()
+    }
+}
+
+internal val LocalNovelCoverPresentationFactory = staticCompositionLocalOf<() -> NovelCoverPresentation> {
+    { NovelCoverPresentation() }
+}
+
+/** Non-bitmap drawables keep independent callback/animation ownership without an AndroidView. */
+@Composable
+private fun NovelDrawableCover(image: Drawable, description: String?) {
+    var frame by remember(image) { mutableIntStateOf(0) }
+    val main = remember { Handler(Looper.getMainLooper()) }
+    DisposableEffect(image) {
+        val tasks = mutableMapOf<Runnable, Runnable>()
+        val callback = object : Drawable.Callback {
+            override fun invalidateDrawable(who: Drawable) { frame++ }
+            override fun scheduleDrawable(who: Drawable, what: Runnable, time: Long) {
+                tasks.remove(what)?.let(main::removeCallbacks)
+                val task = Runnable { tasks.remove(what); what.run() }
+                tasks[what] = task
+                main.postAtTime(task, time)
+            }
+            override fun unscheduleDrawable(who: Drawable, what: Runnable) {
+                tasks.remove(what)?.let(main::removeCallbacks)
+            }
+        }
+        image.callback = callback
+        (image as? Animatable)?.start()
+        onDispose {
+            (image as? Animatable)?.stop()
+            if (image.callback === callback) image.callback = null
+            tasks.values.forEach(main::removeCallbacks)
+            tasks.clear()
+        }
+    }
+    ComposeCanvas(Modifier.fillMaxSize().then(if (description == null) Modifier else Modifier.semantics { contentDescription = description })) {
+        frame
+        val width = image.intrinsicWidth.takeIf { it > 0 }?.toFloat() ?: size.width
+        val height = image.intrinsicHeight.takeIf { it > 0 }?.toFloat() ?: size.height
+        val scale = maxOf(size.width / width.coerceAtLeast(1f), size.height / height.coerceAtLeast(1f))
+        drawIntoCanvas { canvas ->
+            val native = canvas.nativeCanvas
+            val save = native.save()
+            try {
+                native.clipRect(0f, 0f, size.width, size.height)
+                native.translate((size.width - width * scale) / 2f, (size.height - height * scale) / 2f)
+                native.scale(scale, scale)
+                image.setBounds(0, 0, width.toInt().coerceAtLeast(1), height.toInt().coerceAtLeast(1))
+                image.draw(native)
+            } finally { native.restoreToCount(save) }
+        }
+    }
+}
+
 @Composable
 internal fun NovelRemoteCover(entity: String, projection: String, url: String?, modifier: Modifier, description: String? = null) {
     val scope = LocalNovelCoverScope.current
-    val loader = LocalNovelCoverLoader.current
-    // Observe retirement so a native view cannot survive logout until an unrelated model update.
-    val permitted = scope?.active == true
-    val key = if (permitted) novelCoverKey(entity, projection, url) else null
-    AndroidView(factory = { context -> NovelCoverImageView(context) }, modifier = modifier,
-        update = { view ->
-            view.importantForAccessibility = if (description == null) View.IMPORTANT_FOR_ACCESSIBILITY_NO else View.IMPORTANT_FOR_ACCESSIBILITY_AUTO
-            view.contentDescription = description
-            view.binding.bind(scope, entity, key, loader ?: scope?.loader(view.context) ?: view.coverLoader)
-        }, onRelease = { it.binding.release() })
+    val context = LocalContext.current
+    val suppliedLoader = LocalNovelCoverLoader.current
+    val loader = remember(scope, suppliedLoader, context) { suppliedLoader ?: scope?.loader(context) ?: AppKitNovelCoverLoader(context) }
+    // A changed identity gets an empty presentation synchronously, before any new draw can borrow
+    // old pixels. Binding retirement still clears state on logout without a model refresh.
+    val key = if (scope?.active == true) novelCoverKey(entity, projection, url) else null
+    val factory = LocalNovelCoverPresentationFactory.current
+    val presentation = remember(scope, entity, key, loader, factory) { factory() }
+    DisposableEffect(presentation) {
+        presentation.attach(scope, entity, key, loader)
+        onDispose { presentation.release() }
+    }
+    val current = presentation.image
+    val bitmap = (current as? BitmapDrawable)?.bitmap
+    val pixels = remember(bitmap) { bitmap?.takeUnless { it.isRecycled }?.asImageBitmap() }
+    Box(modifier.onGloballyPositioned { presentation.coordinates = it }.drawWithContent {
+        // Preserve the former native onDraw authority gate: even a draw-only invalidation may
+        // never present pixels from an expired session. No loading or copy is done on each frame.
+        if (scope?.isActive() == true && presentation.binding.validate() && presentation.image === current && usableCover(current)) drawContent()
+    }) {
+        if (pixels != null) Image(pixels, description, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+        else if (current != null) NovelDrawableCover(current, description)
+    }
 }
 
