@@ -21,6 +21,7 @@ import org.joinmastodon.android.novel.app.editor.NovelEditorCover
 import org.joinmastodon.android.novel.app.editor.NovelMetadata
 import org.joinmastodon.android.novel.app.models.Page
 import org.joinmastodon.android.novel.app.models.Shelf
+import org.joinmastodon.android.novel.app.models.Work
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Rule
@@ -46,15 +47,19 @@ class NovelCoverComposeTest {
     private val url = "https://compose-cover.example.test/book.png?signature=one"
     private val work = NovelAppTestFixtures.work().copy(coverUrl = url)
     @After fun cleanup() { models.clear(); scope.retire() }
-    private fun image(color: Int) = BitmapDrawable(host.activity.resources, Bitmap.createBitmap(24, 32, Bitmap.Config.ARGB_8888).apply {
+    private fun image(color: Int, width: Int = 24, height: Int = 32) = BitmapDrawable(host.activity.resources, Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).apply {
         eraseColor(color)
         // Genuine synthetic image detail for the existing native screenshot anti-placeholder gate;
         // the middle stays the requested color for exact pixel assertions, never a copied golden.
-        for (y in 0 until 8) for (x in 0 until width) setPixel(x, y, Color.rgb(x * 10, y * 30, 150))
+        for (y in 0 until 8) for (x in 0 until width) setPixel(x, y, Color.rgb((x * 10) and 255, y * 30, 150))
     })
     private fun descendants(view: View): List<View> = listOf(view) + if (view is ViewGroup) (0 until view.childCount).flatMap { descendants(view.getChildAt(it)) } else emptyList()
     private fun covers() = descendants(host.attachedComposeView).filterIsInstance<NovelCoverImageView>().filter { it.isAttachedToWindow }
     private fun pixels(view: NovelCoverImageView) = (view.drawable as? BitmapDrawable)?.bitmap
+    private val bindingKeyField = NovelCoverBinding::class.java.getDeclaredField("key").apply { isAccessible = true }
+    private fun boundKey(view: NovelCoverImageView) = bindingKeyField.get(view.binding) as? NovelCoverKey
+    private fun workKey(value: Work) = requireNotNull(novelCoverKey("work:${value.id}", "${value.author.id}:${value.status}", value.coverUrl))
+    private fun cover(value: Work) = covers().single { boundKey(it) == workKey(value) }
     private fun show(content: @Composable () -> Unit) = fixture.show(host) {
         CompositionLocalProvider(LocalNovelCoverScope provides scope, LocalNovelCoverLoader provides loader, content = content)
     }
@@ -69,24 +74,129 @@ class NovelCoverComposeTest {
         }
     }
     private fun assertPaints(view: NovelCoverImageView, expected: Int) {
+        assertTrue("A cover must have real measured native bounds", view.width > 0 && view.height > 0)
+        assertEquals(View.VISIBLE, view.visibility)
+        assertEquals("Successful redraws must not restart the native fade", 1f, view.alpha, 0f)
+        view.drawable?.let { assertEquals("Drawable opacity must not leak between views", 255, it.alpha) }
         val native = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
-        try { view.draw(Canvas(native)); assertEquals(expected, native.getPixel(native.width / 2, native.height / 2)) }
-        finally { native.recycle() }
+        try {
+            view.draw(Canvas(native))
+            val center = native.getPixel(native.width / 2, native.height / 2)
+            assertEquals("The native center must contain this book's pixels", expected, center)
+            assertEquals("Check painted alpha, not just the drawable reference", Color.alpha(expected), Color.alpha(center))
+        } finally { native.recycle() }
+    }
+    private fun composeCenter(view: NovelCoverImageView): Pair<Int, Int> {
+        val origin = IntArray(2); host.attachedComposeView.getLocationInWindow(origin)
+        val location = IntArray(2); view.getLocationInWindow(location)
+        return location[0] - origin[0] + view.width / 2 to location[1] - origin[1] + view.height / 2
+    }
+    private fun assertComposePaints(view: NovelCoverImageView, expected: Int) {
+        val root = host.attachedComposeView
+        val (x, y) = composeCenter(view)
+        assertTrue("Cover center must be inside the real Compose viewport", x in 0 until root.width && y in 0 until root.height)
+        // Draw the ACTUAL composed/native tree, including parent alpha/clips, through a translated
+        // one-pixel viewport. Repeated frame checks never allocate full-screen screenshots.
+        val sample = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
+        try {
+            root.draw(Canvas(sample).apply { translate(-x.toFloat(), -y.toFloat()) })
+            val center = sample.getPixel(0, 0)
+            assertEquals("Compose must paint this cover, not its typographic fallback", expected, center)
+            assertEquals("The composed success must stay fully opaque", 255, Color.alpha(center))
+        } finally { sample.recycle() }
+    }
+    private fun assertSuccess(view: NovelCoverImageView, value: Work, source: BitmapDrawable, color: Int, composed: Boolean = true) {
+        assertTrue(view.isAttachedToWindow)
+        assertEquals("Correct pixels must belong to the full current book/projection/URL key", workKey(value), boundKey(view))
+        assertFalse("Eviction/disposal must not recycle visible pixels", source.bitmap.isRecycled)
+        assertSame("Keep the same successfully decoded bitmap", source.bitmap, pixels(view))
+        assertPaints(view, color)
+        if (composed) assertComposePaints(view, color)
     }
 
     @Test fun realWorkRecompositionKeepsSameNativeViewImageAndDoesNotRestartFactoryOrFade() {
         var current by mutableStateOf(work)
-        show { Column { NovelHeading("封面加载回归", size = 23); NovelBookCover(current, width = 98.dp); NovelHeading(current.title, size = 19) } }
+        var mounted by mutableStateOf(true)
+        show { Column { NovelHeading("封面加载回归", size = 23); if (mounted) NovelBookCover(current, width = 98.dp); NovelHeading(current.title, size = 19) } }
         val view = covers().single(); assertNull(view.drawable); assertEquals(1, loader.calls.size)
         val red = image(Color.RED); loader.succeed(0, red); settle()
-        assertSame(red.bitmap, pixels(view)); assertEquals(1f, view.alpha, 0f); assertPaints(view, Color.RED)
+        assertSuccess(view, current, red, Color.RED)
         repeat(12) { index ->
             current = current.copy(title = "新标题 $index", reads = index.toLong(), inShelf = index % 2 == 0)
             settle()
-            assertSame(view, covers().single()); assertSame(red.bitmap, pixels(view)); assertEquals(1f, view.alpha, 0f)
+            assertSame(view, covers().single())
+            repeat(3) { assertSuccess(view, current, red, Color.RED) }
         }
-        assertEquals(1, loader.calls.size)
+        var previous = view
+        repeat(3) {
+            mounted = false; settle(); assertTrue(covers().isEmpty()); assertFalse(previous.isAttachedToWindow)
+            mounted = true; settle()
+            val restored = covers().single()
+            assertNotSame("A remount must exercise a new real AndroidView factory", previous, restored)
+            assertSuccess(restored, current, red, Color.RED)
+            previous = restored
+        }
+        assertEquals("Redraws/recomposition/warm remounts must never restart this request", 1, loader.calls.size)
         fixture.capture(host, "same-url-recomposition-custom-cover")
+    }
+
+    @Test fun decoded500x700PressureKeepsVisibleSuccessOpaqueAndWarmRemountUsesOnlyItsOwnBook() {
+        // Exactly three realistic decoded sources (4.2 MB total), not an unbounded catalog or
+        // full-screen bitmap loop. The explicit byte budget forces deterministic LRU pressure.
+        val red = image(Color.RED, 500, 700)
+        val green = image(Color.GREEN, 500, 700)
+        val blue = image(Color.BLUE, 500, 700)
+        val bytes = red.bitmap.allocationByteCount.toLong()
+        val budget = bytes * 2
+        val pressured = NovelCoverScope("bounded-render-pressure", { true }, maxBytes = budget, maxEntries = 8)
+        val second = NovelAppTestFixtures.work(1).copy(coverUrl = url)
+        val third = NovelAppTestFixtures.work(2).copy(coverUrl = url)
+        var neighbor by mutableStateOf(second)
+        var neighborMounted by mutableStateOf(true)
+        var revision by mutableIntStateOf(0)
+        try {
+            show {
+                CompositionLocalProvider(LocalNovelCoverScope provides pressured) {
+                    Row {
+                        NovelBookCover(work.copy(title = "固定作品 $revision"), width = 98.dp)
+                        if (neighborMounted) NovelBookCover(neighbor, width = 76.dp)
+                    }
+                }
+            }
+            assertEquals(bytes, green.bitmap.allocationByteCount.toLong()); assertEquals(bytes, blue.bitmap.allocationByteCount.toLong())
+            val firstCall = loader.calls.single { it.request.coverKey == workKey(work) }
+            val secondCall = loader.calls.single { it.request.coverKey == workKey(second) }
+            assertNotEquals("Even an identical URL belongs to distinct book identities", firstCall.request.memoryCacheKey, secondCall.request.memoryCacheKey)
+            firstCall.result(red); secondCall.result(green); settle()
+            val fixed = cover(work)
+            val reused = cover(second)
+            assertSuccess(fixed, work, red, Color.RED); assertSuccess(reused, second, green, Color.GREEN)
+            assertEquals(2, pressured.retainedCount); assertEquals(budget, pressured.retainedBytes)
+
+            neighbor = third; settle()
+            assertSame("The same Compose slot must rebind its native cover to the next book", reused, cover(third))
+            assertNull("A new book cannot borrow the previous book's successful pixels", reused.drawable)
+            assertPaints(reused, Color.TRANSPARENT)
+            val thirdCall = loader.calls.single { it.request.coverKey == workKey(third) }
+            thirdCall.result(blue); settle()
+            assertEquals(2, pressured.retainedCount); assertEquals(budget, pressured.retainedBytes)
+            assertNull("Third 500x700 result must really evict the oldest reusable cache entry", pressured.image(workKey(work)))
+            assertSuccess(fixed, work, red, Color.RED); assertSuccess(reused, third, blue, Color.BLUE)
+            repeat(8) { index ->
+                revision = index + 1; settle()
+                assertSame(fixed, cover(work)); assertSame(reused, cover(third))
+                repeat(2) { assertSuccess(fixed, work, red, Color.RED); assertSuccess(reused, third, blue, Color.BLUE) }
+                assertTrue(pressured.retainedBytes <= budget)
+            }
+            neighborMounted = false; settle(); assertFalse(reused.isAttachedToWindow)
+            assertSuccess(fixed, work, red, Color.RED)
+            neighborMounted = true; settle()
+            val remounted = cover(third)
+            assertNotSame(reused, remounted)
+            assertSuccess(remounted, third, blue, Color.BLUE); assertSuccess(fixed, work, red, Color.RED)
+            assertEquals("Eviction cannot cause visible redraw reloads or reload the warm MRU remount", 3, loader.calls.size)
+            assertTrue(listOf(red, green, blue).none { it.bitmap.isRecycled })
+        } finally { pressured.retire() }
     }
 
     @Test fun signatureUrlSwitchFailureNullUrlAndLateAbaRepliesRenderRealFallbackInsteadOfOldPrivateCover() {
@@ -129,9 +239,9 @@ class NovelCoverComposeTest {
         assertEquals(callsForFirst, loader.calls.count { it.request.coverKey.entity == "work:${catalog.first().id}" })
         // Real keyed item reordering must not let the old first book populate its new neighbour.
         state = state.copy(works = NovelLoad(Page(catalog.reversed(), null))); settle()
-        val keyField = NovelCoverBinding::class.java.getDeclaredField("key").apply { isAccessible = true }
         covers().filter { pixels(it) === firstPixels }.forEach {
-            assertEquals("Reordering must never assign one book's image to a neighbour", "work:${catalog.first().id}", (keyField.get(it.binding) as NovelCoverKey).entity)
+            assertEquals("Reordering must never assign one book's image to a neighbour", workKey(catalog.first()), boundKey(it))
+            assertPaints(it, Color.RED)
         }
         fixture.capture(host, "store-scroll-return-custom-cover")
     }
@@ -186,11 +296,17 @@ class NovelCoverComposeTest {
 
     @Test fun allActualAppCoverEntrypointsUseTheSameScopeWithoutChangingFallbackLayouts() {
         val vm = NovelAppViewModel({ NovelRepository(TestNovelTransport()) }, MemoryNovelSearchHistory(), { true }).also { models.put("all-pages", it) }
-        val base = NovelAppTestFixtures.state().copy(work = NovelLoad(work), works = NovelLoad(Page(listOf(work), null)),
-            allWorks = NovelLoad(Page(listOf(work), null)), search = NovelLoad(Page(listOf(work), null)), query = "柔软",
-            shelf = NovelLoad(Shelf(listOf(work), work)), ownerWorks = NovelLoad(listOf(work)),
-            creator = NovelLoad(NovelAppTestFixtures.creator().copy(works = listOf(work))),
-            author = NovelLoad(org.joinmastodon.android.novel.app.models.AuthorPage(work.author, NovelAppTestFixtures.stats, listOf(work), false)))
+        // The second book deliberately shares the opaque signed URL. Distinct center colors and
+        // full keys catch cross-book cache/view reuse that an isNotNull assertion cannot detect.
+        val other = NovelAppTestFixtures.work(1).copy(coverUrl = url)
+        val books = listOf(work, other)
+        val red = image(Color.RED); val blue = image(Color.BLUE)
+        val expected = mapOf(workKey(work) to Triple(work, red, Color.RED), workKey(other) to Triple(other, blue, Color.BLUE))
+        val base = NovelAppTestFixtures.state().copy(work = NovelLoad(work), works = NovelLoad(Page(books, null)),
+            allWorks = NovelLoad(Page(books.reversed(), null)), search = NovelLoad(Page(books, null)), query = "柔软",
+            shelf = NovelLoad(Shelf(books.reversed(), work)), ownerWorks = NovelLoad(books.reversed()),
+            creator = NovelLoad(NovelAppTestFixtures.creator().copy(works = books)),
+            author = NovelLoad(org.joinmastodon.android.novel.app.models.AuthorPage(work.author, NovelAppTestFixtures.stats, books.reversed(), false)))
         var page by mutableStateOf<NovelPage>(NovelPage.Store)
         show {
             val state = base.copy(pages = listOf(page))
@@ -206,15 +322,32 @@ class NovelCoverComposeTest {
                 else -> error("Unexpected cover page")
             }
         }
-        completeVisible()
-        for (next in listOf(NovelPage.AllWorks, NovelPage.Search, NovelPage.Shelf, NovelPage.Detail(work.id), NovelPage.AuthorProfile(work.author.id), NovelPage.Creator, NovelPage.OwnerWorks)) {
+        loader.calls.toList().forEach { call -> call.result(requireNotNull(expected[call.request.coverKey]).second) }
+        settle()
+        val storeViews = covers().toList()
+        fun assertPagePaints() {
+            assertTrue("Production cover missing on $page", covers().isNotEmpty())
+            var composed = 0
+            covers().forEach { view ->
+                val (book, source, color) = requireNotNull(expected[boundKey(view)]) { "Unexpected book cover on $page" }
+                val (x, y) = composeCenter(view)
+                val inside = x in 0 until host.attachedComposeView.width && y in 0 until host.attachedComposeView.height
+                assertSuccess(view, book, source, color, composed = inside)
+                if (inside) composed++
+            }
+            assertTrue("At least one actual cover center must be painted inside $page", composed > 0)
+        }
+        assertPagePaints()
+        for (next in listOf(NovelPage.AllWorks, NovelPage.Search, NovelPage.Shelf, NovelPage.Detail(work.id), NovelPage.AuthorProfile(work.author.id), NovelPage.Creator, NovelPage.OwnerWorks, NovelPage.Store)) {
             page = next; settle()
             if (next == NovelPage.Creator) host.scrollTo(hasText(work.title))
-            assertTrue("Production cover missing on $next", covers().isNotEmpty())
-            covers().forEach { assertNotNull("Same permitted cover must remain warm on $next", it.drawable) }
+            repeat(3) { assertPagePaints() }
         }
-        assertEquals("All normal work covers share the exact identity, not page-local requests", 1,
-            loader.calls.count { it.request.coverKey.entity == "work:${work.id}" })
+        assertTrue("Cross-page coverage must include actual native disposal/remount", storeViews.all { !it.isAttachedToWindow })
+        books.forEach { book ->
+            assertEquals("All pages reuse only this book's successful pixels, without a new load", 1,
+                loader.calls.count { it.request.coverKey == workKey(book) })
+        }
     }
 
     @Test fun editorRemoteCoverUsesSameBindingAndPendingLocalSelectionSuppressesItImmediately() {

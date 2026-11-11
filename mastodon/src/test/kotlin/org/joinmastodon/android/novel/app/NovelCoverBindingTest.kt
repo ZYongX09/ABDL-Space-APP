@@ -97,6 +97,73 @@ class NovelCoverBindingTest {
         scope.retire()
     }
 
+    @Test fun twoViewsChangingSameBookToSameSignedUrlAcceptBothReplacementCallbacksWithoutStayingBlank() {
+        val scope = NovelCoverScope("account-a", { true }); val loader = ControlledNovelCoverLoader()
+        val views = List(2) { Display() }; val old = key()
+        val next = old.copy(url = "https://covers.example.test/a.png?signature=replacement&version=2")
+        try {
+            views.forEach { view -> view.binding.bind(scope, old.entity, old, loader); view.binding.attach() }
+            assertEquals(2, loader.calls.size)
+            val original = bitmap(); repeat(2) { loader.succeed(it, original) }
+            views.forEach { assertSame(original.bitmap, pixels(it.image)) }
+            // Both observers transition before either new callback; the second bind must not
+            // revoke the same replacement generation already captured by the first observer.
+            views.forEach { view -> view.binding.bind(scope, next.entity, next.copy(), loader); assertNull(view.image) }
+            assertEquals(4, loader.calls.size)
+            val replacement = bitmap()
+            loader.succeed(2, replacement); loader.succeed(3, replacement)
+            views.forEach { view ->
+                assertSame("Every observer must accept its replacement callback", replacement.bitmap, pixels(view.image))
+                assertTrue(view.binding.validate())
+            }
+            assertNotSame(views[0].image, views[1].image)
+            assertSame(replacement.bitmap, pixels(scope.image(next))); assertNull(scope.image(old))
+            repeat(5) { views.forEach { it.binding.bind(scope, next.entity, next.copy(), loader) } }
+            ShadowLooper.idleMainLooper(2000, TimeUnit.MILLISECONDS)
+            views.forEach { assertSame(replacement.bitmap, pixels(it.image)) }
+            assertEquals("Recovery must not depend on a later bind or retry", 4, loader.calls.size)
+            assertFalse(original.bitmap.isRecycled); assertFalse(replacement.bitmap.isRecycled)
+            assertTrue(scope.isActive()); assertEquals(0, scope.failureCount(next))
+        } finally { scope.retire() }
+    }
+
+    @Test fun pendingLiveBindingKeepsGenerationAndAcceptsSuccessAfterUnrelatedRequestMetadataPressure() {
+        val scope = NovelCoverScope("account-a", { true }); val loader = ControlledNovelCoverLoader()
+        val view = Display(); val original = key()
+        try {
+            view.binding.bind(scope, original.entity, original, loader); view.binding.attach()
+            assertEquals(1, loader.calls.size); assertNull(view.image)
+            // The default generation budget is twice the 64-entry decoded-cache limit. Creating
+            // unrelated requests must trim unobserved entities, never the live pending observer.
+            repeat(160) { index -> NovelCoverRequest(scope, original.copy(entity = "unobserved-book-$index")) }
+            assertEquals(1, loader.calls.size); assertFalse(loader.calls.single().cancelled)
+            val source = bitmap(); loader.succeed(0, source)
+            assertSame("Metadata pressure must not silently reject a still-current callback", source.bitmap, pixels(view.image))
+            assertSame(source.bitmap, pixels(scope.image(original)))
+            assertFalse(source.bitmap.isRecycled); assertTrue(scope.isActive()); assertTrue(view.binding.validate())
+            assertEquals(1, scope.retainedCount); assertEquals(source.bitmap.allocationByteCount.toLong(), scope.retainedBytes)
+            assertEquals(0, scope.failureCount(original))
+            ShadowLooper.idleMainLooper(2000, TimeUnit.MILLISECONDS)
+            assertSame(source.bitmap, pixels(view.image)); assertEquals(1, loader.calls.size)
+        } finally { scope.retire() }
+    }
+
+    @Test fun remountAtOlderUrlThenRepeatPriorTransitionInvalidatesItsOldCompletedPixels() {
+        val scope = NovelCoverScope("account", { true }); val loader = ControlledNovelCoverLoader()
+        val a = key(); val b = key(url = "https://covers.example.test/a.png?signature=replacement")
+        val first = Display(); first.binding.bind(scope, a.entity, a, loader); first.binding.attach()
+        loader.succeed(0, bitmap()); first.binding.bind(scope, b.entity, b, loader); loader.succeed(1, bitmap())
+        first.binding.release()
+        val remounted = Display(); remounted.binding.bind(scope, a.entity, a, loader); remounted.binding.attach()
+        val reopened = bitmap(); loader.succeed(2, reopened); assertSame(reopened.bitmap, pixels(remounted.image))
+        remounted.binding.bind(scope, b.entity, b, loader)
+        assertNull(remounted.image); assertNull(scope.image(a))
+        loader.succeed(2, reopened); assertNull(remounted.image)
+        val replacement = bitmap(); loader.succeed(3, replacement)
+        assertSame(replacement.bitmap, pixels(remounted.image)); assertEquals(4, loader.calls.size)
+        scope.retire()
+    }
+
     @Test fun changingBookSameUrlAndPermissionProjectionOrRemovingCoverNeverRestoresOldImage() {
         val scope = NovelCoverScope("account-a", { true }); val loader = ControlledNovelCoverLoader(); val view = Display(); val a = key()
         view.binding.bind(scope, a.entity, a, loader); view.binding.attach(); loader.succeed(0, bitmap())
@@ -175,6 +242,45 @@ class NovelCoverBindingTest {
         val huge = bitmap(128); scope.remember(a.copy(entity = "huge"), huge); assertEquals(2, scope.retainedCount); assertFalse(huge.bitmap.isRecycled)
         val recycled = bitmap(); scope.remember(a, recycled); recycled.bitmap.recycle(); assertNull(scope.image(a)); assertTrue(scope.retainedBytes >= 0)
         scope.retire(); assertFalse(source.bitmap.isRecycled)
+    }
+
+    @Test fun successAfterTwoFailuresResetsRetryBudgetAfterByteLruEvictionAndLaterTransientFailure() {
+        val successful = bitmap(); val bytes = successful.bitmap.allocationByteCount.toLong()
+        // Keep failure history entries while evicting pixels, so entry-count eviction cannot
+        // accidentally mask a stale failure budget for the successful key.
+        val scope = NovelCoverScope("account", { true }, maxBytes = bytes, maxEntries = 4)
+        val loader = ControlledNovelCoverLoader(); val first = Display(); val original = key()
+        try {
+            first.binding.bind(scope, original.entity, original, loader); first.binding.attach()
+            repeat(2) { attempt ->
+                loader.fail(attempt)
+                assertNull(first.image); assertEquals(attempt + 1, scope.failureCount(original))
+                ShadowLooper.idleMainLooper(601, TimeUnit.MILLISECONDS)
+                assertEquals(attempt + 2, loader.calls.size)
+            }
+            loader.succeed(2, successful)
+            assertSame(successful.bitmap, pixels(first.image))
+            assertEquals(bytes, scope.retainedBytes)
+            first.binding.release()
+            val other = original.copy(entity = "book-b", url = "https://covers.example.test/b.png?signature=fixture")
+            val pressure = Display(); pressure.binding.bind(scope, other.entity, other, loader); pressure.binding.attach()
+            assertEquals(4, loader.calls.size); loader.succeed(3, bitmap())
+            assertNull("A second allocation must evict the successful original pixels", scope.image(original))
+            assertNotNull(scope.image(other)); assertEquals(1, scope.retainedCount); assertEquals(bytes, scope.retainedBytes)
+            pressure.binding.release()
+            val revisited = Display(); revisited.binding.bind(scope, original.entity, original.copy(), loader); revisited.binding.attach()
+            assertEquals(5, loader.calls.size); assertNull(revisited.image)
+            loader.fail(4)
+            assertEquals("An old recovered flight's two failures must not poison a later transient failure", 1, scope.failureCount(original))
+            assertNull(revisited.image)
+            ShadowLooper.idleMainLooper(601, TimeUnit.MILLISECONDS)
+            assertEquals("The later transient failure must still have an automatic retry", 6, loader.calls.size)
+            val recovered = bitmap(); loader.succeed(5, recovered)
+            assertSame(recovered.bitmap, pixels(revisited.image)); assertEquals(0, scope.failureCount(original))
+            assertEquals(bytes, scope.retainedBytes); assertFalse(successful.bitmap.isRecycled)
+            ShadowLooper.idleMainLooper(2000, TimeUnit.MILLISECONDS)
+            assertEquals(6, loader.calls.size)
+        } finally { scope.retire() }
     }
 
     @Test fun sharedCoverUsesIndependentDrawableStateAndReleaseCannotClearAnotherView() {

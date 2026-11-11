@@ -65,6 +65,12 @@ internal class NovelCoverScope(
     private data class Cached(val image: Drawable, val bytes: Long)
     private val images = LinkedHashMap<NovelCoverKey, Cached>(16, .75f, true)
     private val failures = LinkedHashMap<NovelCoverKey, Int>(16, .75f, true)
+    // Completed disk sources outlive decoded-pixel eviction, but never their account/entity lease.
+    private data class CompletedSource(val generation: Long, val diskKey: String)
+    private val sources = LinkedHashMap<NovelCoverKey, CompletedSource>(16, .75f, true)
+    private val generations = LinkedHashMap<String, Long>(16, .75f, true)
+    private val transitions = LinkedHashMap<String, NovelCoverKey?>()
+    private var nextGeneration = 0L
     private val bindings = mutableSetOf<NovelCoverBinding>()
     private val loaders = mutableSetOf<AppKitNovelCoverLoader>()
     internal fun loader(context: Context) = loaders.firstOrNull() ?: AppKitNovelCoverLoader(context).also { loaders += it }
@@ -78,7 +84,7 @@ internal class NovelCoverScope(
     fun retire() {
         if (!active) return
         active = false
-        images.clear(); failures.clear(); retainedBytes = 0
+        images.clear(); failures.clear(); sources.clear(); generations.clear(); transitions.clear(); retainedBytes = 0
         bindings.toList().forEach { it.retire() }
         bindings.clear()
         loaders.forEach { it.retire() }; loaders.clear()
@@ -102,6 +108,7 @@ internal class NovelCoverScope(
         // with an exact allocationByteCount belong in this reusable memory budget.
         if (!isActive() || !usableCover(image) || image !is BitmapDrawable) return
         forget(key)
+        failures.remove(key)
         val canonical = independentCover(image) ?: return
         val bytes = coverBytes(canonical)
         if (bytes > maxBytes) return
@@ -111,8 +118,45 @@ internal class NovelCoverScope(
     internal fun forget(key: NovelCoverKey) {
         images.remove(key)?.let { retainedBytes -= it.bytes }
     }
-    internal fun forgetEntity(entity: String) {
+    private fun forgetEntityData(entity: String) {
         images.keys.filter { it.entity == entity }.toList().forEach(::forget)
+        sources.keys.filter { it.entity == entity }.toList().forEach(sources::remove)
+    }
+    internal fun forgetEntity(entity: String, next: NovelCoverKey?) {
+        // Two mounted views may observe the same metadata update; advance its lease only once.
+        if (transitions.containsKey(entity) && transitions[entity] == next) return
+        forgetEntityData(entity)
+        transitions[entity] = next
+        generations[entity] = ++nextGeneration
+        trimGenerations()
+    }
+    internal fun generation(entity: String): Long {
+        val generation = generations.getOrPut(entity) { ++nextGeneration }
+        trimGenerations(entity)
+        return generation
+    }
+    private fun trimGenerations(retain: String? = null) {
+        val observed = bindings.mapNotNullTo(mutableSetOf()) { it.observedEntity() }
+        retain?.let(observed::add)
+        while (generations.size > maxEntries * 2) {
+            val entity = generations.keys.firstOrNull { it !in observed } ?: return
+            generations.remove(entity); transitions.remove(entity); forgetEntityData(entity)
+        }
+    }
+    internal fun accepts(key: NovelCoverKey, generation: Long) = isActive() && generations[key.entity] == generation
+    internal fun completedSource(key: NovelCoverKey, generation: Long): String? =
+        sources[key]?.takeIf { accepts(key, generation) && it.generation == generation }?.diskKey
+    internal fun loaded(key: NovelCoverKey, generation: Long, diskKey: String, image: Drawable) {
+        if (!accepts(key, generation)) return
+        remember(key, image)
+        failures.remove(key)
+        if (image is BitmapDrawable && usableCover(image)) {
+            sources[key] = CompletedSource(generation, diskKey)
+            while (sources.size > maxEntries) sources.remove(sources.keys.first())
+        }
+    }
+    internal fun discardSource(key: NovelCoverKey, generation: Long, diskKey: String) {
+        if (sources[key]?.let { it.generation == generation && it.diskKey == diskKey } == true) sources.remove(key)
     }
     internal fun failureCount(key: NovelCoverKey) = failures.getOrDefault(key, 0)
     internal fun canLoad(key: NovelCoverKey) = isActive() && failureCount(key) < 3
@@ -131,17 +175,24 @@ private fun coverBytes(image: Drawable): Long = if (image is BitmapDrawable) ima
     else (image.intrinsicWidth.coerceAtLeast(1).toLong() * image.intrinsicHeight.coerceAtLeast(1) * 4).coerceAtLeast(4096)
 
 /** AppKit must not coalesce disk/in-flight/memory requests across accounts, books or projections. */
-internal class NovelCoverRequest(scope: NovelCoverScope, val coverKey: NovelCoverKey, private val attempt: String = "") : UrlImageLoaderRequest(coverKey.url, 500, 700) {
+internal class NovelCoverRequest(
+    internal val scopeOwner: NovelCoverScope,
+    val coverKey: NovelCoverKey,
+    private val attempt: String = "",
+    internal val generation: Long = scopeOwner.generation(coverKey.entity),
+    private val completedDiskKey: String? = null,
+) : UrlImageLoaderRequest(coverKey.url, 500, 700) {
     private val source = MessageDigest.getInstance("SHA-256").digest(
-        listOf(scope.namespace, coverKey.entity, coverKey.projection, coverKey.url)
+        listOf(scopeOwner.namespace, coverKey.entity, coverKey.projection, coverKey.url, generation.toString())
             .joinToString("") { "${it.length}:$it" }.toByteArray(Charsets.UTF_8)
     ).joinToString("") { "%02x".format(it.toInt() and 255) }
     private val cacheKey = MessageDigest.getInstance("SHA-256").digest((source + attempt).toByteArray(Charsets.UTF_8))
         .joinToString("") { "%02x".format(it.toInt() and 255) }
-    private val scopeOwner = scope
-    internal fun nextAttempt() = NovelCoverRequest(scopeOwner, coverKey, UUID.randomUUID().toString().replace("-", ""))
+    internal fun nextAttempt() = NovelCoverRequest(scopeOwner, coverKey, UUID.randomUUID().toString().replace("-", ""),
+        generation, scopeOwner.completedSource(coverKey, generation))
+    internal fun isAuthorized() = scopeOwner.accepts(coverKey, generation)
     override fun getMemoryCacheKey() = "novel-cover-500x700-$cacheKey"
-    override fun getDiskCacheKey() = cacheKey
+    override fun getDiskCacheKey() = completedDiskKey ?: cacheKey
     override fun sourcesEqual(other: ImageLoaderRequest?) = other is NovelCoverRequest && cacheKey == other.cacheKey
     override fun equals(other: Any?) = other is NovelCoverRequest && cacheKey == other.cacheKey
     override fun hashCode() = cacheKey.hashCode()
@@ -158,6 +209,8 @@ internal val LocalNovelCoverLoader = staticCompositionLocalOf<NovelCoverLoader?>
 internal fun interface NovelCoverLoader {
     /** null is a completed failure, not a loading placeholder; callbacks may arrive after cancel. */
     fun load(request: NovelCoverRequest, result: (Drawable?) -> Unit): NovelCoverCancellation
+    /** A shared flight records one result, regardless of how many views subscribe to it. */
+    fun recordsScopeResults(): Boolean = false
 }
 
 internal class AppKitNovelCoverLoader(context: Context) : NovelCoverLoader {
@@ -170,11 +223,17 @@ internal class AppKitNovelCoverLoader(context: Context) : NovelCoverLoader {
         var detach: Runnable? = null
         var timeout: Runnable? = null
     }
+    override fun recordsScopeResults() = true
     override fun load(request: NovelCoverRequest, result: (Drawable?) -> Unit): NovelCoverCancellation {
+        if (!request.isAuthorized()) { result(null); return NovelCoverCancellation {} }
+        request.scopeOwner.image(request.coverKey)?.let { image ->
+            result(image)
+            return NovelCoverCancellation {}
+        }
         var flight = flights[request]
         if (flight == null) {
-            // A cancelled AppKit HTTP request may still own currentlyLoading until its worker runs.
-            // A NEW flight must never join that doomed source; subscribers within a flight still coalesce.
+            // Only a completed disk source may be reused. Cancelled/failed sources retain fresh
+            // attempt keys so a reattachment cannot join AppKit's asynchronously cancelling worker.
             while (flights.size >= 16) terminate(flights.keys.first(), flights.values.first(), null)
             flight = Flight(request.nextAttempt())
             flights[request] = flight
@@ -183,12 +242,12 @@ internal class AppKitNovelCoverLoader(context: Context) : NovelCoverLoader {
         current.detach?.let(main::removeCallbacks); current.detach = null
         current.subscribers += result
         if (current.pending == null) {
-            current.timeout = Runnable { terminate(request, current, null) }.also { main.postDelayed(it, 30_000) }
+            current.timeout = Runnable { terminate(request, current, null, completed = true) }.also { main.postDelayed(it, 30_000) }
             current.pending = cache.get(current.request, null, object : ImageLoaderCallback {
                 override fun onImageLoaded(request: ImageLoaderRequest, image: Drawable) = deliver(image)
                 override fun onImageLoadingFailed(request: ImageLoaderRequest, error: Throwable?) = deliver(null)
                 private fun deliver(image: Drawable?) {
-                    main.post { cache.remove(current.request); terminate(request, current, image) }
+                    main.post { terminate(request, current, image, completed = true) }
                 }
             }, true)
         }
@@ -205,14 +264,27 @@ internal class AppKitNovelCoverLoader(context: Context) : NovelCoverLoader {
             }
         }
     }
-    private fun terminate(key: NovelCoverRequest, flight: Flight, image: Drawable?) {
+    private fun terminate(key: NovelCoverRequest, flight: Flight, image: Drawable?, completed: Boolean = false) {
         if (flights[key] !== flight) return
         flights.remove(key)
         flight.detach?.let(main::removeCallbacks); flight.timeout?.let(main::removeCallbacks)
-        // Remove from our map BEFORE cancel: even a reentrant subscription gets a fresh source.
+        val authorized = flight.request.isAuthorized()
+        val loaded = image?.takeIf { authorized && usableCover(it) }?.let(::independentCover)
+        if (completed && authorized) {
+            val owner = flight.request.scopeOwner
+            val cover = flight.request.coverKey
+            if (loaded != null) owner.loaded(cover, flight.request.generation, flight.request.diskCacheKey, loaded)
+            else {
+                owner.discardSource(cover, flight.request.generation, flight.request.diskCacheKey)
+                owner.failed(cover)
+            }
+        }
+        // Publish accepted pixels BEFORE cancelling/notifying, even if a lazy row is briefly gone.
+        // A cancelled/invalidated source is never accepted into the scope or the completed map.
         flight.pending?.cancel(); flight.pending = null
+        if (!completed) flight.request.scopeOwner.discardSource(flight.request.coverKey, flight.request.generation, flight.request.diskCacheKey)
         cache.remove(flight.request)
-        flight.subscribers.toList().forEach { it(image) }; flight.subscribers.clear()
+        flight.subscribers.toList().forEach { it(loaded) }; flight.subscribers.clear()
     }
     fun retire() {
         flights.keys.toList().forEach { key -> flights[key]?.let { terminate(key, it, null) } }
@@ -230,11 +302,14 @@ internal class NovelCoverBinding(
     private var loader: NovelCoverLoader? = null
     private var image: Drawable? = null
     private var pending: NovelCoverCancellation? = null
+    private var detachedPending: NovelCoverCancellation? = null
     private var retry: Runnable? = null
     private var nonce = 0L
     private var loading = false
     private var attached = false
     private var released = false
+
+    internal fun observedEntity(): String? = if (released) null else entity
 
     fun bind(nextScope: NovelCoverScope?, nextEntity: String, next: NovelCoverKey?, nextLoader: NovelCoverLoader) {
         if (released) return
@@ -243,7 +318,9 @@ internal class NovelCoverBinding(
             return
         }
         cancel()
-        if (scope === nextScope && entity == nextEntity && key != next) scope?.forgetEntity(nextEntity)
+        // Record every newly observed identity, including a fresh factory after navigation.
+        // Otherwise a historical A -> B transition could suppress invalidation on remount A -> B.
+        nextScope?.forgetEntity(nextEntity, next)
         scope?.remove(this)
         scope = nextScope; entity = nextEntity; key = next; loader = nextLoader
         scope?.observe(this)
@@ -283,23 +360,31 @@ internal class NovelCoverBinding(
         nonce++; loading = false
         retry?.let(main::removeCallbacks); retry = null
         val old = pending; pending = null
-        if (scrolling) old?.detached() else old?.cancel()
+        if (scrolling) {
+            old?.detached()
+            if (old != null) detachedPending = old
+        } else {
+            old?.cancel(); detachedPending?.cancel(); detachedPending = null
+        }
     }
     private fun load() {
         val owner = scope ?: return
         val expected = key ?: return
         if (!attached || released || loading || usableCover(image) || !owner.canLoad(expected)) return
         val token = ++nonce
+        val source = requireNotNull(loader)
+        val request = NovelCoverRequest(owner, expected)
         loading = true
-        val handle = requireNotNull(loader).load(NovelCoverRequest(owner, expected)) result@{ result ->
-            if (token != nonce || !loading || !attached || released || scope !== owner || key != expected || !owner.isActive()) return@result
+        val handle = source.load(request) result@{ result ->
+            if (token != nonce || !loading || !attached || released || scope !== owner || key != expected || !request.isAuthorized()) return@result
             loading = false; pending = null
             image = result?.takeIf(::usableCover)?.let(::independentCover)
             if (image != null) {
                 owner.remember(expected, requireNotNull(image))
                 show(image, true)
             } else {
-                owner.failed(expected); show(null, false)
+                if (!source.recordsScopeResults()) owner.failed(expected)
+                show(null, false)
                 if (owner.canLoad(expected)) {
                     retry = Runnable { retry = null; load() }.also { main.postDelayed(it, 600) }
                 }
