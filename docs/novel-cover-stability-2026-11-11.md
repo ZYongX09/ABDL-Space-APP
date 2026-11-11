@@ -22,8 +22,17 @@
 - `NovelCoverComposeTest`：真实 Compose/native center pixel与透明度、3次新工厂重建、3张500×700及两张内存预算的确定性压力、不同书籍相同 URL 的图像隔离、多个实际小说页面复用。
 - `CoverCardImageCacheTest` / `CoverCardCacheRenderTest`：独立时间线小说卡及既有公共封面缓存契约不回归。
 
-中间一次六组53/53通过，但之后补充了换图世代边界，不能把中间结果当作最终同源码结论。最终复验及正式签名打包状态在完成后补记。曾有一次 Gradle 命令将 `--tests` 作用到 assemble 任务而失败，未执行测试/打包；修正参数位置后重新执行，不计成功。
+最终业务源码提交 `44c5ace48497fa6479b05dc20b0aba8059f42461`，六组 **54/54 通过，0失败/错误/跳过**：binding 15、HTTP取消7、实际loader5、Compose9、时间线cache15/render3。测试和 `assembleRelease` 在同次 Gradle 执行中完成（15分27秒）；打包后没有再修改业务源码。只补写本文记录，不重编译或替换已核验 APK。
+
+中间一次六组53/53通过，之后补充了换图世代边界，最终以以上54项为准。曾有一次 Gradle 命令将 `--tests` 作用到 assemble 任务而失败，未执行测试/打包；修正参数位置后重新执行，不计成功。没有在原始基线上执行新增用例，不能声称做过失败到通过的完整对照；这些测试验证修复后相应顺序与绘制结果。
 
 ## 交付边界
 
 只交付原正式证书 release 测试包，不生成 debug APK、不正式发版、不推 main/develop。旧 v5 APK保留，用户可覆盖回退。物理设备实测未由 Robolectric/native Canvas 替代；本机无可用设备/模拟器，测试不能证明所有机型和网络状态下已无闪烁。
+
+- 文件：`/home/ZYongX/projects/ABDL-Space-3.3.0-code36-novel-cover-fix-20261111.apk`。
+- 包名/版本：`top.abdl_space.app` / `3.3.0` / `36`，最低API26，target35。
+- 大小：**169,062,922 字节**。
+- SHA256：`554569de3c492c80d9fb31bd8dae0281904dbe5c5ed1bb3797883098bd3526ee`。
+- APK V2签名校验通过，证书SHA256 `fd2098a3d3493222c247a7ba2787ec48fd8f62d38e9432ed4d6290a057dea475`；ZIP完整性通过。
+- `2dac60b4` 与最终修复源码间的玻璃导航、HomeFragment/HomeTabFragment、BackdropCaptureFrameLayout、reader-core、版本/构建配置均无差异；生产源码仅变更 `NovelCoverImage.kt`。测试分支独立保存，不合并或回带 v6。
