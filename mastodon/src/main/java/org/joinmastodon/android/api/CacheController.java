@@ -594,6 +594,81 @@ public class CacheController{
 		});
 	}
 
+	/**
+	 * A fresh status/thread GET is the only authority allowed to rewrite an already-cached status.
+	 * Rewrite matching rows and nested boost/quote JSON; never infer moderation for offline-only caches.
+	 */
+	public void replaceStatusFromFreshGet(Status fresh){
+		if(fresh==null || fresh.id==null) return;
+		java.util.HashMap<String, Status> blocked=new java.util.HashMap<>();
+		org.joinmastodon.android.model.StatusModerationSupport.collect(fresh, blocked);
+		if(blocked.isEmpty()) return;
+		if(!contentReadable()) return;
+		invalidateHomeTimelineSnapshot();
+		runOnDbThread(db->{
+			// The head snapshot is a single JSON array; drop it so a cold start cannot replay the old row.
+			db.delete("misc", "`key`=?", new String[]{HomeTimelineSnapshot.KEY});
+			for(String table:new String[]{"home_timeline", "notifications_statuses_all", "notifications_statuses_mentions"})
+				replaceStatusJson(db, table, fresh);
+			replaceStatusInSearchJson(db, fresh);
+		});
+	}
+
+	private void replaceStatusJson(SQLiteDatabase db, String table, Status fresh){
+		ArrayList<String[]> replacements=new ArrayList<>();
+		try(Cursor cursor=db.query(table, new String[]{"id", "json"}, null, null, null, null, null)){
+			while(cursor.moveToNext()){
+				String json=cursor.getString(1);
+				if(json==null || !json.contains("\""+fresh.id+"\"")) continue;
+				Status root;
+				try{
+					root=MastodonAPIController.gson.fromJson(json, Status.class);
+				}catch(RuntimeException malformed){
+					continue;
+				}
+				if(root==null) continue;
+				Status updated=org.joinmastodon.android.model.StatusModerationSupport.replace(root, fresh);
+				if(updated==root) continue;
+				replacements.add(new String[]{cursor.getString(0), MastodonAPIController.gson.toJson(updated)});
+			}
+		}catch(RuntimeException malformed){
+			Log.w(TAG, "Moderation cache rewrite skipped for "+table, malformed);
+		}
+		for(String[] replacement:replacements){
+			ContentValues values=new ContentValues(1);
+			values.put("json", replacement[1]);
+			db.update(table, values, "`id`=?", new String[]{replacement[0]});
+		}
+	}
+
+	private void replaceStatusInSearchJson(SQLiteDatabase db, Status fresh){
+		ArrayList<String[]> replacements=new ArrayList<>();
+		try(Cursor cursor=db.query("recent_searches", new String[]{"id", "json"}, null, null, null, null, null)){
+			while(cursor.moveToNext()){
+				String json=cursor.getString(1);
+				if(json==null || !json.contains("\""+fresh.id+"\"")) continue;
+				SearchResult result;
+				try{
+					result=MastodonAPIController.gson.fromJson(json, SearchResult.class);
+				}catch(RuntimeException malformed){
+					continue;
+				}
+				if(result==null || result.status==null) continue;
+				Status updated=org.joinmastodon.android.model.StatusModerationSupport.replace(result.status, fresh);
+				if(updated==result.status) continue;
+				result.status=updated;
+				replacements.add(new String[]{cursor.getString(0), MastodonAPIController.gson.toJson(result)});
+			}
+		}catch(RuntimeException malformed){
+			Log.w(TAG, "Moderation search-cache rewrite skipped", malformed);
+		}
+		for(String[] replacement:replacements){
+			ContentValues values=new ContentValues(1);
+			values.put("json", replacement[1]);
+			db.update("recent_searches", values, "`id`=?", new String[]{replacement[0]});
+		}
+	}
+
 	/** Drop remote-only rows, never a local p_/c_ entity that happens to have NBW metadata. */
 	public void clearNBWRemoteCache(){
 		invalidateHomeTimelineSnapshot();

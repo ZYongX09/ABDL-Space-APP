@@ -42,7 +42,10 @@ public class NestedQuoteStatusDisplayItem extends StatusDisplayItem{
 		public void onBind(NestedQuoteStatusDisplayItem item){
 			itemView.setPaddingRelative(V.dp(item.fullWidth ? 16 : 64), V.dp(8), itemView.getPaddingEnd(), itemView.getPaddingBottom());
 
-			if(item.status!=null)
+			String notice=item.status==null ? null : org.joinmastodon.android.model.StatusModerationSupport.notice(item.status);
+			if(notice!=null)
+				text.setText(notice); // Same safe projection as inline preview: exact notice, no quoted body.
+			else if(item.status!=null)
 				text.setText(text.getContext().getString(R.string.nested_quote, item.status.account.getDisplayUsername()));
 			else if(item.quote.state==Quote.State.ACCEPTED)
 				text.setText(R.string.loading);

@@ -46,6 +46,11 @@
 	<attr name="colorRichTextText" format="color"/>
 	<attr name="colorRichTextContainer" format="color"/>
 	<attr name="colorRichTextDecorations" format="color"/>
+	<attr name="colorModerationNoticeSurface" format="color"/>
+	<attr name="colorModerationNoticeText" format="color"/>
+	<attr name="colorModerationNoticeIcon" format="color"/>
+	<attr name="colorModerationNoticeOnIcon" format="color"/>
+	<attr name="colorModerationPostOutline" format="color"/>
 
 	<!-- Baby verification uses a fixed product palette independent of account accent colors. -->
 	<attr name="colorVerificationBackground" format="color"/>

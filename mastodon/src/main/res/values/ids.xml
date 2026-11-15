@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 	<item name="header" type="id"/>
+	<item name="moderation_notice_text" type="id"/>
+	<item name="moderation_notice" type="id"/>
 
 	<item name="profile_featured" type="id"/>
 	<item name="profile_timeline" type="id"/>

@@ -40,6 +40,7 @@ public class InlineStatusStatusDisplayItem extends StatusDisplayItem{
 
 	public InlineStatusStatusDisplayItem(String parentID, Callbacks callbacks, Context context, Status status, String accountID, int headerIcon, String headerText){
 		super(parentID, callbacks, context);
+		status=status.getContentStatus();
 		this.status=status;
 
 		parsedName=new SpannableStringBuilder(status.account.displayName);
@@ -51,7 +52,9 @@ public class InlineStatusStatusDisplayItem extends StatusDisplayItem{
 				HtmlParser.parseCustomEmoji(parsedHeaderText, status.account.emojis);
 		}
 
-		parsedPostText=HtmlParser.parse(status.content, status.emojis, status.mentions, status.tags, accountID, status.getContentStatus(), context);
+		String notice=org.joinmastodon.android.model.StatusModerationSupport.notice(status);
+		parsedPostText=notice!=null ? new SpannableStringBuilder(notice)
+				: HtmlParser.parse(status.content, status.emojis, status.mentions, status.tags, accountID, status.getContentStatus(), context);
 		for(Object span:parsedPostText.getSpans(0, parsedPostText.length(), Object.class)){
 			if(!(span instanceof CustomEmojiSpan))
 				parsedPostText.removeSpan(span);

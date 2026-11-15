@@ -78,55 +78,61 @@ public abstract class StatusListFragment extends BaseStatusListFragment<Status>{
 	protected void onStatusCreated(Status status){}
 
 	protected void onStatusUpdated(Status status){
-		ArrayList<Status> statusesForDisplayItems=new ArrayList<>();
+		if(status==null || status.id==null) return;
+		ArrayList<Status> updatedRoots=new ArrayList<>();
 		for(int i=0;i<data.size();i++){
 			Status s=data.get(i);
-			if(s.reblog!=null && s.reblog.id.equals(status.id)){
-				s.reblog=status.clone();
-				statusesForDisplayItems.add(s);
-			}else if(s.id.equals(status.id)){
+			if(s.id.equals(status.id)){
 				data.set(i, status);
-				statusesForDisplayItems.add(status);
+				updatedRoots.add(status);
+				continue;
+			}
+			Status updated=org.joinmastodon.android.model.StatusModerationSupport.replace(s, status);
+			if(updated!=s){
+				data.set(i, updated);
+				updatedRoots.add(updated);
 			}
 		}
 		for(int i=0;i<preloadedData.size();i++){
 			Status s=preloadedData.get(i);
-			if(s.reblog!=null && s.reblog.id.equals(status.id)){
-				s.reblog=status.clone();
-			}else if(s.id.equals(status.id)){
+			if(s.id.equals(status.id)){
 				preloadedData.set(i, status);
+				continue;
 			}
+			Status updated=org.joinmastodon.android.model.StatusModerationSupport.replace(s, status);
+			if(updated!=s)
+				preloadedData.set(i, updated);
 		}
-
-		if(statusesForDisplayItems.isEmpty())
+		knownStatuses.put(status.id, status);
+		if(updatedRoots.isEmpty())
 			return;
+		for(Status s:updatedRoots)
+			rebuildDisplayItemsForStatus(s);
+	}
 
-		for(Status s:statusesForDisplayItems){
-			int i=0;
-			for(StatusDisplayItem item:displayItems){
-				if(item.parentID.equals(s.id)){
-					int start=i;
-					for(;i<displayItems.size();i++){
-						if(!displayItems.get(i).parentID.equals(s.id))
-							break;
-					}
-					List<StatusDisplayItem> postItems=displayItems.subList(start, i);
-					postItems.clear();
-					postItems.addAll(buildDisplayItems(s));
-					int oldSize=i-start, newSize=postItems.size();
-					if(oldSize==newSize){
-						adapter.notifyItemRangeChanged(start, newSize);
-					}else if(oldSize<newSize){
-						adapter.notifyItemRangeChanged(start, oldSize);
-						adapter.notifyItemRangeInserted(start+oldSize, newSize-oldSize);
-					}else{
-						adapter.notifyItemRangeChanged(start, newSize);
-						adapter.notifyItemRangeRemoved(start+newSize, oldSize-newSize);
-					}
+	private void rebuildDisplayItemsForStatus(Status s){
+		for(int i=0;i<displayItems.size();i++){
+			if(!displayItems.get(i).parentID.equals(s.id))
+				continue;
+			int start=i;
+			for(;i<displayItems.size();i++){
+				if(!displayItems.get(i).parentID.equals(s.id))
 					break;
-				}
-				i++;
 			}
+			List<StatusDisplayItem> postItems=displayItems.subList(start, i);
+			postItems.clear();
+			postItems.addAll(buildDisplayItems(s));
+			int oldSize=i-start, newSize=postItems.size();
+			if(oldSize==newSize){
+				adapter.notifyItemRangeChanged(start, newSize);
+			}else if(oldSize<newSize){
+				adapter.notifyItemRangeChanged(start, oldSize);
+				adapter.notifyItemRangeInserted(start+oldSize, newSize-oldSize);
+			}else{
+				adapter.notifyItemRangeChanged(start, newSize);
+				adapter.notifyItemRangeRemoved(start+newSize, oldSize-newSize);
+			}
+			break;
 		}
 	}
 

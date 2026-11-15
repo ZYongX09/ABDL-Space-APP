@@ -44,6 +44,12 @@ public class Status extends BaseModel implements DisplayItemsParent, Searchable 
 	@RequiredField
 	public StatusPrivacy visibility;
 	public boolean sensitive;
+	/** Gson/cache extension, deliberately excluded from the existing positional Parcel schema.
+	 * The server's safe actual content survives Parcel; Thread refreshes by ID to re-enrich it. */
+	@org.parceler.Transient
+	@SerializedName("moderation")
+	@com.google.gson.annotations.JsonAdapter(StatusModeration.Deserializer.class)
+	@Nullable public StatusModeration moderation;
 	@SerializedName("mental_crisis")
 	public boolean mentalCrisis;
 
@@ -264,6 +270,11 @@ public class Status extends BaseModel implements DisplayItemsParent, Searchable 
 	}
 
 	public String getStrippedText(){
+		// A blocked boost/quote must return the nested safe notice, never the old outer body.
+		String notice=StatusModerationSupport.notice(this);
+		if(notice==null && getContentStatus()!=this)
+			notice=StatusModerationSupport.notice(getContentStatus());
+		if(notice!=null) return notice; // Never reuse an old stripped body or translation after moderation.
 		if(strippedText==null)
 			strippedText=HtmlParser.strip(content);
 		return strippedText;
@@ -288,6 +299,7 @@ public class Status extends BaseModel implements DisplayItemsParent, Searchable 
 	}
 
 	public boolean isEligibleForTranslation(String target){
+		if(StatusModerationSupport.isBlocked(getContentStatus())) return false;
 		String source=org.joinmastodon.android.translation.PostTranslationSupport.normalizeLanguage(language);
 		String destination=org.joinmastodon.android.translation.PostTranslationSupport.normalizeLanguage(target);
 		return (!TextUtils.isEmpty(content) || !TextUtils.isEmpty(spoilerText)) && !source.isEmpty() && !destination.isEmpty()

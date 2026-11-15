@@ -340,7 +340,10 @@ public class HeaderStatusDisplayItem extends StatusDisplayItem{
 			else
 				time=item.context.getString(R.string.edited_timestamp, UiUtils.formatRelativeTimestamp(itemView.getContext(), item.status.editedAt));
 
-			timeAndUsername.setText(time+" · "+(item.status!=null && !TextUtils.isEmpty(item.status.geoLocation) ? item.status.geoLocation : "@"+item.user.acct));
+			// Blocked posts keep the author handle instead of the geographic label; the model is never rewritten.
+			boolean showGeo=item.status!=null && !TextUtils.isEmpty(item.status.geoLocation)
+					&& !org.joinmastodon.android.model.StatusModerationSupport.isBlocked(item.status);
+			timeAndUsername.setText(time+" · "+(showGeo ? item.status.geoLocation : "@"+item.user.acct));
 			itemView.setPadding(itemView.getPaddingLeft(), itemView.getPaddingTop(), itemView.getPaddingRight(), item.needBottomPadding ? V.dp(6) : V.dp(4));
 			if(TextUtils.isEmpty(item.extraText)){
 				extraText.setVisibility(View.GONE);

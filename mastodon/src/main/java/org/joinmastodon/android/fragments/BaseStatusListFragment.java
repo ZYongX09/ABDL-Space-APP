@@ -7,6 +7,7 @@ import android.content.res.TypedArray;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Rect;
+import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.os.Bundle;
@@ -41,7 +42,9 @@ import org.joinmastodon.android.ui.PhotoLayoutHelper;
 import org.joinmastodon.android.ui.displayitems.AccountStatusDisplayItem;
 import org.joinmastodon.android.ui.displayitems.GapStatusDisplayItem;
 import org.joinmastodon.android.ui.displayitems.HashtagStatusDisplayItem;
+import org.joinmastodon.android.ui.displayitems.HeaderStatusDisplayItem;
 import org.joinmastodon.android.ui.displayitems.MediaGridStatusDisplayItem;
+import org.joinmastodon.android.ui.displayitems.ModerationNoticeStatusDisplayItem;
 import org.joinmastodon.android.ui.displayitems.NestedQuoteStatusDisplayItem;
 import org.joinmastodon.android.ui.displayitems.PollFooterStatusDisplayItem;
 import org.joinmastodon.android.ui.displayitems.PollOptionStatusDisplayItem;
@@ -1419,6 +1422,7 @@ public abstract class BaseStatusListFragment<T extends DisplayItemsParent> exten
 
 	private class StatusListItemDecoration extends RecyclerView.ItemDecoration{
 		private Paint dividerPaint=new Paint();
+		private Paint moderationOutlinePaint=new Paint();
 		private Drawable quoteBorder=getResources().getDrawable(R.drawable.bg_inline_status, getActivity().getTheme()).mutate();
 		private ArrayList<StatusDisplayItem.Holder<?>> itemsTopToBottom=new ArrayList<>();
 
@@ -1426,6 +1430,10 @@ public abstract class BaseStatusListFragment<T extends DisplayItemsParent> exten
 			dividerPaint.setColor(UiUtils.getThemeColor(getActivity(), R.attr.colorM3OutlineVariant));
 			dividerPaint.setStyle(Paint.Style.STROKE);
 			dividerPaint.setStrokeWidth(V.dp(0.5f));
+			moderationOutlinePaint.setColor(UiUtils.getThemeColor(getActivity(), R.attr.colorModerationPostOutline));
+			moderationOutlinePaint.setStyle(Paint.Style.STROKE);
+			moderationOutlinePaint.setStrokeWidth(V.dp(1));
+			moderationOutlinePaint.setAntiAlias(true);
 		}
 
 		@Override
@@ -1447,6 +1455,7 @@ public abstract class BaseStatusListFragment<T extends DisplayItemsParent> exten
 				}
 			}
 			itemsTopToBottom.sort((v1, v2)->Float.compare(v1.itemView.getY(), v2.itemView.getY()));
+			drawModerationOutlines(c, parent);
 
 			boolean insideQuote=false;
 			int quoteTop=0;
@@ -1511,6 +1520,42 @@ public abstract class BaseStatusListFragment<T extends DisplayItemsParent> exten
 					}
 				}
 			}
+		}
+
+		/** A single thin neutral frame per attached blocked row group, keyed by parentID. */
+		private void drawModerationOutlines(Canvas c, RecyclerView parent){
+			int width=parent.getWidth();
+			if(width<=0) return;
+			float inset=V.dp(8), radius=V.dp(14);
+			for(int i=0;i<itemsTopToBottom.size();i++){
+				StatusDisplayItem.Holder<?> first=itemsTopToBottom.get(i);
+				StatusDisplayItem firstItem=(StatusDisplayItem) first.getItem();
+				String parentID=firstItem.parentID;
+				int last=i;
+				float top=first.itemView.getY(), bottom=top+first.itemView.getHeight();
+				while(last+1<itemsTopToBottom.size()){
+					StatusDisplayItem.Holder<?> next=itemsTopToBottom.get(last+1);
+					if(!((StatusDisplayItem) next.getItem()).parentID.equals(parentID)) break;
+					last++;
+					bottom=next.itemView.getY()+next.itemView.getHeight();
+				}
+				i=last;
+				if(!isBlockedRowGroup(first) || bottom<=top) continue;
+				moderationOutlinePaint.setAlpha(Math.round(first.itemView.getAlpha()*255));
+				c.drawRoundRect(new RectF(inset, top, width-inset, bottom), radius, radius, moderationOutlinePaint);
+			}
+		}
+
+		private boolean isBlockedRowGroup(StatusDisplayItem.Holder<?> holder){
+			int pos=holder.getAbsoluteAdapterPosition()-getMainAdapterOffset();
+			if(pos<0 || pos>=displayItems.size()) return false;
+			StatusDisplayItem item=displayItems.get(pos);
+			int start=pos;
+			while(start>0 && displayItems.get(start-1).parentID.equals(item.parentID)) start--;
+			StatusDisplayItem first=displayItems.get(start);
+			if(first instanceof HeaderStatusDisplayItem header)
+				return org.joinmastodon.android.model.StatusModerationSupport.isBlocked(header.status);
+			return first instanceof ModerationNoticeStatusDisplayItem notice && notice.notice!=null;
 		}
 
 		private boolean needDrawDivider(RecyclerView.ViewHolder holder, RecyclerView.ViewHolder siblingHolder){

@@ -29,6 +29,7 @@ import android.widget.Toast;
 import org.joinmastodon.android.BuildConfig;
 import org.joinmastodon.android.GlobalUserPreferences;
 import org.joinmastodon.android.R;
+import org.joinmastodon.android.api.requests.statuses.GetStatusByID;
 import org.joinmastodon.android.api.requests.statuses.GetStatusContext;
 import org.joinmastodon.android.api.session.AccountSession;
 import org.joinmastodon.android.api.session.AccountSessionManager;
@@ -68,6 +69,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import me.grishka.appkit.Nav;
 import me.grishka.appkit.api.SimpleCallback;
 import me.grishka.appkit.api.ErrorResponse;
+import me.grishka.appkit.api.Callback;
 import me.grishka.appkit.imageloader.ViewImageLoader;
 import me.grishka.appkit.imageloader.requests.UrlImageLoaderRequest;
 import me.grishka.appkit.utils.CubicBezierInterpolator;
@@ -78,6 +80,8 @@ import me.grishka.appkit.utils.V;
 public class ThreadFragment extends StatusListFragment implements AssistContentProviderFragment{
 	private Status mainStatus;
 	private boolean mainStatusDeleted;
+	private GetStatusByID mainStatusRefreshRequest;
+	private boolean mainStatusRefreshRequested;
 	// Only the context request owns this page's reply skeleton. No cross-page transfer/cache.
 	private long repliesRequestGeneration;
 	private GetStatusContext repliesRequest;
@@ -138,6 +142,10 @@ public class ThreadFragment extends StatusListFragment implements AssistContentP
 
 	@Override
 	public void onDestroy(){
+		if(mainStatusRefreshRequest!=null){
+			mainStatusRefreshRequest.cancel();
+			mainStatusRefreshRequest=null;
+		}
 		if(asyncRefreshID!=null){
 			AccountSessionManager.get(accountID).getApiController().cancelPollingAsyncRefresh(asyncRefreshID, asyncRefreshCallback);
 		}
@@ -529,6 +537,54 @@ public class ThreadFragment extends StatusListFragment implements AssistContentP
 		renderRepliesLoading();
 
 		list.addItemDecoration(new ReplyLinesItemDecoration());
+		refreshMainStatusOnce();
+	}
+
+	/**
+	 * A cached/parceled status carries no moderation DTO. Refresh it once by ID; only an explicit
+	 * server moderation response replaces payloads and cached JSON, failures keep the offline cache as-is.
+	 */
+	private void refreshMainStatusOnce(){
+		if(mainStatusRefreshRequested || mainStatusDeleted || mainStatus==null || mainStatus.id==null)
+			return;
+		mainStatusRefreshRequested=true;
+		mainStatusRefreshRequest=new GetStatusByID(mainStatus.id);
+		mainStatusRefreshRequest.setCallback(new Callback<>(){
+			@Override
+			public void onSuccess(Status result){
+				mainStatusRefreshRequest=null;
+				if(getActivity()==null || mainStatusDeleted || result==null || !mainStatus.id.equals(result.id))
+					return;
+				java.util.HashMap<String, Status> blocked=new java.util.HashMap<>();
+				org.joinmastodon.android.model.StatusModerationSupport.collect(result, blocked);
+				if(blocked.isEmpty())
+					return;
+				onStatusUpdated(result);
+				Status updated=getStatusByID(mainStatus.id);
+				if(updated!=null)
+					mainStatus=updated;
+				AccountSession session=AccountSessionManager.getInstance().tryGetAccount(accountID);
+				if(session!=null)
+					session.getCacheController().replaceStatusFromFreshGet(result);
+			}
+
+			@Override
+			public void onError(ErrorResponse error){
+				mainStatusRefreshRequest=null;
+				// Deliberately no offline moderation inference: the stale cache remains stale offline.
+			}
+		});
+		mainStatusRefreshRequest.exec(accountID);
+	}
+
+	@Override
+	protected void onStatusUpdated(Status status){
+		super.onStatusUpdated(status);
+		if(mainStatus!=null){
+			Status updated=getStatusByID(mainStatus.id);
+			if(updated!=null)
+				mainStatus=updated;
+		}
 	}
 
 	protected void onStatusCreated(Status status){

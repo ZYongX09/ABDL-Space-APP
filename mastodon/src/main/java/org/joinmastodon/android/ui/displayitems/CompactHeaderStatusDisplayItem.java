@@ -121,8 +121,10 @@ public class CompactHeaderStatusDisplayItem extends StatusDisplayItem{
 				time=item.context.getString(R.string.edited_timestamp, UiUtils.formatRelativeTimestamp(itemView.getContext(), item.status.editedAt));
 
 			Status s=item.status;
-			String geo=s!=null ? s.geoLocation : null;
-			timeAndUsername.setText(time+" · "+(!TextUtils.isEmpty(geo) ? geo : "@"+item.user.acct));
+			// Same safe header projection: blocked posts never surface the geo label in place of @handle.
+			boolean showGeo=s!=null && !TextUtils.isEmpty(s.geoLocation)
+					&& !org.joinmastodon.android.model.StatusModerationSupport.isBlocked(s);
+			timeAndUsername.setText(time+" · "+(showGeo ? s.geoLocation : "@"+item.user.acct));
 //			itemView.setPadding(itemView.getPaddingLeft(), itemView.getPaddingTop(), itemView.getPaddingRight(), item.needBottomPadding ? V.dp(6) : V.dp(4));
 			if(clickableThing!=null){
 				clickableThing.setContentDescription(item.context.getString(R.string.avatar_description, item.user.acct));

@@ -73,6 +73,11 @@
 		<item name="colorRichTextText">@color/ext_rich_text_text_light</item>
 		<item name="colorRichTextContainer">@color/ext_rich_text_container_light</item>
 		<item name="colorRichTextDecorations">@color/ext_rich_text_decoration_light</item>
+		<item name="colorModerationNoticeSurface">#F0F2F5</item>
+		<item name="colorModerationNoticeText">#596273</item>
+		<item name="colorModerationNoticeIcon">#758094</item>
+		<item name="colorModerationNoticeOnIcon">#FFFFFF</item>
+		<item name="colorModerationPostOutline">#DEE3EA</item>
 
 		<item name="colorVerificationBackground">?colorM3Background</item>
 		<item name="colorVerificationTopSurface">?colorM3Surface</item>
@@ -176,6 +181,11 @@
 		<item name="colorRichTextText">@color/ext_rich_text_text_dark</item>
 		<item name="colorRichTextContainer">@color/ext_rich_text_container_dark</item>
 		<item name="colorRichTextDecorations">@color/ext_rich_text_decoration_dark</item>
+		<item name="colorModerationNoticeSurface">#292E36</item>
+		<item name="colorModerationNoticeText">#D0D5DF</item>
+		<item name="colorModerationNoticeIcon">#AAB3C2</item>
+		<item name="colorModerationNoticeOnIcon">#20242C</item>
+		<item name="colorModerationPostOutline">#4A525F</item>
 
 		<item name="colorVerificationBackground">?colorM3Background</item>
 		<item name="colorVerificationTopSurface">?colorM3Surface</item>

@@ -92,6 +92,7 @@ public abstract class StatusDisplayItem{
 			case REBLOG_OR_REPLY_LINE -> new ReblogOrReplyLineCustomStatusDisplayItem.Holder(activity, parent);
 
 			case TEXT -> new TextStatusDisplayItem.Holder(activity, parent);
+			case MODERATION_NOTICE -> new ModerationNoticeStatusDisplayItem.Holder(activity, parent);
 			case TRANSLATION -> new TranslationStatusDisplayItem.Holder(activity, parent);
 			case AUDIO -> new AudioStatusDisplayItem.Holder(activity, parent);
 			case POLL_OPTION -> new PollOptionStatusDisplayItem.Holder(activity, parent);
@@ -144,11 +145,12 @@ public abstract class StatusDisplayItem{
 			callbacks=new NoOpCallbacks(context);
 		String parentID=parentObject.getID();
 		Status statusForContent=status.getContentStatus();
+		boolean blocked=org.joinmastodon.android.model.StatusModerationSupport.isBlocked(statusForContent);
 		String translationTarget=org.joinmastodon.android.translation.PostTranslationSupport.target(context);
 		org.joinmastodon.android.translation.PostTranslationSupport.validateCached(statusForContent, accountID, translationTarget);
 		boolean allowTranslation=(flags & (FLAG_NO_TRANSLATE | FLAG_MEDIA_FORCE_HIDDEN | FLAG_CHECKABLE))==0
 				&& (callbacks.supportsPostTranslation() || callbacks instanceof NoOpCallbacks) && !status.preview;
-		if(statusForContent.advertisement!=null){
+		if(!blocked && statusForContent.advertisement!=null){
 			ArrayList<StatusDisplayItem> result=new ArrayList<>();
 			AdvertisementStatusDisplayItem adItem=new AdvertisementStatusDisplayItem(parentID, callbacks, context, statusForContent, accountID);
 			adItem.index=1;
@@ -156,7 +158,7 @@ public abstract class StatusDisplayItem{
 			result.add(adItem);
 			return result;
 		}
-		if(statusForContent.friendRequest!=null && statusForContent.friendCard==null){
+		if(!blocked && statusForContent.friendRequest!=null && statusForContent.friendCard==null){
 			ArrayList<StatusDisplayItem> result=new ArrayList<>();
 			FriendRequestStatusDisplayItem friendRequestItem=new FriendRequestStatusDisplayItem(parentID, callbacks, context, statusForContent, accountID);
 			friendRequestItem.index=1;
@@ -182,6 +184,23 @@ public abstract class StatusDisplayItem{
 				items.add(header=new CompactHeaderStatusDisplayItem(parentID, statusForContent.account, statusForContent.createdAt, callbacks, context, accountID, statusForContent));
 			else
 				items.add(header=new HeaderStatusDisplayItem(parentID, statusForContent.account, statusForContent.createdAt, callbacks, context, accountID, statusForContent, null));
+		}
+
+		// Must precede filters/CW, translation, media, quotes and every extension body path.
+		if(blocked){
+			items.add(new ModerationNoticeStatusDisplayItem(parentID, callbacks, context, statusForContent));
+			if((flags & FLAG_NO_FOOTER)==0){
+				FooterStatusDisplayItem footer=new FooterStatusDisplayItem(parentID, callbacks, context, statusForContent, accountID);
+				footer.hideCounts=hideCounts;
+				items.add(footer);
+				if(status.hasGapAfter && !(callbacks instanceof ThreadFragment)) items.add(new GapStatusDisplayItem(parentID, callbacks, context));
+			}
+			int index=1;
+			for(StatusDisplayItem item:items){
+				item.fullWidth=(flags & FLAG_FULL_WIDTH)!=0;
+				item.index=index++;
+			}
+			return items;
 		}
 
 		boolean filtered=false;
@@ -329,6 +348,7 @@ public abstract class StatusDisplayItem{
 		HEADER,
 		REBLOG_OR_REPLY_LINE,
 		TEXT,
+		MODERATION_NOTICE,
 		TRANSLATION,
 		AUDIO,
 		POLL_OPTION,
