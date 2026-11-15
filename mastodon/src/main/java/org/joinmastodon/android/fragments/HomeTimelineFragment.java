@@ -251,7 +251,7 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 	}
 
 	private boolean isHomeAccountCurrent(){
-		return homeSession!=null && AccountSessionManager.getInstance().tryGetAccount(accountID)==homeSession
+		return contentAccessOpen() && homeSession!=null && AccountSessionManager.getInstance().tryGetAccount(accountID)==homeSession
 				&& homeToken==homeSession.token && homeToken!=null && java.util.Objects.equals(homeAccessToken, homeToken.accessToken)
 				&& accountID.equals(AccountSessionManager.getInstance().getLastActiveAccountID());
 	}
@@ -348,6 +348,7 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 	}
 
 	private void startHomeHead(int count, boolean allowHistory){
+		if(!contentAccessOpen()){ dataLoading=false; return; }
 		if(homeHeadInFlight) return;
 		AccountSession session=AccountSessionManager.getInstance().tryGetAccount(accountID);
 		if(session==null || !accountID.equals(AccountSessionManager.getInstance().getLastActiveAccountID())){ cancelLoading(); return; }
@@ -560,6 +561,11 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 	@Override public void loadData(int offset, int count){ if(!homeHeadInFlight && !showingHomeHistory) super.loadData(offset, count); }
 	@Override protected void showProgress(){ if(showingHomeHistory && !data.isEmpty()) showHomeContentImmediately(); else super.showProgress(); }
 
+	@Override protected void onContentAccessClosed(){
+		showingHomeHistory=false; homeHistoryAttempted=false; homeLease=null; maxID=null; lists=List.of();
+		if(homeRefreshingText!=null) homeRefreshingText.setVisibility(View.GONE);
+	}
+
 	@Override protected void cancelLoading(){
 		homeHandler.removeCallbacks(homeRoutingRecovery);
 		homeRecoveryGeneration=-1;
@@ -575,6 +581,7 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 
 	@Override
 	protected void doLoadData(int offset, int count){
+		if(!contentAccessOpen()){ dataLoading=false; return; }
 		if(listMode==ListMode.FOLLOWING && offset==0){ startHomeHead(count, true); return; }
 		if(listMode==ListMode.FOLLOWING && (homeHeadInFlight || showingHomeHistory)) return;
 		switch(listMode){
@@ -800,7 +807,7 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 
 	public void onStatusCreated(Status status){
 		// Replies belong in their thread, not in a locally synthesized root timeline.
-		if(status.inReplyToId!=null || getStatusByID(status.id)!=null)
+		if(!contentAccessOpen() || status.inReplyToId!=null || getStatusByID(status.id)!=null)
 			return;
 		prependItems(Collections.singletonList(status), true);
 	}
@@ -814,7 +821,7 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 	}
 
 	private void loadNewPosts(){
-		if(homeHeadInFlight || showingHomeHistory) return;
+		if(!contentAccessOpen() || homeHeadInFlight || showingHomeHistory) return;
 		dataLoading=true;
 		// The idea here is that we request the timeline such that if there are fewer than `limit` posts,
 		// we'll get the currently topmost post as last in the response. This way we know there's no gap

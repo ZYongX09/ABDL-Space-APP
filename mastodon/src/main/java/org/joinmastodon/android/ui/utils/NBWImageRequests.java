@@ -12,6 +12,7 @@ import me.grishka.appkit.imageloader.requests.UrlImageLoaderRequest;
 public final class NBWImageRequests{
 	private NBWImageRequests(){}
 	public static ImageLoaderRequest current(ImageLoaderRequest original){
+		original=ContentMediaImageDownloader.scoped(original);
 		if(!(original instanceof UrlImageLoaderRequest url) || !NBWUrlResolver.isTrusted(url.uri.toString())) return original;
 		var snapshot=NBWEndpointsRepository.getInstance().getSnapshot();
 		var session=org.joinmastodon.android.api.session.AccountSessionManager.getInstance().getLastActiveAccount();
@@ -19,10 +20,10 @@ public final class NBWImageRequests{
 		String resolved=NBWUrlResolver.resolve(url.uri.toString(),snapshot.endpoints,true);
 		return new ScopedRequest(original,resolved,snapshot,session);
 	}
-	public static boolean accepts(ImageLoaderRequest request){ return !(request instanceof ScopedRequest scoped) || scoped.current(); }
+	public static boolean accepts(ImageLoaderRequest request){ return ContentMediaImageDownloader.accepts(request) && (!(request instanceof ScopedRequest scoped) || scoped.current()); }
 	public static void load(android.widget.ImageView view,android.graphics.drawable.Drawable placeholder,ImageLoaderRequest request){
 		if(request==null){ view.setImageDrawable(null); return; }
-		if(!(request instanceof ScopedRequest)){ me.grishka.appkit.imageloader.ViewImageLoader.loadWithoutAnimation(view,placeholder,request); return; }
+		if(!(request instanceof ScopedRequest) && !(request instanceof UrlImageLoaderRequest url && ContentMediaImageDownloader.isMedia(url.uri))){ me.grishka.appkit.imageloader.ViewImageLoader.loadWithoutAnimation(view,placeholder,request); return; }
 		me.grishka.appkit.imageloader.ViewImageLoader.load(new me.grishka.appkit.imageloader.ViewImageLoader.Target(){
 			@Override public android.view.View getView(){ return view; }
 			@Override public void setImageDrawable(android.graphics.drawable.Drawable drawable){ if(accepts(request)) view.setImageDrawable(drawable); }

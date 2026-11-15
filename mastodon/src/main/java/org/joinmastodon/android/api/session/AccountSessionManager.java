@@ -139,11 +139,12 @@ public class AccountSessionManager{
 		instances.put(instance.getDomain(), instance);
 		runOnDbThread(db->insertInstanceIntoDatabase(db, instance.getDomain(), instance, null, 0));
 		AccountSession previous=getLastActiveAccount();
-		if(previous!=null) previous.deactivateNBW();
+		if(previous!=null){ previous.deactivateNBW(); previous.deactivateContentAccess(); }
 		AccountSession session=new AccountSession(token, self, app, instance.getDomain(), activationInfo==null, activationInfo);
 		sessions.put(session.getID(), session);
 		lastActiveAccountID=session.getID();
 		prefs.edit().putString("lastActiveAccount", lastActiveAccountID).apply();
+		org.joinmastodon.android.ContentAccessGate.accountChanged();
 		runOnDbThread(db->{
 			ContentValues values=new ContentValues();
 			session.toContentValues(values);
@@ -201,16 +202,18 @@ public class AccountSessionManager{
 			throw new IllegalStateException("Account session "+id+" not found");
 		if(lastActiveAccountID!=null && !lastActiveAccountID.equals(id)){
 			AccountSession previous=sessions.get(lastActiveAccountID);
-			if(previous!=null) previous.deactivateNBW();
+			if(previous!=null){ previous.deactivateNBW(); previous.deactivateContentAccess(); }
 		}
 		lastActiveAccountID=id;
 		prefs.edit().putString("lastActiveAccount", id).apply();
 		getAccount(id).getNBWForumOptionsRepository().activate();
+		org.joinmastodon.android.ContentAccessGate.accountChanged();
 	}
 
 	public void removeAccount(String id){
 		AccountSession session=getAccount(id);
 		session.deactivateNBW();
+		session.deactivateContentAccess();
 		NovelAccountDataCleaner.revoke(id, ()->sessions.remove(id));
 		NovelAccountDataCleaner.clean(MastodonApp.context, id);
 		session.getCacheController().closeDatabase();
@@ -244,6 +247,7 @@ public class AccountSessionManager{
 		}
 		maybeUpdateShortcuts();
 		E.post(new AccountLoggedOutEvent(id));
+		org.joinmastodon.android.ContentAccessGate.accountChanged();
 	}
 
 	@NonNull

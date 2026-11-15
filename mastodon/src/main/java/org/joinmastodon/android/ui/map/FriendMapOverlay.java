@@ -499,7 +499,7 @@ public final class FriendMapOverlay extends FrameLayout{
 	private ImageView avatar(MapModels.Point point,int size){
 		ImageView image=new ImageView(getContext()); image.setScaleType(ImageView.ScaleType.CENTER_CROP); image.setImageResource(point.anonymous?R.drawable.ic_person_24px:R.drawable.image_placeholder);
 		image.setBackground(SponsorUi.rounded(withAlpha(primary,.12f),size/2)); image.setOutlineProvider(org.joinmastodon.android.ui.OutlineProviders.OVAL); image.setClipToOutline(true);
-		if(!point.anonymous&&point.account!=null&&point.account.avatar!=null) ViewImageLoader.loadWithoutAnimation(image,image.getDrawable(),new UrlImageLoaderRequest(point.account.avatar,V.dp(size),V.dp(size)));
+		if(!point.anonymous&&point.account!=null&&point.account.avatar!=null) org.joinmastodon.android.ui.utils.NBWImageRequests.load(image,image.getDrawable(),org.joinmastodon.android.ui.utils.NBWImageRequests.current(new UrlImageLoaderRequest(point.account.avatar,V.dp(size),V.dp(size))));
 		return image;
 	}
 	private void person(){

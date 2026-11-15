@@ -80,6 +80,7 @@ public class MastodonAPIController{
 			.writeTimeout(60, TimeUnit.SECONDS)
 			.readTimeout(60, TimeUnit.SECONDS)
 			.cache(new Cache(new File(MastodonApp.context.getCacheDir(), "http"), 10*1024*1024))
+			.addInterceptor(new ContentAccessInterceptor())
 			.build();
 	private static final OkHttpClient sensitiveHttpClient=httpClient.newBuilder().cache(null).followRedirects(false).followSslRedirects(false).retryOnConnectionFailure(false).build();
 	private static final OkHttpClient systemTrustSensitiveHttpClient=createSystemTrustClient(sensitiveHttpClient);
@@ -126,10 +127,15 @@ public class MastodonAPIController{
 	}
 
 	public <T> void submitRequest(final MastodonAPIRequest<T> req){
+		if(!req.prepareContentAccess(session)){
+			req.onError(org.joinmastodon.android.api.session.ContentAccessCoordinator.blockedError());
+			return;
+		}
 		thread.postRunnable(()->{
 			try{
 				if(req.canceled || !req.acceptsRemoteResponse())
 					return;
+				if(!req.contentDispatchAllowed()){ req.onError(org.joinmastodon.android.api.session.ContentAccessCoordinator.blockedError()); return; }
 				Request.Builder builder=new Request.Builder()
 						.url(req.getURL().toString())
 						.method(req.getMethod(), req.getRequestBody());
@@ -159,7 +165,8 @@ public class MastodonAPIController{
 						.header("X-ABDL-NBW-Protocol", "2")
 						.header("X-ABDL-App-AI", "1");
 
-				Request hreq=builder.build();
+					if(req.contentOwner()!=null) builder.tag(org.joinmastodon.android.api.session.ContentAccessCoordinator.Owner.class,req.contentOwner());
+					Request hreq=builder.build();
 					OkHttpClient selectedClient=req.requiresSystemTrust() ? systemTrustSensitiveHttpClient : req.isSensitiveRequest() ? sensitiveHttpClient : httpClient;
 					Call call=selectedClient.newCall(hreq);
 
@@ -192,6 +199,7 @@ public class MastodonAPIController{
 							response.close();
 							return;
 						}
+						req.captureContentAccessHeader(response);
 						if(BuildConfig.DEBUG && !req.isSensitiveRequest())
 							Log.d(TAG, logTag(session)+hreq+" received response: "+response);
 						// Keep the call cancellable until its (bounded) body has finished reading.

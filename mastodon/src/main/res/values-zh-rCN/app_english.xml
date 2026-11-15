@@ -451,7 +451,7 @@
 	<string name="password_login">使用账号密码登录</string>
 	<string name="consent_title">确认同意协议</string>
 	<string name="consent_message">登录前请仔细阅读&lt;a href="https://abdl-space.top/terms">《用户协议》&lt;/a>和&lt;a href="https://abdl-space.top/privacy">《隐私政策》&lt;/a>，若您同意以上协议请点击确认按钮。</string>
-	<string name="login_agreement_text">我已阅读并同意&lt;a href="https://abdl-space.top/terms">《用户协议》&lt;/a>和&lt;a href="https://abdl-space.top/privacy">《隐私政策》&lt;/a></string>
+	<string name="login_agreement_text">我已阅读并同意&lt;a href="https://abdl-space.top/terms">《用户协议》&lt;/a>和&lt;a href="https://abdl-space.top/privacy">《隐私政策》&lt;/a>，我已年满18周岁</string>
 	<string name="legacy_login_agreement_text">在登录前您需要仔细阅读&lt;a href="https://abdl-space.top/terms">《用户协议》&lt;/a>和&lt;a href="https://abdl-space.top/privacy">《隐私政策》&lt;/a></string>
 	<string name="qq_login">腾讯 QQ 登录</string>
 	<string name="qq_consent_title">使用腾讯 QQ 登录</string>
@@ -541,7 +541,10 @@
 	<string name="verification_status_review">审核中</string>
 	<string name="verification_status_approved">已认证</string>
 	<string name="verification_status_rejected">已驳回，点按查看</string>
-	<string name="verification_intro_title">开始宝宝认证</string>
+		<string name="content_access_required_title">需要完成宝宝认证</string>
+		<string name="content_access_required_body">为落实《中华人民共和国网络安全法》《中华人民共和国未成年人保护法》《互联网信息服务管理办法》等相关法律法规所涉及的网络信息管理和未成年人保护要求，净化社区环境、营造“清朗”网络空间，防范未成年人接触可能影响其身心健康的网络信息，本平台实行严格的准入与认证管理规则。您需要通过“宝宝认证”后，才可解锁完整的信息流及互动功能。\n\n入口：主页→顶部菜单→设置→账户组当前账号→身份与认证→宝宝认证</string>
+		<string name="content_access_unavailable">暂时无法确认内容访问状态，请检查网络后刷新。账号、设置、宝宝认证、帮助和订单查询仍可使用。</string>
+		<string name="verification_intro_title">开始宝宝认证</string>
 	<string name="verification_intro_body">请仅拍摄认证页面列出的本人照片。照片只用于身份审核，不会出现在公开相册或帖子中。认证相机禁止相册、视频、前摄和外部编辑。</string>
 	<string name="verification_adult_confirm">我已年满18周岁</string>
 	<string name="verification_start">开始认证</string>

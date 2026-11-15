@@ -64,6 +64,7 @@ import me.grishka.appkit.utils.V;
 public class AlbumDetailFragment extends LoaderFragment{
 	private String accountId, albumId;
 	private AccountSession session;
+	private org.joinmastodon.android.api.session.ContentAccessCoordinator.Cancelable accessSubscription;
 	private Album album;
 	private final List<Photo> photos=new ArrayList<>();
 	private final List<Row> rows=new ArrayList<>();

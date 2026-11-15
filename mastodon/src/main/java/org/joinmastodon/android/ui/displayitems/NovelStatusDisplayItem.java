@@ -88,7 +88,7 @@ public final class NovelStatusDisplayItem extends StatusDisplayItem{
 				|| status.sensitive || status.visibility==StatusPrivacy.PRIVATE || status.visibility==StatusPrivacy.DIRECT
 				|| (!TextUtils.isEmpty(status.spoilerText) && !concealmentOwner.revealedSpoilers.contains(Status.SpoilerType.CONTENT_WARNING))
 				|| filtered(concealmentOwner)) return null;
-		return coverRequest instanceof UrlImageLoaderRequest r && r.uri.toString().equals(attachment.coverUrl) ? r : null;
+		return coverRequest instanceof UrlImageLoaderRequest r && r.uri.toString().equals(attachment.coverUrl) ? org.joinmastodon.android.ui.utils.ContentMediaImageDownloader.scoped(r) : null;
 	}
 	private static boolean filtered(Status status){
 		return status.filtered!=null && !status.revealedSpoilers.contains(Status.SpoilerType.FILTER)

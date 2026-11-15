@@ -102,6 +102,16 @@ public class AccountSession{
 	private transient boolean preferencesNeedSaving;
 	private transient AccountLocalPreferences localPreferences;
 	private transient NBWForumOptionsRepository nbwForumOptionsRepository;
+	private transient ContentAccessCoordinator contentAccessCoordinator;
+
+	public synchronized ContentAccessCoordinator getContentAccessCoordinator(){
+		if(contentAccessCoordinator==null) contentAccessCoordinator=new ContentAccessCoordinator(this);
+		return contentAccessCoordinator;
+	}
+
+	public void deactivateContentAccess(){
+		if(contentAccessCoordinator!=null) contentAccessCoordinator.deactivate();
+	}
 
 	public synchronized NBWForumOptionsRepository getNBWForumOptionsRepository(){
 		if(nbwForumOptionsRepository==null) nbwForumOptionsRepository=NBWForumOptionsRepository.forSession(this);

@@ -37,6 +37,7 @@ public class ChatRealtimeClient {
 	private Runnable heartbeatRunnable;
 	private long syncBoundary;
 	private boolean syncing;
+	private org.joinmastodon.android.api.session.ContentAccessCoordinator.Owner contentOwner;
 
 	public ChatRealtimeClient(String accountId) {
 		this.accountId = accountId;
@@ -45,7 +46,8 @@ public class ChatRealtimeClient {
 	public void connect() {
 		if (stopped) return;
 		AccountSession session = AccountSessionManager.getInstance().getAccount(accountId);
-		if (session == null || session.token == null) return;
+		if (session == null || session.token == null || !org.joinmastodon.android.api.session.ContentAccessCoordinator.canRead(accountId)) return;
+		contentOwner=org.joinmastodon.android.api.session.ContentAccessCoordinator.applies(session) ? session.getContentAccessCoordinator().capture() : null;
 
 		String domain = session.domain;
 		String token = session.token.accessToken;
@@ -103,6 +105,7 @@ public class ChatRealtimeClient {
 	}
 
 	private void handleMessage(String text) {
+		if(stopped || !org.joinmastodon.android.api.session.ContentAccessCoordinator.canRead(accountId) || contentOwner!=null && !contentOwner.canRead()) return;
 		try {
 			JsonObject event = JsonParser.parseString(text).getAsJsonObject();
 			String type = event.has("type") ? event.get("type").getAsString() : "";

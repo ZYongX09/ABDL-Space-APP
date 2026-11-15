@@ -10,11 +10,19 @@ import java.util.List;
 public final class VerificationSessionGuard{
 	private final String accountId;
 	private final AccountSession session;
+	private final org.joinmastodon.android.model.Token credential;
+	private final String credentialValue;
 	private final List<MastodonAPIRequest<?>> requests=new ArrayList<>();
 	private int generation;
-	public VerificationSessionGuard(String accountId){ this.accountId=accountId; this.session=AccountSessionManager.getInstance().tryGetAccount(accountId); }
+	public VerificationSessionGuard(String accountId){ this.accountId=accountId; this.session=AccountSessionManager.getInstance().tryGetAccount(accountId); credential=session==null ? null : session.token; credentialValue=credential==null ? null : credential.accessToken; }
 	public int nextGeneration(){ cancelRequests(); return ++generation; }
-	public boolean live(int token){ return token==generation && session!=null && AccountSessionManager.getInstance().tryGetAccount(accountId)==session; }
+	public boolean ownsSession(){
+		return session!=null && AccountSessionManager.getInstance().tryGetAccount(accountId)==session
+				&& session.token==credential && java.util.Objects.equals(credentialValue,credential==null ? null : credential.accessToken)
+				&& (!org.joinmastodon.android.api.session.ContentAccessCoordinator.applies(session)
+				|| credential!=null && credentialValue!=null && !credentialValue.isBlank() && accountId.equals(AccountSessionManager.getInstance().getLastActiveAccountID()));
+	}
+	public boolean live(int token){ return token==generation && ownsSession(); }
 	public <T extends MastodonAPIRequest<?>> T track(T request){ requests.add(request); return request; }
 	public void done(MastodonAPIRequest<?> request){ requests.remove(request); }
 	public void cancel(){ generation++; cancelRequests(); }

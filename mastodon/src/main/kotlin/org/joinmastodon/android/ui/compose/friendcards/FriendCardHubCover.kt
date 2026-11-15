@@ -38,7 +38,7 @@ fun FriendCardHubCover(card: FriendCard, ratio: Float, modifier: Modifier = Modi
             AndroidView(factory = { context ->
                 FocusImage(context).apply {
                     onDrawable = { loaded = it && (drawable?.intrinsicWidth ?: 0) > 0 && (drawable?.intrinsicHeight ?: 0) > 0 }
-                    ViewImageLoader.load(this, null, UrlImageLoaderRequest(url, 1080, 800))
+                    org.joinmastodon.android.ui.utils.NBWImageRequests.load(this, null, org.joinmastodon.android.ui.utils.NBWImageRequests.current(UrlImageLoaderRequest(url, 1080, 800)))
                 }
             }, update = { image ->
                 image.focusX = card.coverFocusX.takeIf { it.isFinite() && it in 0f..1f } ?: .5f

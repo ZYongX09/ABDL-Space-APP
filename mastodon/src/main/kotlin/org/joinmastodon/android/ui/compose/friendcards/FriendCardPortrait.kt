@@ -83,7 +83,7 @@ fun FriendCardIdentity(card: FriendCard, modifier: Modifier = Modifier, onClick:
                 AndroidView(factory = { context -> ImageView(context).apply {
                     scaleType = ImageView.ScaleType.CENTER_CROP
                     importantForAccessibility = android.view.View.IMPORTANT_FOR_ACCESSIBILITY_NO
-                    ViewImageLoader.load(this, null, UrlImageLoaderRequest(url, 160, 160))
+                    org.joinmastodon.android.ui.utils.NBWImageRequests.load(this, null, org.joinmastodon.android.ui.utils.NBWImageRequests.current(UrlImageLoaderRequest(url, 160, 160)))
                 } }, modifier = Modifier.fillMaxSize())
             }
         }
@@ -143,7 +143,7 @@ private fun PortraitHeading(card: FriendCard, palette: FriendCardPalette, compac
                     onContentInvalidated = contentInvalidated
                     animate().setUpdateListener { onContentInvalidated?.invoke() }
                     importantForAccessibility = android.view.View.IMPORTANT_FOR_ACCESSIBILITY_NO
-                    ViewImageLoader.load(this, null, UrlImageLoaderRequest(card.coverUrl, 1440, 1200))
+                    org.joinmastodon.android.ui.utils.NBWImageRequests.load(this, null, org.joinmastodon.android.ui.utils.NBWImageRequests.current(UrlImageLoaderRequest(card.coverUrl, 1440, 1200)))
                 } }, update = { image -> image.onContentInvalidated = contentInvalidated; image.focusX = card.coverFocusX; image.focusY = card.coverFocusY; image.position() },
                     onRelease = { image -> image.onContentInvalidated = null; image.animate().setUpdateListener(null) }, modifier = Modifier.fillMaxSize())
             }

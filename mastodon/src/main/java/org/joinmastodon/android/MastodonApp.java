@@ -50,6 +50,7 @@ public class MastodonApp extends Application{
 		params.maxMemoryCacheSize=Integer.MAX_VALUE;
 		ImageCache.setParams(params);
 		ImageCache.registerDownloader(new org.joinmastodon.android.ui.utils.NBWAvatarImageDownloader(ImageCache.getInstance(context), context));
+		ImageCache.registerDownloader(0,new org.joinmastodon.android.ui.utils.ContentMediaImageDownloader());
 		NetworkUtils.setUserAgent("MastodonAndroid/"+BuildConfig.VERSION_NAME);
 		UiUtils.updateLocalizedDateFormatters(context);
 
@@ -84,6 +85,7 @@ public class MastodonApp extends Application{
 		GlobalUserPreferences.load();
 		if(isMainProcess(getPackageName(), processName)){
 			org.joinmastodon.android.security.AppSecurity.install(this);
+			ContentAccessGate.install(this);
 			NovelAccountCleanupWorker.enqueuePending(context);
 			for(AccountSession session:AccountSessionManager.getInstance().getLoggedInAccounts()){
 				NovelUploadWorker.enqueuePending(context, session.getID());

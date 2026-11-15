@@ -60,6 +60,8 @@ public class CacheController{
 	private DatabaseHelper db;
 	private final Runnable databaseCloseRunnable=this::closeDatabase;
 	private boolean loadingNotifications;
+	/** Retired by content-access invalidation so a suppressed in-flight load can never wedge the coalescer. */
+	private int notificationsGeneration;
 	private final ArrayList<Callback<PaginatedResponse<List<NotificationViewModel>>>> pendingNotificationsCallbacks=new ArrayList<>();
 	private List<FollowList> lists;
 	private final Object homeSnapshotLock=new Object();
@@ -86,17 +88,19 @@ public class CacheController{
 		private final org.joinmastodon.android.model.Token token;
 		private final String accessToken, identity;
 		private final long generation, nbwGeneration;
+		private final org.joinmastodon.android.api.session.ContentAccessCoordinator.Owner contentOwner;
 		private HomeTimelineLease(CacheController owner, AccountSession session, long generation, long nbwGeneration){
 			this.owner=owner; this.session=session; this.generation=generation;
 			token=session.token; accessToken=token.accessToken;
 			identity=HomeTimelineSnapshot.identity(owner.accountID, accessToken);
 			this.nbwGeneration=nbwGeneration;
+			contentOwner=org.joinmastodon.android.api.session.ContentAccessCoordinator.applies(session) ? session.getContentAccessCoordinator().capture() : null;
 		}
 	}
 
 	public HomeTimelineLease beginHomeTimelineSnapshot(){
 		AccountSession session=AccountSessionManager.getInstance().tryGetAccount(accountID);
-		if(session==null || session.token==null || session.token.accessToken==null) return null;
+		if(session==null || session.token==null || session.token.accessToken==null || !org.joinmastodon.android.api.session.ContentAccessCoordinator.canRead(accountID)) return null;
 		long nbwGeneration=session.getNBWForumOptionsRepository().getSnapshot().generation;
 		synchronized(homeSnapshotLock){
 			if(homeSnapshotRetired || AccountSessionManager.getInstance().tryGetAccount(accountID)!=session) return null;
@@ -113,7 +117,8 @@ public class CacheController{
 	private boolean homeLeaseCurrentLocked(HomeTimelineLease lease){
 		return lease!=null && lease.owner==this && !homeSnapshotRetired && lease.generation==homeSnapshotGeneration
 				&& AccountSessionManager.getInstance().tryGetAccount(accountID)==lease.session && lease.session==homeSnapshotSession
-				&& lease.token==lease.session.token && Objects.equals(lease.accessToken, lease.token.accessToken);
+				&& lease.token==lease.session.token && Objects.equals(lease.accessToken, lease.token.accessToken)
+				&& (!org.joinmastodon.android.api.session.ContentAccessCoordinator.applies(lease.session) || lease.contentOwner!=null && lease.contentOwner.canRead());
 	}
 
 	public boolean isHomeTimelineLeaseCurrent(HomeTimelineLease lease){
@@ -190,6 +195,28 @@ public class CacheController{
 		}, 0);
 	}
 
+	/** Retire content leases synchronously, then clear only this account's protected cache rows. */
+	public void invalidateContentAccess(){
+		synchronized(homeSnapshotLock){ homeSnapshotGeneration++; }
+		lists=null;
+		notificationsGeneration++;
+		loadingNotifications=false;
+		synchronized(pendingNotificationsCallbacks){
+			// In-flight completions are suppressed for a retired owner; queued callers retry explicitly.
+			pendingNotificationsCallbacks.clear();
+		}
+		AccountSession owner=AccountSessionManager.getInstance().tryGetAccount(accountID);
+		if(owner==null) return;
+		runOnDbThread(database->{
+			if(AccountSessionManager.getInstance().tryGetAccount(accountID)!=owner) return;
+			for(String table:new String[]{"home_timeline", "notifications_all", "notifications_mentions", "notifications_statuses_all", "notifications_statuses_mentions", "notifications_accounts_all", "notifications_accounts_mentions", "recent_searches"})
+				database.delete(table,null,null);
+			database.delete("misc", "`key` IN (?,?)",new String[]{HomeTimelineSnapshot.KEY,"lists"});
+		});
+	}
+
+	private boolean contentReadable(){ return org.joinmastodon.android.api.session.ContentAccessCoordinator.canRead(accountID); }
+
 	public final class HomeSnapshotEvents{
 		@com.squareup.otto.Subscribe public void removed(org.joinmastodon.android.events.RemoveAccountPostsEvent event){ if(accountID.equals(event.accountID)) invalidateHomeTimelineSnapshot(); }
 		@com.squareup.otto.Subscribe public void updated(org.joinmastodon.android.events.StatusUpdatedEvent event){ invalidateHomeTimelineSnapshot(); }
@@ -209,6 +236,7 @@ public class CacheController{
 	}
 
 	public void getHomeTimeline(String maxID, int count, boolean forceReload, Callback<CacheablePaginatedResponse<List<Status>>> callback){
+		if(!contentReadable()){ uiHandler.post(()->callback.onError(org.joinmastodon.android.api.session.ContentAccessCoordinator.blockedError())); return; }
 		cancelDelayedClose();
 		databaseThread.postRunnable(()->{
 			try{
@@ -262,7 +290,10 @@ public class CacheController{
 	}
 
 	public void putHomeTimeline(List<Status> posts, boolean clear){
+		long generation=homeSnapshotGeneration;
+		if(!contentReadable()) return;
 		runOnDbThread((db)->{
+			if(!contentReadable() || generation!=homeSnapshotGeneration) return;
 			if(clear)
 				db.delete("home_timeline", null, null);
 			ContentValues values=new ContentValues(4);
@@ -300,6 +331,7 @@ public class CacheController{
 	}
 
 	public void getNotifications(String maxID, int count, boolean onlyMentions, boolean forceReload, Callback<PaginatedResponse<List<NotificationViewModel>>> callback){
+		if(!contentReadable()){ uiHandler.post(()->callback.onError(org.joinmastodon.android.api.session.ContentAccessCoordinator.blockedError())); return; }
 		cancelDelayedClose();
 		databaseThread.postRunnable(()->{
 			try{
@@ -361,6 +393,7 @@ public class CacheController{
 					}
 					return;
 				}
+				int generation=notificationsGeneration;
 				if(!onlyMentions)
 					loadingNotifications=true;
 				if(AccountSessionManager.get(accountID).getInstanceInfo().getApiVersion()>=2){
@@ -375,7 +408,7 @@ public class CacheController{
 									PaginatedResponse<List<NotificationViewModel>> res=new PaginatedResponse<>(notifications,
 											result.notificationGroups.isEmpty() ? null : result.notificationGroups.get(result.notificationGroups.size()-1).pageMinId);
 									callback.onSuccess(res);
-									if(!onlyMentions){
+									if(!onlyMentions && generation==notificationsGeneration){
 										loadingNotifications=false;
 										synchronized(pendingNotificationsCallbacks){
 											for(Callback<PaginatedResponse<List<NotificationViewModel>>> cb:pendingNotificationsCallbacks){
@@ -389,7 +422,7 @@ public class CacheController{
 								@Override
 								public void onError(ErrorResponse error){
 									callback.onError(error);
-									if(!onlyMentions){
+									if(!onlyMentions && generation==notificationsGeneration){
 										loadingNotifications=false;
 										synchronized(pendingNotificationsCallbacks){
 											for(Callback<PaginatedResponse<List<NotificationViewModel>>> cb:pendingNotificationsCallbacks){
@@ -432,7 +465,7 @@ public class CacheController{
 											.collect(Collectors.toList());
 									PaginatedResponse<List<NotificationViewModel>> res=new PaginatedResponse<>(converted, result.isEmpty() ? null : result.get(result.size()-1).id);
 									callback.onSuccess(res);
-									if(!onlyMentions){
+									if(!onlyMentions && generation==notificationsGeneration){
 										loadingNotifications=false;
 										synchronized(pendingNotificationsCallbacks){
 											for(Callback<PaginatedResponse<List<NotificationViewModel>>> cb:pendingNotificationsCallbacks){
@@ -447,7 +480,7 @@ public class CacheController{
 								@Override
 								public void onError(ErrorResponse error){
 									callback.onError(error);
-									if(!onlyMentions){
+									if(!onlyMentions && generation==notificationsGeneration){
 										loadingNotifications=false;
 										synchronized(pendingNotificationsCallbacks){
 											for(Callback<PaginatedResponse<List<NotificationViewModel>>> cb:pendingNotificationsCallbacks){
@@ -523,6 +556,7 @@ public class CacheController{
 		}
 	}
 	public void getRecentSearches(Consumer<List<SearchResult>> callback){
+		if(!contentReadable()){ uiHandler.post(()->callback.accept(List.of())); return; }
 		SearchLease lease=new SearchLease();
 		runOnDbThread((db)->{
 			try(Cursor cursor=db.query("recent_searches", new String[]{"json"}, null, null, null, null, "time DESC")){
@@ -532,16 +566,19 @@ public class CacheController{
 					result.postprocess();
 					if(!nbwSearch(result) || lease.current()) results.add(result);
 				}
-				uiHandler.post(()->{ if(!lease.current()) results.removeIf(CacheController::nbwSearch); callback.accept(results); });
+				uiHandler.post(()->{ if(!contentReadable()) results.clear(); else if(!lease.current()) results.removeIf(CacheController::nbwSearch); callback.accept(results); });
 			}
 		});
 	}
 
 	public void putRecentSearch(SearchResult result){
+		if(!contentReadable()) return;
 		SearchLease lease=new SearchLease();
 		boolean remote=nbwSearch(result);
 		runOnDbThread((db)->{
-			if(remote && !lease.current()) return;
+			// Live content-readable re-check only: the home-snapshot generation belongs to timeline
+			// content, and gating search upserts on it drops writes whenever any invalidation races.
+			if(!contentReadable() || remote && !lease.current()) return;
 			ContentValues values=new ContentValues(4);
 			values.put("id", result.getID());
 			values.put("json", MastodonAPIController.gson.toJson(result));
@@ -663,6 +700,7 @@ public class CacheController{
 	}
 
 	public void getLists(Callback<List<FollowList>> callback){
+		if(!contentReadable()){ if(callback!=null) uiHandler.post(()->callback.onSuccess(List.of())); return; }
 		if(lists!=null){
 			if(callback!=null)
 				callback.onSuccess(lists);
@@ -673,7 +711,7 @@ public class CacheController{
 			if(lists!=null){
 				this.lists=lists;
 				if(callback!=null)
-					uiHandler.post(()->callback.onSuccess(lists));
+					uiHandler.post(()->callback.onSuccess(contentReadable() ? lists : List.of()));
 				return;
 			}
 			reloadLists(callback);

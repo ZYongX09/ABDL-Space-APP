@@ -149,7 +149,7 @@ public class FriendCardStatusDisplayItem extends StatusDisplayItem{
 	}
 
 	private ImageLoaderRequest permittedCoverRequest(){
-		return coverRequest instanceof UrlImageLoaderRequest request && request.uri.toString().equals(permittedCoverUrl()) ? coverRequest : null;
+		return coverRequest instanceof UrlImageLoaderRequest request && request.uri.toString().equals(permittedCoverUrl()) ? org.joinmastodon.android.ui.utils.ContentMediaImageDownloader.scoped(coverRequest) : null;
 	}
 
 	private CoverImageBinding.Key coverKey(){

@@ -83,6 +83,10 @@ public class MainActivity extends FragmentStackActivity implements LifecycleOwne
 	@Override public SavedStateRegistry getSavedStateRegistry(){ return savedStateController.getSavedStateRegistry(); }
 
 	private ChatRealtimeClient chatWsClient;
+	private org.joinmastodon.android.api.session.ContentAccessCoordinator.Cancelable chatAccessSubscription;
+	private AccountSession chatAccessSession;
+	/** One reconnect+refresh per required→open episode; unknown probes never count as open. */
+	private boolean chatOpenedEpoch;
 	private GestureDetector backGestureDetector;
 	private static final int LOCATION_PERMISSION_REQUEST=7001;
 	/** 服务公告弹窗引用，防止重复弹出 */
@@ -165,6 +169,7 @@ public class MainActivity extends FragmentStackActivity implements LifecycleOwne
 				startupPromptCoordinator.start();
 			});
 		}
+		bindChatAccessObserver();
 
 		// 位置权限引导序列已迁移到 HomeFragment.onShown 的 showSetupGuideSequence
 		// 此处仅保留无权限时的 IP 属地兜底（不阻塞 UI，不弹 sheet）
@@ -191,6 +196,11 @@ public class MainActivity extends FragmentStackActivity implements LifecycleOwne
 		// if(lanSession!=null && savedInstanceState==null){
 		// 	getWindow().getDecorView().post(() -> showQRLoginDialog(lanSession, true));
 		// }
+	}
+
+	public void showContentAccessPrompt(){
+		if(startupPromptCoordinator==null){ startupPromptCoordinator=new StartupPromptCoordinator(this); startupPromptCoordinator.start(); }
+		startupPromptCoordinator.showContentAccessPrompt();
 	}
 
 	public void restartStartupPrompts(){
@@ -359,6 +369,8 @@ public class MainActivity extends FragmentStackActivity implements LifecycleOwne
 	private void processNavigationIntent(Intent intent){
 		if(intent.getBooleanExtra(EXTRA_OPEN_SOURCE_LICENSES, false)){
 			openSourceLicenses(intent);
+		}else if(intent.getBooleanExtra("content_access_settings", false)){
+			openContentAccessSettings(intent);
 		}else if(intent.getBooleanExtra("fromNotification", false)){
 			String accountID=intent.getStringExtra("accountID");
 			AccountSession accountSession;
@@ -403,6 +415,14 @@ public class MainActivity extends FragmentStackActivity implements LifecycleOwne
 		}*/
 	}
 
+	private void openContentAccessSettings(Intent intent){
+		intent.removeExtra("content_access_settings");
+		AccountSession session=AccountSessionManager.getInstance().getLastActiveAccount();
+		if(session==null) return;
+		Bundle args=new Bundle(); args.putString("account",session.getID());
+		Nav.go(this,org.joinmastodon.android.fragments.settings.SettingsMainFragment.class,args);
+	}
+
 	private void openSourceLicenses(Intent intent){
 		intent.removeExtra(EXTRA_OPEN_SOURCE_LICENSES);
 		Bundle args=new Bundle();
@@ -417,6 +437,12 @@ public class MainActivity extends FragmentStackActivity implements LifecycleOwne
 			return;
 		if(!"https".equals(uri.getScheme()) && !"http".equals(uri.getScheme()))
 			return;
+
+		if(VerificationLink.isSettingsLink(uri)){
+			String selected=accountID==null ? AccountSessionManager.getInstance().getLastActiveAccountID() : accountID;
+			if(selected!=null) ContentAccessGate.openVerification(this,selected);
+			return;
+		}
 
 		String albumInvite=org.joinmastodon.android.albums.AlbumInviteLink.parseToken(uri);
 		if(albumInvite!=null){
@@ -635,8 +661,9 @@ public class MainActivity extends FragmentStackActivity implements LifecycleOwne
 		org.joinmastodon.android.api.session.NBWEndpointsRepository.getInstance().enterForeground(this);
 		AccountSession nbwSession=AccountSessionManager.getInstance().getLastActiveAccount();
 		if(nbwSession!=null) nbwSession.getNBWForumOptionsRepository().activate();
+		if(nbwSession!=chatAccessSession) bindChatAccessObserver();
 		org.joinmastodon.android.security.AppSecurity.runAfterUnlock(this, ()->{
-			if(chatWsClient!=null) chatWsClient.connect();
+			if(chatWsClient!=null && org.joinmastodon.android.api.session.ContentAccessCoordinator.canRead(nbwSession==null ? null : nbwSession.getID())) chatWsClient.reconnect();
 		});
 	}
 
@@ -652,6 +679,10 @@ public class MainActivity extends FragmentStackActivity implements LifecycleOwne
 	protected void onDestroy(){
 		super.onDestroy();
 		lifecycleRegistry.setCurrentState(Lifecycle.State.DESTROYED);
+		if(chatAccessSubscription!=null){
+			chatAccessSubscription.cancel();
+			chatAccessSubscription=null;
+		}
 		if(chatWsClient!=null){
 			chatWsClient.disconnect();
 			chatWsClient=null;
@@ -664,6 +695,33 @@ public class MainActivity extends FragmentStackActivity implements LifecycleOwne
 		if(session==null || !session.activated) return;
 		chatWsClient=new ChatRealtimeClient(session.getID());
 		chatWsClient.connect();
+	}
+
+	/** Realtime chat follows the server access verdict: connect/refresh only on a fresh open, never on unknown. */
+	private void bindChatAccessObserver(){
+		AccountSession session=getCurrentSession();
+		if(chatAccessSubscription!=null){
+			chatAccessSubscription.cancel();
+			chatAccessSubscription=null;
+		}
+		chatAccessSession=session;
+		if(session==null || !org.joinmastodon.android.api.session.ContentAccessCoordinator.applies(session)) return;
+		chatAccessSubscription=session.getContentAccessCoordinator().observe(snapshot->{
+			boolean open=snapshot!=null && snapshot.isOpen();
+			if(!open){
+				chatOpenedEpoch=false;
+				if(chatWsClient!=null) chatWsClient.disconnect();
+				return;
+			}
+			if(chatOpenedEpoch) return;
+			chatOpenedEpoch=true;
+			org.joinmastodon.android.security.AppSecurity.runAfterUnlock(this, ()->{
+				if(isDestroyed() || isFinishing()) return;
+				if(chatWsClient==null) connectChatWebSocket();
+				else chatWsClient.reconnect();
+				refreshChatConversations();
+			});
+		});
 	}
 
 	private void refreshChatConversations(){
@@ -760,6 +818,8 @@ public class MainActivity extends FragmentStackActivity implements LifecycleOwne
 				showCompose();
 			}else if(intent.getBooleanExtra("explore", false) && fragment instanceof HomeFragment hf){
 				getWindow().getDecorView().post(()->hf.setCurrentTab(R.id.tab_messages));
+			}else if(intent.getBooleanExtra("content_access_settings",false)){
+				openContentAccessSettings(intent);
 			}else if(Intent.ACTION_VIEW.equals(intent.getAction())){
 				handleURL(intent.getData(), null);
 			}else{

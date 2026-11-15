@@ -221,13 +221,14 @@ public abstract class StatusListFragment extends BaseStatusListFragment<Status>{
 
 		@Subscribe
 		public void onStatusCreated(StatusCreatedEvent ev){
-			if(!ev.accountID.equals(accountID))
+			if(!contentAccessOpen() || !ev.accountID.equals(accountID))
 				return;
 			StatusListFragment.this.onStatusCreated(ev.status.clone());
 		}
 
 		@Subscribe
 		public void onStatusUpdated(StatusUpdatedEvent ev){
+			if(!contentAccessOpen()) return;
 			StatusListFragment.this.onStatusUpdated(ev.status);
 		}
 

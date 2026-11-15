@@ -260,7 +260,7 @@ private fun AvatarIcon(avatarUrl: String?, animationToken: Int) {
 				clipToOutline = true
 				setImageResource(R.drawable.image_placeholder)
 				if (!avatarUrl.isNullOrEmpty()) {
-					ViewImageLoader.loadWithoutAnimation(this, drawable, UrlImageLoaderRequest(avatarUrl, V.dp(24f), V.dp(24f)))
+					org.joinmastodon.android.ui.utils.NBWImageRequests.load(this, drawable, org.joinmastodon.android.ui.utils.NBWImageRequests.current(UrlImageLoaderRequest(avatarUrl, V.dp(24f), V.dp(24f))))
 				}
 			}
 		},

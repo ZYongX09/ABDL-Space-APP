@@ -866,6 +866,13 @@ public class UiUtils{
 			objectURL=a.url;
 		}
 		Uri uri=Uri.parse(url);
+		if(org.joinmastodon.android.model.verification.VerificationLink.isSettingsLink(uri)){
+			if(context instanceof Activity activity){
+				String selected=accountID==null ? AccountSessionManager.getInstance().getLastActiveAccountID() : accountID;
+				if(selected!=null) org.joinmastodon.android.ContentAccessGate.openVerification(activity,selected);
+			}
+			return;
+		}
 		if(accountID!=null && "https".equals(uri.getScheme()) && !Objects.equals(url, objectURL)){
 			List<String> path=uri.getPathSegments();
 			if(AccountSessionManager.getInstance().getAccount(accountID).domain.equalsIgnoreCase(uri.getAuthority()) && path.size()==2 && path.get(0).matches("^@[a-zA-Z0-9_]+$") && path.get(1).matches("^[0-9]+$")){

@@ -258,7 +258,9 @@ internal class AppKitNovelCoverLoader(context: Context) : NovelCoverLoader {
         current.subscribers += result
         if (current.pending == null) {
             current.timeout = Runnable { terminate(request, current, null, completed = true) }.also { main.postDelayed(it, 30_000) }
-            current.pending = cache.get(current.request, null, object : ImageLoaderCallback {
+            val protectedRequest = org.joinmastodon.android.ui.utils.ContentMediaImageDownloader.scoped(current.request)
+            if (protectedRequest == null) { terminate(request, current, null); return NovelCoverCancellation {} }
+            current.pending = cache.get(protectedRequest, null, object : ImageLoaderCallback {
                 override fun onImageLoaded(request: ImageLoaderRequest, image: Drawable) = deliver(image)
                 override fun onImageLoadingFailed(request: ImageLoaderRequest, error: Throwable?) = deliver(null)
                 private fun deliver(image: Drawable?) {

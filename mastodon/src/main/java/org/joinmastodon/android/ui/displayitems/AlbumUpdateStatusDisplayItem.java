@@ -50,7 +50,7 @@ public class AlbumUpdateStatusDisplayItem extends StatusDisplayItem{
 
 	private ImageLoaderRequest permittedCoverRequest(){
 		return coverRequest instanceof UrlImageLoaderRequest request && coverAllowed()
-				&& request.uri.toString().equals(update.coverUrl) ? coverRequest : null;
+				&& request.uri.toString().equals(update.coverUrl) ? org.joinmastodon.android.ui.utils.ContentMediaImageDownloader.scoped(coverRequest) : null;
 	}
 
 	private CoverImageBinding.Key coverKey(){
@@ -137,7 +137,7 @@ public class AlbumUpdateStatusDisplayItem extends StatusDisplayItem{
 			ImageLoaderRequest request=item.permittedCoverRequest();
 			if(request==null){
 				AlbumPublicCoverMemory.invalidate(item.accountID, item.update.albumId);
-			}else if(request instanceof UrlImageLoaderRequest urlRequest){
+			}else if(request instanceof UrlImageLoaderRequest urlRequest && !org.joinmastodon.android.ui.utils.ContentMediaImageDownloader.isMedia(urlRequest.uri)){
 				var cache=me.grishka.appkit.imageloader.ImageCache.getInstance(wrapper.getContext());
 				if(cache.getFromTop(request)==null){
 					Drawable cached=AlbumPublicCoverMemory.get(wrapper.getContext(), item.accountID, item.update.albumId,

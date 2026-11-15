@@ -4,6 +4,11 @@ import android.net.Uri;
 
 public final class VerificationLink{
 	private VerificationLink(){}
+	public static boolean isSettingsLink(Uri uri){
+		return uri!=null && "https".equals(uri.getScheme()) && "abdl-space.top".equals(uri.getHost())
+				&& uri.getPort()==-1 && uri.getUserInfo()==null && uri.getQuery()==null && uri.getFragment()==null
+				&& "/settings/baby-verification".equals(uri.getEncodedPath());
+	}
 	public static String parseToken(Uri uri){
 		if(uri==null || !"https".equals(uri.getScheme()) || !"abdl-space.top".equals(uri.getHost()) || uri.getPort()!=-1 || uri.getUserInfo()!=null || uri.getQuery()!=null || uri.getFragment()!=null) return null;
 		java.util.List<String> segments=uri.getPathSegments();

@@ -148,6 +148,8 @@ public class PhotoViewer implements ZoomPanView.Listener{
 	private Listener listener;
 	private Status status;
 	private String accountID;
+	private org.joinmastodon.android.api.session.ContentAccessCoordinator.Owner contentOwner;
+	private org.joinmastodon.android.api.session.ContentAccessCoordinator.Cancelable contentAccessSubscription;
 	private BaseStatusListFragment<?> parentFragment;
 	private final AlbumDelegate albumDelegate;
 	private final AccountSession albumSession;
@@ -274,6 +276,11 @@ public class PhotoViewer implements ZoomPanView.Listener{
 		this.listener=listener;
 		this.status=status;
 		this.accountID=accountID;
+		AccountSession contentSession=AccountSessionManager.getInstance().tryGetAccount(accountID);
+		if(org.joinmastodon.android.api.session.ContentAccessCoordinator.applies(contentSession)){
+			contentOwner=contentSession.getContentAccessCoordinator().capture();
+			if(contentOwner==null || !contentOwner.canRead()){ closing=dismissed=true; return; }
+		}
 		this.parentFragment=parentFragment;
 		nbwMedia=albumDelegate==null && this.attachments.stream().anyMatch(a->org.joinmastodon.android.api.NBWUrlResolver.isTrusted(a.url) || org.joinmastodon.android.api.NBWUrlResolver.isTrusted(a.previewUrl));
 		if(nbwMedia){
@@ -539,6 +546,15 @@ public class PhotoViewer implements ZoomPanView.Listener{
 				if(!nbwMediaCurrent()) windowView.post(()->{ if(!dismissed) onDismissed(); });
 			});
 		}
+		if(contentOwner!=null){
+			contentAccessSubscription=contentSession.getContentAccessCoordinator().observe(snapshot->{
+				if(!contentOwner.canRead() && !dismissed){
+					windowView.setVisibility(View.INVISIBLE);
+					if(albumPreviewCache!=null) albumPreviewCache.invalidateSession(accountID,albumSession);
+					onDismissed();
+				}
+			});
+		}
 		if(albumDelegate!=null) windowView.post(()->{
 			for(PhotoViewHolder holder:albumPhotoHolders){ int position=holder.getAbsoluteAdapterPosition(); if(position>=0){ Attachment attachment=this.attachments.get(position); if(attachment.adminBlocked) holder.setImageDrawable(AlbumUi.adminBlockedPlaceholder(activity)); else loadAlbumPreview(holder,attachment); } }
 			updateAlbumViewport();
@@ -602,7 +618,7 @@ public class PhotoViewer implements ZoomPanView.Listener{
 				&& AccountSessionManager.getInstance().tryGetAccount(accountID)==albumSession
 				&& accountID.equals(AccountSessionManager.getInstance().getLastActiveAccountID());
 		if(albumPreviewCache!=null && !sameSession) albumPreviewCache.invalidateSession(accountID, albumSession);
-		return albumDelegate!=null && sameSession && !closing && !dismissed && !activity.isFinishing() && !activity.isDestroyed()
+		return albumDelegate!=null && sameSession && (contentOwner==null || contentOwner.canRead()) && !closing && !dismissed && !activity.isFinishing() && !activity.isDestroyed()
 				&& windowView.isAttachedToWindow();
 	}
 
@@ -1182,6 +1198,7 @@ public class PhotoViewer implements ZoomPanView.Listener{
 	@Override
 	public void onDismissed(){
 		if(dismissed) return;
+		if(contentAccessSubscription!=null){ contentAccessSubscription.cancel(); contentAccessSubscription=null; }
 		if(nbwSubscription!=null){ nbwSubscription.cancel(); nbwSubscription=null; }
 		if(nbwSessionSubscription!=null){ nbwSessionSubscription.cancel(); nbwSessionSubscription=null; }
 		dismissed=true;

@@ -156,7 +156,7 @@ import org.joinmastodon.android.novel.app.models.Work
     Box(Modifier.size(size).clip(CircleShape).background(NovelTheme.colors.primaryContainer), contentAlignment = Alignment.Center) {
         Text(author.name.take(1), color = NovelTheme.colors.primary, fontSize = (size.value * .46f).sp, fontFamily = NovelTypography.serif)
         val url = author.avatar.takeIf { it.startsWith("https://") }
-        if (url != null) key(url) { AndroidView(factory = { context -> ImageView(context).apply { scaleType = ImageView.ScaleType.CENTER_CROP; ViewImageLoader.load(this, null, UrlImageLoaderRequest(url, 160, 160)) } }, modifier = Modifier.fillMaxSize()) }
+        if (url != null) key(url) { AndroidView(factory = { context -> ImageView(context).apply { scaleType = ImageView.ScaleType.CENTER_CROP; org.joinmastodon.android.ui.utils.NBWImageRequests.load(this, null, org.joinmastodon.android.ui.utils.NBWImageRequests.current(UrlImageLoaderRequest(url, 160, 160))) } }, modifier = Modifier.fillMaxSize()) }
     }
 }
 

@@ -59,13 +59,14 @@ public class ChatController {
 	public ChatStorage getStorage() { return storage; }
 
 	public List<ChatMessage> getCachedMessages(long peerId, int limit) {
-		return storage.getMessages(accountId, peerId, limit);
+		return org.joinmastodon.android.api.session.ContentAccessCoordinator.canRead(accountId) ? storage.getMessages(accountId, peerId, limit) : List.of();
 	}
 
 	/**
 	 * 收到新消息时立即更新会话列表缓存
 	 */
 	public void upsertConversationFromMessage(ChatMessage msg) {
+		if(!org.joinmastodon.android.api.session.ContentAccessCoordinator.canRead(accountId)) return;
 		Conversation conv = null;
 		for (Conversation existing : storage.listConversations(accountId)) {
 			if (existing.peerId == msg.peerId) {
@@ -84,6 +85,7 @@ public class ChatController {
 	}
 
 	public void loadConversations(boolean forceNetwork, Callback<List<Conversation>> callback) {
+		if(!org.joinmastodon.android.api.session.ContentAccessCoordinator.canRead(accountId)){ callback.onSuccess(List.of()); return; }
 		List<Conversation> cached = storage.listConversations(accountId);
 		if (!cached.isEmpty() && !forceNetwork) {
 			callback.onSuccess(cached);
@@ -161,6 +163,7 @@ public class ChatController {
 	}
 
 	public void applyWsEvent(JsonObject event) {
+		if(!org.joinmastodon.android.api.session.ContentAccessCoordinator.canRead(accountId)) return;
 		String type = event.has("type") ? event.get("type").getAsString() : "";
 		long eventId = event.has("event_id") ? event.get("event_id").getAsLong() : 0;
 		long localCursor = storage.getLastEventId(accountId);

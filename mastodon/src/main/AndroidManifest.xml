@@ -165,6 +165,12 @@
 				<category android:name="android.intent.category.BROWSABLE"/>
 				<data android:scheme="https" android:host="abdl-space.top" android:pathPrefix="/c/"/>
 			</intent-filter>
+			<intent-filter android:autoVerify="true">
+				<action android:name="android.intent.action.VIEW"/>
+				<category android:name="android.intent.category.DEFAULT"/>
+				<category android:name="android.intent.category.BROWSABLE"/>
+				<data android:scheme="https" android:host="abdl-space.top" android:path="/settings/baby-verification"/>
+			</intent-filter>
 		</activity>
 		<activity android:name=".AlbumInviteLinkActivity" android:exported="true" android:theme="@style/Theme.Mastodon.AutoLightDark">
 			<intent-filter android:autoVerify="true">

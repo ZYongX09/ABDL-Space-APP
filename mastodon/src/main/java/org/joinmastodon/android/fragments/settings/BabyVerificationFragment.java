@@ -191,6 +191,7 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 						R.string.verification_retry, v->loadState(), 0, null);
 				return;
 			}
+			if(org.joinmastodon.android.api.session.ContentAccessCoordinator.applies(session)) session.getContentAccessCoordinator().refresh();
 			currentState=stateResult[0];
 			reconcileApplication=false;
 			currentCertificate=certificateResult[0].certificate;
@@ -1002,7 +1003,7 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 	}
 
 	private boolean sessionValid(){
-		return viewReady && session!=null && ownerUserId()>0 && accountID.equals(session.getID()) && AccountSessionManager.getInstance().tryGetAccount(accountID)==session;
+		return viewReady && session!=null && ownerUserId()>0 && accountID.equals(session.getID()) && guard!=null && guard.ownsSession();
 	}
 
 	private int stageForState(State state){

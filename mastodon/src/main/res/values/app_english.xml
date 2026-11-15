@@ -463,7 +463,7 @@
 	<string name="password_login">Log in with username and password</string>
 	<string name="consent_title">Agree to the terms</string>
 	<string name="consent_message">Before logging in, please read the &lt;a href=\"https://abdl-space.top/terms\">Terms of Service&lt;/a> and &lt;a href=\"https://abdl-space.top/privacy\">Privacy Policy&lt;/a>. Tap Confirm if you agree.</string>
-	<string name="login_agreement_text">I have read and agree to the &lt;a href=\"https://abdl-space.top/terms\">Terms of Service&lt;/a> and &lt;a href=\"https://abdl-space.top/privacy\">Privacy Policy&lt;/a></string>
+	<string name="login_agreement_text">I have read and agree to the &lt;a href=\"https://abdl-space.top/terms\">Terms of Service&lt;/a> and &lt;a href=\"https://abdl-space.top/privacy\">Privacy Policy&lt;/a>, and I am at least 18 years old</string>
 	<string name="legacy_login_agreement_text">Before logging in, please read the &lt;a href=\"https://abdl-space.top/terms\">Terms of Service&lt;/a> and &lt;a href=\"https://abdl-space.top/privacy\">Privacy Policy&lt;/a></string>
 	<string name="qq_login">Log in with Tencent QQ</string>
 	<string name="qq_consent_title">Log in with Tencent QQ</string>
@@ -618,7 +618,10 @@
 	<string name="verification_status_review">Under review</string>
 	<string name="verification_status_approved">Verified</string>
 	<string name="verification_status_rejected">Rejected · Tap for details</string>
-	<string name="verification_intro_title">Start Baby Verification</string>
+		<string name="content_access_required_title">Baby Verification required</string>
+		<string name="content_access_required_body">To implement the online information management and minor protection requirements addressed by laws and regulations including the Cybersecurity Law of the People\'s Republic of China, the Law of the People\'s Republic of China on the Protection of Minors, and the Administrative Measures for Internet Information Services, maintain a safe community and a clean online environment, and prevent minors from encountering information that may harm their physical or mental health, this platform applies strict admission and verification rules. You need to pass Baby Verification to unlock the full feed and interaction features.\n\nHome → Top menu → Settings → Current account in Accounts → Identity and verification → Baby Verification</string>
+		<string name="content_access_unavailable">Content access could not be confirmed. Check your connection and refresh. Account, settings, Baby Verification, help and order queries remain available.</string>
+		<string name="verification_intro_title">Start Baby Verification</string>
 	<string name="verification_intro_body">Take only the photos of yourself listed on the verification page. Photos are used only for identity review and will not appear in public albums or posts. The verification camera does not allow gallery imports, video, front camera, or external editing.</string>
 	<string name="verification_adult_confirm">I am at least 18 years old</string>
 	<string name="verification_start">Start verification</string>

@@ -160,7 +160,7 @@ fun FriendCardCover(url: String?, title: String, focusX: Float, focusY: Float, r
                 key(url) {
                     AndroidView(factory = { context -> FocusImage(context).apply {
                         onDrawable = { loaded = it }
-                        ViewImageLoader.load(this, null, UrlImageLoaderRequest(url, 1440, 1200))
+                        org.joinmastodon.android.ui.utils.NBWImageRequests.load(this, null, org.joinmastodon.android.ui.utils.NBWImageRequests.current(UrlImageLoaderRequest(url, 1440, 1200)))
                     } }, update = { image -> image.focusX = focusX; image.focusY = focusY; image.position() }, modifier = Modifier.fillMaxSize())
                 }
                 if (loaded) {
@@ -181,7 +181,7 @@ fun FriendCardProduct(item: FriendCard.Diaper, onOpen: () -> Unit, onRemove: (()
             Box(Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)).background(MiuixTheme.colorScheme.surface), contentAlignment = Alignment.Center) {
                 Text(stringResource(R.string.fc_product), fontSize = 11.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
                 if (!item.imageUrl.isNullOrBlank()) key(item.imageUrl) {
-                    AndroidView(factory = { context -> ImageView(context).apply { scaleType = ImageView.ScaleType.CENTER_CROP; ViewImageLoader.load(this, null, UrlImageLoaderRequest(item.imageUrl, 160, 160)) } }, modifier = Modifier.fillMaxSize())
+                    AndroidView(factory = { context -> ImageView(context).apply { scaleType = ImageView.ScaleType.CENTER_CROP; org.joinmastodon.android.ui.utils.NBWImageRequests.load(this, null, org.joinmastodon.android.ui.utils.NBWImageRequests.current(UrlImageLoaderRequest(item.imageUrl, 160, 160))) } }, modifier = Modifier.fillMaxSize())
                 }
             }
             Column { Text(item.name?.takeIf { it.isNotBlank() } ?: stringResource(R.string.fc_diaper_fallback, item.id), maxLines = 2, overflow = TextOverflow.Ellipsis); if (!item.available) Text(stringResource(R.string.fc_product_unavailable), fontSize = 12.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary) }

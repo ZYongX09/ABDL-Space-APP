@@ -14,7 +14,7 @@ public class VerificationLinkActivity extends Activity{
 		super.onCreate(savedInstanceState);
 		org.joinmastodon.android.security.AppSecurity.runAfterUnlock(this, ()->{
 			Uri uri=getIntent()==null ? null : getIntent().getData();
-			if(VerificationLink.parseToken(uri)!=null){
+			if(VerificationLink.parseToken(uri)!=null || VerificationLink.isSettingsLink(uri)){
 				Intent intent=new Intent(this, MainActivity.class).setAction(Intent.ACTION_VIEW).setData(uri);
 				startActivity(intent);
 			}

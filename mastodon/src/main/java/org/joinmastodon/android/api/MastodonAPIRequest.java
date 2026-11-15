@@ -58,7 +58,35 @@ public abstract class MastodonAPIRequest<T> extends APIRequest<T>{
 	private long remoteGeneration=-1, rejectedGeneration=-1;
 	private boolean nbwRemoteRequest;
 	private boolean callbackDelivered;
+	private org.joinmastodon.android.api.session.ContentAccessCoordinator.Owner contentOwner;
+	private boolean protectedContent;
 	private Runnable nbwCancellationCleanup;
+
+	/** Called before transport dispatch; no response may borrow the current account's credentials. */
+	boolean prepareContentAccess(AccountSession session){
+		if(!org.joinmastodon.android.api.session.ContentAccessCoordinator.applies(session)) return true;
+		protectedContent=org.joinmastodon.android.api.session.ContentAccessCoordinator.isProtectedRoute(getURL(),getMethod());
+		if(protectedContent || this instanceof org.joinmastodon.android.api.requests.GetContentAccess)
+			contentOwner=session.getContentAccessCoordinator().capture();
+		return !protectedContent || contentOwner!=null && contentOwner.canRead();
+	}
+
+	void captureContentAccessHeader(Response response){
+		// Never trust a cached/redirected foreign response, /c/token JSON, or an auth failure.
+		if(!protectedContent || contentOwner==null || response.code()==401 || response.cacheResponse()!=null && response.networkResponse()==null
+				|| !org.joinmastodon.android.api.session.ContentAccessCoordinator.isFirstParty(Uri.parse(response.request().url().toString()))) return;
+		contentOwner.receiveHeader(response.header(org.joinmastodon.android.api.session.ContentAccessCoordinator.HEADER));
+	}
+
+	org.joinmastodon.android.api.session.ContentAccessCoordinator.Owner contentOwner(){ return contentOwner; }
+	boolean contentDispatchAllowed(){ return !protectedContent || contentOwner!=null && contentOwner.canRead(); }
+	private boolean acceptsContentDelivery(){ return !protectedContent || contentOwner!=null && contentOwner.canRead(); }
+	private boolean acceptsContentError(ErrorResponse error){
+		if(!protectedContent) return true;
+		// Preserve the real current-account auth error; it is not a verification policy response.
+		if(error instanceof MastodonErrorResponse value && value.httpStatus==401) return contentOwner!=null && contentOwner.sameIdentity();
+		return contentOwner!=null && contentOwner.isCurrent();
+	}
 
 	/** Cancellation is an unknown remote outcome, not a fabricated success or ordinary error. */
 	public MastodonAPIRequest<T> setNBWCancellationCleanup(Runnable cleanup){
@@ -279,7 +307,8 @@ public abstract class MastodonAPIRequest<T> extends APIRequest<T>{
 		if(!nbwRemoteRequest){
 			// Recheck at actual UI delivery, including cancellation while an error body is read.
 			uiThreadHandler.post(()->{
-				if(canceled || callbackDelivered) return;
+				if(callbackDelivered) return;
+				if(canceled || !acceptsContentError(err)){ callbackDelivered=true; onRequestDone(); return; }
 				callbackDelivered=true;
 				onRequestDone();
 				if(callback!=null) callback.onError(err);
@@ -306,14 +335,21 @@ public abstract class MastodonAPIRequest<T> extends APIRequest<T>{
 
 	void onSuccess(T resp){
 		if(!nbwRemoteRequest){
-			if(!canceled) invokeSuccessCallback(resp);
+			// Validate at the actual UI callback, after any captured policy header has closed the gate.
+			uiThreadHandler.post(()->{
+				if(callbackDelivered) return;
+				if(canceled || !acceptsContentDelivery()){ callbackDelivered=true; onRequestDone(); return; }
+				callbackDelivered=true;
+				onRequestDone();
+				if(callback!=null) callback.onSuccess(resp);
+			});
 			return;
 		}
 		// AppKit posts again without checking cancellation. Validate at the actual delivery point
 		// and keep the request registered until then so a mode/account change can still cancel it.
 		uiThreadHandler.post(()->{
 			if(callbackDelivered) return;
-			if(canceled || !acceptsRemoteResponse()){
+			if(canceled || !acceptsRemoteResponse() || !acceptsContentDelivery()){
 				completeCancellationOnUiThread();
 				return;
 			}

@@ -100,6 +100,32 @@ public abstract class BaseStatusListFragment<T extends DisplayItemsParent> exten
 	protected HashSet<APIRequest<?>> requestsToCancelWhenListClears=new HashSet<>();
 	private org.joinmastodon.android.api.session.NBWForumOptionsRepository.Cancelable nbwSubscription;
 	private long observedNBWGeneration=-1;
+	private org.joinmastodon.android.api.session.ContentAccessCoordinator.Cancelable contentAccessSubscription;
+	private boolean contentAccessBlocked;
+	protected final boolean contentAccessOpen(){ return org.joinmastodon.android.api.session.ContentAccessCoordinator.canRead(accountID); }
+	protected void onContentAccessClosed(){}
+	protected void onContentAccessOpened(){ reload(); }
+	private void applyContentAccess(org.joinmastodon.android.api.session.ContentAccessCoordinator.Snapshot snapshot){
+		if(!snapshot.isOpen()){
+			contentAccessBlocked=true;
+			cancelLoading();
+			if(currentPhotoViewer!=null) currentPhotoViewer.onDismissed();
+			currentPhotoViewer=null;
+			onContentAccessClosed();
+			data.clear(); preloadedData.clear();
+			onClearItems(); knownAccounts.clear(); relationships.clear();
+			preloader=new me.grishka.appkit.utils.Preloader<>(this,itemsPerPage);
+			data=preloader.getData(); preloadedData=preloader.getPreloadedData(); preloader.setFooterViews(footerProgress,footerError); preloader.setMoreAvailable(false);
+			loaded=false; dataLoading=false;
+			if(adapter!=null) adapter.notifyDataSetChanged();
+			if(content!=null) content.setVisibility(View.GONE);
+			if(errorView!=null) errorView.setVisibility(View.GONE);
+			if(progress!=null) progress.setVisibility(View.VISIBLE);
+		}else if(contentAccessBlocked){
+			contentAccessBlocked=false;
+			if(getView()!=null) onContentAccessOpened();
+		}
+	}
 	private SpringAnimation listShakeAnimation;
 	private org.joinmastodon.android.translation.PostTranslationCoordinator translationCoordinator;
 	private org.joinmastodon.android.translation.PostTranslationCoordinator.Visit translationVisit=new org.joinmastodon.android.translation.PostTranslationCoordinator.Visit();
@@ -276,11 +302,13 @@ public abstract class BaseStatusListFragment<T extends DisplayItemsParent> exten
 
 	@Override
 	protected void onDataLoaded(List<T> items, boolean moreAvailable){
+		if(!contentAccessOpen()) return;
 		super.onDataLoaded(visibleNBWItems(items), moreAvailable);
 	}
 
 	@Override
 	public void onAppendItems(List<T> items){
+		if(!contentAccessOpen()){ data.clear(); preloadedData.clear(); return; }
 		items=visibleNBWItems(items);
 		super.onAppendItems(items);
 		for(T s:items){
@@ -309,6 +337,7 @@ public abstract class BaseStatusListFragment<T extends DisplayItemsParent> exten
 	}
 
 	protected void prependItems(List<T> items, boolean notify){
+		if(!contentAccessOpen()) return;
 		items=visibleNBWItems(items);
 		data.addAll(0, items);
 		int offset=0;
@@ -549,6 +578,8 @@ public abstract class BaseStatusListFragment<T extends DisplayItemsParent> exten
 		if(session!=null) nbwSubscription=session.getNBWForumOptionsRepository().observe(snapshot->{
 			if(getActivity()!=null) getActivity().runOnUiThread(this::applyNBWMode);
 		});
+		if(org.joinmastodon.android.api.session.ContentAccessCoordinator.applies(session))
+			contentAccessSubscription=session.getContentAccessCoordinator().observe(this::applyContentAccess);
 
 		// MOSHIDON: this is for the sake of the fabulous
 		fab=view.findViewById(R.id.fab);
@@ -1324,6 +1355,7 @@ public abstract class BaseStatusListFragment<T extends DisplayItemsParent> exten
 	public void onDestroyView(){
 		stopPostTranslations();
 		if(nbwSubscription!=null){ nbwSubscription.cancel(); nbwSubscription=null; }
+		if(contentAccessSubscription!=null){ contentAccessSubscription.cancel(); contentAccessSubscription=null; }
 		if(list!=null){
 			list.removeCallbacks(retryFailedImagesRunnable);
 			retryFailedImagesScheduled=false;
@@ -1381,7 +1413,7 @@ public abstract class BaseStatusListFragment<T extends DisplayItemsParent> exten
 
 		@Override
 		public ImageLoaderRequest getImageRequest(int position, int image){
-			return displayItems.get(position).getImageRequest(image);
+			return org.joinmastodon.android.ui.utils.ContentMediaImageDownloader.scoped(displayItems.get(position).getImageRequest(image));
 		}
 	}
 

@@ -47,10 +47,12 @@ class MapAvatarRenderer{
 		if(previous!=null) previous.cancel();
 		Object ticket=new Object(); pending.put(point.id, ticket);
 		int currentGeneration=generation;
-		ImageCache.PendingImageRequest imageRequest=ImageCache.getInstance(context).get(new UrlImageLoaderRequest(url, 96, 96), null, new ImageLoaderCallback(){
+		ImageLoaderRequest scoped=org.joinmastodon.android.ui.utils.NBWImageRequests.current(new UrlImageLoaderRequest(url,96,96));
+		if(scoped==null) return;
+		ImageCache.PendingImageRequest imageRequest=ImageCache.getInstance(context).get(scoped, null, new ImageLoaderCallback(){
 			@Override public void onImageLoaded(ImageLoaderRequest request, Drawable drawable){
 				main.post(()->{
-					if(currentGeneration!=generation || pending.get(point.id)!=ticket) return;
+					if(currentGeneration!=generation || pending.get(point.id)!=ticket || !org.joinmastodon.android.ui.utils.NBWImageRequests.accepts(request)) return;
 					pending.remove(point.id); requests.remove(point.id); callback.accept(draw(drawable, initial));
 				});
 			}
