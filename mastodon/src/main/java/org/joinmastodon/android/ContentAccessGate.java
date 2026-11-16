@@ -100,7 +100,6 @@ public final class ContentAccessGate implements Application.ActivityLifecycleCal
 	@Override public void onActivityCreated(Activity activity, Bundle state){
 		if(utilityActivity(activity)) return;
 		Screen screen=new Screen(activity); screens.put(activity,screen); screen.bind();
-		activity.getWindow().getDecorView().getViewTreeObserver().addOnPreDrawListener(screen);
 	}
 	@Override public void onActivityResumed(Activity activity){
 		Screen screen=screens.get(activity); if(screen==null) return;
@@ -110,7 +109,6 @@ public final class ContentAccessGate implements Application.ActivityLifecycleCal
 	@Override public void onActivityDestroyed(Activity activity){
 		Screen screen=screens.remove(activity); if(screen==null) return;
 		if(screen.subscription!=null) screen.subscription.cancel();
-		View decor=activity.getWindow().getDecorView(); if(decor.getViewTreeObserver().isAlive()) decor.getViewTreeObserver().removeOnPreDrawListener(screen);
 	}
 	@Override public void onActivityStarted(Activity activity){}
 	@Override public void onActivityStopped(Activity activity){}
@@ -157,42 +155,15 @@ public final class ContentAccessGate implements Application.ActivityLifecycleCal
 			if(applying || activity.isDestroyed() || activity.isFinishing()) return;
 			applying=true;
 			try{
-				ContentAccessCoordinator.Snapshot snapshot=ContentAccessCoordinator.applies(session) ? session.getContentAccessCoordinator().getSnapshot() : null;
-				boolean blocked=snapshot!=null && !snapshot.isOpen();
-				Fragment top=activity instanceof MainActivity main ? main.getTopmostFragment() : topFragment();
-				for(Fragment fragment:activity.getFragmentManager().getFragments()){
-					View view=fragment==null ? null : fragment.getView();
-					if(view!=null && !viewOwners.containsKey(view)) viewOwners.put(view,new ViewOwner(session));
+				// Silent detection only: never cover or hide content and never show a blocking overlay.
+				// Protected reads stay fenced by ContentAccessCoordinator; a required decision only raises
+				// the existing native prompt so the user can start verification.
+				if(!ContentAccessCoordinator.applies(session)) return;
+				ContentAccessCoordinator.Snapshot snapshot=session.getContentAccessCoordinator().getSnapshot();
+				if(resumed && snapshot.state==ContentAccess.State.BABY_VERIFICATION_REQUIRED
+						&& activity instanceof MainActivity main && !AppSecurity.isLocked()){
+					main.showContentAccessPrompt();
 				}
-				View topView=top==null ? null : top.getView();
-				ViewOwner topOwner=topView==null ? activityOwner : viewOwners.get(topView);
-				if(topOwner==null){ topOwner=new ViewOwner(session); viewOwners.put(topView,topOwner); }
-				boolean wrongOwner=!topOwner.current(session);
-				String explicitAccount=top!=null && top.getArguments()!=null ? top.getArguments().getString("account") : activity.getIntent().getStringExtra("account");
-				wrongOwner|=explicitAccount!=null && (session==null || !explicitAccount.equals(session.getID()));
-				blocked|=wrongOwner && !isAllowedFragment(top);
-				// Hide protected lower stack views even while a native utility page is on top.
-				if(!blocked){ for(Map.Entry<View,Integer> entry:new ArrayList<>(hidden.entrySet())) entry.getKey().setVisibility(entry.getValue()); hidden.clear(); }
-				if(blocked){
-					for(Fragment fragment:activity.getFragmentManager().getFragments()){
-						View view=fragment==null ? null : fragment.getView();
-						if(view!=null && !isAllowedFragment(fragment)){ if(!hidden.containsKey(view)) hidden.put(view,view.getVisibility()); view.setVisibility(View.INVISIBLE); }
-					}
-					org.joinmastodon.android.ui.seamless.SeamlessTransitions.protectedContent(activity);
-				}
-				boolean cover=blocked && !isAllowedFragment(top);
-				if(!cover){ removeShield(); return; }
-				ensureShield();
-				boolean required=snapshot!=null && snapshot.state==ContentAccess.State.BABY_VERIFICATION_REQUIRED;
-				boolean checking=!wrongOwner && snapshot!=null && (snapshot.loading || snapshot.state==null);
-				message.setText(required ? R.string.content_access_required_body : checking ? R.string.loading : R.string.content_access_unavailable);
-				progress.setVisibility(checking ? View.VISIBLE : View.GONE);
-				verify.setVisibility(required ? View.VISIBLE : View.GONE); refresh.setEnabled(snapshot!=null && !snapshot.loading);
-				// Do not place this shield over the independent application-lock boundary.
-				View lock=activity.getWindow().getDecorView().findViewWithTag("abdl_security_shield");
-				View front=lock!=null ? lock : shield;
-				if(front.getParent() instanceof ViewGroup parent && parent.indexOfChild(front)!=parent.getChildCount()-1) front.bringToFront();
-				if(resumed && required && activity instanceof MainActivity main && !AppSecurity.isLocked()) main.showContentAccessPrompt();
 			}finally{ applying=false; }
 		}
 		Fragment topFragment(){
