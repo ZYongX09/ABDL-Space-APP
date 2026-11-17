@@ -34,7 +34,6 @@ final class ContentAccessInterceptor implements Interceptor{
 		if(!owner.canDispatch()) throw unavailable();
 		Response response=chain.proceed(request);
 		if(response.code()==401 && owner.sameIdentity()) return response;
-		if(!owner.isCurrent()){ response.close(); throw unavailable(); }
 		if(ContentAccessCoordinator.isFirstParty(Uri.parse(response.request().url().toString()))
 				&& (response.cacheResponse()==null || response.networkResponse()!=null)){
 			String header=response.header(ContentAccessCoordinator.HEADER);

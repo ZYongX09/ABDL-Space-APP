@@ -45,7 +45,9 @@ public final class ContentAccessCoordinator{
 		/** Only a confirmed "verification required" blocks dispatch. Unknown/unavailable states let the
 		 * server answer authoritatively (it withholds content itself), so a probe outage no longer turns
 		 * every startup request into a synthetic 503 toast. Local cache reads stay strict via canRead(). */
-		public boolean canDispatch(){ ContentAccessCoordinator.Snapshot value=coordinator.getSnapshot(); return isCurrent() && value.state!=ContentAccess.State.BABY_VERIFICATION_REQUIRED; }
+		/** Only a confirmed requirement blocks dispatch. Identity/generation changes (session refresh,
+		 * account switch during splash) must not fabricate 503s; the server enforces content itself. */
+		public boolean canDispatch(){ return coordinator.getSnapshot().state!=ContentAccess.State.BABY_VERIFICATION_REQUIRED; }
 		public String mediaScope(){ return coordinator.mediaScope+"-"+generation; }
 		/** An open header is never authority to clear a gate. Only the latest GET can do that. */
 		public void receiveHeader(String header){ coordinator.dispatch.accept(()->coordinator.applyHeader(this, header)); }
