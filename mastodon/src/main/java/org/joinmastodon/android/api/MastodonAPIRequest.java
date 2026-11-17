@@ -68,7 +68,7 @@ public abstract class MastodonAPIRequest<T> extends APIRequest<T>{
 		protectedContent=org.joinmastodon.android.api.session.ContentAccessCoordinator.isProtectedRoute(getURL(),getMethod());
 		if(protectedContent || this instanceof org.joinmastodon.android.api.requests.GetContentAccess)
 			contentOwner=session.getContentAccessCoordinator().capture();
-		return !protectedContent || contentOwner!=null && contentOwner.canRead();
+		return !protectedContent || contentOwner==null || contentOwner.canDispatch();
 	}
 
 	void captureContentAccessHeader(Response response){
@@ -79,8 +79,8 @@ public abstract class MastodonAPIRequest<T> extends APIRequest<T>{
 	}
 
 	org.joinmastodon.android.api.session.ContentAccessCoordinator.Owner contentOwner(){ return contentOwner; }
-	boolean contentDispatchAllowed(){ return !protectedContent || contentOwner!=null && contentOwner.canRead(); }
-	private boolean acceptsContentDelivery(){ return !protectedContent || contentOwner!=null && contentOwner.canRead(); }
+	boolean contentDispatchAllowed(){ return !protectedContent || contentOwner!=null && contentOwner.canDispatch(); }
+	private boolean acceptsContentDelivery(){ return !protectedContent || contentOwner!=null && contentOwner.canDispatch(); }
 	private boolean acceptsContentError(ErrorResponse error){
 		if(!protectedContent) return true;
 		// Preserve the real current-account auth error; it is not a verification policy response.

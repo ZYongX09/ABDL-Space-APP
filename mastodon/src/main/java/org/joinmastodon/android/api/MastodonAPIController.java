@@ -62,6 +62,15 @@ import okhttp3.ResponseBody;
 public class MastodonAPIController{
 	private static final String TAG="MastodonAPIController";
 
+	/** Diagnostic path only: truncated, no query string, never tokens or bodies. */
+	private static String diagPath(MastodonAPIRequest<?> req){
+		try{
+			String path=req.getURL().getPath();
+			if(path==null) return "";
+			return path.length()>80 ? path.substring(0,80) : path;
+		}catch(RuntimeException invalid){ return ""; }
+	}
+
 	// MOSHIDON:
 	public static final Gson gsonWithoutDeserializer = new GsonBuilder()
 			.disableHtmlEscaping()
@@ -128,6 +137,7 @@ public class MastodonAPIController{
 
 	public <T> void submitRequest(final MastodonAPIRequest<T> req){
 		if(!req.prepareContentAccess(session)){
+			Log.w(TAG, "content_access_blocked_prepare "+req.getMethod()+" "+diagPath(req));
 			req.onError(org.joinmastodon.android.api.session.ContentAccessCoordinator.blockedError());
 			return;
 		}
@@ -135,7 +145,7 @@ public class MastodonAPIController{
 			try{
 				if(req.canceled || !req.acceptsRemoteResponse())
 					return;
-				if(!req.contentDispatchAllowed()){ req.onError(org.joinmastodon.android.api.session.ContentAccessCoordinator.blockedError()); return; }
+				if(!req.contentDispatchAllowed()){ Log.w(TAG, "content_access_blocked_dispatch "+req.getMethod()+" "+diagPath(req)); req.onError(org.joinmastodon.android.api.session.ContentAccessCoordinator.blockedError()); return; }
 				Request.Builder builder=new Request.Builder()
 						.url(req.getURL().toString())
 						.method(req.getMethod(), req.getRequestBody());
@@ -185,6 +195,7 @@ public class MastodonAPIController{
 					public void onFailure(@NonNull Call call, @NonNull IOException e){
 						if(req.canceled)
 							return;
+						String why=e.getClass().getSimpleName()+": "+e.getMessage(); Log.w(TAG, "request_failed "+req.getMethod()+" "+diagPath(req)+" "+(why.length()>140?why.substring(0,140):why));
 						if(BuildConfig.DEBUG && !req.isSensitiveRequest())
 							Log.w(TAG, logTag(session)+""+hreq+" failed", e);
 						synchronized(req){
@@ -253,6 +264,7 @@ public class MastodonAPIController{
 											respObj=null;
 									}
 								}catch(JsonIOException|JsonSyntaxException x){
+									Log.w(TAG, "response_parse_failed "+req.getMethod()+" "+diagPath(req)+" status="+response.code()+" "+x.getClass().getSimpleName());
 									if(BuildConfig.DEBUG && !req.isSensitiveRequest())
 										Log.w(TAG, logTag(session)+response+" error parsing or reading body", x);
 									req.onError(req.isSensitiveRequest() ? "服务器响应格式无效，请重试" : x.getLocalizedMessage(), response.code(), req.isSensitiveRequest() ? null : x);
@@ -262,6 +274,7 @@ public class MastodonAPIController{
 								try{
 									req.validateAndPostprocessResponse(respObj, response);
 								}catch(IOException x){
+									Log.w(TAG, "response_invalid "+req.getMethod()+" "+diagPath(req)+" status="+response.code()+" "+x.getClass().getSimpleName());
 									if(BuildConfig.DEBUG && !req.isSensitiveRequest())
 										Log.w(TAG, logTag(session)+response+" error post-processing or validating response", x);
 									req.onError(x.getLocalizedMessage(), response.code(), x);
@@ -279,6 +292,7 @@ public class MastodonAPIController{
 									error=decodeError(req, response, json);
 								}catch(IOException invalid){ error=null; }
 								if(!req.canceled && req.acceptsRemoteResponse()){
+									if(error==null) Log.w(TAG, "http_error "+req.getMethod()+" "+diagPath(req)+" status="+response.code());
 									if(error!=null) req.onError(error);
 									else req.onError("HTTP "+response.code(), response.code(), null);
 								}

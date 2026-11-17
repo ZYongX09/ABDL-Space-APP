@@ -42,6 +42,10 @@ public final class ContentAccessCoordinator{
 		public boolean isCurrent(){ return coordinator.current(this); }
 		public boolean sameIdentity(){ return session==coordinator.session && token==session.token && Objects.equals(value, token==null ? null : token.accessToken) && coordinator.identityCurrent(); }
 		public boolean canRead(){ return isCurrent() && coordinator.getSnapshot().isOpen(); }
+		/** Only a confirmed "verification required" blocks dispatch. Unknown/unavailable states let the
+		 * server answer authoritatively (it withholds content itself), so a probe outage no longer turns
+		 * every startup request into a synthetic 503 toast. Local cache reads stay strict via canRead(). */
+		public boolean canDispatch(){ ContentAccessCoordinator.Snapshot value=coordinator.getSnapshot(); return isCurrent() && value.state!=ContentAccess.State.BABY_VERIFICATION_REQUIRED; }
 		public String mediaScope(){ return coordinator.mediaScope+"-"+generation; }
 		/** An open header is never authority to clear a gate. Only the latest GET can do that. */
 		public void receiveHeader(String header){ coordinator.dispatch.accept(()->coordinator.applyHeader(this, header)); }
