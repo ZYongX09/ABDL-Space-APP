@@ -264,7 +264,7 @@ public class MastodonAPIController{
 											respObj=null;
 									}
 								}catch(JsonIOException|JsonSyntaxException x){
-									Log.w(TAG, "response_parse_failed "+req.getMethod()+" "+diagPath(req)+" status="+response.code()+" "+x.getClass().getSimpleName());
+									String parseWhy=x.getClass().getSimpleName()+": "+x.getMessage(); Log.w(TAG, "response_parse_failed "+req.getMethod()+" "+diagPath(req)+" status="+response.code()+" "+(parseWhy.length()>180?parseWhy.substring(0,180):parseWhy));
 									if(BuildConfig.DEBUG && !req.isSensitiveRequest())
 										Log.w(TAG, logTag(session)+response+" error parsing or reading body", x);
 									req.onError(req.isSensitiveRequest() ? "服务器响应格式无效，请重试" : x.getLocalizedMessage(), response.code(), req.isSensitiveRequest() ? null : x);

@@ -63,6 +63,7 @@ public class SettingsMainFragment extends BaseSettingsFragment<Object>{
 		items.add(new SectionHeaderListItem(R.string.settings_accounts));
 		for(AccountSession session:AccountSessionManager.getInstance().getLoggedInAccounts()){
 			ImageLoaderRequest req;
+			android.util.Log.d("AVATARDBG", "self avatar="+(session.self.avatar==null?"null":session.self.avatar.substring(0,Math.min(110,session.self.avatar.length())))+" static="+(session.self.avatarStatic==null?"null":session.self.avatarStatic.substring(0,Math.min(110,session.self.avatarStatic.length()))));
 			if(session.self.avatar!=null)
 				req=new UrlImageLoaderRequest(GlobalUserPreferences.playGifs ? session.self.avatar : session.self.avatarStatic, V.dp(50), V.dp(50));
 			else

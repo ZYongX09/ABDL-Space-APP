@@ -7,12 +7,16 @@ import android.content.pm.PackageManager;
 import android.content.res.ColorStateList;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.ProgressBar;
@@ -45,6 +49,7 @@ import org.joinmastodon.android.ui.views.BabyVerificationProgressView;
 import org.joinmastodon.android.verification.VerificationImageProcessor;
 import org.joinmastodon.android.verification.VerificationPendingCapture;
 import org.joinmastodon.android.verification.VerificationSessionGuard;
+import org.joinmastodon.android.verification.VerificationStagePacer;
 import org.joinmastodon.android.verification.VerificationUploader;
 
 import java.io.File;
@@ -53,6 +58,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.FormatStyle;
 import java.util.ArrayList;
+import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -87,8 +93,18 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 	private View loadingState, formCard, messageCard;
 	private BabyVerificationProgressView progressSteps;
 	private TextView loadingText, quotaValue, formNote, messageTitle, messageBody;
-	private EditText qqInput;
-	private CheckBox adult;
+	private View messageScroll, requirementsPage, uploadingPage, statusPage;
+	private TextView reqCountdown, reqStep2, reqStep4, reqUserValue, reqTextValue, statusTitle, statusSubtitle;
+	private LinearLayout statusContent;
+	private Button statusPrimary, statusSecondary;
+	private Button reqStart;
+	private final ImageView[] upIcons=new ImageView[3];
+	private final ProgressBar[] upProgress=new ProgressBar[3];
+	private VerificationStagePacer pacer;
+	private final Handler uiHandler=new Handler(Looper.getMainLooper());
+	private Runnable countdownTick, submitTick;
+	private String pendingSubmitId;
+	private int uploadAttempts;
 	private Button startButton, messagePrimary, messageSecondary;
 	private ProgressBar messageProgress;
 
@@ -115,8 +131,24 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 		formCard=view.findViewById(R.id.verification_form_card);
 		quotaValue=view.findViewById(R.id.verification_quota_value);
 		formNote=view.findViewById(R.id.verification_form_note);
-		qqInput=view.findViewById(R.id.verification_qq_input);
-		adult=view.findViewById(R.id.verification_adult_confirm);
+		messageScroll=view.findViewById(R.id.verification_message_scroll);
+		requirementsPage=view.findViewById(R.id.verification_requirements_page);
+		statusPage=view.findViewById(R.id.verification_status_page);
+		statusTitle=view.findViewById(R.id.vr_status_title);
+		statusSubtitle=view.findViewById(R.id.vr_status_subtitle);
+		statusContent=view.findViewById(R.id.vr_status_content);
+		statusPrimary=view.findViewById(R.id.vr_status_primary);
+		statusSecondary=view.findViewById(R.id.vr_status_secondary);
+		uploadingPage=view.findViewById(R.id.verification_uploading_page);
+		reqCountdown=view.findViewById(R.id.vr_req_countdown);
+		reqStep2=view.findViewById(R.id.vr_req_step2);
+		reqStep4=view.findViewById(R.id.vr_req_step4);
+		reqUserValue=view.findViewById(R.id.vr_req_user_value);
+		reqTextValue=view.findViewById(R.id.vr_req_text_value);
+		reqStart=view.findViewById(R.id.vr_req_start);
+		upIcons[0]=view.findViewById(R.id.vr_up_step1_icon); upIcons[1]=view.findViewById(R.id.vr_up_step2_icon); upIcons[2]=view.findViewById(R.id.vr_up_step3_icon);
+		upProgress[0]=view.findViewById(R.id.vr_up_step1_progress); upProgress[1]=view.findViewById(R.id.vr_up_step2_progress); upProgress[2]=view.findViewById(R.id.vr_up_step3_progress);
+		reqStart.setOnClickListener(v->launchCamera());
 		startButton=view.findViewById(R.id.verification_start_button);
 		messageCard=view.findViewById(R.id.verification_message_card);
 		messageTitle=view.findViewById(R.id.verification_message_title);
@@ -127,14 +159,6 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 		ViewCompat.setAccessibilityHeading(view.findViewById(R.id.verification_hero_title), true);
 		ViewCompat.setAccessibilityHeading(view.findViewById(R.id.verification_quota_title), true);
 		ViewCompat.setAccessibilityHeading(messageTitle, true);
-		qqInput.setSaveFromParentEnabled(false);
-		adult.setSaveFromParentEnabled(false);
-		adult.setOnCheckedChangeListener((button, checked)->updateStartEnabled());
-		qqInput.addTextChangedListener(new TextWatcher(){
-			@Override public void beforeTextChanged(CharSequence value, int start, int count, int after){}
-			@Override public void onTextChanged(CharSequence value, int start, int before, int count){ updateStartEnabled(); }
-			@Override public void afterTextChanged(Editable value){}
-		});
 		startButton.setOnClickListener(v->start());
 		viewReady=true;
 		if(ownsCapture(pendingCapture) && applicationId==null && !reconcileApplication){
@@ -210,34 +234,28 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 	private void renderState(State state, Certificate certificate, int generation){
 		if(certificate!=null && certificate.isActive()){
 			busy=false;
-			String detail=getString(R.string.verification_certificate_active_summary, certificate.generation);
-			String application=applicationSummary(state);
-			if(application!=null) detail=getString(R.string.verification_application_with_certificate, application, detail);
-			showMessage(BabyVerificationProgressView.STAGE_REVIEW, state.status()==Status.APPROVED, state.status()==Status.APPROVED ? getString(R.string.verification_status_approved) : applicationTitle(state), detail, false,
-					R.string.verification_certificate_title, v->openCertificate(certificate), R.string.verification_refresh, v->loadState());
+			showApprovedPage(state, certificate);
 			return;
 		}
 		switch(state.status()){
 			case APPROVED -> {
 				busy=false;
-				if(certificate!=null && certificate.isRevoked()){ showPendingOrForm(state, revokedDetail(certificate)); return; }
-				showMessage(BabyVerificationProgressView.STAGE_REVIEW, false, getString(R.string.verification_status_approved), getString(R.string.verification_certificate_pending_sync), false,
-						R.string.verification_refresh, v->loadState(), 0, null);
+				if(certificate!=null && certificate.isRevoked()){ showRevokedPage(certificate); return; }
+				showStatus(R.string.vr_approved_title, getString(R.string.verification_certificate_pending_sync), null,
+						R.string.verification_refresh, v->loadState(), R.string.vr_home, v->goHome());
 			}
-			case SUBMITTED, REVIEWING -> {
-				busy=false;
-				showMessage(BabyVerificationProgressView.STAGE_REVIEW, false, getString(R.string.verification_review_title), getString(R.string.verification_review_body), false,
-						R.string.verification_refresh, v->loadState(), 0, null);
-			}
+			case SUBMITTED -> { busy=false; showSubmittedPage(); }
+			case REVIEWING -> { busy=false; showReviewPage(state); }
 			case DRAFT -> loadDraftDetail(state.application.id, generation);
 			case REJECTED -> {
 				acknowledgeRejection(state.application.id);
 				busy=false;
-				showPendingOrForm(state, getString(R.string.verification_rejected_title)+"："+state.application.decisionNote);
+				showRejectedPage(state);
 			}
 			case NOT_STARTED, CANCELLED -> {
 				busy=false;
-				showPendingOrForm(state, certificate!=null && certificate.isRevoked() ? revokedDetail(certificate) : null);
+				if(certificate!=null && certificate.isRevoked()){ showRevokedPage(certificate); return; }
+				showPendingOrForm(state, null);
 			}
 		}
 	}
@@ -269,6 +287,7 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 	}
 
 	private void showForm(State state, String note){
+		if(!state.config.enabled || state.quota.remaining<=0){ showUnavailablePage(state); return; }
 		showOnly(formCard);
 		progressSteps.setStage(BabyVerificationProgressView.STAGE_INFORMATION, false);
 		quotaValue.setText(getString(R.string.verification_quota_remaining, state.quota.remaining, state.quota.limit));
@@ -285,6 +304,7 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 		if(!ownsCapture(pendingCapture)){ showAccountMismatch(); return; }
 		if(pendingCapture.expiresAt()<=System.currentTimeMillis()/1000){ showExpiredCapture(); return; }
 		boolean hasPhoto=pendingCapture.hasRecoverablePhoto(getActivity());
+		if(!hasPhoto){ showRequirements(pendingCapture); return; }
 		showMessage(BabyVerificationProgressView.STAGE_PHOTO, false, getString(R.string.verification_capture_title),
 				hasPhoto ? getString(R.string.verification_processing_photo_body) : pendingCapture.requirement(), false,
 				hasPhoto ? R.string.verification_continue_submit : R.string.verification_continue_capture,
@@ -305,13 +325,7 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 	}
 
 	private void start(){
-		if(!sessionValid() || busy || currentState==null || !formAvailable || !adult.isChecked()) return;
-		String qq=qqInput.getText().toString().trim();
-		if(!qq.matches("\\d{5,20}")){
-			qqInput.setError(getString(R.string.verification_qq_invalid));
-			qqInput.requestFocus();
-			return;
-		}
+		if(!sessionValid() || busy || currentState==null || !formAvailable) return;
 		busy=true;
 		updateStartEnabled();
 		showMessage(BabyVerificationProgressView.STAGE_INFORMATION, false, getString(R.string.verification_capture_preparing), getString(R.string.verification_retry_safe), true, 0, null, 0, null);
@@ -322,8 +336,8 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 				guard.done(request);
 				if(!guard.live(generation) || !sessionValid()) return;
 				captureSession=result;
-				String requirement=result.requirement(session.self.id, qq);
-				pendingCapture=new VerificationPendingCapture(result.id, qq, currentState.config.declarationVersion, requirement, result.expiresAt, currentState.config.maxEvidenceSize, accountID, ownerUserId());
+				String requirement=result.requirement(String.valueOf(session.self.id));
+				pendingCapture=new VerificationPendingCapture(result.id, currentState.config.declarationVersion, requirement, result.expiresAt, currentState.config.maxEvidenceSize, accountID, ownerUserId(), result.paperShape, result.foldInstruction, result.placementInstruction, result.randomText);
 				try{
 					pendingCapture.save(getActivity());
 					launchCamera();
@@ -344,7 +358,68 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 		}).exec(accountID);
 	}
 
+
+	/** Structured capture requirements with a live countdown; legacy drafts fall back to the stored text. */
+	private void showRequirements(VerificationPendingCapture capture){
+		if(requirementsPage==null) return;
+		String shape=capture.paperShape(), fold=capture.foldInstruction(), place=capture.placementInstruction(), random=capture.randomText();
+		if(shape!=null && fold!=null){ reqStep2.setText(getString(R.string.vr_req_step2, shape, fold)); reqStep2.setVisibility(View.VISIBLE); }
+		else reqStep2.setVisibility(View.GONE);
+		if(place!=null) reqStep4.setText(getString(R.string.vr_req_step4, place));
+		else reqStep4.setText(capture.requirement());
+		reqUserValue.setText(String.valueOf(capture.userId()));
+		reqTextValue.setText(random==null ? "—" : random);
+		showOnly(requirementsPage);
+		uploadAttempts=0;
+		startCountdown(capture.expiresAt());
+	}
+
+	private void startCountdown(long expiresAt){
+		stopCountdown();
+		countdownTick=new Runnable(){
+			@Override public void run(){
+				if(reqCountdown==null || !viewReady) return;
+				long left=expiresAt-System.currentTimeMillis()/1000;
+				if(left<=0){ stopCountdown(); showExpiredCapture(); return; }
+				reqCountdown.setText(String.format(Locale.US,"%02d:%02d",left/60,left%60));
+				uiHandler.postDelayed(this,1000);
+			}
+		};
+		uiHandler.post(countdownTick);
+	}
+
+	private void stopCountdown(){
+		if(countdownTick!=null){ uiHandler.removeCallbacks(countdownTick); countdownTick=null; }
+	}
+
+	/** Upload page with three steps; each step keeps a one-second readability floor. */
+	private void showUploading(){
+		if(uploadingPage==null) return;
+		showOnly(uploadingPage);
+		if(pacer!=null){ pacer.dispose(); pacer=null; }
+		pacer=new VerificationStagePacer(step->{
+			markUploadingSteps(step);
+			if(step==3 && pendingSubmitId!=null){
+				if(submitTick!=null) uiHandler.removeCallbacks(submitTick);
+				String target=pendingSubmitId;
+				submitTick=()->submitApplication(target,false);
+				uiHandler.postDelayed(submitTick,1000);
+			}
+		});
+		markUploadingSteps(1);
+		pacer.reach(1);
+	}
+
+	private void markUploadingSteps(int completed){
+		for(int i=0;i<3;i++){
+			if(upIcons[i]==null || upProgress[i]==null) continue;
+			upIcons[i].setVisibility(i<completed ? View.VISIBLE : View.INVISIBLE);
+			upProgress[i].setVisibility(i==completed ? View.VISIBLE : View.INVISIBLE);
+		}
+	}
+
 	private void launchCamera(){
+		stopCountdown();
 		if(pendingCapture==null) pendingCapture=findPendingCapture();
 		if(!ownsCapture(pendingCapture)){ loadState(); return; }
 		if(getActivity().checkSelfPermission(Manifest.permission.CAMERA)!=PackageManager.PERMISSION_GRANTED){
@@ -571,7 +646,7 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 		busy=true;
 		beginLocalFlow();
 		int token=flowGeneration;
-		VerificationRequest<ApplicationResult> request=VerificationRequest.createApplication(capture.sessionId(), capture.qq(), capture.declarationVersion());
+		VerificationRequest<ApplicationResult> request=VerificationRequest.createApplication(capture.sessionId(), capture.declarationVersion());
 		flowRequests.add(request);
 		request.setCallback(new Callback<>(){
 			@Override public void onSuccess(ApplicationResult result){
@@ -634,17 +709,19 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 		beginLocalFlow();
 		int token=flowGeneration;
 		busy=true;
-		showMessage(BabyVerificationProgressView.STAGE_PHOTO, false, getString(R.string.verification_status_uploading), getString(R.string.verification_uploading_body), true, 0, null, 0, null);
+		uploadAttempts++;
+		showUploading();
 		uploader=new VerificationUploader(session, new VerificationUploader.UploadListener(){
 			@Override public void onStateChanged(VerificationUploader.State state, VerificationUploader.Recovery value){
 				if(!flowLive(token)) return;
-				if(state==VerificationUploader.State.AUTHORIZING || state==VerificationUploader.State.UPLOADING || state==VerificationUploader.State.COMPLETING)
-					showMessage(BabyVerificationProgressView.STAGE_PHOTO, false, getString(R.string.verification_status_uploading), getString(R.string.verification_uploading_body), true, 0, null, 0, null);
+				if(state==VerificationUploader.State.COMPLETING && pacer!=null) pacer.reach(2);
 			}
 			@Override public void onSuccess(EvidenceComplete result){
 				if(!flowLive(token)) return;
 				uploader=null;
-				submitApplication(id, false);
+				// Keep the last step visible for its minimum duration before submitting.
+				pendingSubmitId=id;
+				if(pacer!=null) pacer.reach(3); else submitApplication(id, false);
 			}
 			@Override public void onError(VerificationUploader.UploadError error){
 				if(!flowLive(token)) return;
@@ -665,14 +742,7 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 	}
 
 	private void handleUploadError(String id, VerificationImageProcessor.Result image, VerificationUploader.UploadError error){
-		if(error.requiresNewCapture || error.requiresLocalImage){
-			showMessage(BabyVerificationProgressView.STAGE_PHOTO, false, getString(R.string.verification_photo_retake_required), errorText(error), false,
-					R.string.verification_discard_draft, v->confirmDiscardCurrentDraft(), R.string.verification_refresh, v->loadState());
-			return;
-		}
-		View.OnClickListener retry=error.retryable && error.recovery!=null ? v->startUploader(id, image, error.recovery) : v->loadState();
-		showMessage(BabyVerificationProgressView.STAGE_PHOTO, false, getString(R.string.verification_state_error), errorText(error), false,
-				R.string.verification_retry, retry, R.string.verification_discard_draft, v->confirmDiscardCurrentDraft());
+		showFailedPage(id, image, error);
 	}
 
 	private void submitApplication(String id, boolean retriedAfterCheck){
@@ -926,13 +996,15 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 	private void showOnly(View target){
 		loadingState.setVisibility(target==loadingState ? View.VISIBLE : View.GONE);
 		formCard.setVisibility(target==formCard ? View.VISIBLE : View.GONE);
-		messageCard.setVisibility(target==messageCard ? View.VISIBLE : View.GONE);
+		messageScroll.setVisibility(target==messageCard ? View.VISIBLE : View.GONE);
+		requirementsPage.setVisibility(target==requirementsPage ? View.VISIBLE : View.GONE);
+		uploadingPage.setVisibility(target==uploadingPage ? View.VISIBLE : View.GONE);
+		statusPage.setVisibility(target==statusPage ? View.VISIBLE : View.GONE);
 	}
 
 	private void updateStartEnabled(){
 		if(startButton==null) return;
-		String value=qqInput==null ? "" : qqInput.getText().toString().trim();
-		startButton.setEnabled(!busy && formAvailable && adult!=null && adult.isChecked() && value.matches("\\d{5,20}"));
+		startButton.setEnabled(!busy && formAvailable);
 	}
 
 	private void continueCurrentDraft(){
@@ -990,10 +1062,204 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 				R.string.verification_refresh, v->loadState(), 0, null);
 	}
 
+
+	// ===== Redesigned status pages (2026-11 design) =====
+
+	private interface ContentBuilder{ void build(LinearLayout parent); }
+
+	private void showStatus(int title, CharSequence subtitle, ContentBuilder content, int primaryLabel, View.OnClickListener primary,
+			int secondaryLabel, View.OnClickListener secondary){
+		showOnly(statusPage);
+		statusTitle.setText(title);
+		statusSubtitle.setText(subtitle==null ? "" : subtitle);
+		statusSubtitle.setVisibility(subtitle==null || subtitle.length()==0 ? View.GONE : View.VISIBLE);
+		statusContent.removeAllViews();
+		if(content!=null) content.build(statusContent);
+		bindButton(statusPrimary, primaryLabel, primary);
+		bindButton(statusSecondary, secondaryLabel, secondary);
+		scroll.post(()->scroll.scrollTo(0,0));
+	}
+
+	private TextView vrText(String value, float size, int color, boolean bold){
+		TextView view=new TextView(getActivity());
+		view.setText(value);
+		view.setTextSize(size);
+		view.setTextColor(getResources().getColor(color, getActivity().getTheme()));
+		if(bold) view.setTypeface(view.getTypeface(), android.graphics.Typeface.BOLD);
+		view.setLineSpacing(0, 1.12f);
+		return view;
+	}
+
+	private LinearLayout vrCard(LinearLayout parent, String heading, String badge, int badgeBackground, int badgeColor){
+		LinearLayout card=new LinearLayout(getActivity());
+		card.setOrientation(LinearLayout.VERTICAL);
+		card.setBackgroundResource(R.drawable.vr_bg_card);
+		int padding=dp(16);
+		card.setPadding(padding, padding, padding, padding);
+		LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+		params.topMargin=dp(12);
+		parent.addView(card, params);
+		if(heading!=null || badge!=null){
+			LinearLayout header=new LinearLayout(getActivity());
+			header.setOrientation(LinearLayout.HORIZONTAL);
+			header.setGravity(android.view.Gravity.CENTER_VERTICAL);
+			card.addView(header, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+			TextView title=vrText(heading==null ? "" : heading, 12f, R.color.vr_text_primary, true);
+			header.addView(title, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+			if(badge!=null){
+				TextView pill=vrText(badge, 9.5f, badgeColor, true);
+				pill.setBackgroundResource(badgeBackground);
+				int hp=dp(8), vp=dp(3);
+				pill.setPadding(hp, vp, hp, vp);
+				header.addView(pill);
+			}
+		}
+		return card;
+	}
+
+	private void vrDivider(LinearLayout card){
+		View line=new View(getActivity());
+		line.setBackgroundColor(getResources().getColor(R.color.vr_border, getActivity().getTheme()));
+		LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, Math.max(1, dp(0.7f)));
+		params.topMargin=dp(12); params.bottomMargin=dp(12);
+		card.addView(line, params);
+	}
+
+	private void vrFact(LinearLayout card, String label, String value){
+		LinearLayout row=new LinearLayout(getActivity());
+		row.setOrientation(LinearLayout.HORIZONTAL);
+		LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+		params.topMargin=dp(8);
+		card.addView(row, params);
+		row.addView(vrText(label, 11f, R.color.vr_text_secondary, false), new LinearLayout.LayoutParams(dp(88), LinearLayout.LayoutParams.WRAP_CONTENT));
+		row.addView(vrText(value, 11f, R.color.vr_text_primary, true), new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+	}
+
+	private void vrStep(LinearLayout card, String title, String state, int color){
+		LinearLayout row=new LinearLayout(getActivity());
+		row.setOrientation(LinearLayout.HORIZONTAL);
+		row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+		LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+		params.topMargin=dp(10);
+		card.addView(row, params);
+		row.addView(vrText(title, 12.5f, R.color.vr_text_primary, true), new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+		row.addView(vrText(state, 10.5f, color, true));
+	}
+
+	private String vrTime(Long seconds){
+		if(seconds==null || seconds<=0) return "—";
+		return new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.CHINA).format(new java.util.Date(seconds*1000L));
+	}
+
+	private String vrShortId(String id){
+		if(id==null || id.length()<=20) return id==null ? "—" : id;
+		return id.substring(0,8)+"…"+id.substring(id.length()-6);
+	}
+
+	private int dp(float value){ return Math.round(value*getResources().getDisplayMetrics().density); }
+	private void goHome(){ if(getActivity()!=null) getActivity().onBackPressed(); }
+
+	private void showSubmittedPage(){
+		showStatus(R.string.vr_submitted_title, getString(R.string.vr_submitted_subtitle), null,
+				R.string.vr_done, v->goHome(), 0, null);
+	}
+
+	private void showReviewPage(State state){
+		String submitted=state.application==null ? null : vrTime(state.application.submittedAt);
+		showStatus(R.string.vr_review_title, getString(R.string.vr_review_subtitle), parent->{
+			LinearLayout card=vrCard(parent, null, null, 0, 0);
+			vrStep(card, getString(R.string.vr_review_step1), getString(R.string.vr_review_step1_state), R.color.vr_success);
+			vrStep(card, getString(R.string.vr_review_step2), getString(R.string.vr_review_step2_state), R.color.vr_primary);
+			vrStep(card, getString(R.string.vr_review_step3), getString(R.string.vr_review_step3_state), R.color.vr_text_muted);
+			vrDivider(card);
+			vrFact(card, getString(R.string.vr_submitted_at), submitted==null ? "—" : submitted);
+		}, R.string.vr_home, v->goHome(), 0, null);
+	}
+
+	private void showApprovedPage(State state, Certificate certificate){
+		String holder=String.valueOf(ownerUserId());
+		showStatus(R.string.vr_approved_title, getString(R.string.vr_approved_subtitle), parent->{
+			LinearLayout card=vrCard(parent, getString(R.string.vr_certificate_card), getString(R.string.vr_active_badge), R.drawable.vr_bg_success_pill, R.color.vr_success_text);
+			vrDivider(card);
+			vrFact(card, getString(R.string.vr_holder), getString(R.string.vr_user_prefix, holder));
+			vrFact(card, getString(R.string.vr_cert_status), getString(R.string.vr_valid));
+			vrFact(card, getString(R.string.vr_verified_at), vrTime(certificate.issuedAt));
+		}, R.string.vr_view_certificate, v->openCertificate(certificate), R.string.vr_home, v->goHome());
+	}
+
+
+	private void showRejectedPage(State state){
+		org.joinmastodon.android.model.verification.VerificationModels.Application app=state.application;
+		showStatus(R.string.vr_rejected_title, getString(R.string.vr_rejected_subtitle), parent->{
+			LinearLayout card=vrCard(parent, getString(R.string.vr_reject_reason), getString(R.string.vr_retake_badge), R.drawable.vr_bg_danger_pill, R.color.vr_danger);
+			vrDivider(card);
+			TextView reason=vrText(app==null || app.decisionNote==null ? "—" : app.decisionNote, 11.5f, R.color.vr_text_secondary, false);
+			card.addView(reason);
+			vrDivider(card);
+			vrFact(card, getString(R.string.vr_submitted_at), vrTime(app==null ? null : app.submittedAt));
+			vrFact(card, getString(R.string.vr_reviewed_at), vrTime(app==null ? null : app.decidedAt));
+		}, R.string.vr_reapply, v->{ if(app!=null) acknowledgeRejection(app.id); loadState(); }, 0, null);
+	}
+
+	private void showRevokedPage(Certificate certificate){
+		showStatus(R.string.vr_revoked_title, getString(R.string.vr_revoked_subtitle), parent->{
+			LinearLayout card=vrCard(parent, getString(R.string.vr_revoke_info), getString(R.string.vr_revoked_badge), R.drawable.vr_bg_neutral_pill, R.color.vr_text_secondary);
+			vrDivider(card);
+			vrFact(card, getString(R.string.vr_cert_id), vrShortId(certificate.id));
+			vrFact(card, getString(R.string.vr_issued_at), vrTime(certificate.issuedAt));
+			vrFact(card, getString(R.string.vr_revoked_at), vrTime(certificate.revokedAt));
+			LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+			params.topMargin=dp(10);
+			TextView reason=vrText(certificate.revokeReason==null ? "—" : certificate.revokeReason, 11.5f, R.color.vr_text_primary, false);
+			card.addView(reason, params);
+		}, R.string.vr_reapply, v->loadState(), 0, null);
+	}
+
+	private void showUnavailablePage(State state){
+		showStatus(R.string.vr_unavailable_title, getString(R.string.vr_unavailable_subtitle), parent->{
+			LinearLayout card=vrCard(parent, getString(R.string.vr_application_info), getString(R.string.vr_not_open), R.drawable.vr_bg_neutral_pill, R.color.vr_text_secondary);
+			vrDivider(card);
+			vrFact(card, getString(R.string.vr_cert_state_label), getString(R.string.vr_not_open));
+			vrFact(card, getString(R.string.vr_monthly_quota), getString(R.string.vr_quota_format, state.quota.remaining, state.quota.limit));
+		}, R.string.vr_home, v->goHome(), 0, null);
+	}
+
+	private void showExpiredPage(){
+		long expires=pendingCapture==null ? 0 : pendingCapture.expiresAt();
+		int ttl=currentState==null || currentState.config==null ? 900 : currentState.config.captureTtlSeconds;
+		int minutes=Math.max(1, ttl/60);
+		long started=expires>0 ? expires-ttl : 0;
+		showStatus(R.string.vr_expired_title, getString(R.string.vr_expired_subtitle, minutes), parent->{
+			LinearLayout card=vrCard(parent, getString(R.string.vr_session_info), getString(R.string.vr_expired_badge), R.drawable.vr_bg_warning_pill, R.color.vr_warning);
+			vrDivider(card);
+			vrFact(card, getString(R.string.vr_started_at), vrTime(started));
+			vrFact(card, getString(R.string.vr_expired_at), vrTime(expires));
+		}, R.string.vr_restart, v->cancelPendingCapture(true), R.string.vr_home, v->goHome());
+	}
+
+	private void showFailedPage(String id, VerificationImageProcessor.Result image, VerificationUploader.UploadError error){
+		String code=error.code==null || error.code.isBlank() ? "UPLOAD_FAILED" : error.code;
+		boolean retake=error.requiresNewCapture || error.requiresLocalImage;
+		int badgeRes=retake ? R.string.vr_retake_needed : error.outcomeUnknown ? R.string.vr_unknown_badge : R.string.vr_retry_badge;
+		int badgeBg=error.outcomeUnknown ? R.drawable.vr_bg_warning_pill : R.drawable.vr_bg_danger_pill;
+		int badgeColor=error.outcomeUnknown ? R.color.vr_warning : R.color.vr_danger;
+		View.OnClickListener action = retake ? v->confirmDiscardCurrentDraft()
+				: error.retryable && error.recovery!=null ? v->startUploader(id, image, error.recovery)
+				: v->loadState();
+		int label = retake ? R.string.vr_retake : error.retryable && error.recovery!=null ? R.string.vr_retry : R.string.vr_check_result;
+		showStatus(R.string.vr_failed_title, getString(R.string.vr_failed_subtitle), parent->{
+			LinearLayout card=vrCard(parent, getString(R.string.vr_upload_status), getString(badgeRes), badgeBg, badgeColor);
+			vrStep(card, getString(R.string.vr_encrypted_done), getString(R.string.vr_review_step1_state), R.color.vr_success);
+			vrStep(card, getString(R.string.vr_upload_interrupted, code), getString(R.string.vr_failed_state), R.color.vr_danger);
+			vrDivider(card);
+			vrFact(card, getString(R.string.vr_error_code), code);
+			vrFact(card, getString(R.string.vr_attempts), getString(R.string.vr_attempts_format, uploadAttempts));
+		}, label, action, 0, null);
+	}
+
 	private void showExpiredCapture(){
 		busy=false;
-		showMessage(BabyVerificationProgressView.STAGE_PHOTO, false, getString(R.string.verification_photo_retake_required), getString(R.string.verification_capture_expired), false,
-				R.string.verification_continue_capture, v->cancelPendingCapture(true), 0, null);
+		showExpiredPage();
 	}
 
 	private void showPendingOrForm(State state, String note){
@@ -1036,6 +1302,9 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 		imageGeneration++;
 		if(uploader!=null) uploader.cancel();
 		uploader=null;
+		stopCountdown();
+		if(submitTick!=null){ uiHandler.removeCallbacks(submitTick); submitTick=null; }
+		if(pacer!=null){ pacer.dispose(); pacer=null; }
 		for(VerificationRequest<?> request:new ArrayList<>(flowRequests)) request.cancel();
 		flowRequests.clear();
 		guard.cancel();
@@ -1043,8 +1312,7 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 		loadingState=formCard=messageCard=null;
 		progressSteps=null;
 		loadingText=quotaValue=formNote=messageTitle=messageBody=null;
-		qqInput=null;
-		adult=null;
+		messageScroll=null;
 		startButton=messagePrimary=messageSecondary=null;
 		messageProgress=null;
 		super.onDestroyView();

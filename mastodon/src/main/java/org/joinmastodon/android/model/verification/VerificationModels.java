@@ -44,7 +44,7 @@ public final class VerificationModels{
 
 	public static class Application extends BaseModel{
 		public String id, status, decisionNote;
-		public Long submittedAt, rejectionAcknowledgedAt, createdAt, updatedAt;
+		public Long submittedAt, decidedAt, rejectionAcknowledgedAt, createdAt, updatedAt;
 		public transient Status parsedStatus;
 		@Override public void postprocess() throws ObjectValidationException{
 			if(!uuid(id)) throw new ObjectValidationException("认证申请响应无效");
@@ -62,7 +62,7 @@ public final class VerificationModels{
 		public List<Evidence> evidence;
 		@Override public void postprocess() throws ObjectValidationException{
 			super.postprocess();
-			if(userId<=0 || !uuid(captureSessionId) || qq==null || !qq.matches("\\d{5,20}") || !adultDeclaration || declarationVersion==null || declarationVersion.isBlank() || declaredAt==null || declaredAt<=0 || evidence==null)
+			if(userId<=0 || !uuid(captureSessionId) || (qq!=null && !qq.isEmpty() && !qq.matches("\\d{5,20}")) || !adultDeclaration || declarationVersion==null || declarationVersion.isBlank() || declaredAt==null || declaredAt<=0 || evidence==null)
 				throw new ObjectValidationException("认证申请详情响应无效");
 			for(Evidence item:evidence){ if(item==null) throw new ObjectValidationException("认证照片响应无效"); item.postprocess(); }
 		}
@@ -110,8 +110,8 @@ public final class VerificationModels{
 			if("active".equals(status) && (paperShape==null || foldInstruction==null || placementInstruction==null || randomText==null)) throw new ObjectValidationException("本次认证要求不完整");
 			// Expiry is a valid server state; the caller must guide a retake rather than classify it as malformed JSON.
 		}
-		public String requirement(String userId, String qq){
-			return "裁剪出"+paperShape+"纸条，"+foldInstruction+"；在纸条上依次写用户 ID "+userId+"、QQ "+qq+"、认证文本“"+randomText+"”；"+placementInstruction+"，并拍下同时包含完整穿着的纸尿裤和纸条的照片。";
+		public String requirement(String userId){
+			return "裁剪出"+paperShape+"纸条，"+foldInstruction+"；在纸条上依次写用户 ID "+userId+"、认证文本“"+randomText+"”；"+placementInstruction+"，并拍下同时包含完整穿着的纸尿裤和纸条的照片。";
 		}
 	}
 

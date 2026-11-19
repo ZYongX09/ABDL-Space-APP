@@ -10,7 +10,7 @@ import java.util.Properties;
 import androidx.annotation.Nullable;
 
 /** Private, account-bound recovery state. Never infer ownership of legacy files. */
-public record VerificationPendingCapture(String sessionId, String qq, String declarationVersion, String requirement, long expiresAt, long maxEvidenceSize, String accountId, long userId){
+public record VerificationPendingCapture(String sessionId, String declarationVersion, String requirement, long expiresAt, long maxEvidenceSize, String accountId, long userId, String paperShape, String foldInstruction, String placementInstruction, String randomText){
 	private static final String FILE_NAME="pending.properties";
 
 	public boolean belongsTo(String account, long user){ return accountId!=null && accountId.equals(account) && userId>0 && userId==user; }
@@ -19,12 +19,15 @@ public record VerificationPendingCapture(String sessionId, String qq, String dec
 		if(!validSessionId(sessionId) || accountId==null || accountId.isBlank() || userId<=0) throw new IOException("无法保存认证拍摄状态");
 		Properties values=new Properties();
 		values.setProperty("session_id", sessionId);
-		values.setProperty("qq", qq);
 		values.setProperty("declaration_version", declarationVersion);
 		values.setProperty("requirement", requirement);
 		values.setProperty("expires_at", Long.toString(expiresAt));
 		values.setProperty("max_evidence_size", Long.toString(maxEvidenceSize));
 		values.setProperty("account_id", accountId);
+		if(paperShape!=null) values.setProperty("paper_shape", paperShape);
+		if(foldInstruction!=null) values.setProperty("fold_instruction", foldInstruction);
+		if(placementInstruction!=null) values.setProperty("placement_instruction", placementInstruction);
+		if(randomText!=null) values.setProperty("random_text", randomText);
 		values.setProperty("user_id", Long.toString(userId));
 		File root=root(context, sessionId);
 		if(!MediaCameraContract.isControlledFile(context, root)) throw new IOException("无法保存认证拍摄状态");
@@ -54,10 +57,10 @@ public record VerificationPendingCapture(String sessionId, String qq, String dec
 		Properties values=properties(context, sessionId);
 		if(values==null || account==null || user<=0 || !account.equals(values.getProperty("account_id")) || !Long.toString(user).equals(values.getProperty("user_id"))) return null;
 		try{
-			String qq=values.getProperty("qq"), version=values.getProperty("declaration_version"), requirement=values.getProperty("requirement");
+			String version=values.getProperty("declaration_version"), requirement=values.getProperty("requirement");
 			long expires=Long.parseLong(values.getProperty("expires_at", "0")), max=Long.parseLong(values.getProperty("max_evidence_size", "0"));
-			if(!sessionId.equals(values.getProperty("session_id")) || qq==null || !qq.matches("\\d{5,20}") || version==null || version.isBlank() || requirement==null || requirement.isBlank() || expires<=0 || max<1024) return null;
-			return new VerificationPendingCapture(sessionId, qq, version, requirement, expires, max, account, user);
+			if(!sessionId.equals(values.getProperty("session_id")) || version==null || version.isBlank() || requirement==null || requirement.isBlank() || expires<=0 || max<1024) return null;
+			return new VerificationPendingCapture(sessionId, version, requirement, expires, max, account, user, values.getProperty("paper_shape"), values.getProperty("fold_instruction"), values.getProperty("placement_instruction"), values.getProperty("random_text"));
 		}catch(Exception ignored){ return null; }
 	}
 

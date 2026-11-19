@@ -2,8 +2,12 @@ package org.joinmastodon.android.fragments.settings;
 
 import android.Manifest;
 import android.content.ContentValues;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.media.MediaScannerConnection;
 import android.net.Uri;
@@ -78,23 +82,60 @@ public class BabyVerificationCertificateFragment extends ToolbarFragment{
 		ScrollView scroll=new ScrollView(getActivity());
 		content=new LinearLayout(getActivity());
 		content.setOrientation(LinearLayout.VERTICAL);
-		content.setPadding(V.dp(16), V.dp(20), V.dp(16), V.dp(32));
+		content.setBackgroundColor(getResources().getColor(R.color.vr_page, getActivity().getTheme()));
+		content.setPadding(V.dp(20), V.dp(12), V.dp(20), V.dp(24));
 		scroll.addView(content);
 
 		status=new TextView(getActivity());
-		status.setTextAppearance(R.style.m3_body_large);
-		content.addView(status, new LinearLayout.LayoutParams(-1, -2));
+		status.setTextAppearance(R.style.TextAppearance_Mastodon_Verification2_Subtitle);
+		status.setGravity(android.view.Gravity.CENTER);
+		LinearLayout.LayoutParams statusParams=new LinearLayout.LayoutParams(-1, -2);
+		statusParams.bottomMargin=V.dp(12);
+		content.addView(status, statusParams);
 
+		android.widget.FrameLayout card=new android.widget.FrameLayout(getActivity());
+		card.setBackgroundResource(R.drawable.vr_bg_cert);
+		int pad=V.dp(10);
+		card.setPadding(pad, pad, pad, pad);
 		image=new ImageView(getActivity());
 		image.setAdjustViewBounds(true);
 		image.setContentDescription(getString(R.string.verification_certificate_qr_description));
-		LinearLayout.LayoutParams imageParams=new LinearLayout.LayoutParams(-1, -2);
-		imageParams.topMargin=V.dp(16);
-		content.addView(image, imageParams);
+		card.addView(image, new android.widget.FrameLayout.LayoutParams(-1, -2));
+		content.addView(card, new LinearLayout.LayoutParams(-1, -2));
 
-		refresh=button(R.string.verification_refresh, v->refresh(PendingAction.NONE), 16);
-		save=button(R.string.verification_certificate_save, v->save(), 8);
-		share=button(R.string.verification_certificate_share, v->refresh(PendingAction.SHARE), 8);
+		refresh=new Button(getActivity()); refresh.setVisibility(View.GONE);
+		save=new Button(getActivity(), null, 0, R.style.Widget_Mastodon_Verification2_PrimaryButton);
+		save.setText(R.string.vr_save_certificate);
+		save.setOnClickListener(v->save());
+		LinearLayout.LayoutParams saveParams=new LinearLayout.LayoutParams(-1, V.dp(52));
+		saveParams.topMargin=V.dp(18);
+		content.addView(save, saveParams);
+
+		LinearLayout row=new LinearLayout(getActivity());
+		row.setOrientation(LinearLayout.HORIZONTAL);
+		LinearLayout.LayoutParams rowParams=new LinearLayout.LayoutParams(-1, V.dp(52));
+		rowParams.topMargin=V.dp(10);
+		content.addView(row, rowParams);
+		Button copy=new Button(getActivity(), null, 0, R.style.Widget_Mastodon_Verification2_SecondaryButton);
+		copy.setText(R.string.vr_copy_link);
+		copy.setOnClickListener(v->copyLink());
+		share=new Button(getActivity(), null, 0, R.style.Widget_Mastodon_Verification2_SecondaryButton);
+		share.setText(R.string.vr_share_certificate);
+		share.setOnClickListener(v->refresh(PendingAction.SHARE));
+		LinearLayout.LayoutParams copyParams=new LinearLayout.LayoutParams(0, -1, 1f);
+		copyParams.rightMargin=V.dp(5);
+		LinearLayout.LayoutParams shareParams=new LinearLayout.LayoutParams(0, -1, 1f);
+		shareParams.leftMargin=V.dp(5);
+		row.addView(copy, copyParams);
+		row.addView(share, shareParams);
+
+		TextView footer=new TextView(getActivity());
+		footer.setText(R.string.vr_footer);
+		footer.setTextAppearance(R.style.TextAppearance_Mastodon_Verification2_Footer);
+		footer.setGravity(android.view.Gravity.CENTER);
+		LinearLayout.LayoutParams footerParams=new LinearLayout.LayoutParams(-1, -2);
+		footerParams.topMargin=V.dp(12);
+		content.addView(footer, footerParams);
 		viewReady=true;
 		refresh(PendingAction.NONE);
 		return scroll;
@@ -152,6 +193,7 @@ public class BabyVerificationCertificateFragment extends ToolbarFragment{
 		if(!viewReady || token!=generation || !sessionValid()) return;
 		if(certificate==null){
 			pendingAction=PendingAction.NONE;
+			status.setVisibility(View.VISIBLE);
 			status.setText(R.string.verification_certificate_pending_sync);
 			setActionsEnabled(false);
 			refresh.setEnabled(true);
@@ -159,6 +201,7 @@ public class BabyVerificationCertificateFragment extends ToolbarFragment{
 		}
 		if(certificate.isRevoked()){
 			pendingAction=PendingAction.NONE;
+			status.setVisibility(View.VISIBLE);
 			status.setText(getString(R.string.verification_certificate_revoked_detail, formatTime(certificate.revokedAt), certificate.revokeReason));
 			setActionsEnabled(false);
 			refresh.setEnabled(true);
@@ -176,6 +219,7 @@ public class BabyVerificationCertificateFragment extends ToolbarFragment{
 				return;
 			}
 			image.setImageBitmap(rendered);
+			status.setVisibility(View.GONE);
 			status.setText(getString(R.string.verification_certificate_active_summary, certificate.generation));
 			setActionsEnabled(true);
 			PendingAction action=pendingAction;
@@ -196,7 +240,15 @@ public class BabyVerificationCertificateFragment extends ToolbarFragment{
 				getString(R.string.verification_certificate_note_4),
 				getString(R.string.verification_certificate_note_5),
 		};
-		return BabyCertificateRenderer.render(value, notes);
+		boolean dark=(getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK)==Configuration.UI_MODE_NIGHT_YES;
+		return BabyCertificateRenderer.render(value, dark);
+	}
+
+	private void copyLink(){
+		if(certificate==null || !certificate.isActive()) return;
+		ClipboardManager clipboard=(ClipboardManager)getActivity().getSystemService(Context.CLIPBOARD_SERVICE);
+		clipboard.setPrimaryClip(ClipData.newPlainText("ABDL Space 宝宝认证证书", certificate.publicUrl()));
+		Toast.makeText(getActivity(), R.string.vr_copy_link_done, Toast.LENGTH_SHORT).show();
 	}
 
 	private void save(){

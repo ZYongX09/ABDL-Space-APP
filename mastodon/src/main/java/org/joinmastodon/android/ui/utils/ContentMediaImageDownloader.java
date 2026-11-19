@@ -48,8 +48,15 @@ public final class ContentMediaImageDownloader extends ImageDownloader{
 	@Override public boolean needsDiskCache(){ return false; }
 	@Override public boolean canHandleRequest(ImageLoaderRequest request){ return request instanceof UrlImageLoaderRequest url && isMedia(url.uri); }
 	@Override public Drawable getDrawable(ImageLoaderRequest request, boolean decode, ImageCache.ImageDownloadInfo info) throws IOException{
-		// Plain URL keys must never populate the global image cache with authenticated bytes.
-		if(!(request instanceof ScopedRequest scoped) || !scoped.current()) throw new IOException("Content media owner unavailable");
+		// Callers may hand us an unwrapped URL request (avatars, settings rows). Bind it to the current
+		// account/owner here instead of rejecting it, so authenticated bytes never enter the global cache.
+		if(!(request instanceof ScopedRequest)){
+			ImageLoaderRequest wrapped=scoped(request);
+			if(!(wrapped instanceof ScopedRequest scopedRequest) || !scopedRequest.current()) throw new IOException("Content media owner unavailable");
+			return getDrawable(scopedRequest,decode,info);
+		}
+		ScopedRequest scoped=(ScopedRequest)request;
+		if(!scoped.current()) throw new IOException("Content media owner unavailable");
 		Request http=new Request.Builder().url(scoped.uri.toString()).header("Authorization","Bearer "+scoped.tokenValue)
 				.header("Cache-Control","no-store").tag(ContentAccessCoordinator.Owner.class,scoped.owner).build();
 		Call call=client.newCall(http); if(info!=null) info.httpCall=call;

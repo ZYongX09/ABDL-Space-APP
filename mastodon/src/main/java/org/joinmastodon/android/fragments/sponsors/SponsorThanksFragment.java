@@ -281,9 +281,11 @@ public class SponsorThanksFragment extends ToolbarFragment{
 			itemView.setContentDescription(itemView.getContext().getString(R.string.sponsor_thanks_accessibility, item.rank, item.name()));
 			avatar.setImageResource(R.drawable.default_avatar);
 			String url=item.avatarStatic.isBlank() ? item.avatar : item.avatarStatic;
+			android.util.Log.d("AVATARDBG", "sponsor "+(url.length()>110?url.substring(0,110):url));
 			if(!url.isBlank()) avatarRequest=ImageCache.getInstance(avatar.getContext()).get(
 					new UrlImageLoaderRequest(url, V.dp(56), V.dp(56)), null, new ImageLoaderCallback(){
 				@Override public void onImageLoaded(ImageLoaderRequest request, android.graphics.drawable.Drawable image){
+					android.util.Log.d("AVATARDBG", "sponsor-ok");
 					// ImageCache callbacks may arrive off-main or after cancel. Binding owns both the request and UI post.
 					new Handler(Looper.getMainLooper()).post(()->{
 						if(binding==token){ avatarRequest=null; avatar.setImageDrawable(image); }

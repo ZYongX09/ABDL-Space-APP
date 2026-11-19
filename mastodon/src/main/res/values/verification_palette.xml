@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+	<!-- Verification redesign palette: light theme. Night overrides live in values-night. -->
+	<color name="vr_page">#FEFEFE</color>
+	<color name="vr_card">#F7F8FA</color>
+	<color name="vr_tile">#F2F3F6</color>
+	<color name="vr_info">#EEF3FF</color>
+	<color name="vr_border">#E1E1E1</color>
+	<color name="vr_text_primary">#1A1A1A</color>
+	<color name="vr_text_secondary">#6E6E73</color>
+	<color name="vr_text_muted">#8C8C93</color>
+	<color name="vr_primary">#2667FF</color>
+	<color name="vr_on_primary">#FFFFFF</color>
+	<color name="vr_success">#2F9E64</color>
+	<color name="vr_success_bg">#E7F7EC</color>
+	<color name="vr_success_text">#1B7A3A</color>
+	<color name="vr_danger">#CF4747</color>
+	<color name="vr_danger_bg">#FDEEEE</color>
+	<color name="vr_warning">#B7791F</color>
+	<color name="vr_warning_bg">#FDF2E3</color>
+	<color name="vr_neutral_bg">#ECEEF2</color>
+	<color name="vr_step_bg">#1A1A1A</color>
+	<color name="vr_step_text">#FFFFFF</color>
+	<color name="vr_progress_track">#E9EDF7</color>
+	<color name="vr_cert_bg">#F8F6FC</color>
+	<color name="vr_cert_border">#C3B7D7</color>
+	<color name="vr_cert_title">#2B2440</color>
+	<color name="vr_cert_body">#4B4165</color>
+	<color name="vr_cert_muted">#6D6280</color>
+</resources>
