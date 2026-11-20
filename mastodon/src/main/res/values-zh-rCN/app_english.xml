@@ -1060,6 +1060,8 @@
 	<string name="vr_cam_step3_fmt">%1$s，并拍下同时包含完整穿着的纸尿裤和纸条的照片</string>
 	<string name="vr_cam_meta_fmt">ID %1$s · %2$s</string>
 	<string name="vr_cam_remaining">认证剩余时间</string>
+	<string name="vr_cam_collapse">收起认证要求</string>
+	<string name="vr_cam_expand">展开认证要求</string>
 	<string name="vr_cam_preview_title">使用这张照片？</string>
 	<string name="vr_cam_retake">重拍</string>
 	<string name="vr_cam_use">使用这张照片</string>

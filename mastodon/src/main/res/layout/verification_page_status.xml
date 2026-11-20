@@ -26,6 +26,7 @@
 			android:tint="@color/vr_text_primary"/>
 
 		<TextView
+			android:id="@+id/verification_locale_pill_status"
 			android:layout_width="wrap_content"
 			android:layout_height="wrap_content"
 			android:layout_gravity="end|top"
@@ -91,7 +92,7 @@
 				android:id="@+id/vr_status_content"
 				android:layout_width="match_parent"
 				android:layout_height="wrap_content"
-				android:layout_marginTop="18dp"
+				android:layout_marginTop="10dp"
 				android:orientation="vertical"/>
 		</LinearLayout>
 	</ScrollView>
@@ -114,7 +115,7 @@
 
 		<Button
 			android:id="@+id/vr_status_secondary"
-			style="@style/Widget.Mastodon.Verification2.SecondaryButton"
+			style="@style/Widget.Mastodon.Verification2.TextButton"
 			android:layout_width="match_parent"
 			android:layout_height="43dp"
 			android:layout_marginTop="8dp"
@@ -124,6 +125,7 @@
 			android:layout_width="match_parent"
 			android:layout_height="wrap_content"
 			android:layout_marginTop="8dp"
+			android:gravity="center"
 			android:text="@string/vr_footer"
 			android:textAppearance="@style/TextAppearance.Mastodon.Verification2.Footer"/>
 	</LinearLayout>

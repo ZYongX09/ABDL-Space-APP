@@ -127,13 +127,29 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 	@Override
 	public View onCreateContentView(LayoutInflater inflater, ViewGroup container, Bundle state){
 		View view=inflater.inflate(R.layout.fragment_baby_verification, container, false);
+		org.joinmastodon.android.ui.verification.VerificationWindowMode.enter(getActivity());
 		ViewCompat.setOnApplyWindowInsetsListener(view, (v, insets)->{
-			v.setPadding(0, insets.getInsets(WindowInsetsCompat.Type.statusBars()).top, 0, 0);
+			// Content draws behind the status bar; the page's own top row keeps the safe inset.
+			v.setPadding(0, insets.getInsets(WindowInsetsCompat.Type.statusBars()).top,
+					0, insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom);
 			return insets;
 		});
 		for(int id : new int[]{R.id.verification_back_intro, R.id.verification_back_requirements, R.id.verification_back_uploading, R.id.verification_back_status}){
 			View back=view.findViewById(id);
 			if(back!=null) back.setOnClickListener(v->goHome());
+		}
+		boolean chinese=org.joinmastodon.android.ui.utils.AppLanguageManager.getEffectiveLocale(getActivity())
+				.getLanguage().startsWith("zh");
+		String other=chinese ? org.joinmastodon.android.ui.utils.AppLanguageManager.ENGLISH
+				: org.joinmastodon.android.ui.utils.AppLanguageManager.CHINESE;
+		for(int id : new int[]{R.id.verification_locale_pill, R.id.verification_locale_pill_requirements,
+				R.id.verification_locale_pill_uploading, R.id.verification_locale_pill_status}){
+			TextView pill=view.findViewById(id);
+			if(pill==null) continue;
+			pill.setText(chinese ? "ZH" : "EN");
+			pill.setOnClickListener(v->{
+				if(getActivity()!=null) org.joinmastodon.android.ui.utils.AppLanguageManager.setLanguage(getActivity(), other);
+			});
 		}
 		scroll=view.findViewById(R.id.verification_scroll);
 		progressSteps=view.findViewById(R.id.verification_progress_steps);
@@ -427,6 +443,8 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 	/** Upload page with three steps; each step keeps a one-second readability floor. */
 	private void showUploading(){
 		if(uploadingPage==null) return;
+		pendingSubmitId=null;
+		if(submitTick!=null){ uiHandler.removeCallbacks(submitTick); submitTick=null; }
 		showOnly(uploadingPage);
 		if(pacer!=null){ pacer.dispose(); pacer=null; }
 		pacer=new VerificationStagePacer(step->{
@@ -533,7 +551,7 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 		if(!ownsCapture(capture)){ showAccountMismatch(); return; }
 		beginLocalFlow();
 		busy=true;
-		showMessage(BabyVerificationProgressView.STAGE_PHOTO, false, getString(R.string.verification_processing_photo_title), getString(R.string.verification_processing_photo_body), true, 0, null, 0, null);
+		showUploading();
 		int generation=++imageGeneration;
 		File destination=capture.photoFile(getActivity());
 		try{
@@ -596,7 +614,7 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 		if(!ownsCapture(pendingCapture)) return;
 		beginLocalFlow();
 		busy=true;
-		showMessage(BabyVerificationProgressView.STAGE_PHOTO, false, getString(R.string.verification_processing_photo_title), getString(R.string.verification_processing_photo_body), true, 0, null, 0, null);
+		showUploading();
 		int generation=++imageGeneration;
 		VerificationPendingCapture capture=pendingCapture;
 		File file=capture.photoFile(getActivity());
@@ -650,7 +668,7 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 		beginLocalFlow();
 		int token=flowGeneration;
 		busy=true;
-		showMessage(BabyVerificationProgressView.STAGE_PHOTO, false, getString(R.string.verification_processing_photo_title), getString(R.string.verification_processing_photo_body), true, 0, null, 0, null);
+		showUploading();
 		VerificationRequest<CaptureSession> request=VerificationRequest.finishCapture(capture.sessionId());
 		flowRequests.add(request);
 		request.setCallback(new Callback<>(){
@@ -711,7 +729,7 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 		if(file.isFile()){
 			final VerificationUploader.Recovery resumeRecovery=recovery;
 			busy=true;
-			showMessage(BabyVerificationProgressView.STAGE_PHOTO, false, getString(R.string.verification_processing_photo_title), getString(R.string.verification_processing_photo_body), true, 0, null, 0, null);
+			showUploading();
 			int generation=++imageGeneration;
 			long maxSize=currentState==null ? VerificationImageProcessor.MAX_BYTES : currentState.config.maxEvidenceSize;
 			IMAGE_EXECUTOR.execute(()->{
@@ -1146,7 +1164,7 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 		int padding=dp(16);
 		card.setPadding(padding, padding, padding, padding);
 		LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-		params.topMargin=dp(12);
+		params.topMargin=dp(8);
 		parent.addView(card, params);
 		if(heading!=null || badge!=null){
 			LinearLayout header=new LinearLayout(getActivity());
@@ -1346,6 +1364,7 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 
 	@Override
 	public void onDestroyView(){
+		org.joinmastodon.android.ui.verification.VerificationWindowMode.exit(getActivity());
 		viewReady=false;
 		busy=false;
 		localFlow=false;

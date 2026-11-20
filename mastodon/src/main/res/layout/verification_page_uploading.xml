@@ -26,6 +26,7 @@
 			android:tint="@color/vr_text_primary"/>
 
 		<TextView
+			android:id="@+id/verification_locale_pill_uploading"
 			android:layout_width="wrap_content"
 			android:layout_height="wrap_content"
 			android:layout_gravity="end|top"
@@ -196,6 +197,7 @@
 		<TextView
 			android:layout_width="match_parent"
 			android:layout_height="wrap_content"
+			android:gravity="center"
 			android:text="@string/vr_footer"
 			android:textAppearance="@style/TextAppearance.Mastodon.Verification2.Footer"/>
 	</LinearLayout>

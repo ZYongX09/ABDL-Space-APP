@@ -1078,6 +1078,8 @@
 	<string name="vr_cam_step3_fmt">%1$s, and photograph the fully worn diaper together with the paper</string>
 	<string name="vr_cam_meta_fmt">ID %1$s · %2$s</string>
 	<string name="vr_cam_remaining">Time remaining</string>
+	<string name="vr_cam_collapse">Collapse requirements</string>
+	<string name="vr_cam_expand">Expand requirements</string>
 	<string name="vr_cam_preview_title">Use this photo?</string>
 	<string name="vr_cam_retake">Retake</string>
 	<string name="vr_cam_use">Use this photo</string>

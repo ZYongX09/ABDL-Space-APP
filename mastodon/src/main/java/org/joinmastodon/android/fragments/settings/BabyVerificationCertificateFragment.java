@@ -86,6 +86,7 @@ public class BabyVerificationCertificateFragment extends ToolbarFragment{
 	}
 
 	@Override public View onCreateContentView(LayoutInflater inflater, ViewGroup container, Bundle state){
+		org.joinmastodon.android.ui.verification.VerificationWindowMode.enter(getActivity());
 		ScrollView scroll=new ScrollView(getActivity());
 		content=new LinearLayout(getActivity());
 		content.setOrientation(LinearLayout.VERTICAL);
@@ -110,15 +111,22 @@ public class BabyVerificationCertificateFragment extends ToolbarFragment{
 		backParams.gravity=android.view.Gravity.START|android.view.Gravity.CENTER_VERTICAL;
 		bar.addView(back, backParams);
 		android.widget.TextView pill=new android.widget.TextView(getActivity());
-		pill.setText("ZH");
-		pill.setTextSize(12);
+		boolean chinese=org.joinmastodon.android.ui.utils.AppLanguageManager.getEffectiveLocale(getActivity())
+				.getLanguage().startsWith("zh");
+		pill.setText(chinese ? "ZH" : "EN");
+		pill.setTextSize(11);
 		pill.setTextColor(getResources().getColor(R.color.vr_text_primary, getActivity().getTheme()));
 		pill.setBackgroundResource(R.drawable.vr_bg_pill);
 		pill.setGravity(android.view.Gravity.CENTER);
-		pill.setPadding(V.dp(12), V.dp(5), V.dp(12), V.dp(5));
+		pill.setPadding(V.dp(9), V.dp(6), V.dp(7), V.dp(6));
 		pill.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_vr_globe_20, 0, 0, 0);
-		pill.setCompoundDrawablePadding(V.dp(6));
+		pill.setCompoundDrawablePadding(V.dp(5));
 		pill.setCompoundDrawableTintList(tint);
+		pill.setOnClickListener(v->{
+			if(getActivity()!=null) org.joinmastodon.android.ui.utils.AppLanguageManager.setLanguage(getActivity(),
+					chinese ? org.joinmastodon.android.ui.utils.AppLanguageManager.ENGLISH
+							: org.joinmastodon.android.ui.utils.AppLanguageManager.CHINESE);
+		});
 		android.widget.FrameLayout.LayoutParams pillParams=new android.widget.FrameLayout.LayoutParams(-2, -2);
 		pillParams.gravity=android.view.Gravity.END|android.view.Gravity.CENTER_VERTICAL;
 		bar.addView(pill, pillParams);
@@ -405,6 +413,7 @@ public class BabyVerificationCertificateFragment extends ToolbarFragment{
 	}
 
 	@Override public void onDestroyView(){
+		org.joinmastodon.android.ui.verification.VerificationWindowMode.exit(getActivity());
 		viewReady=false;
 		generation++;
 		pendingAction=PendingAction.NONE;
