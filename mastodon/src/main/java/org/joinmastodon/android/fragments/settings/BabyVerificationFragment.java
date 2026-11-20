@@ -126,8 +126,6 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 	@Override
 	public View onCreateContentView(LayoutInflater inflater, ViewGroup container, Bundle state){
 		View view=inflater.inflate(R.layout.fragment_baby_verification, container, false);
-		// The design is a full-screen page with its own top bar; the app toolbar would add a second one.
-		getToolbar().setVisibility(View.GONE);
 		ViewCompat.setOnApplyWindowInsetsListener(view, (v, insets)->{
 			v.setPadding(0, insets.getInsets(WindowInsetsCompat.Type.statusBars()).top, 0, 0);
 			return insets;
@@ -185,6 +183,9 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 		super.updateToolbar();
 		Toolbar toolbar=getToolbar();
 		if(toolbar==null) return;
+		// The design is a full-screen page with its own top bar; the app toolbar would add a second one.
+		// Hide it here (not in onCreateContentView) because the toolbar is created after that callback.
+		toolbar.setVisibility(View.GONE);
 		toolbar.setBackgroundColor(UiUtils.getThemeColor(getActivity(), R.attr.colorVerificationTopSurface));
 		toolbar.setTitleTextColor(UiUtils.getThemeColor(getActivity(), R.attr.colorVerificationTextPrimary));
 		Drawable navigation=toolbar.getNavigationIcon();

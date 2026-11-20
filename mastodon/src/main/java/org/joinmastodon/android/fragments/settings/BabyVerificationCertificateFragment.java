@@ -78,6 +78,13 @@ public class BabyVerificationCertificateFragment extends ToolbarFragment{
 		}
 	}
 
+	@Override public void onViewCreated(View view, Bundle state){
+		super.onViewCreated(view, state);
+		// Full-screen design: the toolbar only exists after onCreateContentView, so hide it here.
+		android.widget.Toolbar toolbar=getToolbar();
+		if(toolbar!=null) toolbar.setVisibility(View.GONE);
+	}
+
 	@Override public View onCreateContentView(LayoutInflater inflater, ViewGroup container, Bundle state){
 		ScrollView scroll=new ScrollView(getActivity());
 		content=new LinearLayout(getActivity());
@@ -90,7 +97,6 @@ public class BabyVerificationCertificateFragment extends ToolbarFragment{
 		});
 		scroll.addView(content);
 
-		getToolbar().setVisibility(View.GONE);
 		android.widget.FrameLayout bar=new android.widget.FrameLayout(getActivity());
 		android.widget.ImageButton back=new android.widget.ImageButton(getActivity());
 		back.setBackgroundColor(android.graphics.Color.TRANSPARENT);
