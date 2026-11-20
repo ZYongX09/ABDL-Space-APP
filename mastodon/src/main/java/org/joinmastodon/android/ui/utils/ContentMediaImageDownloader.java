@@ -29,6 +29,9 @@ import okhttp3.Response;
 /** Only authenticated first-party media, with ephemeral owner-scoped memory keys and no disk cache. */
 public final class ContentMediaImageDownloader extends ImageDownloader{
 	private static final int MAX_BYTES=20*1024*1024, MAX_PIXELS=32*1024*1024;
+	/** Avatars/emoji are small but get evicted from the shared LRU by large post media; keep a
+	 * bounded side cache so scrolling an avatar back into view never refetches it. */
+	private static final android.util.LruCache<String,Drawable> smallImages=new android.util.LruCache<>(1024);
 	private final OkHttpClient client;
 	public ContentMediaImageDownloader(){ this(MastodonAPIController.getHttpClient()); }
 	public ContentMediaImageDownloader(OkHttpClient client){ this.client=client.newBuilder().cache(null).followRedirects(false).followSslRedirects(false).build(); }
@@ -45,6 +48,12 @@ public final class ContentMediaImageDownloader extends ImageDownloader{
 		return owner!=null && owner.canFetchMedia() ? new ScopedRequest(original,url.uri,session,owner) : null;
 	}
 	public static boolean accepts(ImageLoaderRequest request){ return !(request instanceof ScopedRequest scoped) || scoped.current(); }
+	public static Drawable peekSmall(android.graphics.drawable.Drawable ignored, ImageLoaderRequest original){
+		ImageLoaderRequest request=scoped(original);
+		if(request instanceof ScopedRequest scoped && scoped.isSmall()) return smallImages.get(scoped.getMemoryCacheKey());
+		return null;
+	}
+	private static boolean isSmall(int width, int height){ return width>0 && height>0 && width<=256 && height<=256; }
 	@Override public boolean needsDiskCache(){ return false; }
 	@Override public boolean canHandleRequest(ImageLoaderRequest request){ return request instanceof UrlImageLoaderRequest url && isMedia(url.uri); }
 	@Override public Drawable getDrawable(ImageLoaderRequest request, boolean decode, ImageCache.ImageDownloadInfo info) throws IOException{
@@ -79,6 +88,7 @@ public final class ContentMediaImageDownloader extends ImageDownloader{
 			if(!scoped.current()){ bitmap.recycle(); throw new IOException("Content media owner changed"); }
 			Drawable drawable=new BitmapDrawable(MastodonApp.context.getResources(),bitmap);
 			for(ImageProcessingStep step:request.processingSteps) drawable=step.processDrawable(drawable);
+			if(scoped.isSmall()) smallImages.put(scoped.getMemoryCacheKey(),drawable);
 			if(!scoped.current()) throw new IOException("Content media owner changed");
 			return drawable;
 		}finally{ if(info!=null) info.httpCall=null; }
@@ -95,6 +105,7 @@ public final class ContentMediaImageDownloader extends ImageDownloader{
 			scope=owner.mediaScope();
 		}
 		boolean current(){ return owner.canFetchMedia() && session.token==token && Objects.equals(tokenValue,token.accessToken); }
+		boolean isSmall(){ return ContentMediaImageDownloader.isSmall(desiredMaxWidth,desiredMaxHeight); }
 		@Override public String getMemoryCacheKey(){ return super.getMemoryCacheKey()+"/content-"+scope; }
 		@Override public String getDiskCacheKey(){ return okio.ByteString.encodeUtf8(getMemoryCacheKey()).md5().hex(); }
 		@Override public boolean equals(Object other){ return other instanceof ScopedRequest value && scope.equals(value.scope) && super.equals(other); }

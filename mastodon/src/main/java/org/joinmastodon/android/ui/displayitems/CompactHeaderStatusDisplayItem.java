@@ -107,7 +107,9 @@ public class CompactHeaderStatusDisplayItem extends StatusDisplayItem{
 				// otherwise shows the recycled placeholder for a frame (or refetches after a miss).
 				me.grishka.appkit.imageloader.requests.ImageLoaderRequest request=item.getImageRequest(0);
 				if(request!=null){
-					android.graphics.drawable.Drawable cached=me.grishka.appkit.imageloader.ImageCache
+					android.graphics.drawable.Drawable cached=org.joinmastodon.android.ui.utils.ContentMediaImageDownloader
+							.peekSmall(null, request);
+					if(cached==null) cached=me.grishka.appkit.imageloader.ImageCache
 							.getInstance(itemView.getContext()).getFromTop(request);
 					if(cached!=null) avatar.setImageDrawable(cached);
 				}
