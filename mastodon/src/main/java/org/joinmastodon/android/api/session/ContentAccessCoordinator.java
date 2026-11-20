@@ -30,6 +30,9 @@ public final class ContentAccessCoordinator{
 		public final boolean loading;
 		Snapshot(ContentAccess.State state, long generation, boolean loading){ this.state=state; this.generation=generation; this.loading=loading; }
 		public boolean isOpen(){ return state==ContentAccess.State.OPEN && !loading; }
+		/** Only a confirmed requirement withholds content. Unknown/unavailable/loading are not decisions;
+		 * the server remains authoritative for every protected read. */
+		public boolean withholdsContent(){ return state==ContentAccess.State.BABY_VERIFICATION_REQUIRED; }
 	}
 	/** Captured at dispatch, never reconstructed from whichever account is active at response time. */
 	public static final class Owner{
@@ -42,13 +45,18 @@ public final class ContentAccessCoordinator{
 		public boolean isCurrent(){ return coordinator.current(this); }
 		public boolean sameIdentity(){ return session==coordinator.session && token==session.token && Objects.equals(value, token==null ? null : token.accessToken) && coordinator.identityCurrent(); }
 		public boolean canRead(){ return isCurrent() && coordinator.getSnapshot().isOpen(); }
+		/** Media dispatch and already-fetched media views only stop on a confirmed requirement; the
+		 * server still authorizes every byte, so an in-flight probe must not blank avatars or photos. */
+		public boolean canFetchMedia(){ return sameIdentity() && canDispatch(); }
 		/** Only a confirmed "verification required" blocks dispatch. Unknown/unavailable states let the
 		 * server answer authoritatively (it withholds content itself), so a probe outage no longer turns
 		 * every startup request into a synthetic 503 toast. Local cache reads stay strict via canRead(). */
 		/** Only a confirmed requirement blocks dispatch. Identity/generation changes (session refresh,
 		 * account switch during splash) must not fabricate 503s; the server enforces content itself. */
 		public boolean canDispatch(){ return coordinator.getSnapshot().state!=ContentAccess.State.BABY_VERIFICATION_REQUIRED; }
-		public String mediaScope(){ return coordinator.mediaScope+"-"+generation; }
+		/** Stable for the lifetime of this account session. Routine policy refreshes must not rotate the
+		 * image cache namespace, or every foreground would throw away all decoded media. */
+		public String mediaScope(){ return coordinator.mediaScope; }
 		/** An open header is never authority to clear a gate. Only the latest GET can do that. */
 		public void receiveHeader(String header){ coordinator.dispatch.accept(()->coordinator.applyHeader(this, header)); }
 	}
@@ -77,6 +85,12 @@ public final class ContentAccessCoordinator{
 	public static boolean canRead(String accountId){
 		AccountSession session=AccountSessionManager.getInstance().tryGetAccount(accountId);
 		return session!=null && (!applies(session) || session.getContentAccessCoordinator().isOpen());
+	}
+	/** Request dispatch and already-authorized UI only stop on a confirmed requirement. Unknown and
+	 * unavailable are not verdicts; the server answers each protected request authoritatively. */
+	public static boolean allowsContent(String accountId){
+		AccountSession session=AccountSessionManager.getInstance().tryGetAccount(accountId);
+		return session!=null && (!applies(session) || !session.getContentAccessCoordinator().getSnapshot().withholdsContent());
 	}
 	/** First-party API is content by default; only account/utility operations bypass the content gate. */
 	public static boolean isProtectedRoute(Uri uri){ return isProtectedRoute(uri,"GET"); }
@@ -138,7 +152,8 @@ public final class ContentAccessCoordinator{
 		// A known requirement may remain visible during revalidation; never retain an allow.
 		if(state!=ContentAccess.State.BABY_VERIFICATION_REQUIRED) state=null;
 		loading=true;
-		session.getCacheController().invalidateContentAccess();
+		// Revalidation is not revocation: dropping local timelines here wiped the home/notifications
+		// cache on every resume and forced a full network reload (and avatar rebind) each time.
 		emit();
 		if(!identityCurrent()){ loading=false; emit(); return; }
 		Owner owner=new Owner(this);
@@ -152,8 +167,12 @@ public final class ContentAccessCoordinator{
 		if(!current(owner) || !loading) return;
 		pending=null; loading=false;
 		try{ if(access!=null) access.postprocess(); }catch(Exception invalid){ access=null; }
+		ContentAccess.State previous=state;
 		state=access==null ? (state==ContentAccess.State.BABY_VERIFICATION_REQUIRED ? state : ContentAccess.State.UNAVAILABLE) : access.state;
 		if(state==ContentAccess.State.OPEN) requiredPromptClaimed=false;
+		// Only a confirmed requirement revokes locally cached content.
+		if(state==ContentAccess.State.BABY_VERIFICATION_REQUIRED && previous!=ContentAccess.State.BABY_VERIFICATION_REQUIRED)
+			session.getCacheController().invalidateContentAccess();
 		emit();
 	}
 	private void applyHeader(Owner owner, String header){
@@ -165,8 +184,11 @@ public final class ContentAccessCoordinator{
 		};
 		if(next==null) return;
 		cancelPending(); generation++; loading=false;
+		ContentAccess.State previous=state;
 		if(state!=ContentAccess.State.BABY_VERIFICATION_REQUIRED || next==ContentAccess.State.BABY_VERIFICATION_REQUIRED) state=next;
-		session.getCacheController().invalidateContentAccess();
+		// An unavailable probe is not a revocation; the server still answers each request.
+		if(next==ContentAccess.State.BABY_VERIFICATION_REQUIRED && previous!=ContentAccess.State.BABY_VERIFICATION_REQUIRED)
+			session.getCacheController().invalidateContentAccess();
 		emit();
 	}
 	/** Invalidate an old selected-account epoch, including an A -> B -> A switch. */

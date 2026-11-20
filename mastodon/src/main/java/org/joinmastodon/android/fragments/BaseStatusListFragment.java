@@ -105,11 +105,13 @@ public abstract class BaseStatusListFragment<T extends DisplayItemsParent> exten
 	private long observedNBWGeneration=-1;
 	private org.joinmastodon.android.api.session.ContentAccessCoordinator.Cancelable contentAccessSubscription;
 	private boolean contentAccessBlocked;
-	protected final boolean contentAccessOpen(){ return org.joinmastodon.android.api.session.ContentAccessCoordinator.canRead(accountID); }
+	protected final boolean contentAccessOpen(){ return org.joinmastodon.android.api.session.ContentAccessCoordinator.allowsContent(accountID); }
 	protected void onContentAccessClosed(){}
 	protected void onContentAccessOpened(){ reload(); }
 	private void applyContentAccess(org.joinmastodon.android.api.session.ContentAccessCoordinator.Snapshot snapshot){
-		if(!snapshot.isOpen()){
+		// A probe in progress is not a verdict. Clearing here used to wipe the list (and every decoded
+		// avatar) on each resume; only a confirmed requirement should withhold content.
+		if(snapshot.withholdsContent()){
 			contentAccessBlocked=true;
 			cancelLoading();
 			if(currentPhotoViewer!=null) currentPhotoViewer.onDismissed();

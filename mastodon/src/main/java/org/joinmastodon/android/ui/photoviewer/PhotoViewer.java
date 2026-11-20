@@ -279,7 +279,7 @@ public class PhotoViewer implements ZoomPanView.Listener{
 		AccountSession contentSession=AccountSessionManager.getInstance().tryGetAccount(accountID);
 		if(org.joinmastodon.android.api.session.ContentAccessCoordinator.applies(contentSession)){
 			contentOwner=contentSession.getContentAccessCoordinator().capture();
-			if(contentOwner==null || !contentOwner.canRead()){ closing=dismissed=true; return; }
+			if(contentOwner==null || !contentOwner.canFetchMedia()){ closing=dismissed=true; return; }
 		}
 		this.parentFragment=parentFragment;
 		nbwMedia=albumDelegate==null && this.attachments.stream().anyMatch(a->org.joinmastodon.android.api.NBWUrlResolver.isTrusted(a.url) || org.joinmastodon.android.api.NBWUrlResolver.isTrusted(a.previewUrl));
@@ -548,7 +548,7 @@ public class PhotoViewer implements ZoomPanView.Listener{
 		}
 		if(contentOwner!=null){
 			contentAccessSubscription=contentSession.getContentAccessCoordinator().observe(snapshot->{
-				if(!contentOwner.canRead() && !dismissed){
+				if(!contentOwner.canFetchMedia() && !dismissed){
 					windowView.setVisibility(View.INVISIBLE);
 					if(albumPreviewCache!=null) albumPreviewCache.invalidateSession(accountID,albumSession);
 					onDismissed();
@@ -618,7 +618,7 @@ public class PhotoViewer implements ZoomPanView.Listener{
 				&& AccountSessionManager.getInstance().tryGetAccount(accountID)==albumSession
 				&& accountID.equals(AccountSessionManager.getInstance().getLastActiveAccountID());
 		if(albumPreviewCache!=null && !sameSession) albumPreviewCache.invalidateSession(accountID, albumSession);
-		return albumDelegate!=null && sameSession && (contentOwner==null || contentOwner.canRead()) && !closing && !dismissed && !activity.isFinishing() && !activity.isDestroyed()
+		return albumDelegate!=null && sameSession && (contentOwner==null || contentOwner.canFetchMedia()) && !closing && !dismissed && !activity.isFinishing() && !activity.isDestroyed()
 				&& windowView.isAttachedToWindow();
 	}
 

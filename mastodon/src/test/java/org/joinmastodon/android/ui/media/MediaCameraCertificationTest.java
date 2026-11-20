@@ -79,7 +79,7 @@ public class MediaCameraCertificationTest{
 		ActivityController<MediaCameraActivity> lifecycle=launch(intent);
 		MediaCameraActivity activity=lifecycle.get();
 		assertEquals(View.VISIBLE, activity.findViewById(R.id.camera_certification_panel).getVisibility());
-		assertEquals(intent.getStringExtra(MediaCameraContract.EXTRA_CERTIFICATION_REQUIREMENT), ((TextView)activity.findViewById(R.id.camera_certification_requirement)).getText().toString());
+		assertEquals(intent.getStringExtra(MediaCameraContract.EXTRA_CERTIFICATION_REQUIREMENT), ((TextView)activity.findViewById(R.id.camera_req_1)).getText().toString());
 		assertEquals(View.GONE, activity.findViewById(R.id.camera_gallery).getVisibility());
 		assertEquals(activity.getString(R.string.verification_camera_capture_hint), ((TextView)activity.findViewById(R.id.camera_capture_hint)).getText().toString());
 		activity.findViewById(R.id.camera_gallery).performClick();

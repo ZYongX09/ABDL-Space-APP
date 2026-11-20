@@ -32,7 +32,7 @@ public class VerificationPendingCaptureTest{
 
 	@Test
 	public void savesAndRestoresPendingCapture() throws Exception{
-		VerificationPendingCapture expected=new VerificationPendingCapture(SESSION, "123456", "2026-09", "拍摄要求", 2_000_000_000L, 5L*1024L*1024L, "test", 42);
+		VerificationPendingCapture expected=new VerificationPendingCapture(SESSION, "2026-09", "拍摄要求", 2_000_000_000L, 5L*1024L*1024L, "test", 42, "", "", "", "");
 		expected.save(context);
 		assertEquals(expected, VerificationPendingCapture.load(context, SESSION, "test", 42));
 		assertEquals(expected, VerificationPendingCapture.findActive(context, 1_900_000_000L, "test", 42));
@@ -40,7 +40,7 @@ public class VerificationPendingCaptureTest{
 
 	@Test
 	public void rawOnlyCaptureIsRecoverableAndEmptyOrSymlinkIsNot() throws Exception{
-		VerificationPendingCapture value=new VerificationPendingCapture(SESSION, "123456", "v1", "requirement", 2_000_000_000L, 5L*1024L*1024L, "test", 42);
+		VerificationPendingCapture value=new VerificationPendingCapture(SESSION, "v1", "requirement", 2_000_000_000L, 5L*1024L*1024L, "test", 42, "", "", "", "");
 		value.save(context);
 		assertEquals(false, value.hasRecoverablePhoto(context));
 		java.nio.file.Files.write(value.rawFile(context).toPath(), new byte[]{1,2,3});
@@ -62,7 +62,7 @@ public class VerificationPendingCaptureTest{
 			@Override public java.io.File getNoBackupFilesDir(){ return alias; }
 		};
 		try{
-			VerificationPendingCapture value=new VerificationPendingCapture(SESSION, "123456", "v1", "requirement", 2_000_000_000L, 5L*1024*1024, "test", 42);
+			VerificationPendingCapture value=new VerificationPendingCapture(SESSION, "v1", "requirement", 2_000_000_000L, 5L*1024*1024, "test", 42, "", "", "", "");
 			value.save(aliased);
 			assertEquals(value, VerificationPendingCapture.load(aliased, SESSION, "test", 42));
 			java.nio.file.Files.write(value.rawFile(aliased).toPath(), new byte[]{1});
@@ -75,7 +75,7 @@ public class VerificationPendingCaptureTest{
 
 	@Test
 	public void linksWithinPrivateRootAndDirectoryLinksAreStillRejected() throws Exception{
-		VerificationPendingCapture value=new VerificationPendingCapture(SESSION, "123456", "v1", "requirement", 2_000_000_000L, 5L*1024*1024, "test", 42);
+		VerificationPendingCapture value=new VerificationPendingCapture(SESSION, "v1", "requirement", 2_000_000_000L, 5L*1024*1024, "test", 42, "", "", "", "");
 		value.save(context);
 		java.io.File target=new java.io.File(VerificationPendingCapture.root(context, SESSION), "target.jpg");
 		java.nio.file.Files.write(target.toPath(), new byte[]{1});
@@ -101,7 +101,7 @@ public class VerificationPendingCaptureTest{
 
 	@Test
 	public void cleanupDoesNotFollowChildDirectoryLink() throws Exception{
-		VerificationPendingCapture value=new VerificationPendingCapture(SESSION, "123456", "v1", "requirement", 2_000_000_000L, 5L*1024*1024, "test", 42);
+		VerificationPendingCapture value=new VerificationPendingCapture(SESSION, "v1", "requirement", 2_000_000_000L, 5L*1024*1024, "test", 42, "", "", "", "");
 		value.save(context);
 		java.io.File outside=new java.io.File(context.getCacheDir(), "cleanup-outside"); outside.mkdirs();
 		java.io.File untouched=new java.io.File(outside, "private.jpg");
@@ -114,7 +114,7 @@ public class VerificationPendingCaptureTest{
 	}
 
 	@Test public void bothOwnerKeysAreRequiredAndForeignCleanupIsRejected() throws Exception{
-		VerificationPendingCapture value=new VerificationPendingCapture(SESSION, "123456", "v1", "private requirement", 2_000_000_000L, 5242880, "test", 42);
+		VerificationPendingCapture value=new VerificationPendingCapture(SESSION, "v1", "private requirement", 2_000_000_000L, 5242880, "test", 42, "", "", "", "");
 		value.save(context);
 		java.nio.file.Files.write(value.photoFile(context).toPath(), new byte[]{1});
 		assertNull(VerificationPendingCapture.load(context, SESSION, "other", 42));
@@ -122,7 +122,7 @@ public class VerificationPendingCaptureTest{
 		assertNull(VerificationPendingCapture.findPending(context, "other", 43));
 		value.delete(context, "other", 43);
 		assertEquals(true, value.photoFile(context).isFile());
-		org.junit.Assert.assertThrows(java.io.IOException.class, ()->new VerificationPendingCapture(SESSION, "999999", "v1", "other", 2_000_000_000L, 5242880, "other", 43).save(context));
+		org.junit.Assert.assertThrows(java.io.IOException.class, ()->new VerificationPendingCapture(SESSION, "v1", "other", 2_000_000_000L, 5242880, "other", 43, "", "", "", "").save(context));
 		assertEquals(value, VerificationPendingCapture.load(context, SESSION, "test", 42));
 	}
 
@@ -143,7 +143,7 @@ public class VerificationPendingCaptureTest{
 	@Test
 	public void expiredCaptureIsRemoved(){
 		try{
-			new VerificationPendingCapture(SESSION, "123456", "2026-09", "拍摄要求", 10L, 5L*1024L*1024L, "test", 42).save(context);
+			new VerificationPendingCapture(SESSION, "2026-09", "拍摄要求", 10L, 5L*1024L*1024L, "test", 42, "", "", "", "").save(context);
 		}catch(Exception error){
 			throw new AssertionError(error);
 		}

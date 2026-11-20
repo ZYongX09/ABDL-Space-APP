@@ -42,7 +42,7 @@ public final class ContentMediaImageDownloader extends ImageDownloader{
 		AccountSession session=AccountSessionManager.getInstance().getLastActiveAccount();
 		if(!ContentAccessCoordinator.applies(session)) return null;
 		ContentAccessCoordinator.Owner owner=session.getContentAccessCoordinator().capture();
-		return owner!=null && owner.canRead() ? new ScopedRequest(original,url.uri,session,owner) : null;
+		return owner!=null && owner.canFetchMedia() ? new ScopedRequest(original,url.uri,session,owner) : null;
 	}
 	public static boolean accepts(ImageLoaderRequest request){ return !(request instanceof ScopedRequest scoped) || scoped.current(); }
 	@Override public boolean needsDiskCache(){ return false; }
@@ -94,7 +94,7 @@ public final class ContentMediaImageDownloader extends ImageDownloader{
 			// Random in-memory epoch avoids credential material and cross-process/account reuse in cache keys.
 			scope=owner.mediaScope();
 		}
-		boolean current(){ return owner.canRead() && session.token==token && Objects.equals(tokenValue,token.accessToken); }
+		boolean current(){ return owner.canFetchMedia() && session.token==token && Objects.equals(tokenValue,token.accessToken); }
 		@Override public String getMemoryCacheKey(){ return super.getMemoryCacheKey()+"/content-"+scope; }
 		@Override public String getDiskCacheKey(){ return okio.ByteString.encodeUtf8(getMemoryCacheKey()).md5().hex(); }
 		@Override public boolean equals(Object other){ return other instanceof ScopedRequest value && scope.equals(value.scope) && super.equals(other); }

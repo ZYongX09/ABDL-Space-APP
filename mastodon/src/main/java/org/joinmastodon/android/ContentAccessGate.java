@@ -65,7 +65,13 @@ public final class ContentAccessGate implements Application.ActivityLifecycleCal
 		refreshSelected();
 	}
 	public static void accountChanged(){
-		if(instance!=null) instance.handler.post(()->{ for(Screen screen:new ArrayList<>(instance.screens.values())) screen.bind(); instance.refreshSelected(); });
+		if(instance!=null) instance.handler.post(()->{
+			// Raw URL requests (tab bar, settings rows) are cached under their URL, not an owner scope.
+			// Drop decoded media on account changes so another account can never see the previous one's bytes.
+			try{ me.grishka.appkit.imageloader.ImageCache.getInstance(org.joinmastodon.android.MastodonApp.context).clearTopLevel(); }catch(RuntimeException ignored){}
+			for(Screen screen:new ArrayList<>(instance.screens.values())) screen.bind();
+			instance.refreshSelected();
+		});
 	}
 	private void refreshSelected(){
 		AccountSession session=AccountSessionManager.getInstance().getLastActiveAccount();

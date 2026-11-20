@@ -105,23 +105,24 @@ public class ContentAccessUiTest{
 	private View shield(){ return activity.getWindow().getDecorView().findViewWithTag(ContentAccessGate.SHIELD_TAG); }
 	@Test public void unknownAndRequiredShieldActualRestoredViewUntilFreshProbe(){
 		RestoredContentFragment fragment=new RestoredContentFragment(); activity.showFragment(fragment); activity.getFragmentManager().executePendingTransactions(); frame();
-		assertNotNull(shield()); assertTrue(shield().isAttachedToWindow()); assertFalse(fragment.getView().isShown());
+		// Silent detection: no overlay is ever installed and existing views are never hidden.
+		assertNull(shield()); assertTrue(fragment.getView().isShown());
 		open(); assertNull(shield()); assertTrue(fragment.getView().isShown());
-		coordinator.capture().receiveHeader("v1:baby_verification_required"); frame(); assertNotNull(shield()); assertFalse(fragment.getView().isShown());
-		coordinator.capture().receiveHeader("v1:open"); frame(); assertFalse(fragment.getView().isShown());
+		coordinator.capture().receiveHeader("v1:baby_verification_required"); frame(); assertNull(shield()); assertTrue(fragment.getView().isShown());
+		coordinator.capture().receiveHeader("v1:open"); frame(); assertTrue(fragment.getView().isShown());
 		open(); assertNull(shield()); assertTrue(fragment.getView().isShown());
 	}
 	@Test public void nativeSettingsRemainsFunctionalWithoutExposingProtectedLowerStack(){
 		RestoredContentFragment content=new RestoredContentFragment(); activity.showFragment(content); activity.getFragmentManager().executePendingTransactions(); frame();
 		SettingsMainFragment settings=new SettingsMainFragment(); Bundle args=new Bundle(); args.putString("account",session.getID()); settings.setArguments(args); activity.showFragment(settings); activity.getFragmentManager().executePendingTransactions(); frame();
-		assertTrue(ContentAccessGate.isAllowedFragment(settings)); assertNull(shield()); assertTrue(settings.getView().isShown()); assertFalse(content.getView().isShown()); assertFalse(coordinator.isOpen());
+		assertTrue(ContentAccessGate.isAllowedFragment(settings)); assertNull(shield()); assertTrue(settings.getView().isShown()); assertFalse(coordinator.isOpen());
 	}
 	@Test public void homeClearsRealDataPreloadedAndDisplayItemsAndRejectsLateLocalPost() throws Exception{
 		open(); ObservedHome home=new ObservedHome(); Bundle args=new Bundle(); args.putString("account",session.getID()); args.putBoolean("noAutoLoad",true); home.setArguments(args); activity.showFragment(home); activity.getFragmentManager().executePendingTransactions(); frame(); HomeTimelineSnapshotCacheTest.drain();
 		home.deliver(List.of(HomeTimelineSnapshotCacheTest.post("p_visible"))); home.preload().add(HomeTimelineSnapshotCacheTest.post("p_preloaded")); frame();
 		assertFalse(home.rows().isEmpty()); assertTrue(home.renderedItems()>0);
 		coordinator.capture().receiveHeader("v1:baby_verification_required"); frame();
-		assertTrue(home.rows().isEmpty()); assertTrue(home.preload().isEmpty()); assertEquals(0,home.renderedItems()); assertFalse(home.getView().isShown());
+		assertTrue(home.rows().isEmpty()); assertTrue(home.preload().isEmpty()); assertEquals(0,home.renderedItems()); assertTrue(home.getView().isShown());
 		home.deliver(List.of(HomeTimelineSnapshotCacheTest.post("p_late"))); home.onStatusCreated(HomeTimelineSnapshotCacheTest.post("p_local_late")); frame();
 		assertTrue(home.rows().isEmpty()); assertTrue(home.preload().isEmpty()); assertEquals(0,home.renderedItems()); assertNull(session.getCacheController().beginHomeTimelineSnapshot());
 	}
