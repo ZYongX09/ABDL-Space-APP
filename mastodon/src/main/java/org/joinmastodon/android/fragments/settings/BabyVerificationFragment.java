@@ -120,6 +120,9 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 	@Override
 	public void onCreate(Bundle state){
 		super.onCreate(state);
+		if(getActivity()!=null) getActivity().getTheme().applyStyle(UiUtils.isDarkTheme()
+				? R.style.ThemeOverlay_Mastodon_Verification_Dark
+				: R.style.ThemeOverlay_Mastodon_Verification_Light, true);
 		accountID=getArguments().getString("account");
 		session=AccountSessionManager.getInstance().tryGetAccount(accountID);
 		guard=new VerificationSessionGuard(accountID);
@@ -128,9 +131,6 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 
 	@Override
 	public View onCreateContentView(LayoutInflater inflater, ViewGroup container, Bundle state){
-		getActivity().getTheme().applyStyle(UiUtils.isDarkTheme()
-				? R.style.ThemeOverlay_Mastodon_Verification_Dark
-				: R.style.ThemeOverlay_Mastodon_Verification_Light, true);
 		View view=inflater.inflate(R.layout.fragment_baby_verification, container, false);
 		org.joinmastodon.android.ui.verification.VerificationWindowMode.enter(getActivity());
 		ViewCompat.setOnApplyWindowInsetsListener(view, (v, insets)->{

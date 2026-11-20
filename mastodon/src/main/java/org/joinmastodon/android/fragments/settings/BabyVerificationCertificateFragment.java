@@ -68,6 +68,9 @@ public class BabyVerificationCertificateFragment extends ToolbarFragment{
 
 	@Override public void onCreate(Bundle state){
 		super.onCreate(state);
+		if(getActivity()!=null) getActivity().getTheme().applyStyle(UiUtils.isDarkTheme()
+				? R.style.ThemeOverlay_Mastodon_Verification_Dark
+				: R.style.ThemeOverlay_Mastodon_Verification_Light, true);
 		setTitle(R.string.verification_certificate_title);
 		accountID=getArguments().getString("account");
 		pinnedSession=AccountSessionManager.getInstance().tryGetAccount(accountID);
@@ -87,9 +90,6 @@ public class BabyVerificationCertificateFragment extends ToolbarFragment{
 	}
 
 	@Override public View onCreateContentView(LayoutInflater inflater, ViewGroup container, Bundle state){
-		getActivity().getTheme().applyStyle(UiUtils.isDarkTheme()
-				? R.style.ThemeOverlay_Mastodon_Verification_Dark
-				: R.style.ThemeOverlay_Mastodon_Verification_Light, true);
 		org.joinmastodon.android.ui.verification.VerificationWindowMode.enter(getActivity());
 		ScrollView scroll=new ScrollView(getActivity());
 		content=new LinearLayout(getActivity());
@@ -143,10 +143,8 @@ public class BabyVerificationCertificateFragment extends ToolbarFragment{
 		statusParams.bottomMargin=V.dp(12);
 		content.addView(status, statusParams);
 
+		// The credential itself is the legacy design: show it edge-to-edge on the page.
 		android.widget.FrameLayout card=new android.widget.FrameLayout(getActivity());
-		card.setBackgroundResource(R.drawable.vr_bg_cert);
-		int pad=V.dp(10);
-		card.setPadding(pad, pad, pad, pad);
 		image=new ImageView(getActivity());
 		image.setAdjustViewBounds(true);
 		image.setContentDescription(getString(R.string.verification_certificate_qr_description));
@@ -291,8 +289,7 @@ public class BabyVerificationCertificateFragment extends ToolbarFragment{
 				getString(R.string.verification_certificate_note_4),
 				getString(R.string.verification_certificate_note_5),
 		};
-		boolean dark=UiUtils.isDarkTheme();
-		return BabyCertificateRenderer.render(value, dark);
+		return BabyCertificateRenderer.render(value, notes);
 	}
 
 	private void copyLink(){
