@@ -1053,4 +1053,14 @@
 	<string name="vr_copy_link">复制验证链接</string>
 	<string name="vr_share_certificate">分享证书</string>
 	<string name="vr_copy_link_done">验证链接已复制</string>
+	<string name="vr_cam_title">认证照片拍摄</string>
+	<string name="vr_cam_requirements">认证要求</string>
+	<string name="vr_cam_step1_fmt">裁剪出%1$s纸条，%2$s</string>
+	<string name="vr_cam_step2">在纸条上依次写用户 ID 和认证文本</string>
+	<string name="vr_cam_step3_fmt">%1$s，并拍下同时包含完整穿着的纸尿裤和纸条的照片</string>
+	<string name="vr_cam_meta_fmt">ID %1$s · %2$s</string>
+	<string name="vr_cam_remaining">认证剩余时间</string>
+	<string name="vr_cam_preview_title">使用这张照片？</string>
+	<string name="vr_cam_retake">重拍</string>
+	<string name="vr_cam_use">使用这张照片</string>
 </resources>

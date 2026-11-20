@@ -127,9 +127,10 @@ public class MediaCameraActivity extends Activity implements MediaCameraControll
 				finish();
 				return;
 			}
-			findViewById(R.id.camera_certification_panel).setVisibility(View.VISIBLE);
-			((android.widget.TextView)findViewById(R.id.camera_certification_requirement)).setText(certification.requirement());
+			showCertificationPanel(true);
 			certificationTimer=findViewById(R.id.camera_certification_timer);
+			bindCertificationRequirements();
+			findViewById(R.id.camera_certification_title).setVisibility(View.VISIBLE);
 			findViewById(R.id.camera_gallery).setVisibility(View.GONE);
 			((android.widget.TextView)findViewById(R.id.camera_capture_hint)).setText(R.string.verification_camera_capture_hint);
 		}
@@ -337,6 +338,30 @@ public class MediaCameraActivity extends Activity implements MediaCameraControll
 			Toast.makeText(this, R.string.media_camera_audio_required, Toast.LENGTH_SHORT).show();
 	}
 
+	private void bindCertificationRequirements(){
+		android.widget.TextView first=findViewById(R.id.camera_req_1);
+		android.widget.TextView second=findViewById(R.id.camera_req_2);
+		android.widget.TextView third=findViewById(R.id.camera_req_3);
+		android.widget.TextView meta=findViewById(R.id.camera_certification_meta);
+		if(certification.structured()){
+			first.setText(getString(R.string.vr_cam_step1_fmt, certification.shape(), certification.fold()));
+			second.setText(R.string.vr_cam_step2);
+			third.setText(getString(R.string.vr_cam_step3_fmt, certification.placement()));
+			meta.setText(getString(R.string.vr_cam_meta_fmt, certification.userId(), certification.random()));
+		}else{
+			first.setText(certification.requirement());
+			second.setText("");
+			third.setText("");
+			meta.setText("");
+		}
+	}
+
+	private void showCertificationPanel(boolean show){
+		int visibility=show ? View.VISIBLE : View.GONE;
+		findViewById(R.id.camera_certification_panel).setVisibility(visibility);
+		findViewById(R.id.camera_certification_timer_pill).setVisibility(visibility);
+	}
+
 	private void showReview(){
 		controller.close();
 		preview.setVisibility(View.GONE);
@@ -344,7 +369,15 @@ public class MediaCameraActivity extends Activity implements MediaCameraControll
 		flashButton.setVisibility(View.GONE);
 		switchButton.setVisibility(View.GONE);
 		reviewControls.setVisibility(View.VISIBLE);
-		useButton.setText(reviewIsVideo ? R.string.media_camera_use_video : R.string.media_camera_use_photo);
+		if(certificationMode){
+			showCertificationPanel(false);
+			findViewById(R.id.camera_certification_title).setVisibility(View.GONE);
+			android.widget.TextView title=findViewById(R.id.camera_review_title);
+			title.setText(R.string.vr_cam_preview_title);
+			title.setVisibility(View.VISIBLE);
+			((android.widget.Button)findViewById(R.id.camera_retake)).setText(R.string.vr_cam_retake);
+		}
+		useButton.setText(certificationMode ? R.string.vr_cam_use : reviewIsVideo ? R.string.media_camera_use_video : R.string.media_camera_use_photo);
 		if(reviewIsVideo){
 			reviewVideo.setVisibility(View.VISIBLE);
 			reviewVideo.setVideoPath(reviewFile.getAbsolutePath());
@@ -362,6 +395,8 @@ public class MediaCameraActivity extends Activity implements MediaCameraControll
 		reviewVideo.stopPlayback();
 		reviewVideo.setVisibility(View.GONE);
 		reviewControls.setVisibility(View.GONE);
+		findViewById(R.id.camera_review_title).setVisibility(View.GONE);
+		if(certificationMode){ showCertificationPanel(true); findViewById(R.id.camera_certification_title).setVisibility(View.VISIBLE); }
 		preview.setVisibility(View.VISIBLE);
 		captureControls.setVisibility(View.VISIBLE);
 		if(certificationActive()) controller.open(preview);

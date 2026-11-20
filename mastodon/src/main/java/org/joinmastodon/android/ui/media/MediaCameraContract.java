@@ -19,6 +19,11 @@ public final class MediaCameraContract{
 	public static final String EXTRA_CERTIFICATION_REQUIREMENT="media_camera_certification_requirement";
 	public static final String EXTRA_CERTIFICATION_DURATION="media_camera_certification_duration";
 	public static final String EXTRA_CONTROLLED_PATH="media_camera_controlled_path";
+	public static final String EXTRA_CERTIFICATION_SHAPE="media_camera_certification_shape";
+	public static final String EXTRA_CERTIFICATION_FOLD="media_camera_certification_fold";
+	public static final String EXTRA_CERTIFICATION_PLACEMENT="media_camera_certification_placement";
+	public static final String EXTRA_CERTIFICATION_RANDOM="media_camera_certification_random";
+	public static final String EXTRA_CERTIFICATION_USER="media_camera_certification_user";
 
 	public static final String EXTRA_CERTIFICATION_DEADLINE="media_camera_certification_deadline";
 
@@ -47,7 +52,9 @@ public final class MediaCameraContract{
 		return file.getCanonicalFile().equals(new File(root.getCanonicalFile(), relative.toString()).getAbsoluteFile());
 	}
 
-	public record CertificationRequest(String sessionId, int slot, String requirement, long deadline, File output){ }
+	public record CertificationRequest(String sessionId, int slot, String requirement, long deadline, File output, String shape, String fold, String placement, String random, String userId){
+		public boolean structured(){ return shape!=null && fold!=null && placement!=null && random!=null && userId!=null; }
+	}
 
 	/** Reject malformed requests before touching any caller-supplied file. */
 	public static CertificationRequest readCertificationRequest(Context context, Intent intent) throws IOException{
@@ -63,7 +70,10 @@ public final class MediaCameraContract{
 				|| !isControlledFile(context, expected)
 				|| requirement==null || requirement.isBlank() || duration<=0 || deadline<=0)
 			throw new IllegalArgumentException("Invalid certification camera parameters");
-		return new CertificationRequest(session, slot, requirement, deadline, expected);
+		String shape=optional(intent, EXTRA_CERTIFICATION_SHAPE), fold=optional(intent, EXTRA_CERTIFICATION_FOLD);
+		String placement=optional(intent, EXTRA_CERTIFICATION_PLACEMENT), random=optional(intent, EXTRA_CERTIFICATION_RANDOM);
+		String userId=optional(intent, EXTRA_CERTIFICATION_USER);
+		return new CertificationRequest(session, slot, requirement, deadline, expected, shape, fold, placement, random, userId);
 	}
 
 	public static Intent createIntent(Context context, boolean allowVideo){
@@ -75,12 +85,29 @@ public final class MediaCameraContract{
 	}
 
 	public static Intent createCertificationIntent(Context context, String sessionId, int slot, String requirement, long durationMs){
+		return createCertificationIntent(context, sessionId, slot, requirement, durationMs, null, null, null, null, null);
+	}
+
+	/** Structured requirements let the camera render the designed checklist instead of one paragraph. */
+	public static Intent createCertificationIntent(Context context, String sessionId, int slot, String requirement, long durationMs,
+			String shape, String fold, String placement, String random, String userId){
 		long now=System.currentTimeMillis();
 		if(durationMs<=0 || durationMs>Long.MAX_VALUE-now) throw new IllegalArgumentException("Invalid certification duration");
-		return createIntent(context, false).putExtra(EXTRA_CERTIFICATION_MODE, true).putExtra(EXTRA_CERTIFICATION_SESSION, sessionId)
+		Intent intent=createIntent(context, false).putExtra(EXTRA_CERTIFICATION_MODE, true).putExtra(EXTRA_CERTIFICATION_SESSION, sessionId)
 				.putExtra(EXTRA_CERTIFICATION_SLOT, slot).putExtra(EXTRA_CERTIFICATION_REQUIREMENT, requirement).putExtra(EXTRA_CERTIFICATION_DURATION, durationMs)
 				.putExtra(EXTRA_CERTIFICATION_DEADLINE, now+durationMs)
 				.putExtra(EXTRA_CONTROLLED_PATH, certificationPhotoFile(context, sessionId, slot).getAbsolutePath());
+		if(shape!=null) intent.putExtra(EXTRA_CERTIFICATION_SHAPE, shape);
+		if(fold!=null) intent.putExtra(EXTRA_CERTIFICATION_FOLD, fold);
+		if(placement!=null) intent.putExtra(EXTRA_CERTIFICATION_PLACEMENT, placement);
+		if(random!=null) intent.putExtra(EXTRA_CERTIFICATION_RANDOM, random);
+		if(userId!=null) intent.putExtra(EXTRA_CERTIFICATION_USER, userId);
+		return intent;
+	}
+
+	private static String optional(Intent intent, String name){
+		String value=intent.getStringExtra(name);
+		return value==null || value.isEmpty() || value.length()>200 || value.indexOf('\0')>=0 ? null : value;
 	}
 
 	public static Intent createCertificationResult(String controlledPath, String sessionId, int slot){

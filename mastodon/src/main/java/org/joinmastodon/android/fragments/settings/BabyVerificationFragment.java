@@ -63,6 +63,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 import me.grishka.appkit.Nav;
 import me.grishka.appkit.api.Callback;
 import me.grishka.appkit.api.ErrorResponse;
@@ -105,6 +106,7 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 	private Runnable countdownTick, submitTick;
 	private String pendingSubmitId;
 	private int uploadAttempts;
+	private boolean justSubmitted;
 	private Button startButton, messagePrimary, messageSecondary;
 	private ProgressBar messageProgress;
 
@@ -124,6 +126,16 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 	@Override
 	public View onCreateContentView(LayoutInflater inflater, ViewGroup container, Bundle state){
 		View view=inflater.inflate(R.layout.fragment_baby_verification, container, false);
+		// The design is a full-screen page with its own top bar; the app toolbar would add a second one.
+		getToolbar().setVisibility(View.GONE);
+		ViewCompat.setOnApplyWindowInsetsListener(view, (v, insets)->{
+			v.setPadding(0, insets.getInsets(WindowInsetsCompat.Type.statusBars()).top, 0, 0);
+			return insets;
+		});
+		for(int id : new int[]{R.id.verification_back_intro, R.id.verification_back_requirements, R.id.verification_back_uploading, R.id.verification_back_status}){
+			View back=view.findViewById(id);
+			if(back!=null) back.setOnClickListener(v->goHome());
+		}
 		scroll=view.findViewById(R.id.verification_scroll);
 		progressSteps=view.findViewById(R.id.verification_progress_steps);
 		loadingState=view.findViewById(R.id.verification_loading_state);
@@ -244,7 +256,11 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 				showStatus(R.string.vr_approved_title, getString(R.string.verification_certificate_pending_sync), null,
 						R.string.verification_refresh, v->loadState(), R.string.vr_home, v->goHome());
 			}
-			case SUBMITTED -> { busy=false; showSubmittedPage(); }
+			case SUBMITTED -> {
+				busy=false;
+				if(justSubmitted){ justSubmitted=false; showSubmittedPage(); }
+				else showReviewPage(state);
+			}
 			case REVIEWING -> { busy=false; showReviewPage(state); }
 			case DRAFT -> loadDraftDetail(state.application.id, generation);
 			case REJECTED -> {
@@ -436,7 +452,7 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 		cameraResultConsumed=false;
 		busy=true;
 		showMessage(BabyVerificationProgressView.STAGE_PHOTO, false, getString(R.string.verification_capture_title), pendingCapture.requirement(), false, 0, null, 0, null);
-		Intent intent=MediaCameraContract.createCertificationIntent(getActivity(), pendingCapture.sessionId(), 0, pendingCapture.requirement(), duration);
+		Intent intent=MediaCameraContract.createCertificationIntent(getActivity(), pendingCapture.sessionId(), 0, pendingCapture.requirement(), duration, pendingCapture.paperShape(), pendingCapture.foldInstruction(), pendingCapture.placementInstruction(), pendingCapture.randomText(), String.valueOf(pendingCapture.userId()));
 		intent.putExtra(MediaCameraContract.EXTRA_CERTIFICATION_DEADLINE, pendingCapture.expiresAt()*1000);
 		startActivityForResult(intent, CAMERA_REQUEST);
 	}
@@ -759,6 +775,7 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 				deleteCurrentLocalFiles();
 				busy=false;
 				localFlow=false;
+				justSubmitted=true;
 				loadState();
 			}
 			@Override public void onError(ErrorResponse error){
@@ -1085,7 +1102,7 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 		view.setText(value);
 		view.setTextSize(size);
 		view.setTextColor(getResources().getColor(color, getActivity().getTheme()));
-		if(bold) view.setTypeface(view.getTypeface(), android.graphics.Typeface.BOLD);
+		if(bold) view.setTypeface(android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL));
 		view.setLineSpacing(0, 1.12f);
 		return view;
 	}

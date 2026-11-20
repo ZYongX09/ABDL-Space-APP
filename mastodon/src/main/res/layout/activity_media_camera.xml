@@ -51,6 +51,18 @@
 			android:tint="#FFFFFF"/>
 
 		<TextView
+			android:id="@+id/camera_certification_title"
+			android:layout_width="0dp"
+			android:layout_height="48dp"
+			android:layout_weight="1"
+			android:gravity="center"
+			android:text="@string/vr_cam_title"
+			android:textColor="#FFFFFF"
+			android:textSize="16sp"
+			android:textStyle="bold"
+			android:visibility="gone"/>
+
+		<TextView
 			android:id="@+id/recording_timer"
 			android:layout_width="0dp"
 			android:layout_height="48dp"
@@ -76,38 +88,117 @@
 	<ScrollView
 		android:id="@+id/camera_certification_panel"
 		android:layout_width="match_parent"
-		android:layout_height="200dp"
+		android:layout_height="wrap_content"
 		android:layout_gravity="top"
-		android:layout_marginTop="72dp"
+		android:layout_marginTop="64dp"
 		android:layout_marginHorizontal="16dp"
-		android:background="#DD000000"
+		android:background="@drawable/bg_camera_requirements"
 		android:visibility="gone">
+
 		<LinearLayout
 			android:layout_width="match_parent"
 			android:layout_height="wrap_content"
 			android:orientation="vertical"
-			android:padding="12dp">
+			android:padding="16dp">
+
 			<TextView
-				android:id="@+id/camera_certification_timer"
 				android:layout_width="match_parent"
 				android:layout_height="wrap_content"
-				android:textColor="#FFFFFF"
-				android:textSize="18sp"
+				android:text="@string/vr_cam_requirements"
+				android:textColor="#1A1A1A"
+				android:textSize="15sp"
 				android:textStyle="bold"/>
-			<TextView
-				android:id="@+id/camera_certification_requirement"
+
+			<LinearLayout
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:layout_marginTop="10dp"
+				android:orientation="horizontal">
+
+				<TextView
+					android:layout_width="18dp"
+					android:layout_height="18dp"
+					android:background="@drawable/vr_bg_step"
+					android:gravity="center"
+					android:includeFontPadding="false"
+					android:text="1"
+					android:textColor="#FFFFFF"
+					android:textSize="9sp"
+					android:textStyle="bold"/>
+
+				<TextView
+					android:id="@+id/camera_req_1"
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					android:layout_marginStart="10dp"
+					android:layout_weight="1"
+					android:textColor="#1A1A1A"
+					android:textSize="13sp"/>
+			</LinearLayout>
+
+			<LinearLayout
 				android:layout_width="match_parent"
 				android:layout_height="wrap_content"
 				android:layout_marginTop="8dp"
-				android:textColor="#FFFFFF"
-				android:textSize="16sp"/>
-			<TextView
+				android:orientation="horizontal">
+
+				<TextView
+					android:layout_width="18dp"
+					android:layout_height="18dp"
+					android:background="@drawable/vr_bg_step"
+					android:gravity="center"
+					android:includeFontPadding="false"
+					android:text="2"
+					android:textColor="#FFFFFF"
+					android:textSize="9sp"
+					android:textStyle="bold"/>
+
+				<TextView
+					android:id="@+id/camera_req_2"
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					android:layout_marginStart="10dp"
+					android:layout_weight="1"
+					android:text="@string/vr_cam_step2"
+					android:textColor="#1A1A1A"
+					android:textSize="13sp"/>
+			</LinearLayout>
+
+			<LinearLayout
 				android:layout_width="match_parent"
 				android:layout_height="wrap_content"
 				android:layout_marginTop="8dp"
-				android:text="@string/verification_camera_capture_rules"
-				android:textColor="#FFFFFF"
-				android:textSize="14sp"/>
+				android:orientation="horizontal">
+
+				<TextView
+					android:layout_width="18dp"
+					android:layout_height="18dp"
+					android:background="@drawable/vr_bg_step"
+					android:gravity="center"
+					android:includeFontPadding="false"
+					android:text="3"
+					android:textColor="#FFFFFF"
+					android:textSize="9sp"
+					android:textStyle="bold"/>
+
+				<TextView
+					android:id="@+id/camera_req_3"
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					android:layout_marginStart="10dp"
+					android:layout_weight="1"
+					android:textColor="#1A1A1A"
+					android:textSize="13sp"/>
+			</LinearLayout>
+
+			<TextView
+				android:id="@+id/camera_certification_meta"
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:layout_marginTop="10dp"
+				android:fontFamily="monospace"
+				android:textColor="#6E6E73"
+				android:textSize="12sp"/>
 		</LinearLayout>
 	</ScrollView>
 
@@ -161,6 +252,59 @@
 	</FrameLayout>
 
 	<LinearLayout
+		android:id="@+id/camera_certification_timer_pill"
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:layout_gravity="bottom|center_horizontal"
+		android:layout_marginBottom="156dp"
+		android:background="@drawable/bg_camera_timer_pill"
+		android:gravity="center_vertical"
+		android:orientation="horizontal"
+		android:paddingStart="14dp"
+		android:paddingTop="8dp"
+		android:paddingEnd="14dp"
+		android:paddingBottom="8dp"
+		android:visibility="gone">
+
+		<ImageView
+			android:layout_width="16dp"
+			android:layout_height="16dp"
+			android:importantForAccessibility="no"
+			android:src="@drawable/ic_fluent_clock_24_regular"
+			android:tint="#2667FF"/>
+
+		<TextView
+			android:layout_width="wrap_content"
+			android:layout_height="wrap_content"
+			android:layout_marginStart="6dp"
+			android:text="@string/vr_cam_remaining"
+			android:textColor="#1A1A1A"
+			android:textSize="12sp"/>
+
+		<TextView
+			android:id="@+id/camera_certification_timer"
+			android:layout_width="wrap_content"
+			android:layout_height="wrap_content"
+			android:layout_marginStart="10dp"
+			android:textColor="#1A1A1A"
+			android:textSize="13sp"
+			android:textStyle="bold"/>
+	</LinearLayout>
+
+	<TextView
+		android:id="@+id/camera_review_title"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:layout_gravity="bottom"
+		android:layout_marginBottom="124dp"
+		android:gravity="center"
+		android:text="@string/vr_cam_preview_title"
+		android:textColor="#FFFFFF"
+		android:textSize="17sp"
+		android:textStyle="bold"
+		android:visibility="gone"/>
+
+	<LinearLayout
 		android:id="@+id/camera_review_controls"
 		android:layout_width="match_parent"
 		android:layout_height="104dp"
@@ -177,7 +321,10 @@
 			android:layout_height="52dp"
 			android:layout_marginEnd="8dp"
 			android:layout_weight="1"
-			android:text="@string/media_camera_retake"/>
+			android:background="@drawable/bg_camera_outline_button"
+			android:text="@string/media_camera_retake"
+			android:textAllCaps="false"
+			android:textColor="#FFFFFF"/>
 
 		<Button
 			android:id="@+id/camera_use"
@@ -185,6 +332,9 @@
 			android:layout_height="52dp"
 			android:layout_marginStart="8dp"
 			android:layout_weight="1"
-			android:text="@string/media_camera_use_photo"/>
+			android:background="@drawable/vr_bg_primary"
+			android:text="@string/media_camera_use_photo"
+			android:textAllCaps="false"
+			android:textColor="#FFFFFF"/>
 	</LinearLayout>
 </FrameLayout>

@@ -14,6 +14,17 @@
 		android:layout_width="match_parent"
 		android:layout_height="36dp">
 
+		<ImageButton
+			android:id="@+id/verification_back_intro"
+			android:layout_width="36dp"
+			android:layout_height="36dp"
+			android:layout_gravity="start|center_vertical"
+			android:background="@android:color/transparent"
+			android:contentDescription="@string/back"
+			android:padding="8dp"
+			android:src="@drawable/ic_fluent_arrow_left_24_regular"
+			android:tint="@color/vr_text_primary"/>
+
 		<TextView
 			android:id="@+id/verification_locale_pill"
 			android:layout_width="wrap_content"
@@ -33,14 +44,14 @@
 			android:textSize="12sp"/>
 	</FrameLayout>
 
-	<TextView
-		android:layout_width="match_parent"
-		android:layout_height="wrap_content"
+	<ImageView
+		android:id="@+id/verification_hero_icon"
+		android:layout_width="56dp"
+		android:layout_height="56dp"
+		android:layout_gravity="center_horizontal"
 		android:layout_marginTop="18dp"
-		android:gravity="center"
-		android:includeFontPadding="false"
-		android:text="🍼"
-		android:textSize="38sp"/>
+		android:importantForAccessibility="no"
+		android:src="@drawable/abdl_icon_hero"/>
 
 	<TextView
 		android:id="@+id/verification_hero_title"
@@ -74,7 +85,7 @@
 		<FrameLayout
 			android:layout_width="40dp"
 			android:layout_height="40dp"
-			android:background="@drawable/vr_bg_pill">
+			android:background="@drawable/vr_bg_icon_tile">
 
 			<ImageView
 				android:layout_width="20dp"

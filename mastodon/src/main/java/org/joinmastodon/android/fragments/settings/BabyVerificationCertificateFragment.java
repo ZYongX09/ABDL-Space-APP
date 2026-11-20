@@ -84,7 +84,39 @@ public class BabyVerificationCertificateFragment extends ToolbarFragment{
 		content.setOrientation(LinearLayout.VERTICAL);
 		content.setBackgroundColor(getResources().getColor(R.color.vr_page, getActivity().getTheme()));
 		content.setPadding(V.dp(20), V.dp(12), V.dp(20), V.dp(24));
+		androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(scroll, (v, insets)->{
+			v.setPadding(0, insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.statusBars()).top, 0, 0);
+			return insets;
+		});
 		scroll.addView(content);
+
+		getToolbar().setVisibility(View.GONE);
+		android.widget.FrameLayout bar=new android.widget.FrameLayout(getActivity());
+		android.widget.ImageButton back=new android.widget.ImageButton(getActivity());
+		back.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+		back.setImageResource(R.drawable.ic_fluent_arrow_left_24_regular);
+		android.content.res.ColorStateList tint=android.content.res.ColorStateList.valueOf(getResources().getColor(R.color.vr_text_primary, getActivity().getTheme()));
+		back.setImageTintList(tint);
+		back.setContentDescription(getString(R.string.back));
+		back.setOnClickListener(v->{ if(getActivity()!=null) getActivity().onBackPressed(); });
+		int backSize=V.dp(36);
+		android.widget.FrameLayout.LayoutParams backParams=new android.widget.FrameLayout.LayoutParams(backSize, backSize);
+		backParams.gravity=android.view.Gravity.START|android.view.Gravity.CENTER_VERTICAL;
+		bar.addView(back, backParams);
+		android.widget.TextView pill=new android.widget.TextView(getActivity());
+		pill.setText("ZH");
+		pill.setTextSize(12);
+		pill.setTextColor(getResources().getColor(R.color.vr_text_primary, getActivity().getTheme()));
+		pill.setBackgroundResource(R.drawable.vr_bg_pill);
+		pill.setGravity(android.view.Gravity.CENTER);
+		pill.setPadding(V.dp(12), V.dp(5), V.dp(12), V.dp(5));
+		pill.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_vr_globe_20, 0, 0, 0);
+		pill.setCompoundDrawablePadding(V.dp(6));
+		pill.setCompoundDrawableTintList(tint);
+		android.widget.FrameLayout.LayoutParams pillParams=new android.widget.FrameLayout.LayoutParams(-2, -2);
+		pillParams.gravity=android.view.Gravity.END|android.view.Gravity.CENTER_VERTICAL;
+		bar.addView(pill, pillParams);
+		content.addView(bar, new LinearLayout.LayoutParams(-1, V.dp(36)));
 
 		status=new TextView(getActivity());
 		status.setTextAppearance(R.style.TextAppearance_Mastodon_Verification2_Subtitle);

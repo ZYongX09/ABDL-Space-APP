@@ -1071,4 +1071,14 @@
 	<string name="vr_copy_link">Copy verification link</string>
 	<string name="vr_share_certificate">Share certificate</string>
 	<string name="vr_copy_link_done">Verification link copied</string>
+	<string name="vr_cam_title">Verification photo</string>
+	<string name="vr_cam_requirements">Requirements</string>
+	<string name="vr_cam_step1_fmt">Cut out a %1$s piece of paper, %2$s</string>
+	<string name="vr_cam_step2">Write your user ID and the verification text on the paper</string>
+	<string name="vr_cam_step3_fmt">%1$s, and photograph the fully worn diaper together with the paper</string>
+	<string name="vr_cam_meta_fmt">ID %1$s · %2$s</string>
+	<string name="vr_cam_remaining">Time remaining</string>
+	<string name="vr_cam_preview_title">Use this photo?</string>
+	<string name="vr_cam_retake">Retake</string>
+	<string name="vr_cam_use">Use this photo</string>
 </resources>
