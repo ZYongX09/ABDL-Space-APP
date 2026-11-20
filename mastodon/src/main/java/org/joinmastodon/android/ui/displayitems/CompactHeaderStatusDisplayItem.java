@@ -102,6 +102,16 @@ public class CompactHeaderStatusDisplayItem extends StatusDisplayItem{
 			// 无头像账号（宝宝新天地同步等）显示默认头像
 			if(!item.hasAvatarUrl)
 				avatar.setImageResource(R.drawable.default_avatar);
+			else{
+				// Apply an already-decoded avatar synchronously on rebind; the list loader's async task
+				// otherwise shows the recycled placeholder for a frame (or refetches after a miss).
+				me.grishka.appkit.imageloader.requests.ImageLoaderRequest request=item.getImageRequest(0);
+				if(request!=null){
+					android.graphics.drawable.Drawable cached=me.grishka.appkit.imageloader.ImageCache
+							.getInstance(itemView.getContext()).getFromTop(request);
+					if(cached!=null) avatar.setImageDrawable(cached);
+				}
+			}
 			name.setText(item.parsedName);
 			org.joinmastodon.android.friendcards.PublicFriendCardUi.bindMarker(publicFriendCardMarker, item.user, item.status);
 			nameBadge.setText(null);

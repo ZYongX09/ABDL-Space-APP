@@ -97,6 +97,7 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 	private View messageScroll, requirementsPage, uploadingPage, statusPage;
 	private TextView reqCountdown, reqStep2, reqStep4, reqUserValue, reqTextValue, statusTitle, statusSubtitle;
 	private LinearLayout statusContent;
+	private android.widget.ImageView statusIcon;
 	private Button statusPrimary, statusSecondary;
 	private Button reqStart;
 	private final ImageView[] upIcons=new ImageView[3];
@@ -147,6 +148,7 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 		statusTitle=view.findViewById(R.id.vr_status_title);
 		statusSubtitle=view.findViewById(R.id.vr_status_subtitle);
 		statusContent=view.findViewById(R.id.vr_status_content);
+		statusIcon=view.findViewById(R.id.vr_status_icon);
 		statusPrimary=view.findViewById(R.id.vr_status_primary);
 		statusSecondary=view.findViewById(R.id.vr_status_secondary);
 		uploadingPage=view.findViewById(R.id.verification_uploading_page);
@@ -176,6 +178,15 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 			showPendingCapture();
 		}else loadState();
 		return view;
+	}
+
+	@Override
+	public void onViewCreated(View view, Bundle state){
+		super.onViewCreated(view, state);
+		// The shell still carries an appkit toolbar for library compatibility; the design is a
+		// full-screen page, so collapse the toolbar's whole row, not just the toolbar view.
+		View toolbarWrap=view.findViewById(R.id.verification_toolbar_wrap);
+		if(toolbarWrap!=null) toolbarWrap.setVisibility(View.GONE);
 	}
 
 	@Override
@@ -254,7 +265,7 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 			case APPROVED -> {
 				busy=false;
 				if(certificate!=null && certificate.isRevoked()){ showRevokedPage(certificate); return; }
-				showStatus(R.string.vr_approved_title, getString(R.string.verification_certificate_pending_sync), null,
+				showStatus(R.drawable.ic_fluent_checkmark_24_filled, R.color.vr_success, R.drawable.vr_bg_status_success, R.string.vr_approved_title, getString(R.string.verification_certificate_pending_sync), null,
 						R.string.verification_refresh, v->loadState(), R.string.vr_home, v->goHome());
 			}
 			case SUBMITTED -> {
@@ -357,7 +368,11 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 				pendingCapture=new VerificationPendingCapture(result.id, currentState.config.declarationVersion, requirement, result.expiresAt, currentState.config.maxEvidenceSize, accountID, ownerUserId(), result.paperShape, result.foldInstruction, result.placementInstruction, result.randomText);
 				try{
 					pendingCapture.save(getActivity());
-					launchCamera();
+					// Design order: intro -> capture-requirements guide -> camera. The guide carries the
+					// live countdown and the exact paper/id/text instructions before the camera opens.
+					busy=false;
+					updateStartEnabled();
+					showRequirements(pendingCapture);
 				}catch(Exception error){
 					cancelPendingCapture(false);
 					busy=false;
@@ -1087,7 +1102,23 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 
 	private void showStatus(int title, CharSequence subtitle, ContentBuilder content, int primaryLabel, View.OnClickListener primary,
 			int secondaryLabel, View.OnClickListener secondary){
+		showStatus(0, 0, 0, title, subtitle, content, primaryLabel, primary, secondaryLabel, secondary);
+	}
+
+	private void showStatus(int iconRes, int iconTint, int iconBackground, int title, CharSequence subtitle, ContentBuilder content,
+			int primaryLabel, View.OnClickListener primary, int secondaryLabel, View.OnClickListener secondary){
 		showOnly(statusPage);
+		if(statusIcon!=null){
+			if(iconRes==0){
+				statusIcon.setVisibility(View.GONE);
+			}else{
+				statusIcon.setVisibility(View.VISIBLE);
+				statusIcon.setImageResource(iconRes);
+				statusIcon.setImageTintList(android.content.res.ColorStateList.valueOf(
+						getResources().getColor(iconTint, getActivity().getTheme())));
+				statusIcon.setBackgroundResource(iconBackground);
+			}
+		}
 		statusTitle.setText(title);
 		statusSubtitle.setText(subtitle==null ? "" : subtitle);
 		statusSubtitle.setVisibility(subtitle==null || subtitle.length()==0 ? View.GONE : View.VISIBLE);
@@ -1178,13 +1209,13 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 	private void goHome(){ if(getActivity()!=null) getActivity().onBackPressed(); }
 
 	private void showSubmittedPage(){
-		showStatus(R.string.vr_submitted_title, getString(R.string.vr_submitted_subtitle), null,
+		showStatus(R.drawable.ic_fluent_checkmark_24_filled, R.color.vr_success, R.drawable.vr_bg_status_success, R.string.vr_submitted_title, getString(R.string.vr_submitted_subtitle), null,
 				R.string.vr_done, v->goHome(), 0, null);
 	}
 
 	private void showReviewPage(State state){
 		String submitted=state.application==null ? null : vrTime(state.application.submittedAt);
-		showStatus(R.string.vr_review_title, getString(R.string.vr_review_subtitle), parent->{
+		showStatus(R.drawable.ic_fluent_clock_24_regular, R.color.vr_primary, R.drawable.vr_bg_status_info, R.string.vr_review_title, getString(R.string.vr_review_subtitle), parent->{
 			LinearLayout card=vrCard(parent, null, null, 0, 0);
 			vrStep(card, getString(R.string.vr_review_step1), getString(R.string.vr_review_step1_state), R.color.vr_success);
 			vrStep(card, getString(R.string.vr_review_step2), getString(R.string.vr_review_step2_state), R.color.vr_primary);
@@ -1196,7 +1227,7 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 
 	private void showApprovedPage(State state, Certificate certificate){
 		String holder=String.valueOf(ownerUserId());
-		showStatus(R.string.vr_approved_title, getString(R.string.vr_approved_subtitle), parent->{
+		showStatus(R.drawable.ic_fluent_checkmark_24_filled, R.color.vr_success, R.drawable.vr_bg_status_success, R.string.vr_approved_title, getString(R.string.vr_approved_subtitle), parent->{
 			LinearLayout card=vrCard(parent, getString(R.string.vr_certificate_card), getString(R.string.vr_active_badge), R.drawable.vr_bg_success_pill, R.color.vr_success_text);
 			vrDivider(card);
 			vrFact(card, getString(R.string.vr_holder), getString(R.string.vr_user_prefix, holder));
@@ -1208,7 +1239,7 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 
 	private void showRejectedPage(State state){
 		org.joinmastodon.android.model.verification.VerificationModels.Application app=state.application;
-		showStatus(R.string.vr_rejected_title, getString(R.string.vr_rejected_subtitle), parent->{
+		showStatus(R.drawable.ic_fluent_dismiss_24_regular, R.color.vr_danger, R.drawable.vr_bg_status_danger, R.string.vr_rejected_title, getString(R.string.vr_rejected_subtitle), parent->{
 			LinearLayout card=vrCard(parent, getString(R.string.vr_reject_reason), getString(R.string.vr_retake_badge), R.drawable.vr_bg_danger_pill, R.color.vr_danger);
 			vrDivider(card);
 			TextView reason=vrText(app==null || app.decisionNote==null ? "—" : app.decisionNote, 11.5f, R.color.vr_text_secondary, false);
@@ -1220,7 +1251,7 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 	}
 
 	private void showRevokedPage(Certificate certificate){
-		showStatus(R.string.vr_revoked_title, getString(R.string.vr_revoked_subtitle), parent->{
+		showStatus(R.drawable.ic_fluent_warning_24_regular, R.color.vr_warning, R.drawable.vr_bg_status_warning, R.string.vr_revoked_title, getString(R.string.vr_revoked_subtitle), parent->{
 			LinearLayout card=vrCard(parent, getString(R.string.vr_revoke_info), getString(R.string.vr_revoked_badge), R.drawable.vr_bg_neutral_pill, R.color.vr_text_secondary);
 			vrDivider(card);
 			vrFact(card, getString(R.string.vr_cert_id), vrShortId(certificate.id));
@@ -1234,7 +1265,7 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 	}
 
 	private void showUnavailablePage(State state){
-		showStatus(R.string.vr_unavailable_title, getString(R.string.vr_unavailable_subtitle), parent->{
+		showStatus(R.drawable.ic_fluent_shield_24_regular, R.color.vr_text_secondary, R.drawable.vr_bg_status_neutral, R.string.vr_unavailable_title, getString(R.string.vr_unavailable_subtitle), parent->{
 			LinearLayout card=vrCard(parent, getString(R.string.vr_application_info), getString(R.string.vr_not_open), R.drawable.vr_bg_neutral_pill, R.color.vr_text_secondary);
 			vrDivider(card);
 			vrFact(card, getString(R.string.vr_cert_state_label), getString(R.string.vr_not_open));
@@ -1247,7 +1278,7 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 		int ttl=currentState==null || currentState.config==null ? 900 : currentState.config.captureTtlSeconds;
 		int minutes=Math.max(1, ttl/60);
 		long started=expires>0 ? expires-ttl : 0;
-		showStatus(R.string.vr_expired_title, getString(R.string.vr_expired_subtitle, minutes), parent->{
+		showStatus(R.drawable.ic_fluent_clock_24_regular, R.color.vr_warning, R.drawable.vr_bg_status_warning, R.string.vr_expired_title, getString(R.string.vr_expired_subtitle, minutes), parent->{
 			LinearLayout card=vrCard(parent, getString(R.string.vr_session_info), getString(R.string.vr_expired_badge), R.drawable.vr_bg_warning_pill, R.color.vr_warning);
 			vrDivider(card);
 			vrFact(card, getString(R.string.vr_started_at), vrTime(started));
@@ -1265,7 +1296,9 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 				: error.retryable && error.recovery!=null ? v->startUploader(id, image, error.recovery)
 				: v->loadState();
 		int label = retake ? R.string.vr_retake : error.retryable && error.recovery!=null ? R.string.vr_retry : R.string.vr_check_result;
-		showStatus(R.string.vr_failed_title, getString(R.string.vr_failed_subtitle), parent->{
+		showStatus(R.drawable.ic_fluent_warning_24_regular, error.outcomeUnknown ? R.color.vr_warning : R.color.vr_danger,
+				error.outcomeUnknown ? R.drawable.vr_bg_status_warning : R.drawable.vr_bg_status_danger,
+				R.string.vr_failed_title, getString(R.string.vr_failed_subtitle), parent->{
 			LinearLayout card=vrCard(parent, getString(R.string.vr_upload_status), getString(badgeRes), badgeBg, badgeColor);
 			vrStep(card, getString(R.string.vr_encrypted_done), getString(R.string.vr_review_step1_state), R.color.vr_success);
 			vrStep(card, getString(R.string.vr_upload_interrupted, code), getString(R.string.vr_failed_state), R.color.vr_danger);

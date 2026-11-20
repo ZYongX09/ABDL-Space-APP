@@ -132,6 +132,11 @@ public class MediaCameraActivity extends Activity implements MediaCameraControll
 			bindCertificationRequirements();
 			findViewById(R.id.camera_certification_title).setVisibility(View.VISIBLE);
 			findViewById(R.id.camera_gallery).setVisibility(View.GONE);
+			findViewById(R.id.camera_switch).setVisibility(View.GONE);
+			findViewById(R.id.camera_flash).setVisibility(View.GONE);
+			findViewById(R.id.camera_capture_hint).setVisibility(View.GONE);
+			// Design: a single floating white shutter, not a dark control bar.
+			captureControls.setBackground(null);
 			((android.widget.TextView)findViewById(R.id.camera_capture_hint)).setText(R.string.verification_camera_capture_hint);
 		}
 
@@ -370,12 +375,18 @@ public class MediaCameraActivity extends Activity implements MediaCameraControll
 		switchButton.setVisibility(View.GONE);
 		reviewControls.setVisibility(View.VISIBLE);
 		if(certificationMode){
-			showCertificationPanel(false);
+			// Design keeps the requirements card and the countdown pill above the confirmation sheet.
+			showCertificationPanel(true);
+			findViewById(R.id.camera_top_controls).setVisibility(View.GONE);
 			findViewById(R.id.camera_certification_title).setVisibility(View.GONE);
 			android.widget.TextView title=findViewById(R.id.camera_review_title);
 			title.setText(R.string.vr_cam_preview_title);
 			title.setVisibility(View.VISIBLE);
 			((android.widget.Button)findViewById(R.id.camera_retake)).setText(R.string.vr_cam_retake);
+			View timer=findViewById(R.id.camera_certification_timer_pill);
+			android.widget.FrameLayout.LayoutParams params=(android.widget.FrameLayout.LayoutParams)timer.getLayoutParams();
+			params.bottomMargin=dp(148);
+			timer.setLayoutParams(params);
 		}
 		useButton.setText(certificationMode ? R.string.vr_cam_use : reviewIsVideo ? R.string.media_camera_use_video : R.string.media_camera_use_photo);
 		if(reviewIsVideo){
@@ -396,7 +407,15 @@ public class MediaCameraActivity extends Activity implements MediaCameraControll
 		reviewVideo.setVisibility(View.GONE);
 		reviewControls.setVisibility(View.GONE);
 		findViewById(R.id.camera_review_title).setVisibility(View.GONE);
-		if(certificationMode){ showCertificationPanel(true); findViewById(R.id.camera_certification_title).setVisibility(View.VISIBLE); }
+		if(certificationMode){
+			showCertificationPanel(true);
+			findViewById(R.id.camera_top_controls).setVisibility(View.VISIBLE);
+			findViewById(R.id.camera_certification_title).setVisibility(View.VISIBLE);
+			View timer=findViewById(R.id.camera_certification_timer_pill);
+			android.widget.FrameLayout.LayoutParams params=(android.widget.FrameLayout.LayoutParams)timer.getLayoutParams();
+			params.bottomMargin=dp(156);
+			timer.setLayoutParams(params);
+		}
 		preview.setVisibility(View.VISIBLE);
 		captureControls.setVisibility(View.VISIBLE);
 		if(certificationActive()) controller.open(preview);

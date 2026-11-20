@@ -57,9 +57,8 @@
 			android:layout_weight="1"
 			android:gravity="center"
 			android:text="@string/vr_cam_title"
-			android:textColor="#FFFFFF"
-			android:textSize="16sp"
-			android:textStyle="bold"
+			android:textColor="#9DA1A1"
+			android:textSize="14sp"
 			android:visibility="gone"/>
 
 		<TextView
@@ -101,13 +100,31 @@
 			android:orientation="vertical"
 			android:padding="16dp">
 
-			<TextView
+			<LinearLayout
 				android:layout_width="match_parent"
 				android:layout_height="wrap_content"
-				android:text="@string/vr_cam_requirements"
-				android:textColor="#1A1A1A"
-				android:textSize="15sp"
-				android:textStyle="bold"/>
+				android:gravity="center_vertical"
+				android:orientation="horizontal">
+
+				<TextView
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					android:layout_weight="1"
+					android:text="@string/vr_cam_requirements"
+					android:textColor="#1A1A1A"
+					android:textSize="15sp"
+					android:textStyle="bold"/>
+
+				<ImageView
+					android:id="@+id/camera_req_collapse"
+					android:layout_width="28dp"
+					android:layout_height="28dp"
+					android:background="@drawable/vr_bg_pill"
+					android:importantForAccessibility="no"
+					android:padding="6dp"
+					android:src="@drawable/ic_fluent_chevron_up_16_regular"
+					android:tint="#1A1A1A"/>
+			</LinearLayout>
 
 			<LinearLayout
 				android:layout_width="match_parent"
@@ -291,50 +308,58 @@
 			android:textStyle="bold"/>
 	</LinearLayout>
 
-	<TextView
-		android:id="@+id/camera_review_title"
-		android:layout_width="match_parent"
-		android:layout_height="wrap_content"
-		android:layout_gravity="bottom"
-		android:layout_marginBottom="124dp"
-		android:gravity="center"
-		android:text="@string/vr_cam_preview_title"
-		android:textColor="#FFFFFF"
-		android:textSize="17sp"
-		android:textStyle="bold"
-		android:visibility="gone"/>
-
 	<LinearLayout
 		android:id="@+id/camera_review_controls"
 		android:layout_width="match_parent"
-		android:layout_height="104dp"
+		android:layout_height="wrap_content"
 		android:layout_gravity="bottom"
-		android:background="#99000000"
-		android:gravity="center"
-		android:orientation="horizontal"
-		android:padding="16dp"
+		android:background="@drawable/bg_camera_review_sheet"
+		android:orientation="vertical"
 		android:visibility="gone">
 
-		<Button
-			android:id="@+id/camera_retake"
-			android:layout_width="0dp"
-			android:layout_height="52dp"
-			android:layout_marginEnd="8dp"
-			android:layout_weight="1"
-			android:background="@drawable/bg_camera_outline_button"
-			android:text="@string/media_camera_retake"
-			android:textAllCaps="false"
-			android:textColor="#FFFFFF"/>
+		<TextView
+			android:id="@+id/camera_review_title"
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:layout_marginTop="20dp"
+			android:gravity="center"
+			android:text="@string/vr_cam_preview_title"
+			android:textColor="#1A1A1A"
+			android:textSize="20sp"
+			android:textStyle="bold"/>
 
-		<Button
-			android:id="@+id/camera_use"
-			android:layout_width="0dp"
-			android:layout_height="52dp"
-			android:layout_marginStart="8dp"
-			android:layout_weight="1"
-			android:background="@drawable/vr_bg_primary"
-			android:text="@string/media_camera_use_photo"
-			android:textAllCaps="false"
-			android:textColor="#FFFFFF"/>
+		<LinearLayout
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:orientation="horizontal"
+			android:paddingStart="16dp"
+			android:paddingTop="18dp"
+			android:paddingEnd="16dp"
+			android:paddingBottom="20dp">
+
+			<Button
+				android:id="@+id/camera_retake"
+				android:layout_width="0dp"
+				android:layout_height="50dp"
+				android:layout_marginEnd="8dp"
+				android:layout_weight="1"
+				android:background="@drawable/bg_camera_review_outline"
+				android:text="@string/media_camera_retake"
+				android:textAllCaps="false"
+				android:textColor="#1A1A1A"
+				android:textSize="14sp"/>
+
+			<Button
+				android:id="@+id/camera_use"
+				android:layout_width="0dp"
+				android:layout_height="50dp"
+				android:layout_marginStart="8dp"
+				android:layout_weight="1"
+				android:background="@drawable/vr_bg_primary"
+				android:text="@string/media_camera_use_photo"
+				android:textAllCaps="false"
+				android:textColor="#FFFFFF"
+				android:textSize="14sp"/>
+		</LinearLayout>
 	</LinearLayout>
 </FrameLayout>

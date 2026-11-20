@@ -35,7 +35,7 @@
 		<item name="android:textSize">13sp</item>
 		<item name="android:fontFamily">sans-serif-medium</item>
 		<item name="android:textAllCaps">false</item>
-		<item name="android:minHeight">52dp</item>
+		<item name="android:minHeight">43dp</item>
 		<item name="android:stateListAnimator">@null</item>
 		<item name="android:insetTop">0dp</item>
 		<item name="android:insetBottom">0dp</item>
@@ -46,7 +46,7 @@
 		<item name="android:textSize">13sp</item>
 		<item name="android:fontFamily">sans-serif-medium</item>
 		<item name="android:textAllCaps">false</item>
-		<item name="android:minHeight">52dp</item>
+		<item name="android:minHeight">43dp</item>
 		<item name="android:stateListAnimator">@null</item>
 		<item name="android:insetTop">0dp</item>
 		<item name="android:insetBottom">0dp</item>
