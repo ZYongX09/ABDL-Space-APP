@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+	<attr name="vrBorder" format="color"/>
+	<attr name="vrCard" format="color"/>
+	<attr name="vrCertBg" format="color"/>
+	<attr name="vrCertBody" format="color"/>
+	<attr name="vrCertBorder" format="color"/>
+	<attr name="vrCertMuted" format="color"/>
+	<attr name="vrCertTitle" format="color"/>
+	<attr name="vrDanger" format="color"/>
+	<attr name="vrDangerBg" format="color"/>
+	<attr name="vrField" format="color"/>
+	<attr name="vrInfo" format="color"/>
+	<attr name="vrInfoDivider" format="color"/>
+	<attr name="vrNeutralBg" format="color"/>
+	<attr name="vrOnPrimary" format="color"/>
+	<attr name="vrPage" format="color"/>
+	<attr name="vrPrimary" format="color"/>
+	<attr name="vrProgressTrack" format="color"/>
+	<attr name="vrStepBg" format="color"/>
+	<attr name="vrStepText" format="color"/>
+	<attr name="vrSuccess" format="color"/>
+	<attr name="vrSuccessBg" format="color"/>
+	<attr name="vrSuccessText" format="color"/>
+	<attr name="vrTextMuted" format="color"/>
+	<attr name="vrTextPrimary" format="color"/>
+	<attr name="vrTextSecondary" format="color"/>
+	<attr name="vrTile" format="color"/>
+	<attr name="vrWarning" format="color"/>
+	<attr name="vrWarningBg" format="color"/>
+</resources>

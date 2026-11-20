@@ -1000,6 +1000,9 @@
 	<string name="vr_up_subtitle">Please do not close this page</string>
 	<string name="vr_up_step1">Photo processed</string>
 	<string name="vr_up_step2">Photo uploaded</string>
+	<string name="vr_up_step1_active">Processing photo</string>
+	<string name="vr_up_step2_active">Uploading photo</string>
+	<string name="vr_up_step3_done">Verification complete</string>
 	<string name="vr_up_step3">Verifying information</string>
 	<string name="vr_submitted_title">Photo submitted for review</string>
 	<string name="vr_submitted_subtitle">Review is expected to finish within 24 hours</string>

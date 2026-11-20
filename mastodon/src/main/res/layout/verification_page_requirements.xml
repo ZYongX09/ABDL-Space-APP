@@ -3,7 +3,7 @@
 	android:id="@+id/verification_requirements_page"
 	android:layout_width="match_parent"
 	android:layout_height="match_parent"
-	android:background="@color/vr_page"
+	android:background="?attr/vrPage"
 	android:orientation="vertical"
 	android:visibility="gone">
 
@@ -23,7 +23,7 @@
 			android:contentDescription="@string/back"
 			android:padding="8dp"
 			android:src="@drawable/ic_fluent_arrow_left_24_regular"
-			android:tint="@color/vr_text_primary"/>
+			android:tint="?attr/vrTextPrimary"/>
 
 		<TextView
 			android:id="@+id/verification_locale_pill_requirements"
@@ -41,7 +41,7 @@
 			android:paddingEnd="7dp"
 			android:paddingBottom="6dp"
 			android:text="ZH"
-			android:textColor="@color/vr_text_primary"
+			android:textColor="?attr/vrTextPrimary"
 			android:textSize="11sp"/>
 	</FrameLayout>
 
@@ -70,7 +70,7 @@
 				android:layout_height="13dp"
 				android:importantForAccessibility="no"
 				android:src="@drawable/ic_fluent_clock_24_regular"
-				android:tint="@color/vr_primary"/>
+				android:tint="?attr/vrPrimary"/>
 
 			<TextView
 				android:layout_width="0dp"
@@ -78,7 +78,7 @@
 				android:layout_marginStart="7dp"
 				android:layout_weight="1"
 				android:text="@string/vr_req_remaining"
-				android:textColor="@color/vr_text_secondary"
+				android:textColor="?attr/vrTextSecondary"
 				android:textSize="11.5sp"
 				android:fontFamily="sans-serif-medium"/>
 
@@ -87,7 +87,7 @@
 				android:layout_width="wrap_content"
 				android:layout_height="wrap_content"
 				android:text="--:--"
-				android:textColor="@color/vr_text_primary"
+				android:textColor="?attr/vrTextPrimary"
 				android:textSize="14sp"
 				android:fontFamily="sans-serif-medium"/>
 		</LinearLayout>
@@ -143,7 +143,7 @@
 					android:gravity="center"
 					android:includeFontPadding="false"
 					android:text="1"
-					android:textColor="@color/vr_step_text"
+					android:textColor="?attr/vrStepText"
 					android:textSize="9.5sp"
 					android:textStyle="bold"/>
 
@@ -161,7 +161,7 @@
 				android:layout_height="1dp"
 				android:layout_marginTop="10dp"
 				android:layout_marginBottom="10dp"
-				android:background="@color/vr_info_divider"/>
+				android:background="?attr/vrInfoDivider"/>
 
 			<TextView
 				android:layout_width="match_parent"
@@ -183,7 +183,7 @@
 					android:gravity="center"
 					android:includeFontPadding="false"
 					android:text="2"
-					android:textColor="@color/vr_step_text"
+					android:textColor="?attr/vrStepText"
 					android:textSize="9.5sp"
 					android:textStyle="bold"/>
 
@@ -209,7 +209,7 @@
 					android:gravity="center"
 					android:includeFontPadding="false"
 					android:text="3"
-					android:textColor="@color/vr_step_text"
+					android:textColor="?attr/vrStepText"
 					android:textSize="9.5sp"
 					android:textStyle="bold"/>
 
@@ -247,7 +247,7 @@
 								android:layout_width="60dp"
 								android:layout_height="wrap_content"
 								android:text="@string/vr_req_user_id"
-								android:textColor="@color/vr_text_secondary"
+								android:textColor="?attr/vrTextSecondary"
 								android:textSize="11sp"/>
 
 							<TextView
@@ -256,7 +256,7 @@
 								android:layout_height="wrap_content"
 								android:layout_marginStart="8dp"
 								android:layout_weight="1"
-								android:textColor="@color/vr_text_primary"
+								android:textColor="?attr/vrTextPrimary"
 								android:textSize="11.5sp"
 								android:fontFamily="sans-serif-medium"/>
 						</LinearLayout>
@@ -272,7 +272,7 @@
 								android:layout_width="60dp"
 								android:layout_height="wrap_content"
 								android:text="@string/vr_req_random_text"
-								android:textColor="@color/vr_text_secondary"
+								android:textColor="?attr/vrTextSecondary"
 								android:textSize="11sp"/>
 
 							<TextView
@@ -281,7 +281,7 @@
 								android:layout_height="wrap_content"
 								android:layout_marginStart="8dp"
 								android:layout_weight="1"
-								android:textColor="@color/vr_text_primary"
+								android:textColor="?attr/vrTextPrimary"
 								android:textSize="11.5sp"
 								android:fontFamily="sans-serif-medium"/>
 						</LinearLayout>
@@ -294,7 +294,7 @@
 				android:layout_height="1dp"
 				android:layout_marginTop="10dp"
 				android:layout_marginBottom="10dp"
-				android:background="@color/vr_info_divider"/>
+				android:background="?attr/vrInfoDivider"/>
 
 			<TextView
 				android:layout_width="match_parent"
@@ -315,7 +315,7 @@
 					android:gravity="center"
 					android:includeFontPadding="false"
 					android:text="4"
-					android:textColor="@color/vr_step_text"
+					android:textColor="?attr/vrStepText"
 					android:textSize="9.5sp"
 					android:textStyle="bold"/>
 
@@ -347,7 +347,7 @@
 				android:layout_height="wrap_content"
 				android:lineSpacingExtra="2dp"
 				android:text="@string/vr_req_tips"
-				android:textColor="@color/vr_text_secondary"
+				android:textColor="?attr/vrTextSecondary"
 				android:textSize="11.5sp"/>
 		</LinearLayout>
 

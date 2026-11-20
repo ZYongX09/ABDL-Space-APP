@@ -1,8 +1,8 @@
 package org.joinmastodon.android.ui.verification;
 
 import android.app.Activity;
-import android.content.res.Configuration;
 import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
 import android.view.Window;
 
 import org.joinmastodon.android.R;
@@ -23,14 +23,18 @@ public final class VerificationWindowMode{
 		if(activity==null) return;
 		Integer depth=depths.get(activity);
 		if(depth==null){
-			Window window=activity.getWindow();
-			WindowCompat.setDecorFitsSystemWindows(window,false);
-			window.setStatusBarColor(Color.TRANSPARENT);
-			applyIconMode(activity);
+			WindowCompat.setDecorFitsSystemWindows(activity.getWindow(),false);
+			applySurface(activity);
 			depths.put(activity,1);
 		}else{
 			depths.put(activity,depth+1);
 		}
+	}
+	/** Re-apply after AppKit/FragmentStackActivity resets system bar colours on navigation. */
+	public static void reapply(Activity activity){
+		if(activity==null || !depths.containsKey(activity)) return;
+		WindowCompat.setDecorFitsSystemWindows(activity.getWindow(),false);
+		applySurface(activity);
 	}
 	public static void exit(Activity activity){
 		if(activity==null) return;
@@ -40,15 +44,25 @@ public final class VerificationWindowMode{
 		depths.remove(activity);
 		Window window=activity.getWindow();
 		WindowCompat.setDecorFitsSystemWindows(window,true);
-		window.setStatusBarColor(UiUtils.getThemeColor(activity,R.attr.colorM3Background));
+		int background=UiUtils.getThemeColor(activity,R.attr.colorM3Background);
+		window.setStatusBarColor(background);
+		window.setNavigationBarColor(background);
+		window.setBackgroundDrawable(new ColorDrawable(background));
 		WindowInsetsControllerCompat controller=WindowCompat.getInsetsController(window,window.getDecorView());
-		boolean night=(activity.getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK)==Configuration.UI_MODE_NIGHT_YES;
+		boolean night=UiUtils.isDarkTheme();
 		controller.setAppearanceLightStatusBars(!night);
+		controller.setAppearanceLightNavigationBars(!night);
 	}
-	private static void applyIconMode(Activity activity){
+	private static void applySurface(Activity activity){
 		Window window=activity.getWindow();
+		int page=UiUtils.getThemeColor(activity,R.attr.vrPage);
+		window.setStatusBarColor(Color.TRANSPARENT);
+		window.setNavigationBarColor(page);
+		// Even if a parent view is still inset, the strip behind the status bar matches the page.
+		window.setBackgroundDrawable(new ColorDrawable(page));
 		WindowInsetsControllerCompat controller=WindowCompat.getInsetsController(window,window.getDecorView());
-		boolean night=(activity.getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK)==Configuration.UI_MODE_NIGHT_YES;
+		boolean night=UiUtils.isDarkTheme();
 		controller.setAppearanceLightStatusBars(!night);
+		controller.setAppearanceLightNavigationBars(!night);
 	}
 }

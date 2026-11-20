@@ -3,7 +3,7 @@
 	android:id="@+id/verification_scroll"
 	android:layout_width="match_parent"
 	android:layout_height="match_parent"
-	android:background="@color/vr_page"
+	android:background="?attr/vrPage"
 	android:clipToPadding="false"
 	android:fillViewport="true">
 
@@ -45,7 +45,7 @@
 				android:id="@+id/verification_loading_state"
 				android:layout_width="match_parent"
 				android:layout_height="match_parent"
-				android:background="@color/vr_page"
+				android:background="?attr/vrPage"
 				android:gravity="center"
 				android:orientation="vertical"
 				android:paddingStart="20dp"
@@ -55,7 +55,7 @@
 				<ProgressBar
 					android:layout_width="36dp"
 					android:layout_height="36dp"
-					android:indeterminateTint="@color/vr_primary"/>
+					android:indeterminateTint="?attr/vrPrimary"/>
 
 				<TextView
 					android:id="@+id/verification_loading_text"
@@ -71,7 +71,7 @@
 				android:id="@+id/verification_message_scroll"
 				android:layout_width="match_parent"
 				android:layout_height="match_parent"
-				android:background="@color/vr_page"
+				android:background="?attr/vrPage"
 				android:fillViewport="true"
 				android:visibility="gone">
 
@@ -103,7 +103,7 @@
 							android:paddingEnd="12dp"
 							android:paddingBottom="5dp"
 							android:text="ZH"
-							android:textColor="@color/vr_text_primary"
+							android:textColor="?attr/vrTextPrimary"
 							android:textSize="12sp"/>
 					</FrameLayout>
 
@@ -130,7 +130,7 @@
 						android:layout_height="4dp"
 						android:layout_marginTop="20dp"
 						android:indeterminate="true"
-						android:indeterminateTint="@color/vr_primary"
+						android:indeterminateTint="?attr/vrPrimary"
 						android:visibility="gone"/>
 
 					<Space

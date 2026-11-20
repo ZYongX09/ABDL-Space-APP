@@ -3,7 +3,7 @@
 	android:id="@+id/verification_status_page"
 	android:layout_width="match_parent"
 	android:layout_height="match_parent"
-	android:background="@color/vr_page"
+	android:background="?attr/vrPage"
 	android:orientation="vertical"
 	android:visibility="gone">
 
@@ -23,7 +23,7 @@
 			android:contentDescription="@string/back"
 			android:padding="8dp"
 			android:src="@drawable/ic_fluent_arrow_left_24_regular"
-			android:tint="@color/vr_text_primary"/>
+			android:tint="?attr/vrTextPrimary"/>
 
 		<TextView
 			android:id="@+id/verification_locale_pill_status"
@@ -41,7 +41,7 @@
 			android:paddingEnd="7dp"
 			android:paddingBottom="6dp"
 			android:text="ZH"
-			android:textColor="@color/vr_text_primary"
+			android:textColor="?attr/vrTextPrimary"
 			android:textSize="11sp"/>
 	</FrameLayout>
 

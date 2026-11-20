@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-	<solid android:color="@color/vr_cert_bg"/>
-	<stroke android:width="1.5dp" android:color="@color/vr_cert_border"/>
+	<solid android:color="?attr/vrCertBg"/>
+	<stroke android:width="1.5dp" android:color="?attr/vrCertBorder"/>
 	<corners android:radius="18dp"/>
 </shape>

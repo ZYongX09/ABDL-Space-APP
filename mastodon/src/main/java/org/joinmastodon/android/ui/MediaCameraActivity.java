@@ -104,6 +104,9 @@ public class MediaCameraActivity extends Activity implements MediaCameraControll
 		getWindow().setStatusBarColor(0x00000000);
 		getWindow().setNavigationBarColor(0xff000000);
 		WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+		getTheme().applyStyle(org.joinmastodon.android.ui.utils.UiUtils.isDarkTheme()
+				? R.style.ThemeOverlay_Mastodon_Verification_Dark
+				: R.style.ThemeOverlay_Mastodon_Verification_Light, true);
 		setContentView(R.layout.activity_media_camera);
 		WindowInsetsControllerCompat insetsController=WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
 		insetsController.setAppearanceLightStatusBars(false);
@@ -294,8 +297,8 @@ public class MediaCameraActivity extends Activity implements MediaCameraControll
 	}
 
 	@Override public void onCameraReady(boolean frontFacing, boolean flashAvailable, boolean switchAvailable){
-		flashButton.setVisibility(flashAvailable ? View.VISIBLE : View.INVISIBLE);
-		switchButton.setVisibility(switchAvailable ? View.VISIBLE : View.INVISIBLE);
+		flashButton.setVisibility(!certificationMode && flashAvailable ? View.VISIBLE : View.INVISIBLE);
+		switchButton.setVisibility(!certificationMode && switchAvailable ? View.VISIBLE : View.INVISIBLE);
 	}
 
 	@Override public void onPhotoCaptured(File file){

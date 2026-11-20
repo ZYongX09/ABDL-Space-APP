@@ -83,14 +83,18 @@ public class BabyVerificationCertificateFragment extends ToolbarFragment{
 		// Full-screen design: the toolbar only exists after onCreateContentView, so hide it here.
 		android.widget.Toolbar toolbar=getToolbar();
 		if(toolbar!=null) toolbar.setVisibility(View.GONE);
+		view.post(()->org.joinmastodon.android.ui.verification.VerificationWindowMode.reapply(getActivity()));
 	}
 
 	@Override public View onCreateContentView(LayoutInflater inflater, ViewGroup container, Bundle state){
+		getActivity().getTheme().applyStyle(UiUtils.isDarkTheme()
+				? R.style.ThemeOverlay_Mastodon_Verification_Dark
+				: R.style.ThemeOverlay_Mastodon_Verification_Light, true);
 		org.joinmastodon.android.ui.verification.VerificationWindowMode.enter(getActivity());
 		ScrollView scroll=new ScrollView(getActivity());
 		content=new LinearLayout(getActivity());
 		content.setOrientation(LinearLayout.VERTICAL);
-		content.setBackgroundColor(getResources().getColor(R.color.vr_page, getActivity().getTheme()));
+		content.setBackgroundColor(UiUtils.getThemeColor(getActivity(), R.attr.vrPage));
 		content.setPadding(V.dp(20), V.dp(12), V.dp(20), V.dp(24));
 		androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(scroll, (v, insets)->{
 			v.setPadding(0, insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.statusBars()).top, 0, 0);
@@ -102,7 +106,7 @@ public class BabyVerificationCertificateFragment extends ToolbarFragment{
 		android.widget.ImageButton back=new android.widget.ImageButton(getActivity());
 		back.setBackgroundColor(android.graphics.Color.TRANSPARENT);
 		back.setImageResource(R.drawable.ic_fluent_arrow_left_24_regular);
-		android.content.res.ColorStateList tint=android.content.res.ColorStateList.valueOf(getResources().getColor(R.color.vr_text_primary, getActivity().getTheme()));
+		android.content.res.ColorStateList tint=android.content.res.ColorStateList.valueOf(UiUtils.getThemeColor(getActivity(), R.attr.vrTextPrimary));
 		back.setImageTintList(tint);
 		back.setContentDescription(getString(R.string.back));
 		back.setOnClickListener(v->{ if(getActivity()!=null) getActivity().onBackPressed(); });
@@ -115,7 +119,7 @@ public class BabyVerificationCertificateFragment extends ToolbarFragment{
 				.getLanguage().startsWith("zh");
 		pill.setText(chinese ? "ZH" : "EN");
 		pill.setTextSize(11);
-		pill.setTextColor(getResources().getColor(R.color.vr_text_primary, getActivity().getTheme()));
+		pill.setTextColor(UiUtils.getThemeColor(getActivity(), R.attr.vrTextPrimary));
 		pill.setBackgroundResource(R.drawable.vr_bg_pill);
 		pill.setGravity(android.view.Gravity.CENTER);
 		pill.setPadding(V.dp(9), V.dp(6), V.dp(7), V.dp(6));
@@ -198,6 +202,7 @@ public class BabyVerificationCertificateFragment extends ToolbarFragment{
 	}
 
 	@Override public void onResume(){
+		org.joinmastodon.android.ui.verification.VerificationWindowMode.reapply(getActivity());
 		super.onResume();
 		if(!resumedOnce){ resumedOnce=true; return; }
 		if(viewReady) refresh(PendingAction.NONE);
@@ -286,7 +291,7 @@ public class BabyVerificationCertificateFragment extends ToolbarFragment{
 				getString(R.string.verification_certificate_note_4),
 				getString(R.string.verification_certificate_note_5),
 		};
-		boolean dark=(getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK)==Configuration.UI_MODE_NIGHT_YES;
+		boolean dark=UiUtils.isDarkTheme();
 		return BabyCertificateRenderer.render(value, dark);
 	}
 

@@ -3,7 +3,7 @@
 	android:id="@+id/verification_uploading_page"
 	android:layout_width="match_parent"
 	android:layout_height="match_parent"
-	android:background="@color/vr_page"
+	android:background="?attr/vrPage"
 	android:orientation="vertical"
 	android:visibility="gone">
 
@@ -21,9 +21,9 @@
 			android:layout_marginTop="5dp"
 			android:background="@android:color/transparent"
 			android:contentDescription="@string/back"
-			android:padding="8dp"
+			android:padding="10dp"
 			android:src="@drawable/ic_fluent_arrow_left_24_regular"
-			android:tint="@color/vr_text_primary"/>
+			android:tint="?attr/vrTextPrimary"/>
 
 		<TextView
 			android:id="@+id/verification_locale_pill_uploading"
@@ -41,7 +41,7 @@
 			android:paddingEnd="7dp"
 			android:paddingBottom="6dp"
 			android:text="ZH"
-			android:textColor="@color/vr_text_primary"
+			android:textColor="?attr/vrTextPrimary"
 			android:textSize="11sp"/>
 	</FrameLayout>
 
@@ -58,7 +58,7 @@
 			android:id="@+id/vr_up_progress"
 			android:layout_width="46dp"
 			android:layout_height="46dp"
-			android:indeterminateTint="@color/vr_primary"/>
+			android:indeterminateTint="?attr/vrPrimary"/>
 
 		<TextView
 			android:layout_width="match_parent"
@@ -84,26 +84,34 @@
 			android:orientation="vertical">
 
 			<LinearLayout
+				android:id="@+id/vr_up_step1_row"
 				android:layout_width="wrap_content"
 				android:layout_height="wrap_content"
 				android:gravity="center_vertical"
-				android:orientation="horizontal">
+				android:orientation="horizontal"
+				android:visibility="gone">
 
-				<ImageView
-					android:id="@+id/vr_up_step1_icon"
+				<FrameLayout
 					android:layout_width="18dp"
-					android:layout_height="18dp"
-					android:importantForAccessibility="no"
-					android:src="@drawable/ic_fluent_checkmark_circle_24_filled"
-					android:tint="@color/vr_success"
-					android:visibility="invisible"/>
+					android:layout_height="18dp">
 
-				<ProgressBar
-					android:id="@+id/vr_up_step1_progress"
-					android:layout_width="16dp"
-					android:layout_height="16dp"
-					android:layout_marginStart="1dp"
-					android:indeterminateTint="@color/vr_primary"/>
+					<ImageView
+						android:id="@+id/vr_up_step1_icon"
+						android:layout_width="18dp"
+						android:layout_height="18dp"
+						android:layout_gravity="center"
+						android:importantForAccessibility="no"
+						android:src="@drawable/ic_fluent_checkmark_circle_24_filled"
+						android:tint="?attr/vrSuccess"
+						android:visibility="invisible"/>
+
+					<ProgressBar
+						android:id="@+id/vr_up_step1_progress"
+						android:layout_width="18dp"
+						android:layout_height="18dp"
+						android:layout_gravity="center"
+						android:indeterminateTint="?attr/vrPrimary"/>
+				</FrameLayout>
 
 				<TextView
 					android:id="@+id/vr_up_step1_text"
@@ -111,33 +119,41 @@
 					android:layout_height="wrap_content"
 					android:layout_marginStart="10dp"
 					android:text="@string/vr_up_step1"
-					android:textColor="@color/vr_text_primary"
+					android:textColor="?attr/vrTextPrimary"
 					android:textSize="12sp"/>
 			</LinearLayout>
 
 			<LinearLayout
+				android:id="@+id/vr_up_step2_row"
 				android:layout_width="wrap_content"
 				android:layout_height="wrap_content"
 				android:layout_marginTop="10dp"
 				android:gravity="center_vertical"
-				android:orientation="horizontal">
+				android:orientation="horizontal"
+				android:visibility="gone">
 
-				<ImageView
-					android:id="@+id/vr_up_step2_icon"
+				<FrameLayout
 					android:layout_width="18dp"
-					android:layout_height="18dp"
-					android:importantForAccessibility="no"
-					android:src="@drawable/ic_fluent_checkmark_circle_24_filled"
-					android:tint="@color/vr_success"
-					android:visibility="invisible"/>
+					android:layout_height="18dp">
 
-				<ProgressBar
-					android:id="@+id/vr_up_step2_progress"
-					android:layout_width="16dp"
-					android:layout_height="16dp"
-					android:layout_marginStart="1dp"
-					android:indeterminateTint="@color/vr_primary"
-					android:visibility="invisible"/>
+					<ImageView
+						android:id="@+id/vr_up_step2_icon"
+						android:layout_width="18dp"
+						android:layout_height="18dp"
+						android:layout_gravity="center"
+						android:importantForAccessibility="no"
+						android:src="@drawable/ic_fluent_checkmark_circle_24_filled"
+						android:tint="?attr/vrSuccess"
+						android:visibility="invisible"/>
+
+					<ProgressBar
+						android:id="@+id/vr_up_step2_progress"
+						android:layout_width="18dp"
+						android:layout_height="18dp"
+						android:layout_gravity="center"
+						android:indeterminateTint="?attr/vrPrimary"
+						android:visibility="invisible"/>
+				</FrameLayout>
 
 				<TextView
 					android:id="@+id/vr_up_step2_text"
@@ -145,33 +161,41 @@
 					android:layout_height="wrap_content"
 					android:layout_marginStart="10dp"
 					android:text="@string/vr_up_step2"
-					android:textColor="@color/vr_text_primary"
+					android:textColor="?attr/vrTextPrimary"
 					android:textSize="12sp"/>
 			</LinearLayout>
 
 			<LinearLayout
+				android:id="@+id/vr_up_step3_row"
 				android:layout_width="wrap_content"
 				android:layout_height="wrap_content"
 				android:layout_marginTop="10dp"
 				android:gravity="center_vertical"
-				android:orientation="horizontal">
+				android:orientation="horizontal"
+				android:visibility="gone">
 
-				<ImageView
-					android:id="@+id/vr_up_step3_icon"
+				<FrameLayout
 					android:layout_width="18dp"
-					android:layout_height="18dp"
-					android:importantForAccessibility="no"
-					android:src="@drawable/ic_fluent_checkmark_circle_24_filled"
-					android:tint="@color/vr_success"
-					android:visibility="invisible"/>
+					android:layout_height="18dp">
 
-				<ProgressBar
-					android:id="@+id/vr_up_step3_progress"
-					android:layout_width="16dp"
-					android:layout_height="16dp"
-					android:layout_marginStart="1dp"
-					android:indeterminateTint="@color/vr_primary"
-					android:visibility="invisible"/>
+					<ImageView
+						android:id="@+id/vr_up_step3_icon"
+						android:layout_width="18dp"
+						android:layout_height="18dp"
+						android:layout_gravity="center"
+						android:importantForAccessibility="no"
+						android:src="@drawable/ic_fluent_checkmark_circle_24_filled"
+						android:tint="?attr/vrSuccess"
+						android:visibility="invisible"/>
+
+					<ProgressBar
+						android:id="@+id/vr_up_step3_progress"
+						android:layout_width="18dp"
+						android:layout_height="18dp"
+						android:layout_gravity="center"
+						android:indeterminateTint="?attr/vrPrimary"
+						android:visibility="invisible"/>
+				</FrameLayout>
 
 				<TextView
 					android:id="@+id/vr_up_step3_text"
@@ -179,7 +203,7 @@
 					android:layout_height="wrap_content"
 					android:layout_marginStart="10dp"
 					android:text="@string/vr_up_step3"
-					android:textColor="@color/vr_text_primary"
+					android:textColor="?attr/vrTextPrimary"
 					android:textSize="12sp"/>
 			</LinearLayout>
 		</LinearLayout>
