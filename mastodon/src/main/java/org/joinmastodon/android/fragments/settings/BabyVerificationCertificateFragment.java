@@ -92,15 +92,18 @@ public class BabyVerificationCertificateFragment extends ToolbarFragment{
 	@Override public View onCreateContentView(LayoutInflater inflater, ViewGroup container, Bundle state){
 		org.joinmastodon.android.ui.verification.VerificationWindowMode.enter(getActivity());
 		ScrollView scroll=new ScrollView(getActivity());
+		scroll.setFillViewport(true);
+		scroll.setBackgroundColor(UiUtils.getThemeColor(getActivity(), R.attr.vrPage));
 		content=new LinearLayout(getActivity());
 		content.setOrientation(LinearLayout.VERTICAL);
 		content.setBackgroundColor(UiUtils.getThemeColor(getActivity(), R.attr.vrPage));
-		content.setPadding(V.dp(20), V.dp(12), V.dp(20), V.dp(24));
+		content.setPadding(V.dp(16), V.dp(12), V.dp(16), V.dp(0));
 		androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(scroll, (v, insets)->{
-			v.setPadding(0, insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.statusBars()).top, 0, 0);
+			v.setPadding(0, insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.statusBars()).top,
+					0, insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars()).bottom);
 			return insets;
 		});
-		scroll.addView(content);
+		scroll.addView(content, new ScrollView.LayoutParams(ScrollView.LayoutParams.MATCH_PARENT, ScrollView.LayoutParams.MATCH_PARENT));
 
 		android.widget.FrameLayout bar=new android.widget.FrameLayout(getActivity());
 		android.widget.ImageButton back=new android.widget.ImageButton(getActivity());
@@ -151,18 +154,22 @@ public class BabyVerificationCertificateFragment extends ToolbarFragment{
 		card.addView(image, new android.widget.FrameLayout.LayoutParams(-1, -2));
 		content.addView(card, new LinearLayout.LayoutParams(-1, -2));
 
+		// Keep the action block and footer pinned to the bottom on tall screens.
+		View spacer=new View(getActivity());
+		content.addView(spacer, new LinearLayout.LayoutParams(-1, 0, 1f));
+
 		refresh=new Button(getActivity()); refresh.setVisibility(View.GONE);
 		save=new Button(getActivity(), null, 0, R.style.Widget_Mastodon_Verification2_PrimaryButton);
 		save.setText(R.string.vr_save_certificate);
 		save.setOnClickListener(v->save());
-		LinearLayout.LayoutParams saveParams=new LinearLayout.LayoutParams(-1, V.dp(52));
-		saveParams.topMargin=V.dp(18);
+		LinearLayout.LayoutParams saveParams=new LinearLayout.LayoutParams(-1, V.dp(43));
+		saveParams.topMargin=V.dp(16);
 		content.addView(save, saveParams);
 
 		LinearLayout row=new LinearLayout(getActivity());
 		row.setOrientation(LinearLayout.HORIZONTAL);
-		LinearLayout.LayoutParams rowParams=new LinearLayout.LayoutParams(-1, V.dp(52));
-		rowParams.topMargin=V.dp(10);
+		LinearLayout.LayoutParams rowParams=new LinearLayout.LayoutParams(-1, V.dp(43));
+		rowParams.topMargin=V.dp(8);
 		content.addView(row, rowParams);
 		Button copy=new Button(getActivity(), null, 0, R.style.Widget_Mastodon_Verification2_SecondaryButton);
 		copy.setText(R.string.vr_copy_link);
@@ -182,7 +189,8 @@ public class BabyVerificationCertificateFragment extends ToolbarFragment{
 		footer.setTextAppearance(R.style.TextAppearance_Mastodon_Verification2_Footer);
 		footer.setGravity(android.view.Gravity.CENTER);
 		LinearLayout.LayoutParams footerParams=new LinearLayout.LayoutParams(-1, -2);
-		footerParams.topMargin=V.dp(12);
+		footerParams.topMargin=V.dp(8);
+		footerParams.bottomMargin=V.dp(16);
 		content.addView(footer, footerParams);
 		viewReady=true;
 		refresh(PendingAction.NONE);

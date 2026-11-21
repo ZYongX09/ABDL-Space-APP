@@ -48,6 +48,7 @@ public final class VerificationWindowMode{
 		window.setStatusBarColor(background);
 		window.setNavigationBarColor(background);
 		window.setBackgroundDrawable(new ColorDrawable(background));
+		window.getDecorView().setBackgroundColor(background);
 		WindowInsetsControllerCompat controller=WindowCompat.getInsetsController(window,window.getDecorView());
 		boolean night=UiUtils.isDarkTheme();
 		controller.setAppearanceLightStatusBars(!night);
@@ -56,10 +57,13 @@ public final class VerificationWindowMode{
 	private static void applySurface(Activity activity){
 		Window window=activity.getWindow();
 		int page=UiUtils.getThemeColor(activity,R.attr.vrPage);
-		window.setStatusBarColor(Color.TRANSPARENT);
+		// Use the page colour, not transparent: OEM skins (e.g. HyperOS) may still paint the
+		// status-bar strip from this value even when the content draws behind it.
+		window.setStatusBarColor(page);
 		window.setNavigationBarColor(page);
 		// Even if a parent view is still inset, the strip behind the status bar matches the page.
 		window.setBackgroundDrawable(new ColorDrawable(page));
+		window.getDecorView().setBackgroundColor(page);
 		WindowInsetsControllerCompat controller=WindowCompat.getInsetsController(window,window.getDecorView());
 		boolean night=UiUtils.isDarkTheme();
 		controller.setAppearanceLightStatusBars(!night);

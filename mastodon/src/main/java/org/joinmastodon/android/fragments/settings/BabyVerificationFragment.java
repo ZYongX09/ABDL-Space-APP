@@ -1273,11 +1273,12 @@ public class BabyVerificationFragment extends MastodonToolbarFragment{
 	}
 
 	private void showApprovedPage(State state, Certificate certificate){
-		String holder=String.valueOf(ownerUserId());
+		String holder=session!=null && session.self!=null && session.self.acct!=null && !session.self.acct.isBlank()
+				? "@"+session.self.acct : String.valueOf(ownerUserId());
 		showStatus(R.drawable.ic_fluent_checkmark_24_filled, R.attr.vrSuccess, R.drawable.vr_bg_status_success, R.string.vr_approved_title, getString(R.string.vr_approved_subtitle), parent->{
 			LinearLayout card=vrCard(parent, getString(R.string.vr_certificate_card), getString(R.string.vr_active_badge), R.drawable.vr_bg_success_pill, R.attr.vrSuccessText);
 			vrDivider(card);
-			vrFact(card, getString(R.string.vr_holder), getString(R.string.vr_user_prefix, holder));
+			vrFact(card, getString(R.string.vr_holder), holder);
 			vrFact(card, getString(R.string.vr_cert_status), getString(R.string.vr_valid));
 			vrFact(card, getString(R.string.vr_verified_at), vrTime(certificate.issuedAt));
 		}, R.string.vr_view_certificate, v->openCertificate(certificate), R.string.vr_home, v->goHome());
