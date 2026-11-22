@@ -62,7 +62,7 @@ public final class ContentAccessGate implements Application.ActivityLifecycleCal
 	private void networkChanged(Network next){
 		if(observedNetwork && java.util.Objects.equals(network,next)) return;
 		network=next; observedNetwork=true;
-		refreshSelected();
+		refreshSelected(true);
 	}
 	public static void accountChanged(){
 		if(instance!=null) instance.handler.post(()->{
@@ -71,12 +71,16 @@ public final class ContentAccessGate implements Application.ActivityLifecycleCal
 			try{ me.grishka.appkit.imageloader.ImageCache.getInstance(org.joinmastodon.android.MastodonApp.context).clearTopLevel(); }catch(RuntimeException ignored){}
 			org.joinmastodon.android.ui.utils.ContentMediaImageDownloader.clearDiskCache();
 			for(Screen screen:new ArrayList<>(instance.screens.values())) screen.bind();
-			instance.refreshSelected();
+			instance.refreshSelected(true);
 		});
 	}
-	private void refreshSelected(){
+	private void refreshSelected(){ refreshSelected(false); }
+	private void refreshSelected(boolean force){
 		AccountSession session=AccountSessionManager.getInstance().getLastActiveAccount();
-		if(ContentAccessCoordinator.applies(session)) session.getContentAccessCoordinator().refresh();
+		if(ContentAccessCoordinator.applies(session)){
+			if(force) session.getContentAccessCoordinator().refresh();
+			else session.getContentAccessCoordinator().refreshIfStale(60_000);
+		}
 	}
 	public static void openVerification(Activity activity, String accountId){
 		AccountSession session=AccountSessionManager.getInstance().tryGetAccount(accountId);
@@ -110,7 +114,7 @@ public final class ContentAccessGate implements Application.ActivityLifecycleCal
 	}
 	@Override public void onActivityResumed(Activity activity){
 		Screen screen=screens.get(activity); if(screen==null) return;
-		screen.resumed=true; screen.bind(); refreshSelected(); screen.apply();
+		screen.resumed=true; screen.bind(); refreshSelected(false); screen.apply();
 	}
 	@Override public void onActivityPaused(Activity activity){ Screen screen=screens.get(activity); if(screen!=null) screen.resumed=false; }
 	@Override public void onActivityDestroyed(Activity activity){

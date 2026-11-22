@@ -70,6 +70,7 @@ public final class ContentAccessCoordinator{
 	private Token token;
 	private String tokenValue;
 	private volatile long generation=1;
+	private volatile long lastProbeAt;
 	private volatile ContentAccess.State state;
 	private volatile boolean loading;
 	private Cancelable pending;
@@ -170,6 +171,7 @@ public final class ContentAccessCoordinator{
 		ContentAccess.State previous=state;
 		state=access==null ? (state==ContentAccess.State.BABY_VERIFICATION_REQUIRED ? state : ContentAccess.State.UNAVAILABLE) : access.state;
 		if(state==ContentAccess.State.OPEN) requiredPromptClaimed=false;
+		lastProbeAt=android.os.SystemClock.elapsedRealtime();
 		// Only a confirmed requirement revokes locally cached content.
 		if(state==ContentAccess.State.BABY_VERIFICATION_REQUIRED && previous!=ContentAccess.State.BABY_VERIFICATION_REQUIRED)
 			session.getCacheController().invalidateContentAccess();
@@ -192,6 +194,12 @@ public final class ContentAccessCoordinator{
 		emit();
 	}
 	/** Invalidate an old selected-account epoch, including an A -> B -> A switch. */
+	/** Foreground transitions must not discard a freshly confirmed allow and force another probe. */
+	public void refreshIfStale(long maxAgeMs){
+		if(state==ContentAccess.State.OPEN && !loading
+				&& android.os.SystemClock.elapsedRealtime()-lastProbeAt<maxAgeMs) return;
+		refresh();
+	}
 	public void deactivate(){
 		cancelPending(); generation++; loading=false;
 		if(state!=ContentAccess.State.BABY_VERIFICATION_REQUIRED) state=null;

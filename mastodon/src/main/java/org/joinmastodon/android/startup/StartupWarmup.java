@@ -38,6 +38,7 @@ public final class StartupWarmup{
 			if(SystemClock.uptimeMillis()<deadline) MAIN.postDelayed(()->waitForSession(deadline),RETRY_MS);
 			return;
 		}
+		android.util.Log.i("StartupWarmup","session ready "+session.getID());
 		if(ContentAccessCoordinator.applies(session)){
 			ContentAccessCoordinator coordinator=session.getContentAccessCoordinator();
 			coordinator.refresh();
@@ -56,6 +57,7 @@ public final class StartupWarmup{
 		if(lease==null){ SNAPSHOT_DONE.set(false); return; }
 		cache.getHomeTimelineSnapshot(lease, snapshot->{
 			if(snapshot==null){ SNAPSHOT_DONE.set(false); return; }
+			android.util.Log.i("StartupWarmup","snapshot posts "+snapshot.posts.size());
 			prefetch(snapshot);
 		});
 	}
