@@ -140,7 +140,7 @@ public final class ContentAccessGate implements Application.ActivityLifecycleCal
 		TextView message;
 		ProgressBar progress;
 		Button verify, refresh;
-		boolean resumed, applying;
+		boolean resumed, applying, withheld;
 		Screen(Activity activity){ this.activity=activity; }
 		void bind(){
 			AccountSession selected=AccountSessionManager.getInstance().getLastActiveAccount();
@@ -167,6 +167,14 @@ public final class ContentAccessGate implements Application.ActivityLifecycleCal
 				// the existing native prompt so the user can start verification.
 				if(!ContentAccessCoordinator.applies(session)) return;
 				ContentAccessCoordinator.Snapshot snapshot=session.getContentAccessCoordinator().getSnapshot();
+				if(snapshot.withholdsContent()){
+					if(!withheld){
+						withheld=true;
+						org.joinmastodon.android.ui.utils.ContentMediaImageDownloader.clearDiskCache();
+					}
+				}else{
+					withheld=false;
+				}
 				if(resumed && snapshot.state==ContentAccess.State.BABY_VERIFICATION_REQUIRED
 						&& activity instanceof MainActivity main && !AppSecurity.isLocked()){
 					main.showContentAccessPrompt();

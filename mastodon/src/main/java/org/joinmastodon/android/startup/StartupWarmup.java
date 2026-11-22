@@ -53,9 +53,9 @@ public final class StartupWarmup{
 		if(!SNAPSHOT_DONE.compareAndSet(false,true)) return;
 		var cache=session.getCacheController();
 		var lease=cache.beginHomeTimelineSnapshot();
-		if(lease==null) return;
+		if(lease==null){ SNAPSHOT_DONE.set(false); return; }
 		cache.getHomeTimelineSnapshot(lease, snapshot->{
-			if(snapshot==null) return;
+			if(snapshot==null){ SNAPSHOT_DONE.set(false); return; }
 			prefetch(snapshot);
 		});
 	}
