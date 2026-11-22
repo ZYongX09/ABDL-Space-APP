@@ -69,6 +69,7 @@ class SplashActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         makeEdgeToEdge()
+        org.joinmastodon.android.startup.StartupWarmup.start(this)
 
         val wasLocked = org.joinmastodon.android.security.AppSecurity.isLocked()
         org.joinmastodon.android.security.AppSecurity.runAfterUnlock(this) {

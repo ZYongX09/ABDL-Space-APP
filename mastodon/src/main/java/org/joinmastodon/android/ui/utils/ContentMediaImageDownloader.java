@@ -36,6 +36,15 @@ public final class ContentMediaImageDownloader extends ImageDownloader{
 	private static final int MAX_BYTES=20*1024*1024, MAX_PIXELS=32*1024*1024;
 	private static final long DISK_MAX_BYTES=256L*1024*1024, DISK_MAX_ENTRY=4L*1024*1024;
 	private static final Object DISK_LOCK=new Object();
+	private static final java.util.concurrent.ExecutorService PREFETCH=java.util.concurrent.Executors.newFixedThreadPool(2,r->{
+		Thread t=new Thread(r,"ContentMediaPrefetch");
+		t.setDaemon(true);
+		return t;
+	});
+	private static final java.util.Set<String> PREFETCHING=java.util.concurrent.ConcurrentHashMap.newKeySet();
+	private static final class PrefetchHolder{
+		static final ContentMediaImageDownloader INSTANCE=new ContentMediaImageDownloader();
+	}
 	/** Avatars/emoji are small but get evicted from the shared LRU by large post media; keep a
 	 * bounded side cache so scrolling an avatar back into view never refetches it. */
 	private static final android.util.LruCache<String,Drawable> smallImages=new android.util.LruCache<>(1024);
@@ -63,6 +72,21 @@ public final class ContentMediaImageDownloader extends ImageDownloader{
 	private static boolean isSmall(int width, int height){ return width>0 && height>0 && width<=256 && height<=256; }
 	@Override public boolean needsDiskCache(){ return false; }
 	@Override public boolean canHandleRequest(ImageLoaderRequest request){ return request instanceof UrlImageLoaderRequest url && isMedia(url.uri); }
+
+	/** Warm disk/network for offscreen list images without touching the UI thread. */
+	public static void prefetch(ImageLoaderRequest request){
+		if(!(request instanceof ScopedRequest scoped) || !scoped.current()) return;
+		String key=scoped.getMemoryCacheKey();
+		if(!PREFETCHING.add(key)) return;
+		PREFETCH.execute(()->{
+			try{
+				if(scoped.current() && readDisk(scoped)==null) PrefetchHolder.INSTANCE.getDrawable(scoped,false,null);
+			}catch(IOException|RuntimeException ignored){
+			}finally{
+				PREFETCHING.remove(key);
+			}
+		});
+	}
 
 	/** Drop the private media cache when the account identity changes. */
 	public static void clearDiskCache(){

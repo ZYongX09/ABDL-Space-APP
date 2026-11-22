@@ -326,6 +326,23 @@ public abstract class BaseStatusListFragment<T extends DisplayItemsParent> exten
 			displayItems.addAll(newItems);
 		}
 		loadRelationships(items.stream().map(DisplayItemsParent::getAccountID).filter(Objects::nonNull).collect(Collectors.toSet()));
+		prefetchFirstScreenMedia();
+	}
+
+	/** Warm avatars and the first media of the next visible rows on a background pool. */
+	private void prefetchFirstScreenMedia(){
+		if(!contentAccessOpen()) return;
+		int budget=12;
+		for(StatusDisplayItem item:displayItems){
+			if(budget<=0) break;
+			int count=Math.min(item.getImageCount(), budget);
+			for(int i=0;i<count;i++){
+				org.joinmastodon.android.ui.utils.ContentMediaImageDownloader.prefetch(item.getImageRequest(i));
+				budget--;
+			}
+			// Only the first page-ish rows matter for the cold-start experience.
+			if(displayItems.indexOf(item)>=14) break;
+		}
 	}
 
 	@Override
