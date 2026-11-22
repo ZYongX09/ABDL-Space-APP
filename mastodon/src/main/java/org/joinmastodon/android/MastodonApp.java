@@ -54,6 +54,22 @@ public class MastodonApp extends Application{
 		NetworkUtils.setUserAgent("MastodonAndroid/"+BuildConfig.VERSION_NAME);
 		UiUtils.updateLocalizedDateFormatters(context);
 
+		// Push SDKs are cold-start heavy and are not needed for the first frame. Initialise them
+		// after the launcher UI has had a chance to draw.
+		new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(this::initPush, 1200);
+		GlobalUserPreferences.load();
+		if(isMainProcess(getPackageName(), processName)){
+			org.joinmastodon.android.security.AppSecurity.install(this);
+			ContentAccessGate.install(this);
+			NovelAccountCleanupWorker.enqueuePending(context);
+			for(AccountSession session:AccountSessionManager.getInstance().getLoggedInAccounts()){
+				NovelUploadWorker.enqueuePending(context, session.getID());
+				NovelSyncWorker.enqueue(context, session.getID());
+			}
+		}
+	}
+
+	private void initPush(){
 		// 初始化极光推送
 		JPushInterface.setDebugMode(BuildConfig.DEBUG);
 		JCollectionAuth.setAuth(this, true);
@@ -76,21 +92,10 @@ public class MastodonApp extends Application{
 			Log.e(TAG, "Failed to create JPush HIGH channel", e);
 		}
 		Log.i(TAG, "JPush initialized");
-
 		try{
 			PushSubscriptionManager.tryRegisterFCM();
 		}catch(Throwable t){
 			// 快捷方式发布失败不影响正常功能（SplashActivity 改变了 LAUNCHER 入口）
-		}
-		GlobalUserPreferences.load();
-		if(isMainProcess(getPackageName(), processName)){
-			org.joinmastodon.android.security.AppSecurity.install(this);
-			ContentAccessGate.install(this);
-			NovelAccountCleanupWorker.enqueuePending(context);
-			for(AccountSession session:AccountSessionManager.getInstance().getLoggedInAccounts()){
-				NovelUploadWorker.enqueuePending(context, session.getID());
-				NovelSyncWorker.enqueue(context, session.getID());
-			}
 		}
 	}
 

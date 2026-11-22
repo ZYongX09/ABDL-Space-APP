@@ -54,9 +54,9 @@ public final class ContentAccessCoordinator{
 		/** Only a confirmed requirement blocks dispatch. Identity/generation changes (session refresh,
 		 * account switch during splash) must not fabricate 503s; the server enforces content itself. */
 		public boolean canDispatch(){ return coordinator.getSnapshot().state!=ContentAccess.State.BABY_VERIFICATION_REQUIRED; }
-		/** Stable for the lifetime of this account session. Routine policy refreshes must not rotate the
-		 * image cache namespace, or every foreground would throw away all decoded media. */
-		public String mediaScope(){ return coordinator.mediaScope; }
+		/** Stable across process restarts for the same account credential; policy refreshes must not
+		 * rotate the image cache namespace. */
+		public String mediaScope(){ return coordinator.accountId+"-"+Integer.toHexString(java.util.Objects.hashCode(value)); }
 		/** An open header is never authority to clear a gate. Only the latest GET can do that. */
 		public void receiveHeader(String header){ coordinator.dispatch.accept(()->coordinator.applyHeader(this, header)); }
 	}
