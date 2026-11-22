@@ -61,8 +61,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 class SplashActivity : ComponentActivity() {
 
     companion object {
-        // Brand flash only; do not delay first usable frame by a fixed multi-second timer.
-        private const val SPLASH_MIN_MS = 400L
+        private const val SPLASH_SECONDS = 3
     }
 
     private var routed = false
@@ -83,8 +82,8 @@ class SplashActivity : ComponentActivity() {
 
     private fun showBrandSplash() {
         if (routed) return
-        setContent { SplashScreenContent() }
-        window.decorView.postDelayed({ routeToMain() }, SPLASH_MIN_MS)
+        setContent { SplashScreenContent(totalSeconds = SPLASH_SECONDS, onSkip = ::routeToMain) }
+        window.decorView.postDelayed({ routeToMain() }, SPLASH_SECONDS * 1000L)
     }
 
     override fun onBackPressed() {
@@ -116,7 +115,14 @@ class SplashActivity : ComponentActivity() {
 }
 
 @Composable
-private fun SplashScreenContent() {
+private fun SplashScreenContent(totalSeconds: Int, onSkip: () -> Unit) {
+    var remainingSeconds by remember { mutableIntStateOf(totalSeconds) }
+    LaunchedEffect(Unit) {
+        repeat(totalSeconds) {
+            delay(1000)
+            remainingSeconds--
+        }
+    }
     CompositionLocalProvider(LocalAppState provides AppState()) {
         MiuixAppTheme {
             Box(
@@ -159,9 +165,37 @@ private fun SplashScreenContent() {
                                 fontSize = 14.sp,
                             )
                         }
+                        if (remainingSeconds > 0) {
+                            val statusBarsTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+                            SkipButton(
+                                secondsLeft = remainingSeconds,
+                                onClick = onSkip,
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(top = statusBarsTop + 10.dp, end = 16.dp),
+                            )
+                        }
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun SkipButton(secondsLeft: Int, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(50))
+            .background(MiuixTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 8.dp),
+    ) {
+        Text(
+            text = androidx.compose.ui.res.stringResource(R.string.general_skip_seconds, secondsLeft),
+            color = MiuixTheme.colorScheme.onSurface,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium,
+        )
     }
 }
