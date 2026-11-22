@@ -23,6 +23,8 @@ import me.grishka.appkit.utils.V;
 public final class StartupWarmup{
 	private static final long MAX_WAIT_MS=2800, RETRY_MS=80;
 	private static final AtomicBoolean STARTED=new AtomicBoolean(), SNAPSHOT_DONE=new AtomicBoolean();
+	private static volatile HomeTimelineSnapshot warmSnapshot;
+	private static volatile String warmAccountID;
 	private static final Handler MAIN=new Handler(Looper.getMainLooper());
 	private StartupWarmup(){}
 
@@ -57,9 +59,19 @@ public final class StartupWarmup{
 		if(lease==null){ SNAPSHOT_DONE.set(false); return; }
 		cache.getHomeTimelineSnapshot(lease, snapshot->{
 			if(snapshot==null){ SNAPSHOT_DONE.set(false); return; }
+			warmSnapshot=snapshot;
+			warmAccountID=session.getID();
 			android.util.Log.i("StartupWarmup","snapshot posts "+snapshot.posts.size());
 			prefetch(snapshot);
 		});
+	}
+
+	/** Hand-off the warmed head exactly once so the first home frame does not wait for a lease. */
+	public static HomeTimelineSnapshot takeSnapshot(String accountID){
+		HomeTimelineSnapshot snapshot=warmSnapshot;
+		if(snapshot==null || warmAccountID==null || !warmAccountID.equals(accountID)) return null;
+		warmSnapshot=null;
+		return snapshot;
 	}
 
 	private static void prefetch(HomeTimelineSnapshot snapshot){

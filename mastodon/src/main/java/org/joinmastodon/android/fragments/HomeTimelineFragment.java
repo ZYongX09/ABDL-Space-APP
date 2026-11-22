@@ -359,13 +359,31 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 		homeNBWGeneration=session.getNBWForumOptionsRepository().getSnapshot().generation;
 		homeCache=session.getCacheController();
 		homeLease=homeCache.beginHomeTimelineSnapshot();
+		android.util.Log.i("HomeTimeline","start lease="+(homeLease!=null)+" open="+contentAccessOpen()
+				+" allowHistory="+allowHistory+" attempted="+homeHistoryAttempted+" data="+data.size());
 		long generation=++homeGeneration;
 		homeHeadInFlight=true;
 		dataLoading=true;
 		maxID=null; // Cached opaque cursor is metadata only, never a pagination capability.
 		preloader.setMoreAvailable(false);
 		updateHomeRefreshingText();
-		if(allowHistory && homeLease!=null && !homeHistoryAttempted && data.isEmpty()){
+		org.joinmastodon.android.api.cache.HomeTimelineSnapshot warm=allowHistory && !homeHistoryAttempted && data.isEmpty()
+				? org.joinmastodon.android.startup.StartupWarmup.takeSnapshot(accountID) : null;
+		if(warm!=null){
+			homeHistoryAttempted=true;
+			deliverHomeResult(generation, ()->{
+				ArrayList<Status> history=new ArrayList<>(warm.posts);
+				session.filterStatuses(history, getFilterContext());
+				if(!history.isEmpty()){
+					showingHomeHistory=true;
+					replaceHomeHead(history, null, false);
+					dataLoading=true;
+					showHomeContentImmediately();
+					android.util.Log.i("HomeTimeline","warm handoff rendered "+history.size());
+				}
+				sendHomeHead(generation, count);
+			});
+		}else if(allowHistory && homeLease!=null && !homeHistoryAttempted && data.isEmpty()){
 			homeHistoryAttempted=true;
 			homeCache.getHomeTimelineSnapshot(homeLease, snapshot->deliverHomeResult(generation, ()->{
 				if(snapshot!=null){
