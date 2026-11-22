@@ -25,11 +25,13 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -69,7 +71,6 @@ class SplashActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         makeEdgeToEdge()
-        org.joinmastodon.android.startup.StartupWarmup.start(this)
 
         val wasLocked = org.joinmastodon.android.security.AppSecurity.isLocked()
         org.joinmastodon.android.security.AppSecurity.runAfterUnlock(this) {
@@ -84,6 +85,8 @@ class SplashActivity : ComponentActivity() {
     private fun showBrandSplash() {
         if (routed) return
         setContent { SplashScreenContent(totalSeconds = SPLASH_SECONDS, onSkip = ::routeToMain) }
+        // Never let database/session warm-up delay the first splash frame.
+        window.decorView.post { org.joinmastodon.android.startup.StartupWarmup.start(this) }
         window.decorView.postDelayed({ routeToMain() }, SPLASH_SECONDS * 1000L)
     }
 
@@ -118,67 +121,87 @@ class SplashActivity : ComponentActivity() {
 @Composable
 private fun SplashScreenContent(totalSeconds: Int, onSkip: () -> Unit) {
     var remainingSeconds by remember { mutableIntStateOf(totalSeconds) }
+    var effectReady by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         repeat(totalSeconds) {
             delay(1000)
             remainingSeconds--
         }
     }
+    // First frame is a cheap static gradient; the runtime shader background starts on the next
+    // composition so the branded splash reaches the screen without waiting for shader setup.
+    LaunchedEffect(Unit) {
+        delay(80)
+        effectReady = true
+    }
     CompositionLocalProvider(LocalAppState provides AppState()) {
         MiuixAppTheme {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(MiuixTheme.colorScheme.background),
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(Color(0xFF101B45), Color(0xFF2C2350), Color(0xFF14131C))
+                        )
+                    ),
             ) {
-                BgEffectBackground(
-                    dynamicBackground = isRuntimeShaderSupported(),
-                    isOs3Effect = true,
-                    isFullSize = false,
-                    modifier = Modifier.fillMaxSize(),
-                ) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Box(
-                                modifier = Modifier
-                                    .size(88.dp)
-                                    .clip(RoundedCornerShape(24.dp))
-                                    .background(Color.White),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Image(
-                                    painter = painterResource(R.drawable.ic_ntf_logo),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(74.dp),
-                                    contentScale = ContentScale.Fit,
-                                )
-                            }
-                            Text(
-                                text = "ABDL Space",
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 35.sp,
-                                modifier = Modifier.padding(top = 12.dp, bottom = 5.dp),
-                            )
-                            Text(
-                                text = "v${BuildConfig.VERSION_NAME}",
-                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                                fontSize = 14.sp,
-                            )
-                        }
-                        if (remainingSeconds > 0) {
-                            val statusBarsTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-                            SkipButton(
-                                secondsLeft = remainingSeconds,
-                                onClick = onSkip,
-                                modifier = Modifier
-                                    .align(Alignment.TopEnd)
-                                    .padding(top = statusBarsTop + 10.dp, end = 16.dp),
-                            )
-                        }
+                if (effectReady) {
+                    BgEffectBackground(
+                        dynamicBackground = isRuntimeShaderSupported(),
+                        isOs3Effect = true,
+                        isFullSize = false,
+                        modifier = Modifier.fillMaxSize(),
+                    ) {
+                        SplashCenter(remainingSeconds, onSkip)
                     }
+                } else {
+                    SplashCenter(remainingSeconds, onSkip)
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun SplashCenter(remainingSeconds: Int, onSkip: () -> Unit) {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Box(
+                modifier = Modifier
+                    .size(88.dp)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(Color.White),
+                contentAlignment = Alignment.Center,
+            ) {
+                Image(
+                    painter = painterResource(R.drawable.ic_ntf_logo),
+                    contentDescription = null,
+                    modifier = Modifier.size(74.dp),
+                    contentScale = ContentScale.Fit,
+                )
+            }
+            Text(
+                text = "ABDL Space",
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                fontSize = 35.sp,
+                modifier = Modifier.padding(top = 12.dp, bottom = 5.dp),
+            )
+            Text(
+                text = "v${BuildConfig.VERSION_NAME}",
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                fontSize = 14.sp,
+            )
+        }
+        if (remainingSeconds > 0) {
+            val statusBarsTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+            SkipButton(
+                secondsLeft = remainingSeconds,
+                onClick = onSkip,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = statusBarsTop + 10.dp, end = 16.dp),
+            )
         }
     }
 }
