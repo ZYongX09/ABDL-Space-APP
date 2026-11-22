@@ -61,11 +61,14 @@ public class MastodonApp extends Application{
 		if(isMainProcess(getPackageName(), processName)){
 			org.joinmastodon.android.security.AppSecurity.install(this);
 			ContentAccessGate.install(this);
-			NovelAccountCleanupWorker.enqueuePending(context);
-			for(AccountSession session:AccountSessionManager.getInstance().getLoggedInAccounts()){
-				NovelUploadWorker.enqueuePending(context, session.getID());
-				NovelSyncWorker.enqueue(context, session.getID());
-			}
+			// WorkManager/account enumeration is not needed before the first frame.
+			new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(()->{
+				NovelAccountCleanupWorker.enqueuePending(context);
+				for(AccountSession session:AccountSessionManager.getInstance().getLoggedInAccounts()){
+					NovelUploadWorker.enqueuePending(context, session.getID());
+					NovelSyncWorker.enqueue(context, session.getID());
+				}
+			}, 2000);
 		}
 	}
 

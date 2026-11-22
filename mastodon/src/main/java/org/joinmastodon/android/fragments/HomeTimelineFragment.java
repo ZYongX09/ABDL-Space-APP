@@ -376,6 +376,7 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 						replaceHomeHead(history, null, false);
 						dataLoading=true;
 						showHomeContentImmediately();
+						android.util.Log.i("HomeTimeline","snapshot rendered "+history.size());
 					}
 				}
 				sendHomeHead(generation, count);
@@ -398,6 +399,7 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 					homeCache.putHomeTimelineSnapshot(homeLease, authoritative, request.getNextMaxID());
 					showingHomeHistory=false;
 					replaceHomeHead(authoritative, request.getNextMaxID(), request.getNextMaxID()!=null);
+					android.util.Log.i("HomeTimeline","network rendered "+authoritative.size());
 					homeHeadInFlight=false;
 					dataLoading=false;
 					updateHomeRefreshingText();
