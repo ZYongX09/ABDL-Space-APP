@@ -100,7 +100,7 @@ public class CacheController{
 
 	public HomeTimelineLease beginHomeTimelineSnapshot(){
 		AccountSession session=AccountSessionManager.getInstance().tryGetAccount(accountID);
-		if(session==null || session.token==null || session.token.accessToken==null || !org.joinmastodon.android.api.session.ContentAccessCoordinator.canRead(accountID)) return null;
+		if(session==null || session.token==null || session.token.accessToken==null || !org.joinmastodon.android.api.session.ContentAccessCoordinator.allowsContent(accountID)) return null;
 		long nbwGeneration=session.getNBWForumOptionsRepository().getSnapshot().generation;
 		synchronized(homeSnapshotLock){
 			if(homeSnapshotRetired || AccountSessionManager.getInstance().tryGetAccount(accountID)!=session) return null;
@@ -118,7 +118,7 @@ public class CacheController{
 		return lease!=null && lease.owner==this && !homeSnapshotRetired && lease.generation==homeSnapshotGeneration
 				&& AccountSessionManager.getInstance().tryGetAccount(accountID)==lease.session && lease.session==homeSnapshotSession
 				&& lease.token==lease.session.token && Objects.equals(lease.accessToken, lease.token.accessToken)
-				&& (!org.joinmastodon.android.api.session.ContentAccessCoordinator.applies(lease.session) || lease.contentOwner!=null && lease.contentOwner.canRead());
+				&& (!org.joinmastodon.android.api.session.ContentAccessCoordinator.applies(lease.session) || lease.contentOwner!=null && lease.contentOwner.canFetchMedia());
 	}
 
 	public boolean isHomeTimelineLeaseCurrent(HomeTimelineLease lease){

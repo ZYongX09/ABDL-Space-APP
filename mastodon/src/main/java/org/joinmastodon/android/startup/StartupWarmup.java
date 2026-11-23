@@ -41,15 +41,10 @@ public final class StartupWarmup{
 			return;
 		}
 		android.util.Log.i("StartupWarmup","session ready "+session.getID());
-		if(ContentAccessCoordinator.applies(session)){
-			ContentAccessCoordinator coordinator=session.getContentAccessCoordinator();
-			coordinator.refresh();
-			coordinator.observe(snapshot->{
-				if(snapshot!=null && snapshot.isOpen()) loadSnapshot(session);
-			});
-		}else{
-			loadSnapshot(session);
-		}
+		if(ContentAccessCoordinator.applies(session)) session.getContentAccessCoordinator().refresh();
+		// Local cache is readable while the access probe is in flight; only a confirmed
+		// requirement withholds it. This is what makes the cached head available at splash exit.
+		loadSnapshot(session);
 	}
 
 	private static void loadSnapshot(AccountSession session){
