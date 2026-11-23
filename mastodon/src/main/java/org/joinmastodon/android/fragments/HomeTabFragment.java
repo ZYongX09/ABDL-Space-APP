@@ -115,6 +115,8 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 	private AnimatorSet currentNewPostsAnim;
 	private ViewPager2 pager;
 	private View switcher;
+	private android.widget.HorizontalScrollView timelineTabsScroll;
+	private android.widget.LinearLayout timelineTabs;
 	private FrameLayout toolbarFrame;
 	private View toolbarGeometryRoot;
 	private final ViewTreeObserver.OnPreDrawListener toolbarGeometry=this::updateTimelineTopGeometry;
@@ -347,7 +349,26 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		if(transaction!=null)
 			transaction.commit();
 
-		view.addView(pager, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+		FrameLayout.LayoutParams pagerParams=new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+		pagerParams.topMargin=V.dp(46);
+		view.addView(pager, pagerParams);
+
+		android.widget.LinearLayout tabsWrap=new android.widget.LinearLayout(getContext());
+		tabsWrap.setOrientation(android.widget.LinearLayout.VERTICAL);
+		tabsWrap.setBackgroundColor(UiUtils.getThemeColor(getContext(), R.attr.colorM3Background));
+		timelineTabsScroll=new android.widget.HorizontalScrollView(getContext());
+		timelineTabsScroll.setFillViewport(false);
+		timelineTabsScroll.setHorizontalScrollBarEnabled(false);
+		timelineTabs=new android.widget.LinearLayout(getContext());
+		timelineTabs.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+		timelineTabsScroll.addView(timelineTabs, new android.widget.FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT));
+		tabsWrap.addView(timelineTabsScroll, new android.widget.LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+		android.view.View tabsDivider=new android.view.View(getContext());
+		tabsDivider.setBackgroundColor(UiUtils.getThemeColor(getContext(), R.attr.colorM3OutlineVariant));
+		tabsWrap.addView(tabsDivider, new android.widget.LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, V.dp(0.5f)));
+		FrameLayout.LayoutParams tabsParams=new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, V.dp(46));
+		tabsParams.gravity=android.view.Gravity.TOP;
+		view.addView(tabsWrap, tabsParams);
 
 		overflowActionView = UiUtils.makeOverflowActionView(getContext());
 		overflowPopup = new PopupMenu(getContext(), overflowActionView);
@@ -379,6 +400,7 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		switcher.setOnClickListener(v->switcherPopup.show());
 		switcher.setOnTouchListener(switcherPopup.getDragToOpenListener());
 		updateSwitcherMenu();
+		buildTimelineTabs();
 
 		UiUtils.reduceSwipeSensitivity(pager);
 		pager.setUserInputEnabled(!GlobalUserPreferences.disableSwipe);
@@ -391,6 +413,7 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 			public void onPageSelected(int position){
 				if(position>=visibleTimelineIndices.size()) return;
 				int index=visibleTimelineIndices.get(position);
+				updateTimelineTabsSelection(position);
 				if(position!=0) {
 					addBackCallback(returnToBeginningOfPager);
 				} else {
@@ -731,6 +754,8 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 			toolbar.setVisibility(liquid ? View.GONE : View.VISIBLE);
 		if(fab!=null)
 			fab.setVisibility(liquid ? View.GONE : View.VISIBLE);
+		if(timelineTabsScroll!=null) timelineTabsScroll.setVisibility(liquid ? View.GONE : View.VISIBLE);
+		if(switcher!=null) switcher.setVisibility(liquid ? View.VISIBLE : View.GONE);
 		if(fragments!=null){
 			for(Fragment fragment:fragments){
 				if(fragment instanceof BaseStatusListFragment<?> statusListFragment){
@@ -935,6 +960,48 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		}
 
 		UiUtils.enablePopupMenuIcons(getContext(), switcherPopup);
+		if(timelineTabs!=null) buildTimelineTabs();
+	}
+
+	private void buildTimelineTabs(){
+		if(timelineTabs==null || timelines==null) return;
+		timelineTabs.removeAllViews();
+		for(int i=0;i<visibleTimelineIndices.size();i++){
+			int timelineIndex=visibleTimelineIndices.get(i);
+			TimelineDefinition definition=timelines[timelineIndex];
+			if(definition==null) continue;
+			android.widget.LinearLayout tab=new android.widget.LinearLayout(getContext());
+			tab.setOrientation(android.widget.LinearLayout.VERTICAL);
+			tab.setGravity(android.view.Gravity.CENTER);
+			tab.setTag(timelineIndex);
+			tab.setOnClickListener(v->navigateTo((Integer)v.getTag()));
+			android.widget.TextView label=new android.widget.TextView(getContext());
+			label.setText(definition.getTitle(getContext()));
+			label.setTextSize(15);
+			label.setGravity(android.view.Gravity.CENTER);
+			label.setTypeface(android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL));
+			label.setPadding(V.dp(14),0,V.dp(14),0);
+			tab.addView(label,new android.widget.LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,0,1f));
+			android.view.View indicator=new android.view.View(getContext());
+			indicator.setBackgroundColor(UiUtils.getThemeColor(getContext(),R.attr.colorM3Primary));
+			indicator.setVisibility(View.INVISIBLE);
+			tab.addView(indicator,new android.widget.LinearLayout.LayoutParams(V.dp(20),V.dp(2.5f)));
+			timelineTabs.addView(tab,new android.widget.LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,V.dp(46)));
+		}
+		updateTimelineTabsSelection(pager==null ? 0 : pager.getCurrentItem());
+		updateLiquidToolbarMode();
+	}
+
+	private void updateTimelineTabsSelection(int position){
+		if(timelineTabs==null) return;
+		for(int i=0;i<timelineTabs.getChildCount();i++){
+			android.view.View tab=timelineTabs.getChildAt(i);
+			boolean selected=i==position;
+			android.widget.TextView label=(android.widget.TextView)((android.view.ViewGroup)tab).getChildAt(0);
+			label.setTextColor(UiUtils.getThemeColor(getContext(),selected ? R.attr.colorM3Primary : R.attr.colorM3OnSurfaceVariant));
+			((android.view.ViewGroup)tab).getChildAt(1).setVisibility(selected ? View.VISIBLE : View.INVISIBLE);
+			if(selected) timelineTabsScroll.smoothScrollTo(Math.max(0,tab.getLeft()-V.dp(16)),0);
+		}
 	}
 
 	private boolean onSwitcherItemSelected(MenuItem item) {
