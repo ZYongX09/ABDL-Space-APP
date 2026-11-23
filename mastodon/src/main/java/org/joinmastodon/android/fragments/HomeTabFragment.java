@@ -353,22 +353,16 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		pagerParams.topMargin=V.dp(46);
 		view.addView(pager, pagerParams);
 
-		android.widget.LinearLayout tabsWrap=new android.widget.LinearLayout(getContext());
-		tabsWrap.setOrientation(android.widget.LinearLayout.VERTICAL);
-		tabsWrap.setBackgroundColor(UiUtils.getThemeColor(getContext(), R.attr.colorM3Background));
 		timelineTabsScroll=new android.widget.HorizontalScrollView(getContext());
 		timelineTabsScroll.setFillViewport(false);
 		timelineTabsScroll.setHorizontalScrollBarEnabled(false);
+		timelineTabsScroll.setBackgroundColor(UiUtils.getThemeColor(getContext(), R.attr.colorM3Background));
 		timelineTabs=new android.widget.LinearLayout(getContext());
 		timelineTabs.setOrientation(android.widget.LinearLayout.HORIZONTAL);
 		timelineTabsScroll.addView(timelineTabs, new android.widget.FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT));
-		tabsWrap.addView(timelineTabsScroll, new android.widget.LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
-		android.view.View tabsDivider=new android.view.View(getContext());
-		tabsDivider.setBackgroundColor(UiUtils.getThemeColor(getContext(), R.attr.colorM3OutlineVariant));
-		tabsWrap.addView(tabsDivider, new android.widget.LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, V.dp(0.5f)));
 		FrameLayout.LayoutParams tabsParams=new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, V.dp(46));
 		tabsParams.gravity=android.view.Gravity.TOP;
-		view.addView(tabsWrap, tabsParams);
+		view.addView(timelineTabsScroll, tabsParams);
 
 		overflowActionView = UiUtils.makeOverflowActionView(getContext());
 		overflowPopup = new PopupMenu(getContext(), overflowActionView);
@@ -400,7 +394,7 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		switcher.setOnClickListener(v->switcherPopup.show());
 		switcher.setOnTouchListener(switcherPopup.getDragToOpenListener());
 		updateSwitcherMenu();
-		buildTimelineTabs();
+		view.post(this::buildTimelineTabs);
 
 		UiUtils.reduceSwipeSensitivity(pager);
 		pager.setUserInputEnabled(!GlobalUserPreferences.disableSwipe);
@@ -960,7 +954,6 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		}
 
 		UiUtils.enablePopupMenuIcons(getContext(), switcherPopup);
-		if(timelineTabs!=null) buildTimelineTabs();
 	}
 
 	private void buildTimelineTabs(){
