@@ -315,6 +315,13 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		args.putBoolean("__is_tab", true);
 		args.putBoolean("__disable_fab", true);
 		args.putBoolean("onlyPosts", true);
+		// Fragment containers must be attached to the activity hierarchy so that
+		// findFragmentById can resolve them, but they must not be direct children of `view`:
+		// ViewPager2's onCreateViewHolder removes each tabView from its parent while the
+		// surrounding FrameLayout is laying out, which corrupts the parent's child list.
+		FrameLayout tabHost=new FrameLayout(getContext());
+		tabHost.setVisibility(View.GONE);
+		view.addView(tabHost, new FrameLayout.LayoutParams(0,0));
 		FragmentTransaction transaction = null;
 		visibleTimelineIndices.clear();
 		for (int i = 0; i < count; i++) {
@@ -343,7 +350,7 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 			tabView.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 			tabView.setVisibility(View.GONE);
 			tabView.setId(containerId);
-			view.addView(tabView);
+			tabHost.addView(tabView);
 			tabViews[i] = tabView;
 		}
 		if(transaction!=null)
