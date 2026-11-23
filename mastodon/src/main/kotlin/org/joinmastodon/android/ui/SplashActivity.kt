@@ -8,6 +8,12 @@ import android.view.Window
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -31,6 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -155,11 +162,26 @@ private fun SplashScreenContent(totalSeconds: Int, onSkip: () -> Unit) {
 
 @Composable
 private fun SplashCenter(remainingSeconds: Int, onSkip: () -> Unit) {
+    // Mirrors X's splash AnimatedVectorDrawable: 1200ms ping-pong scale/alpha on the logo.
+    val pulse = rememberInfiniteTransition(label = "splashLogoPulse")
+    val logoScale by pulse.animateFloat(
+        initialValue = 1f,
+        targetValue = 0.88f,
+        animationSpec = infiniteRepeatable(tween(1200, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "splashLogoScale",
+    )
+    val logoAlpha by pulse.animateFloat(
+        initialValue = 1f,
+        targetValue = 0.75f,
+        animationSpec = infiniteRepeatable(tween(1200, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "splashLogoAlpha",
+    )
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Box(
                 modifier = Modifier
                     .size(88.dp)
+                    .graphicsLayer { scaleX = logoScale; scaleY = logoScale; alpha = logoAlpha }
                     .clip(RoundedCornerShape(24.dp))
                     .background(Color.White),
                 contentAlignment = Alignment.Center,
@@ -226,8 +248,13 @@ object SplashOverlay {
         decor.findViewWithTag<android.view.View>(TAG)?.let { decor.removeView(it) }
         val overlay = androidx.compose.ui.platform.ComposeView(activity)
         overlay.tag = TAG
+        var dismissing = false
         fun dismiss() {
-            if (overlay.parent === decor) decor.removeView(overlay)
+            if (dismissing || overlay.parent !== decor) return
+            dismissing = true
+            overlay.animate().alpha(0f).setDuration(220L).withEndAction {
+                if (overlay.parent === decor) decor.removeView(overlay)
+            }.start()
         }
         overlay.setContent {
             SplashScreenContent(totalSeconds = 3, onSkip = { dismiss() })
