@@ -115,8 +115,10 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 	private AnimatorSet currentNewPostsAnim;
 	private ViewPager2 pager;
 	private View switcher;
-	private android.widget.HorizontalScrollView timelineTabsScroll;
+	private FrameLayout timelineTabsHost;
 	private android.widget.LinearLayout timelineTabs;
+	private View timelineTabIndicator;
+	private float timelineIndicatorPage;
 	private FrameLayout toolbarFrame;
 	private View toolbarGeometryRoot;
 	private final ViewTreeObserver.OnPreDrawListener toolbarGeometry=this::updateTimelineTopGeometry;
@@ -145,6 +147,7 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		visibleTimelineIndices.clear(); visibleTimelineIndices.addAll(next);
 		pager.getAdapter().notifyDataSetChanged();
 		pager.setCurrentItem(Math.max(0, visibleTimelineIndices.indexOf(selected)), false);
+		if(timelineTabs!=null) buildTimelineTabs();
 		updateSwitcherMenu(); updateSwitcherIcon(currentTimelineIndex()); updateLiquidToolbarState();
 	}
 	private Fragment[] fragments;
@@ -357,19 +360,29 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 			transaction.commit();
 
 		FrameLayout.LayoutParams pagerParams=new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
-		pagerParams.topMargin=V.dp(46);
+		pagerParams.topMargin=V.dp(48);
 		view.addView(pager, pagerParams);
 
-		timelineTabsScroll=new android.widget.HorizontalScrollView(getContext());
-		timelineTabsScroll.setFillViewport(false);
-		timelineTabsScroll.setHorizontalScrollBarEnabled(false);
-		timelineTabsScroll.setBackgroundColor(UiUtils.getThemeColor(getContext(), R.attr.colorM3Background));
+		// X's tab strip: fixed 48dp row, equal-width tabs filling the width, and a
+		// full-width 4dp rounded indicator that follows the pager's scroll position.
+		timelineTabsHost=new FrameLayout(getContext());
+		timelineTabsHost.setBackgroundColor(UiUtils.getThemeColor(getContext(), R.attr.colorM3Background));
 		timelineTabs=new android.widget.LinearLayout(getContext());
 		timelineTabs.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-		timelineTabsScroll.addView(timelineTabs, new android.widget.FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT));
-		FrameLayout.LayoutParams tabsParams=new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, V.dp(46));
+		timelineTabsHost.addView(timelineTabs, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+		timelineTabIndicator=new View(getContext());
+		android.graphics.drawable.GradientDrawable indicatorBackground=new android.graphics.drawable.GradientDrawable();
+		indicatorBackground.setColor(UiUtils.getThemeColor(getContext(), R.attr.colorM3OnSurface));
+		indicatorBackground.setCornerRadius(V.dp(2));
+		timelineTabIndicator.setBackground(indicatorBackground);
+		FrameLayout.LayoutParams indicatorParams=new FrameLayout.LayoutParams(0, V.dp(4), android.view.Gravity.BOTTOM|android.view.Gravity.START);
+		timelineTabsHost.addView(timelineTabIndicator, indicatorParams);
+		FrameLayout.LayoutParams tabsParams=new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, V.dp(48));
 		tabsParams.gravity=android.view.Gravity.TOP;
-		view.addView(timelineTabsScroll, tabsParams);
+		view.addView(timelineTabsHost, tabsParams);
+		// The pager position can be updated before the tab row is measured; re-apply once
+		// layout has produced real tab bounds (and after orientation changes).
+		timelineTabs.addOnLayoutChangeListener((v,l,t,r,b,oldL,oldT,oldR,oldB)->positionTimelineIndicator(timelineIndicatorPage));
 
 		overflowActionView = UiUtils.makeOverflowActionView(getContext());
 		overflowPopup = new PopupMenu(getContext(), overflowActionView);
@@ -410,6 +423,11 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 			if(getActivity()!=null) getActivity().runOnUiThread(this::updateNBWVisiblePages);
 		});
 		pager.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
+			@Override
+			public void onPageScrolled(int position, float positionOffset, int positionOffsetPixels){
+				positionTimelineIndicator(position+positionOffset);
+			}
+
 			@Override
 			public void onPageSelected(int position){
 				if(position>=visibleTimelineIndices.size()) return;
@@ -755,7 +773,14 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 			toolbar.setVisibility(liquid ? View.GONE : View.VISIBLE);
 		if(fab!=null)
 			fab.setVisibility(liquid ? View.GONE : View.VISIBLE);
-		if(timelineTabsScroll!=null) timelineTabsScroll.setVisibility(liquid ? View.GONE : View.VISIBLE);
+		if(timelineTabsHost!=null) timelineTabsHost.setVisibility(liquid ? View.GONE : View.VISIBLE);
+		if(pager!=null && pager.getLayoutParams() instanceof FrameLayout.LayoutParams pagerParams){
+			int topMargin=liquid ? 0 : V.dp(48);
+			if(pagerParams.topMargin!=topMargin){
+				pagerParams.topMargin=topMargin;
+				pager.setLayoutParams(pagerParams);
+			}
+		}
 		if(switcher!=null) switcher.setVisibility(liquid ? View.VISIBLE : View.GONE);
 		if(fragments!=null){
 			for(Fragment fragment:fragments){
@@ -970,23 +995,17 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 			int timelineIndex=visibleTimelineIndices.get(i);
 			TimelineDefinition definition=timelines[timelineIndex];
 			if(definition==null) continue;
-			android.widget.LinearLayout tab=new android.widget.LinearLayout(getContext());
-			tab.setOrientation(android.widget.LinearLayout.VERTICAL);
-			tab.setGravity(android.view.Gravity.CENTER);
+			FrameLayout tab=new FrameLayout(getContext());
 			tab.setTag(timelineIndex);
 			tab.setOnClickListener(v->navigateTo((Integer)v.getTag()));
 			android.widget.TextView label=new android.widget.TextView(getContext());
 			label.setText(definition.getTitle(getContext()));
 			label.setTextSize(15);
 			label.setGravity(android.view.Gravity.CENTER);
-			label.setTypeface(android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL));
-			label.setPadding(V.dp(14),0,V.dp(14),0);
-			tab.addView(label,new android.widget.LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,0,1f));
-			android.view.View indicator=new android.view.View(getContext());
-			indicator.setBackgroundColor(UiUtils.getThemeColor(getContext(),R.attr.colorM3Primary));
-			indicator.setVisibility(View.INVISIBLE);
-			tab.addView(indicator,new android.widget.LinearLayout.LayoutParams(V.dp(20),V.dp(2.5f)));
-			timelineTabs.addView(tab,new android.widget.LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,V.dp(46)));
+			label.setSingleLine(true);
+			tab.addView(label,new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+			// Weight 1 matches X's full-width equal distribution when the labels fit.
+			timelineTabs.addView(tab,new android.widget.LinearLayout.LayoutParams(0,V.dp(48),1f));
 		}
 		updateTimelineTabsSelection(pager==null ? 0 : pager.getCurrentItem());
 		updateLiquidToolbarMode();
@@ -995,13 +1014,39 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 	private void updateTimelineTabsSelection(int position){
 		if(timelineTabs==null) return;
 		for(int i=0;i<timelineTabs.getChildCount();i++){
-			android.view.View tab=timelineTabs.getChildAt(i);
+			View tab=timelineTabs.getChildAt(i);
+			android.widget.TextView label=(android.widget.TextView)((ViewGroup)tab).getChildAt(0);
 			boolean selected=i==position;
-			android.widget.TextView label=(android.widget.TextView)((android.view.ViewGroup)tab).getChildAt(0);
-			label.setTextColor(UiUtils.getThemeColor(getContext(),selected ? R.attr.colorM3Primary : R.attr.colorM3OnSurfaceVariant));
-			((android.view.ViewGroup)tab).getChildAt(1).setVisibility(selected ? View.VISIBLE : View.INVISIBLE);
-			if(selected) timelineTabsScroll.smoothScrollTo(Math.max(0,tab.getLeft()-V.dp(16)),0);
+			label.setTextColor(UiUtils.getThemeColor(getContext(),selected ? R.attr.colorM3OnSurface : R.attr.colorM3OnSurfaceVariant));
+			label.setTypeface(android.graphics.Typeface.create(selected ? "sans-serif" : "sans-serif-medium",
+					selected ? android.graphics.Typeface.BOLD : android.graphics.Typeface.NORMAL));
 		}
+		positionTimelineIndicator(position);
+	}
+
+	/** Places the shared indicator at an interpolated tab position, following the pager. */
+	private void positionTimelineIndicator(float page){
+		if(timelineTabs==null || timelineTabIndicator==null) return;
+		timelineIndicatorPage=page;
+		int count=timelineTabs.getChildCount();
+		if(count==0) return;
+		int from=(int)Math.floor(page);
+		if(from<0) from=0;
+		if(from>=count) from=count-1;
+		int to=Math.min(count-1, from+1);
+		float fraction=Math.max(0f, Math.min(1f, page-from));
+		View fromTab=timelineTabs.getChildAt(from);
+		View toTab=timelineTabs.getChildAt(to);
+		if(fromTab==null || toTab==null) return;
+		// While the host is GONE (liquid mode) or before the first layout there are no
+		// usable bounds. Do not post again: that would spin the UI thread indefinitely.
+		if(fromTab.getWidth()==0) return;
+		float left=fromTab.getLeft()+(toTab.getLeft()-fromTab.getLeft())*fraction;
+		float right=fromTab.getRight()+(toTab.getRight()-fromTab.getRight())*fraction;
+		FrameLayout.LayoutParams lp=(FrameLayout.LayoutParams)timelineTabIndicator.getLayoutParams();
+		lp.leftMargin=Math.round(left);
+		lp.width=Math.max(0,Math.round(right-left));
+		timelineTabIndicator.setLayoutParams(lp);
 	}
 
 	private boolean onSwitcherItemSelected(MenuItem item) {
