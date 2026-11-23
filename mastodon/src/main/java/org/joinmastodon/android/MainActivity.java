@@ -196,11 +196,6 @@ public class MainActivity extends FragmentStackActivity implements LifecycleOwne
 		// if(lanSession!=null && savedInstanceState==null){
 		// 	getWindow().getDecorView().post(() -> showQRLoginDialog(lanSession, true));
 		// }
-		if(savedInstanceState==null && getIntent().getBooleanExtra(org.joinmastodon.android.ui.SplashOverlay.EXTRA, false)){
-			// Add before the first draw so the content never flashes before the brand overlay.
-			org.joinmastodon.android.ui.SplashOverlay.show(this);
-			getWindow().getDecorView().post(()->org.joinmastodon.android.startup.StartupWarmup.start(this));
-		}
 	}
 
 	public void showContentAccessPrompt(){
@@ -368,12 +363,6 @@ public class MainActivity extends FragmentStackActivity implements LifecycleOwne
 	protected void onNewIntent(Intent intent){
 		super.onNewIntent(intent);
 		setIntent(intent);
-		if(intent.getBooleanExtra(org.joinmastodon.android.ui.SplashOverlay.EXTRA, false)){
-			getWindow().getDecorView().post(()->{
-				org.joinmastodon.android.ui.SplashOverlay.show(this);
-				org.joinmastodon.android.startup.StartupWarmup.start(this);
-			});
-		}
 		org.joinmastodon.android.security.AppSecurity.runAfterUnlock(this, ()->processNavigationIntent(intent));
 	}
 

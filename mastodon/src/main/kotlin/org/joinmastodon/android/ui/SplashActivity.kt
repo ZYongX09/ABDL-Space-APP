@@ -81,10 +81,9 @@ class SplashActivity : ComponentActivity() {
         // Start the 3s worth of background warm-up before MainActivity is even created.
         org.joinmastodon.android.startup.StartupWarmup.start(this)
 
-        val wasLocked = org.joinmastodon.android.security.AppSecurity.isLocked()
         org.joinmastodon.android.security.AppSecurity.runAfterUnlock(this) {
-            // MainActivity owns the 3s brand overlay so the timeline can load underneath it.
-            routeToMain(!(wasLocked && org.joinmastodon.android.security.AppSecurity.authTracker().isProtectionEnabled()))
+            // The platform splash window is the entire opening animation; hand over immediately.
+            routeToMain()
         }
     }
 
@@ -92,10 +91,10 @@ class SplashActivity : ComponentActivity() {
         finish()
     }
 
-    private fun routeToMain(showSplash: Boolean = true) {
+    private fun routeToMain() {
         if (routed) return
         routed = true
-        startActivity(Intent(this, MainActivity::class.java).putExtra(SplashOverlay.EXTRA, showSplash))
+        startActivity(Intent(this, MainActivity::class.java))
         overridePendingTransition(0, 0)
         finish()
     }
@@ -234,34 +233,5 @@ private fun SkipButton(secondsLeft: Int, onClick: () -> Unit, modifier: Modifier
             fontSize = 14.sp,
             fontWeight = FontWeight.Medium,
         )
-    }
-}
-
-/** Full-screen brand overlay inside MainActivity; content loads behind it for the full 3s. */
-object SplashOverlay {
-    const val EXTRA = "show_splash"
-    private const val TAG = "abdl_splash_overlay"
-
-    @JvmStatic
-    fun show(activity: android.app.Activity) {
-        val decor = activity.window?.decorView as? android.view.ViewGroup ?: return
-        decor.findViewWithTag<android.view.View>(TAG)?.let { decor.removeView(it) }
-        val overlay = androidx.compose.ui.platform.ComposeView(activity)
-        overlay.tag = TAG
-        var dismissing = false
-        fun dismiss() {
-            if (dismissing || overlay.parent !== decor) return
-            dismissing = true
-            overlay.animate().alpha(0f).setDuration(220L).withEndAction {
-                if (overlay.parent === decor) decor.removeView(overlay)
-            }.start()
-        }
-        overlay.setContent {
-            SplashScreenContent(totalSeconds = 3, onSkip = { dismiss() })
-        }
-        decor.addView(overlay, android.view.ViewGroup.LayoutParams(
-            android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-            android.view.ViewGroup.LayoutParams.MATCH_PARENT))
-        overlay.postDelayed({ dismiss() }, 3000L)
     }
 }
