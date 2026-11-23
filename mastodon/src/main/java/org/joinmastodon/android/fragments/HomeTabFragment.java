@@ -467,7 +467,8 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 
 			@Override
 			public void onError(ErrorResponse error) {
-				error.showToast(getContext());
+				// Non-critical toolbar metadata: a transient failure must not toast over the timeline.
+				android.util.Log.w("HomeTab", "lists metadata failed: "+error);
 			}
 		}).exec(accountID);
 
@@ -479,7 +480,7 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 
 			@Override
 			public void onError(ErrorResponse error) {
-				error.showToast(getContext());
+				android.util.Log.w("HomeTab", "followed tags metadata failed: "+error);
 			}
 		}).exec(accountID);
 
@@ -499,7 +500,7 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 
 			@Override
 			public void onError(ErrorResponse error) {
-				error.showToast(getActivity());
+				android.util.Log.w("HomeTab", "announcements metadata failed: "+error);
 			}
 		}).exec(accountID);
 	}
