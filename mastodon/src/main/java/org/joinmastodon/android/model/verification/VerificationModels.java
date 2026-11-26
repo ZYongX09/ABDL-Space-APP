@@ -58,7 +58,7 @@ public final class VerificationModels{
 		public long userId;
 		public String captureSessionId, qq, declarationVersion;
 		public boolean adultDeclaration;
-		public Long declaredAt, claimedBy, claimedAt, decidedBy, decidedAt, cancelledAt;
+		public Long declaredAt, claimedBy, claimedAt, decidedBy, cancelledAt;
 		public List<Evidence> evidence;
 		@Override public void postprocess() throws ObjectValidationException{
 			super.postprocess();

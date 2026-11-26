@@ -16,6 +16,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.os.VibrationEffect;
 import android.text.SpannableStringBuilder;
 import android.text.TextUtils;
@@ -53,7 +54,6 @@ import org.joinmastodon.android.api.cache.HomeTimelineSnapshot;
 import org.joinmastodon.android.api.session.AccountSession;
 import me.grishka.appkit.utils.Preloader;
 import me.grishka.appkit.imageloader.ListImageLoaderAdapter;
-import me.grishka.appkit.imageloader.ImageCache;
 import me.grishka.appkit.imageloader.requests.ImageLoaderRequest;
 import org.joinmastodon.android.api.requests.catalog.GetDonationCampaigns;
 import org.joinmastodon.android.api.requests.markers.SaveMarkers;
@@ -95,6 +95,7 @@ import java.util.stream.Collectors;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.swiperefreshlayout.widget.CircularProgressDrawable;
 import me.grishka.appkit.Nav;
 import me.grishka.appkit.api.Callback;
 import me.grishka.appkit.api.ErrorResponse;
@@ -154,15 +155,32 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 		if(homeRecoveryGeneration>=0) scheduleHomeRoutingRecovery();
 		return true;
 	};
-	private boolean homeHeadInFlight, homeHistoryAttempted, showingHomeHistory, homeViewDestroyed;
-	private TextView homeRefreshingText;
-	private View homeRefreshingLayoutRoot;
-	private WindowInsets homeRefreshingInsets;
-	private final ViewTreeObserver.OnPreDrawListener homeRefreshingPosition=this::positionHomeRefreshingText;
+	private boolean homeHeadInFlight, homeHeadManual, homeHistoryAttempted, showingHomeHistory, homeViewDestroyed;
+	private boolean checkingNewPosts, listRefreshInFlight, ownsRefreshIndicator;
+	private ImageView homeRefreshCircle;
+	private ViewTreeObserver homeRefreshObserver;
+	private WindowInsets homeRefreshInsets;
+	private final Rect homeRefreshViewport=new Rect(), toolbarBounds=new Rect(), homeRefreshClip=new Rect(), currentRefreshClip=new Rect();
+	private final int[] geometryOrigin=new int[2];
+	private final ViewTreeObserver.OnPreDrawListener homeRefreshPosition=this::updateHomeRefreshGeometry;
+	private final View.OnAttachStateChangeListener homeRefreshAttachment=new View.OnAttachStateChangeListener(){
+		@Override public void onViewAttachedToWindow(View view){ observeHomeRefreshGeometry(); }
+		@Override public void onViewDetachedFromWindow(View view){
+			stopObservingHomeRefreshGeometry();
+			// SwipeRefreshLayout resets the drawable on detach, not its mRefreshing flag.
+			// A detached pager view still owns its request; reattach will render that state again.
+			refreshLayout.setRefreshing(false);
+		}
+	};
 	private Runnable pendingHomeDelivery;
+	private boolean homeHistoryPending;
+	private ErrorResponse homeErrorWaitingForHistory;
+	private long lastAutomaticHomeReadAt=-1;
+	private static final long HOME_REVALIDATE_INTERVAL_MS=30_000;
 	private final Runnable homeIdentityCheck=()->{
-		if(homeHeadInFlight && !isHomeIdentityCurrent()) acceptsHomeResponse(homeGeneration);
-		else updateHomeRefreshingText();
+		if(!homeHeadInFlight) return;
+		if(!isHomeIdentityCurrent()) acceptsHomeResponse(homeGeneration);
+		else scheduleHomeIdentityCheck();
 	};
 
 	public HomeTimelineFragment(){
@@ -198,6 +216,7 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 
 	@Override
 	public void onDestroy(){
+		cancelLoading();
 		super.onDestroy();
 		E.unregister(this);
 	}
@@ -239,15 +258,6 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 		}, AccountSessionManager.get(accountID).canAccessLocalTimeline());
 		setHasOptionsMenu(true);
 		loadData();
-		AccountSessionManager.get(accountID).getCacheController().getLists(new Callback<>(){
-			@Override
-			public void onSuccess(List<FollowList> result){
-				lists=result;
-			}
-
-			@Override
-			public void onError(ErrorResponse error){}
-		});
 	}
 
 	private boolean isHomeAccountCurrent(){
@@ -263,13 +273,15 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 	}
 
 	private void recoverHomeAfterRoutingChange(){
-		cancelLoading();
+		cancelLoading(true);
 		showingHomeHistory=true;
 		if(list!=null && !data.isEmpty()){
+			HomeScrollAnchor anchor=captureHomeScrollAnchor();
 			ArrayList<Status> localHistory=new ArrayList<>(data);
 			localHistory.removeIf(status->status.id!=null && status.id.startsWith("nbw_"));
 			homeSession.filterStatuses(localHistory, getFilterContext());
 			replaceHomeHead(localHistory, null, false);
+			if(anchor!=null) restoreHomeScrollAnchor(anchor);
 		}
 		maxID=null;
 		preloader.setMoreAvailable(false);
@@ -308,6 +320,7 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 				|| getActivity()==null || getActivity().isFinishing() || !isHomeAccountCurrent()){
 			homeRecoveryGeneration=-1;
 			clearHomeRecoveryView();
+			updateHomeRefreshIndicator();
 			return;
 		}
 		View view=getView();
@@ -347,8 +360,10 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 		}else delivery.run();
 	}
 
-	private void startHomeHead(int count, boolean allowHistory){
-		if(!contentAccessOpen()){ dataLoading=false; return; }
+	private void startHomeHead(int count, boolean allowHistory){ startHomeHead(count, allowHistory, false); }
+
+	private void startHomeHead(int count, boolean allowHistory, boolean manual){
+		if(!contentAccessOpen()){ cancelLoading(); return; }
 		if(homeHeadInFlight) return;
 		AccountSession session=AccountSessionManager.getInstance().tryGetAccount(accountID);
 		if(session==null || !accountID.equals(AccountSessionManager.getInstance().getLastActiveAccountID())){ cancelLoading(); return; }
@@ -361,14 +376,19 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 		homeLease=homeCache.beginHomeTimelineSnapshot();
 		long generation=++homeGeneration;
 		homeHeadInFlight=true;
+		homeHeadManual=manual;
+		homeHistoryPending=allowHistory && homeLease!=null && !homeHistoryAttempted && data.isEmpty();
+		homeHistoryAttempted=true;
+		homeErrorWaitingForHistory=null;
 		dataLoading=true;
 		maxID=null; // Cached opaque cursor is metadata only, never a pagination capability.
 		preloader.setMoreAvailable(false);
-		updateHomeRefreshingText();
-		if(allowHistory && homeLease!=null && !homeHistoryAttempted && data.isEmpty()){
-			homeHistoryAttempted=true;
+		scheduleHomeIdentityCheck();
+		updateHomeRefreshIndicator();
+		if(homeHistoryPending){
 			homeCache.getHomeTimelineSnapshot(homeLease, snapshot->deliverHomeResult(generation, ()->{
-				if(snapshot!=null){
+				homeHistoryPending=false;
+				if(snapshot!=null && data.isEmpty()){
 					ArrayList<Status> history=new ArrayList<>(snapshot.posts);
 					session.filterStatuses(history, getFilterContext());
 					if(!history.isEmpty()){
@@ -376,20 +396,24 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 						replaceHomeHead(history, null, false);
 						dataLoading=true;
 						showHomeContentImmediately();
+						android.util.Log.i("HomeTimeline", "snapshot rendered "+history.size());
 					}
 				}
-				sendHomeHead(generation, count);
+				if(homeErrorWaitingForHistory!=null) completeHomeFailure(homeErrorWaitingForHistory);
 			}));
-		}else{
-			homeHistoryAttempted=true;
-			sendHomeHead(generation, count);
 		}
+		// The optional, account-scoped disk read and the authoritative GET run independently.
+		// Once fresh data (even an empty response) wins, no late local read can replace it.
+		sendHomeHead(generation, count);
 	}
 
 	private void sendHomeHead(long generation, int count){
 		if(!acceptsHomeResponse(generation)) return;
 		GetAllTimeline request=new GetAllTimeline(null, count);
 		currentRequest=request;
+		request.setNBWCancellationCleanup(()->{
+			if(generation==homeGeneration && currentRequest==request && acceptsHomeResponse(generation)) cancelLoading();
+		});
 		request.setCallback(new Callback<>(){
 			@Override public void onSuccess(List<Status> result){
 				deliverHomeResult(generation, ()->{
@@ -397,33 +421,58 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 					homeSession.filterStatuses(authoritative, getFilterContext());
 					homeCache.putHomeTimelineSnapshot(homeLease, authoritative, request.getNextMaxID());
 					showingHomeHistory=false;
+					lastAutomaticHomeReadAt=SystemClock.elapsedRealtime();
+					HomeScrollAnchor anchor=homeHeadManual ? null : captureHomeScrollAnchor();
 					replaceHomeHead(authoritative, request.getNextMaxID(), request.getNextMaxID()!=null);
-					homeHeadInFlight=false;
-					dataLoading=false;
-					updateHomeRefreshingText();
+					if(anchor!=null) restoreHomeScrollAnchor(anchor);
+					android.util.Log.i("HomeTimeline","network rendered "+authoritative.size());
+					finishHomeHead();
 				});
 			}
 			@Override public void onError(ErrorResponse error){
 				deliverHomeResult(generation, ()->{
-					homeHeadInFlight=false;
-					dataLoading=false;
-					currentRequest=null;
-					refreshDone();
-					updateHomeRefreshingText();
-					if(error instanceof MastodonErrorResponse response && (response.httpStatus==401 || response.httpStatus==403)){
-						homeCache.invalidateHomeTimelineSnapshot();
-						showingHomeHistory=false;
-						replaceHomeHead(List.of(), null, false);
-						loaded=false;
-						doReauthOnErrorRetry=true;
-						HomeTimelineFragment.super.onError(error);
-					}else if(showingHomeHistory){
-						preloader.setMoreAvailable(false);
-						showHomeContentImmediately();
-					}else HomeTimelineFragment.super.onError(error);
+					if(homeHistoryPending && !isHomeAuthorizationError(error)){
+						homeErrorWaitingForHistory=error;
+						currentRequest=null;
+					}else completeHomeFailure(error);
 				});
 			}
 		}).exec(accountID);
+	}
+
+	private static boolean isHomeAuthorizationError(ErrorResponse error){
+		return error instanceof MastodonErrorResponse response && (response.httpStatus==401 || response.httpStatus==403);
+	}
+
+	private void completeHomeFailure(ErrorResponse error){
+		finishHomeHead();
+		if(isHomeAuthorizationError(error)){
+			homeCache.invalidateHomeTimelineSnapshot();
+			showingHomeHistory=false;
+			replaceHomeHead(List.of(), null, false);
+			loaded=false;
+			doReauthOnErrorRetry=true;
+			super.onError(error);
+		}else if(showingHomeHistory || !data.isEmpty()){
+			preloader.setMoreAvailable(false);
+			showHomeContentImmediately();
+			if(homeHeadManual && getActivity()!=null) error.showToast(getActivity());
+		}else super.onError(error);
+	}
+
+	private void scheduleHomeIdentityCheck(){
+		homeHandler.removeCallbacks(homeIdentityCheck);
+		if(homeHeadInFlight) homeHandler.postDelayed(homeIdentityCheck, 500);
+	}
+
+	private void finishHomeHead(){
+		homeHeadInFlight=false;
+		homeHistoryPending=false;
+		homeErrorWaitingForHistory=null;
+		dataLoading=false;
+		currentRequest=null;
+		homeHandler.removeCallbacks(homeIdentityCheck);
+		refreshDone();
 	}
 
 	/** AppKit 1.4.8 has no reset for preloading/preloadOnReady. Rebind its real backing arrays. */
@@ -439,38 +488,129 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 		onDataLoaded(posts, more);
 	}
 
+	private record HomeScrollAnchor(String statusId, StatusDisplayItem.Type type, int offset){}
+
+	private HomeScrollAnchor captureHomeScrollAnchor(){
+		LinearLayoutManager manager=(LinearLayoutManager)list.getLayoutManager();
+		int start=getMainAdapterOffset();
+		int position=manager.findFirstVisibleItemPosition();
+		View row=manager.findViewByPosition(position);
+		int index=position-start;
+		if(row==null || index<0 || index>=displayItems.size()) return null;
+		list.getDecoratedBoundsWithMargins(row, tmpRect);
+		int offset=tmpRect.top-list.getPaddingTop();
+		if(index==0 && offset==0) return null; // At the head, let new first posts appear normally.
+		StatusDisplayItem item=displayItems.get(index);
+		return new HomeScrollAnchor(item.parentID, item.getType(), offset);
+	}
+
+	private void restoreHomeScrollAnchor(HomeScrollAnchor anchor){
+		int fallback=-1;
+		for(int i=0;i<displayItems.size();i++){
+			StatusDisplayItem item=displayItems.get(i);
+			if(!anchor.statusId.equals(item.parentID)) continue;
+			if(fallback<0) fallback=i;
+			if(item.getType()==anchor.type){ fallback=i; break; }
+		}
+		if(fallback>=0)
+			((LinearLayoutManager)list.getLayoutManager()).scrollToPositionWithOffset(getMainAdapterOffset()+fallback, anchor.offset);
+	}
+
 	private void showHomeContentImmediately(){
 		if(content!=null){ content.animate().cancel(); content.setAlpha(1f); content.setVisibility(View.VISIBLE); }
 		if(progress!=null){ progress.animate().cancel(); progress.setVisibility(View.GONE); }
 		if(errorView!=null){ errorView.animate().cancel(); errorView.setVisibility(View.GONE); }
-		if(refreshLayout!=null){ refreshLayout.setRefreshing(false); refreshLayout.setVisibility(View.VISIBLE); }
-		updateHomeRefreshingText();
+		updateHomeRefreshIndicator();
 	}
 
-	private void updateHomeRefreshingText(){
-		if(homeRefreshingText==null) return;
-		homeRefreshingText.removeCallbacks(homeIdentityCheck);
-		homeRefreshingText.setVisibility(homeHeadInFlight && listMode==ListMode.FOLLOWING ? View.VISIBLE : View.GONE);
-		if(homeHeadInFlight) homeRefreshingText.postDelayed(homeIdentityCheck, 500);
+	private boolean isRefreshPending(){
+		return listMode==ListMode.FOLLOWING
+				? (homeHeadInFlight || homeRecoveryGeneration>=0 || checkingNewPosts)
+				: listRefreshInFlight;
 	}
 
-	/** Runs after real measurement, including ancestor scroll/translation and toolbar replacement.
-	 * Only presentation is affected: the identity timer and home request state remain independent. */
-	private boolean positionHomeRefreshingText(){
-		if(homeRefreshingText==null || !homeRefreshingText.isAttachedToWindow()) return true;
-		View parent=(View)homeRefreshingText.getParent();
-		View root=homeRefreshingText.getRootView();
-		Rect viewport=new Rect(), visible=new Rect();
-		if(!parent.getGlobalVisibleRect(viewport)) return true;
-		int[] window=new int[2];
-		root.getLocationInWindow(window);
-		// getGlobalVisibleRect is root-relative, not screen-relative. Convert only by the
-		// root's window position; subtracting the screen origin breaks floating/split windows.
-		viewport.offset(window[0], window[1]);
+	private void updateHomeRefreshIndicator(){
+		if(refreshLayout==null || !refreshLayout.isAttachedToWindow()) return;
+		boolean pending=isRefreshPending() && refreshLayout.isShown();
+		if(pending){
+			ownsRefreshIndicator=true;
+			if(!refreshLayout.isRefreshing()) refreshLayout.setRefreshing(true);
+		}else if(ownsRefreshIndicator){
+			// Don't interrupt a native swipe that is still settling before it calls onRefresh().
+			if(refreshLayout.isRefreshing()){
+				if(refreshLayout.isShown()) refreshLayout.setRefreshing(false);
+				else resetHomeRefreshIndicator();
+			}
+			ownsRefreshIndicator=isRefreshPending();
+		}
+	}
+
+	private void resetHomeRefreshIndicator(){
+		// An error, cancellation or hidden view needn't draw a scale-down frame before reset.
+		refreshLayout.setRefreshing(false);
+		boolean enabled=refreshLayout.isEnabled();
+		refreshLayout.setEnabled(false);
+		if(enabled) refreshLayout.setEnabled(true);
+	}
+
+	@Override public void refreshDone(){
+		listRefreshInFlight=false;
+		// AppKit also calls this when the cache is rendered as a replacement page. Its
+		// replacement flag must reset, but cache hydration hasn't completed the home refresh.
+		if(isRefreshPending()){
+			refreshing=false;
+			updateHomeRefreshIndicator();
+		}else{
+			if(refreshLayout!=null && (ownsRefreshIndicator || refreshLayout.isRefreshing()) && !refreshLayout.isShown())
+				resetHomeRefreshIndicator();
+			super.refreshDone();
+			ownsRefreshIndicator=false;
+		}
+	}
+
+	private void observeHomeRefreshGeometry(){
+		if(homeRefreshObserver!=null) return;
+		homeRefreshObserver=refreshLayout.getViewTreeObserver();
+		homeRefreshObserver.addOnPreDrawListener(homeRefreshPosition);
+	}
+
+	private void stopObservingHomeRefreshGeometry(){
+		if(homeRefreshObserver!=null && homeRefreshObserver.isAlive())
+			homeRefreshObserver.removeOnPreDrawListener(homeRefreshPosition);
+		homeRefreshObserver=null;
+	}
+
+	private void bindHomeRefreshCircle(){
+		// The pinned AppKit widget has one content child and a native CircleImageView. Use
+		// its public drawable type to identify the latter, not a private field or child index.
+		for(int i=0;i<refreshLayout.getChildCount();i++){
+			if(refreshLayout.getChildAt(i) instanceof ImageView image && image.getDrawable() instanceof CircularProgressDrawable){
+				homeRefreshCircle=image;
+				break;
+			}
+		}
+		refreshLayout.addOnAttachStateChangeListener(homeRefreshAttachment);
+		if(refreshLayout.isAttachedToWindow()) observeHomeRefreshGeometry();
+	}
+
+	/** Follow the measured window viewport (including a scrolled toolbar or pager), without
+	 * setting padding on the refresh wrapper or resetting its live animation/refresh listener. */
+	private boolean updateHomeRefreshGeometry(){
+		updateHomeRefreshIndicator();
+		if(!refreshLayout.isShown()) return true;
+		Rect viewport=homeRefreshViewport;
+		if(!refreshLayout.getGlobalVisibleRect(viewport)){
+			if(homeRefreshCircle!=null) homeRefreshCircle.setAlpha(0f);
+			return true;
+		}
+		View root=refreshLayout.getRootView();
+		root.getLocationInWindow(geometryOrigin);
+		// Global visible bounds are root-relative, not physical screen coordinates.
+		viewport.offset(geometryOrigin[0], geometryOrigin[1]);
 		WindowInsets insets=root.getRootWindowInsets();
-		if(insets==null) insets=homeRefreshingInsets;
-		int left=0, top=0, right=0, bottom=0;
+		if(insets==null || insets.isConsumed()) insets=homeRefreshInsets;
 		if(insets!=null){
+			int left, top, right, bottom;
 			if(Build.VERSION.SDK_INT>=30){
 				android.graphics.Insets safe=insets.getInsets(WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
 				left=safe.left; top=safe.top; right=safe.right; bottom=safe.bottom;
@@ -484,62 +624,68 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 					bottom=Math.max(bottom, insets.getDisplayCutout().getSafeInsetBottom());
 				}
 			}
+			// Intersect rather than count system bars again when AppKit already consumed them.
+			viewport.left=Math.max(viewport.left, geometryOrigin[0]+left);
+			viewport.top=Math.max(viewport.top, geometryOrigin[1]+top);
+			viewport.right=Math.min(viewport.right, geometryOrigin[0]+root.getWidth()-right);
+			viewport.bottom=Math.min(viewport.bottom, geometryOrigin[1]+root.getHeight()-bottom);
 		}
-		// Root can itself already be inset. max/intersection avoids counting a status bar twice.
-		viewport.left=Math.max(viewport.left, left);
-		viewport.top=Math.max(viewport.top, top);
-		viewport.right=Math.min(viewport.right, window[0]+root.getWidth()-right);
-		viewport.bottom=Math.min(viewport.bottom, window[1]+root.getHeight()-bottom);
+		int contentGap=getResources().getDimensionPixelSize(R.dimen.home_toolbar_content_gap);
+		int overlayPadding=0;
+		if(getParentFragment() instanceof HomeTabFragment home && home.getVisibleHomeToolbarBoundsInWindow(toolbarBounds)
+				&& toolbarBounds.left<viewport.right && toolbarBounds.right>viewport.left){
+			viewport.top=Math.max(viewport.top, toolbarBounds.bottom);
+			if(home.hasVisibleLiquidToolbar()){
+				list.getLocationInWindow(geometryOrigin);
+				overlayPadding=Math.max(0, viewport.top+contentGap-geometryOrigin[1]);
+				// A large open glass menu may be taller than the entire list. Don't blank it.
+				if(overlayPadding>=list.getHeight()) overlayPadding=0;
+			}
+		}
+		if(list.getPaddingTop()!=overlayPadding) setLiquidToolbarTopPadding(overlayPadding);
 		Toolbar toolbar=getToolbar();
-		if(toolbar!=null && toolbar.isShown() && toolbar.getGlobalVisibleRect(visible)){
-			toolbar.getRootView().getLocationInWindow(window);
-			visible.offset(window[0], window[1]);
-			if(visible.left<viewport.right && visible.right>viewport.left) viewport.top=Math.max(viewport.top, visible.bottom);
+		if(toolbar!=null && toolbar.isShown() && toolbar.getGlobalVisibleRect(toolbarBounds)){
+			root.getLocationInWindow(geometryOrigin);
+			toolbarBounds.offset(geometryOrigin[0], geometryOrigin[1]);
+			if(toolbarBounds.left<viewport.right && toolbarBounds.right>viewport.left)
+				viewport.top=Math.max(viewport.top, toolbarBounds.bottom);
 		}
-		if(getParentFragment() instanceof HomeTabFragment home && home.getVisibleHomeToolbarBoundsInWindow(visible)
-				&& visible.left<viewport.right && visible.right>viewport.left)
-			viewport.top=Math.max(viewport.top, visible.bottom);
-		int gap=getResources().getDimensionPixelSize(R.dimen.home_refresh_text_gap);
-		int side=getResources().getDimensionPixelSize(R.dimen.home_refresh_text_side);
-		int availableWidth=Math.max(1, viewport.width()-side*2);
-		int desiredWidth=Math.min(homeRefreshingText.getMeasuredWidth(), availableWidth);
-		boolean remeasure=homeRefreshingText.getMaxWidth()!=availableWidth;
-		if(remeasure) homeRefreshingText.setMaxWidth(availableWidth);
-		// While the next traversal remeasures wrapping text, never draw it through a system bar.
-		boolean showing=homeRefreshingText.getVisibility()==View.VISIBLE;
-		boolean fits=viewport.height()>homeRefreshingText.getHeight()+gap*2
-				&& homeRefreshingText.getMeasuredWidth()<=availableWidth;
-		homeRefreshingText.setAlpha(fits ? 1f : 0f);
-		if(list!=null && list.isAttachedToWindow()){
-			int[] listOrigin=new int[2];
-			list.getLocationInWindow(listOrigin);
-			// The hint and the first post share this real viewport. Reserve only the text that
-			// is actually drawn, so a refresh never paints over the author's header. The root
-			// and toolbar may already consume the status inset; do not add it a second time.
-			boolean hasOverlay=getParentFragment() instanceof HomeTabFragment home
-					&& home.hasVisibleLiquidToolbar();
-			int contentTop=viewport.top+(hasOverlay ? gap : 0);
-			if(showing && fits) contentTop=viewport.top+gap+homeRefreshingText.getHeight()+gap;
-			int padding=Math.max(0, contentTop-listOrigin[1]);
-			// An oversized menu in a short window is an overlay, not permission to blank the
-			// entire timeline. With no room below it, omit extra clearance rather than hide
-			// or clip normal content. The hint alone may be suppressed until it fits again.
-			if(padding>=list.getHeight()) padding=0;
-			if(list.getPaddingTop()!=padding) setLiquidToolbarTopPadding(padding);
+		positionHomeRefreshCircle(viewport);
+		return true;
+	}
+
+	private void positionHomeRefreshCircle(Rect viewport){
+		ImageView circle=homeRefreshCircle;
+		if(circle==null || circle.getVisibility()!=View.VISIBLE) return;
+		// The raw default end offset is relative to the hidden start (-diameter), not
+		// the visible circle's top. Keep the same resting gap and gesture travel as Thread.
+		int restTop=refreshLayout.getProgressViewStartOffset()+refreshLayout.getProgressViewEndOffset();
+		int diameter=refreshLayout.getProgressCircleDiameter();
+		boolean fits=viewport.width()>=diameter && viewport.height()>=restTop+diameter;
+		circle.setAlpha(fits ? 1f : 0f);
+		if(!fits) return;
+		refreshLayout.getLocationInWindow(geometryOrigin);
+		circle.setTranslationX(viewport.exactCenterX()-geometryOrigin[0]-(circle.getLeft()+circle.getRight())/2f);
+		circle.setTranslationY(viewport.top-geometryOrigin[1]);
+		// While dragging, the native circle enters from above its start. Clip that travel
+		// at the visible safe edge, not over the system bars or glass; never clip the list.
+		int x=geometryOrigin[0]+circle.getLeft()+Math.round(circle.getTranslationX());
+		int y=viewport.top+circle.getTop();
+		homeRefreshClip.set(Math.max(0, viewport.left-x), Math.max(0, viewport.top-y),
+				Math.min(circle.getWidth(), viewport.right-x), Math.min(circle.getHeight(), viewport.bottom-y));
+		if(homeRefreshClip.isEmpty()) homeRefreshClip.setEmpty();
+		if(homeRefreshClip.contains(0, 0, circle.getWidth(), circle.getHeight())){
+			if(circle.getClipBounds(currentRefreshClip)) circle.setClipBounds(null);
+		}else if(!circle.getClipBounds(currentRefreshClip) || !homeRefreshClip.equals(currentRefreshClip)){
+			circle.setClipBounds(homeRefreshClip);
 		}
-		parent.getLocationInWindow(window);
-		float targetX=(viewport.left+viewport.right-desiredWidth)/2f-window[0]-homeRefreshingText.getLeft();
-		float targetY=viewport.top+gap-window[1]-homeRefreshingText.getTop();
-		if(homeRefreshingText.getTranslationX()!=targetX) homeRefreshingText.setTranslationX(targetX);
-		if(homeRefreshingText.getTranslationY()!=targetY) homeRefreshingText.setTranslationY(targetY);
-		return !remeasure;
 	}
 
 	@Override
 	public void onApplyWindowInsets(WindowInsets insets){
-		homeRefreshingInsets=insets;
+		homeRefreshInsets=insets;
 		super.onApplyWindowInsets(insets);
-		if(homeRefreshingText!=null) homeRefreshingText.invalidate();
+		if(refreshLayout!=null) refreshLayout.invalidate();
 	}
 
 	@Override protected boolean shouldAutomaticallyTranslateVisibleContent(){ return !showingHomeHistory; }
@@ -559,29 +705,41 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 	}
 	@Override public void onScrolledToLastItem(){ if(!homeHeadInFlight && !showingHomeHistory) super.onScrolledToLastItem(); }
 	@Override public void loadData(int offset, int count){ if(!homeHeadInFlight && !showingHomeHistory) super.loadData(offset, count); }
-	@Override protected void showProgress(){ if(showingHomeHistory && !data.isEmpty()) showHomeContentImmediately(); else super.showProgress(); }
+	@Override protected void showProgress(){
+		if(listMode==ListMode.FOLLOWING && !data.isEmpty()) showHomeContentImmediately();
+		else super.showProgress();
+	}
 
 	@Override protected void onContentAccessClosed(){
 		showingHomeHistory=false; homeHistoryAttempted=false; homeLease=null; maxID=null; lists=List.of();
-		if(homeRefreshingText!=null) homeRefreshingText.setVisibility(View.GONE);
 	}
 
-	@Override protected void cancelLoading(){
+	@Override protected void cancelLoading(){ cancelLoading(false); }
+
+	private void cancelLoading(boolean keepRefreshIndicator){
+		// This may also be called by the content gate, before it hides the timeline.
+		if(!keepRefreshIndicator && refreshLayout!=null && (ownsRefreshIndicator || refreshLayout.isRefreshing()))
+			resetHomeRefreshIndicator();
 		homeHandler.removeCallbacks(homeRoutingRecovery);
+		homeHandler.removeCallbacks(homeIdentityCheck);
 		homeRecoveryGeneration=-1;
 		clearHomeRecoveryView();
 		homeGeneration++;
 		homeHeadInFlight=false;
+		homeHistoryPending=false;
+		homeErrorWaitingForHistory=null;
+		checkingNewPosts=false;
+		listRefreshInFlight=false;
 		pendingHomeDelivery=null;
 		super.cancelLoading();
 		dataLoading=false;
-		refreshDone();
-		updateHomeRefreshingText();
+		if(keepRefreshIndicator) refreshing=false;
+		else refreshDone();
 	}
 
 	@Override
 	protected void doLoadData(int offset, int count){
-		if(!contentAccessOpen()){ dataLoading=false; return; }
+		if(!contentAccessOpen()){ cancelLoading(); return; }
 		if(listMode==ListMode.FOLLOWING && offset==0){ startHomeHead(count, true); return; }
 		if(listMode==ListMode.FOLLOWING && (homeHeadInFlight || showingHomeHistory)) return;
 		switch(listMode){
@@ -643,10 +801,8 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 		newPostsBtn.setOnClickListener(this::onNewPostsBtnClick);
 		newPostsBtnWrap=view.findViewById(R.id.new_posts_btn_wrap);
 		homeViewDestroyed=false;
-		homeRefreshingText=view.findViewById(R.id.home_timeline_refreshing);
-		homeRefreshingLayoutRoot=view;
-		view.getViewTreeObserver().addOnPreDrawListener(homeRefreshingPosition);
-		updateHomeRefreshingText();
+		bindHomeRefreshCircle();
+		updateHomeRefreshIndicator();
 
 		if(newPostsBtnShown){
 			newPostsBtnWrap.setVisibility(View.VISIBLE);
@@ -821,8 +977,15 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 	}
 
 	private void loadNewPosts(){
-		if(!contentAccessOpen() || homeHeadInFlight || showingHomeHistory) return;
+		if(!contentAccessOpen() || homeHeadInFlight || homeRecoveryGeneration>=0 || showingHomeHistory || dataLoading) return;
+		if(listMode==ListMode.FOLLOWING){
+			long now=SystemClock.elapsedRealtime();
+			if(lastAutomaticHomeReadAt>=0 && now-lastAutomaticHomeReadAt<HOME_REVALIDATE_INTERVAL_MS) return;
+			lastAutomaticHomeReadAt=now;
+		}
 		dataLoading=true;
+		checkingNewPosts=listMode==ListMode.FOLLOWING;
+		updateHomeRefreshIndicator();
 		// The idea here is that we request the timeline such that if there are fewer than `limit` posts,
 		// we'll get the currently topmost post as last in the response. This way we know there's no gap
 		// between the existing and newly loaded parts of the timeline.
@@ -831,8 +994,7 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 		loadAdditionalPosts(null, null, 20, sinceID, new Callback<>(){
 					@Override
 					public void onSuccess(List<Status> result){
-						currentRequest=null;
-						dataLoading=false;
+						finishNewPostsCheck();
 						if(result.isEmpty() || getActivity()==null)
 							return;
 						Status last=result.get(result.size()-1);
@@ -858,11 +1020,15 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 					}
 
 					@Override
-					public void onError(ErrorResponse error){
-						currentRequest=null;
-						dataLoading=false;
-					}
+					public void onError(ErrorResponse error){ finishNewPostsCheck(); }
 				});
+	}
+
+	private void finishNewPostsCheck(){
+		currentRequest=null;
+		dataLoading=false;
+		checkingNewPosts=false;
+		updateHomeRefreshIndicator();
 	}
 
 	@Override
@@ -1043,6 +1209,9 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 		long generation=homeGeneration;
 		ListMode requestedMode=listMode;
 		currentRequest=req;
+		if(checkingNewPosts) req.setNBWCancellationCleanup(()->{
+			if(generation==homeGeneration && currentRequest==req && acceptsHomeResponse(generation)) finishNewPostsCheck();
+		});
 		req.setCallback(new Callback<>(){
 			private boolean current(){ return requestedMode==listMode && list!=null && (requestedMode!=ListMode.FOLLOWING || acceptsHomeResponse(generation)); }
 			@Override public void onSuccess(List<Status> result){ if(current()) callback.onSuccess(result); }
@@ -1052,10 +1221,15 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 
 	@Override
 	public void onRefresh(){
-		if(listMode==ListMode.FOLLOWING){
+		if(homeViewDestroyed || !contentAccessOpen()){
 			cancelLoading();
-			startHomeHead(itemsPerPage*2, false);
-			if(refreshLayout!=null) refreshLayout.setRefreshing(false);
+			return;
+		}
+		if(listMode==ListMode.FOLLOWING){
+			// An explicit refresh still supersedes a cache read or older head. The new
+			// generation owns the same native indicator, with no stop/start in between.
+			cancelLoading(true);
+			startHomeHead(itemsPerPage*2, false, true);
 			return;
 		}
 		if(currentRequest!=null){
@@ -1063,6 +1237,8 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 			currentRequest=null;
 			dataLoading=false;
 		}
+		listRefreshInFlight=true;
+		updateHomeRefreshIndicator();
 		super.onRefresh();
 	}
 
@@ -1109,9 +1285,12 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 		if(newPostsBtnShown)
 			return;
 		newPostsBtnShown=true;
-		if(GlobalUserPreferences.isIosLiquidNavigationEnabled()){
-			newPostsBtnWrap.setVisibility(View.GONE);
-			return;
+		if(getParentFragment() instanceof HomeTabFragment home){
+			home.onHomeNewPostsChanged();
+			if(home.hasVisibleLiquidToolbar()){
+				newPostsBtnWrap.setVisibility(View.GONE);
+				return;
+			}
 		}
 		if(currentNewPostsAnim!=null){
 			currentNewPostsAnim.cancel();
@@ -1145,6 +1324,7 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 		if(!newPostsBtnShown)
 			return;
 		newPostsBtnShown=false;
+		if(getParentFragment() instanceof HomeTabFragment home) home.onHomeNewPostsChanged();
 		if(currentNewPostsAnim!=null){
 			currentNewPostsAnim.cancel();
 		}
@@ -1169,17 +1349,21 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 		set.start();
 	}
 
-	private void onNewPostsBtnClick(View v){
-		if(newPostsBtnShown){
+	boolean hasNewPosts(){ return newPostsBtnShown; }
+
+	void scrollToNewPosts(){
+		if(newPostsBtnShown && list!=null){
 			hideNewPostsButton();
 			smoothScrollRecyclerViewToTop(list);
 		}
 	}
 
+	private void onNewPostsBtnClick(View v){ scrollToNewPosts(); }
+
 	private void onListsDropdownClick(View v){
 		listsDropdownArrow.animate().rotation(-180f).setDuration(150).setInterpolator(CubicBezierInterpolator.DEFAULT).start();
 		dropdownController.show(dropdownMainMenuController);
-		AccountSessionManager.get(accountID).getCacheController().reloadLists(new Callback<>(){
+		AccountSessionManager.get(accountID).getCacheController().getLists(new Callback<>(){
 			@Override
 			public void onSuccess(java.util.List<FollowList> result){
 				lists=result;
@@ -1194,12 +1378,10 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 	public void onDestroyView(){
 		cancelLoading();
 		homeViewDestroyed=true;
-		if(homeRefreshingText!=null) homeRefreshingText.removeCallbacks(homeIdentityCheck);
-		if(homeRefreshingLayoutRoot!=null && homeRefreshingLayoutRoot.getViewTreeObserver().isAlive())
-			homeRefreshingLayoutRoot.getViewTreeObserver().removeOnPreDrawListener(homeRefreshingPosition);
-		homeRefreshingLayoutRoot=null;
-		homeRefreshingInsets=null;
-		homeRefreshingText=null;
+		stopObservingHomeRefreshGeometry();
+		if(refreshLayout!=null) refreshLayout.removeOnAttachStateChangeListener(homeRefreshAttachment);
+		homeRefreshInsets=null;
+		homeRefreshCircle=null;
 		super.onDestroyView();
 		donationBanner=null;
 		donationBannerDismissing=false;
@@ -1275,25 +1457,13 @@ public class HomeTimelineFragment extends StatusListFragment implements ToolbarD
 			@Override public ImageLoaderRequest getImageRequest(int position, int image){
 				ImageLoaderRequest request=delegate.getImageRequest(position, image);
 				if(!showingHomeHistory || request==null) return request;
-				// Binding still reuses the original memory key. Disk misses never download a source.
-				try{
-					java.io.File file=ImageCache.getInstance(getActivity()).getFile(request);
-					return file==null ? null : new CachedHomeImageRequest(request, file);
-				}catch(java.io.IOException | RuntimeException unavailable){ return null; }
+				return org.joinmastodon.android.ui.utils.ContentMediaImageDownloader.cacheOnly(request, homeSession);
 			}
-			@Override public void imageLoaded(int position, int image, android.graphics.drawable.Drawable drawable){ delegate.imageLoaded(position, image, drawable); }
+			@Override public void imageLoaded(int position, int image, android.graphics.drawable.Drawable drawable){
+				if(!showingHomeHistory || isHomeIdentityCurrent()) delegate.imageLoaded(position, image, drawable);
+			}
 			@Override public void imageLoadingFailed(int position, int image, Throwable error){ delegate.imageLoadingFailed(position, image, error); }
 		};
-	}
-
-	private static final class CachedHomeImageRequest extends me.grishka.appkit.imageloader.requests.UrlImageLoaderRequest{
-		private final ImageLoaderRequest source;
-		CachedHomeImageRequest(ImageLoaderRequest source, java.io.File file){
-			super(source.desiredConfig, source.desiredMaxWidth, source.desiredMaxHeight, source.processingSteps, Uri.fromFile(file));
-			this.source=source;
-		}
-		@Override public String getMemoryCacheKey(){ return source.getMemoryCacheKey(); }
-		@Override public String getDiskCacheKey(){ return source.getDiskCacheKey(); }
 	}
 
 	@Override

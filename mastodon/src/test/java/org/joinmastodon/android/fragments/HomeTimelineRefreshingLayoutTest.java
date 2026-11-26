@@ -5,11 +5,13 @@ import android.graphics.Canvas;
 import android.graphics.Insets;
 import android.graphics.Rect;
 import android.os.Bundle;
+import android.os.SystemClock;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowInsets;
 import android.widget.FrameLayout;
-import android.widget.TextView;
+import android.widget.ImageView;
 import android.widget.Toolbar;
 
 import androidx.lifecycle.Lifecycle;
@@ -17,15 +19,21 @@ import androidx.lifecycle.LifecycleOwner;
 import androidx.lifecycle.LifecycleRegistry;
 import androidx.lifecycle.ViewModelStore;
 import androidx.lifecycle.ViewModelStoreOwner;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 import androidx.savedstate.SavedStateRegistry;
 import androidx.savedstate.SavedStateRegistryController;
 import androidx.savedstate.SavedStateRegistryOwner;
+import androidx.swiperefreshlayout.widget.CircularProgressDrawable;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
+import androidx.viewpager2.widget.ViewPager2;
 
 import org.joinmastodon.android.CompatibilityTestApplication;
 import org.joinmastodon.android.GlobalUserPreferences;
 import org.joinmastodon.android.MastodonApp;
 import org.joinmastodon.android.R;
 import org.joinmastodon.android.api.HomeTimelineSnapshotCacheTest;
+import org.joinmastodon.android.api.MastodonErrorResponse;
 import org.joinmastodon.android.api.requests.timelines.GetAllTimeline;
 import org.joinmastodon.android.api.session.AccountSession;
 import org.joinmastodon.android.api.session.AccountSessionManager;
@@ -37,6 +45,7 @@ import org.joinmastodon.android.translation.PostTranslationCoordinator;
 import org.joinmastodon.android.ui.compose.ComposeLifecycleHelperKt;
 import org.joinmastodon.android.ui.compose.navigation.HomeLiquidToolbarController;
 import org.joinmastodon.android.ui.compose.navigation.HomeToolbarTimeline;
+import org.joinmastodon.android.ui.views.HomeTimelineTabStrip;
 import org.joinmastodon.android.ui.views.NestedRecyclerScrollView;
 import org.junit.After;
 import org.junit.Before;
@@ -51,22 +60,28 @@ import org.robolectric.annotation.GraphicsMode;
 import org.robolectric.annotation.LooperMode;
 import org.robolectric.shadows.ShadowChoreographer;
 import org.robolectric.shadows.ShadowLooper;
+import org.robolectric.util.ReflectionHelpers;
+import org.robolectric.util.ReflectionHelpers.ClassParameter;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import me.grishka.appkit.FragmentStackActivity;
+import me.grishka.appkit.api.APIRequest;
+import me.grishka.appkit.api.Callback;
 import me.grishka.appkit.utils.V;
+import me.grishka.appkit.views.RecursiveSwipeRefreshLayout;
 
 import static org.junit.Assert.*;
 
 /** Real attached HomeTab -> pager -> HomeTimeline -> scroller/content hierarchy and real offline
- * cache hydration. No mHost injection, replacement refresh view, delayed-handler suppression,
- * attach/GPU gate relaxation, or fixed test-only refresh positioning. */
+ * cache hydration. The indicator is SwipeRefreshLayout's real built-in CircleImageView; only HTTP
+ * is intercepted, with no replacement refresh view or fixed test-only positioning. */
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk=33, qualifiers="en-w320dp-h720dp-mdpi", application=CompatibilityTestApplication.class,
         shadows=HomeTimelineHistoryTest.OfflineRequests.class)
@@ -108,6 +123,7 @@ public class HomeTimelineRefreshingLayoutTest{
 
     @Before @SuppressWarnings("unchecked") public void setup() throws Exception{
         ShadowChoreographer.setPaused(true);
+        ShadowChoreographer.setFrameDelay(Duration.ofMillis(16));
         MastodonApp.context=RuntimeEnvironment.getApplication(); V.setApplicationContext(MastodonApp.context);
         previousTheme=GlobalUserPreferences.theme;
         org.joinmastodon.android.ui.utils.UiUtils.updateLocalizedDateFormatters(MastodonApp.context);
@@ -119,15 +135,14 @@ public class HomeTimelineRefreshingLayoutTest{
         session.self.sponsor.active=session.self.sponsor.permanent=true;
         previousSession=sessions.put(session.getID(),session);
         previousActive=manager.getLastActiveAccountID(); HomeTimelineSnapshotCacheTest.field(AccountSessionManager.class,"lastActiveAccountID").set(manager,session.getID());
-        session.getLocalPreferences().timelines=new ArrayList<>(List.of(TimelineDefinition.HOME_TIMELINE.copy()));
         InstanceV1 instance=new InstanceV1(); instance.uri=instance.normalizedUri=session.domain; instance.version="4.3.0";
         previousInstance=instances.put(session.domain,instance);
+        session.getLocalPreferences().timelines=new ArrayList<>(List.of(TimelineDefinition.HOME_TIMELINE.copy()));
+        MastodonApp.context.getSharedPreferences("location_cache",0).edit().putString("province","测试省").commit();
         previousLiquid=GlobalUserPreferences.useIosLiquidNavigation; GlobalUserPreferences.useIosLiquidNavigation=false;
         previousReduceMotion=GlobalUserPreferences.reduceMotion; GlobalUserPreferences.reduceMotion=true;
         HomeTimelineHistoryTest.OfflineRequests.sent.clear(); HomeTimelineHistoryTest.OfflineRequests.canceled.clear();
-        Status post=HomeTimelineSnapshotCacheTest.post("p_refresh_layout");
-        post.account.avatar=post.account.avatarStatic="https://refresh-layout.offline.example.test/fictional.png";
-        session.getCacheController().putHomeTimelineSnapshot(session.getCacheController().beginHomeTimelineSnapshot(),List.of(post),null);
+        session.getCacheController().putHomeTimelineSnapshot(session.getCacheController().beginHomeTimelineSnapshot(),List.of(post("p_refresh_layout")),null);
         HomeTimelineSnapshotCacheTest.drain();
     }
 
@@ -145,6 +160,7 @@ public class HomeTimelineRefreshingLayoutTest{
         HomeTimelineSnapshotCacheTest.field(AccountSessionManager.class,"lastActiveAccountID").set(AccountSessionManager.getInstance(),previousActive);
         GlobalUserPreferences.useIosLiquidNavigation=previousLiquid; GlobalUserPreferences.reduceMotion=previousReduceMotion;
         GlobalUserPreferences.theme=previousTheme;
+        MastodonApp.context.getSharedPreferences("location_cache",0).edit().remove("province").commit();
         HomeTimelineHistoryTest.OfflineRequests.sent.clear(); HomeTimelineHistoryTest.OfflineRequests.canceled.clear();
     }
 
@@ -160,29 +176,73 @@ public class HomeTimelineRefreshingLayoutTest{
         }
         activity.getFragmentManager().executePendingTransactions();
         for(int i=0;i<4;i++){
-            if(home!=null) home.getChildFragmentManager().executePendingTransactions();
+            if(home!=null){
+                home.getChildFragmentManager().executePendingTransactions();
+                timeline=(HomeTimelineFragment)home.getCurrentFragment();
+            }
             HomeTimelineSnapshotCacheTest.drain(); settle(8);
         }
-        if(home!=null) timeline=(HomeTimelineFragment)home.getCurrentFragment();
         assertNotNull(timeline);
         assertTrue(timeline.getView().isAttachedToWindow());
-        assertEquals(View.VISIBLE,pill().getVisibility());
-        assertTrue("Use a real in-flight head, not a manually shown hint", HomeTimelineSnapshotCacheTest.field(HomeTimelineFragment.class,"homeHeadInFlight").getBoolean(timeline));
+        assertTrue("Use a real in-flight head", HomeTimelineSnapshotCacheTest.field(HomeTimelineFragment.class,"homeHeadInFlight").getBoolean(timeline));
+        assertTrue(refresh().isRefreshing());
+        assertEquals(View.VISIBLE,circle().getVisibility());
     }
 
     private void settle(int frames){
-        for(int i=0;i<frames;i++){
-            boolean[] vsync={false};
-            android.view.Choreographer.getInstance().postFrameCallback(time->vsync[0]=true);
-            ShadowLooper.idleMainLooper(16,TimeUnit.MILLISECONDS);
-            assertTrue("Advance a real attached-window vsync, not only manual layout",vsync[0]);
-            View root=activity.getWindow().getDecorView(); root.forceLayout();
-            root.measure(View.MeasureSpec.makeMeasureSpec(width,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(height,View.MeasureSpec.EXACTLY));
-            root.layout(0,0,width,height);
-            root.getViewTreeObserver().dispatchOnPreDraw();
+        // Layout alone does not advance a legacy child animation's drawing time. Draw only
+        // the real CircleImageView (not the glass RuntimeShader) at each attached-window vsync.
+        Bitmap frame=timeline==null ? null : Bitmap.createBitmap(width,height,Bitmap.Config.ARGB_8888);
+        Canvas canvas=frame==null ? null : new Canvas(frame);
+        try{
+            for(int i=0;i<frames;i++){
+                long[] vsync={-1};
+                android.view.Choreographer.getInstance().postFrameCallback(time->vsync[0]=time);
+                ShadowLooper.idleMainLooper(16,TimeUnit.MILLISECONDS);
+                assertTrue("Advance a real attached-window vsync, not only manual layout",vsync[0]>=0);
+                View root=activity.getWindow().getDecorView(); root.forceLayout();
+                root.measure(View.MeasureSpec.makeMeasureSpec(width,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(height,View.MeasureSpec.EXACTLY));
+                root.layout(0,0,width,height);
+                root.getViewTreeObserver().dispatchOnPreDraw();
+                if(canvas==null || timeline.getView()==null || !refresh().isShown()) continue;
+                ImageView indicator=circle();
+                if(indicator.getAnimation()==null) continue;
+                // ShadowView can initialize the Animation before the first draw, preventing
+                // View from setting the flag that dispatches CircleImageView.onAnimationEnd.
+                if(indicator.getAnimation().isInitialized())
+                    ReflectionHelpers.callInstanceMethod(View.class,indicator,"onAnimationStart");
+                ReflectionHelpers.callInstanceMethod(ViewGroup.class,refresh(),"drawChild",
+                        ClassParameter.from(Canvas.class,canvas),ClassParameter.from(View.class,indicator),
+                        ClassParameter.from(long.class,TimeUnit.NANOSECONDS.toMillis(vsync[0])));
+            }
+        }finally{
+            if(frame!=null) frame.recycle();
         }
     }
-    private TextView pill(){ return timeline.getView().findViewById(R.id.home_timeline_refreshing); }
+    private Status post(String id){
+        Status post=HomeTimelineSnapshotCacheTest.post(id);
+        post.account.avatar=post.account.avatarStatic="https://refresh-layout.offline.example.test/fictional.png";
+        return post;
+    }
+    private List<GetAllTimeline> heads(){
+        return HomeTimelineHistoryTest.OfflineRequests.sent.stream().filter(GetAllTimeline.class::isInstance).map(GetAllTimeline.class::cast).toList();
+    }
+    @SuppressWarnings("unchecked") private Callback<List<Status>> callback(GetAllTimeline request) throws Exception{
+        return (Callback<List<Status>>)HomeTimelineSnapshotCacheTest.field(APIRequest.class,"callback").get(request);
+    }
+    private void failHead(GetAllTimeline request,int code) throws Exception{
+        callback(request).onError(new MastodonErrorResponse("Offline layout test",code,null));
+    }
+    private SwipeRefreshLayout refresh(){ return timeline.getView().findViewById(R.id.refresh_layout); }
+    private RecyclerView rows(){ return timeline.getView().findViewById(R.id.list); }
+    private ImageView circle(){ return nativeCircle(refresh()); }
+    static ImageView nativeCircle(SwipeRefreshLayout refresh){
+        assertTrue(refresh instanceof RecursiveSwipeRefreshLayout);
+        assertEquals("One AppKit content child and one native indicator",2,refresh.getChildCount());
+        for(int i=0;i<refresh.getChildCount();i++)
+            if(refresh.getChildAt(i) instanceof ImageView image && image.getDrawable() instanceof CircularProgressDrawable) return image;
+        throw new AssertionError("Missing the actual SwipeRefreshLayout circle");
+    }
     private Toolbar toolbar(){ return home==null ? timeline.getToolbar() : home.getView().findViewById(me.grishka.appkit.R.id.toolbar); }
     private static Rect bounds(View view){
         int[] position=new int[2]; view.getLocationInWindow(position);
@@ -197,22 +257,28 @@ public class HomeTimelineRefreshingLayoutTest{
         }else timeline.onApplyWindowInsets(insets);
         settle(6);
     }
+    private static Rect visibleViewportInWindow(View wrapper){
+        Rect viewport=new Rect(); assertTrue(wrapper.getGlobalVisibleRect(viewport));
+        int[] rootOrigin=new int[2]; wrapper.getRootView().getLocationInWindow(rootOrigin);
+        viewport.offset(rootOrigin[0],rootOrigin[1]);
+        return viewport;
+    }
+
     private Rect assertSafe(int topInset, Rect obstruction){
-        TextView text=pill(); assertEquals(TextView.class,text.getClass());
-        assertEquals(View.VISIBLE,text.getVisibility()); assertEquals(1f,text.getAlpha(),0f);
-        assertFalse(text.isClickable()); assertFalse(text.isFocusable());
-        for(var drawable:text.getCompoundDrawables()) assertNull(drawable);
-        Rect hint=bounds(text), root=bounds(activity.getWindow().getDecorView());
-        assertTrue("Hint is measured and readable: "+hint, hint.width()>0 && hint.height()>0);
-        assertTrue("No status-bar overlap: "+hint, hint.top>=topInset);
-        assertTrue("Hint stays inside the real viewport: "+hint+" / "+root, root.contains(hint));
+        ImageView indicator=circle();
+        assertTrue(refresh().isRefreshing());
+        assertEquals(View.VISIBLE,indicator.getVisibility()); assertEquals(1f,indicator.getAlpha(),0f);
+        assertFalse(indicator.isClickable()); assertFalse(indicator.isFocusable());
+        Rect visible=bounds(indicator), root=bounds(activity.getWindow().getDecorView());
+        assertEquals(refresh().getProgressCircleDiameter(),visible.width());
+        assertEquals(visible.width(),visible.height());
+        assertTrue("No status-bar overlap: "+visible,visible.top>=topInset);
+        assertTrue("Circle stays inside the real viewport: "+visible+" / "+root,root.contains(visible));
         if(obstruction!=null){
-            assertTrue("Known toolbar bottom must be cleared: "+hint+" / "+obstruction, hint.top>=obstruction.bottom);
-            assertFalse("No real toolbar/glass overlap",Rect.intersects(hint,obstruction));
+            assertTrue("Known toolbar or tab strip must be cleared: "+visible+" / "+obstruction,visible.top>=obstruction.bottom);
+            assertFalse("No real toolbar/glass overlap",Rect.intersects(visible,obstruction));
         }
-        assertNotNull(text.getLayout());
-        for(int line=0;line<text.getLineCount();line++) assertEquals(0,text.getLayout().getEllipsisCount(line));
-        return hint;
+        return visible;
     }
 
     @Test public void embeddedClassicUsesKnownActualParentToolbarAndRecoversAfterHideResizeAndScroll() throws Exception{
@@ -222,9 +288,22 @@ public class HomeTimelineRefreshingLayoutTest{
         Toolbar bar=toolbar(); ViewGroup.LayoutParams lp=bar.getLayoutParams(); lp.height=91; bar.setLayoutParams(lp);
         insets(0,37,0,24);
         Rect barBounds=bounds(bar); assertEquals(91,barBounds.height());
-        Rect before=assertSafe(37,barBounds);
+        HomeTimelineTabStrip strip=org.robolectric.util.ReflectionHelpers.getField(home,"timelineTabs");
+        ViewPager2 pager=org.robolectric.util.ReflectionHelpers.getField(home,"pager");
+        View logo=bar.findViewById(R.id.home_brand_logo);
+        assertNotNull(logo);
+        assertTrue(logo.isShown());
+        assertEquals(barBounds.exactCenterX(),bounds(logo).exactCenterX(),1f);
+        assertEquals(V.dp(35),logo.getWidth());
+        assertEquals(V.dp(35),logo.getHeight());
+        assertEquals(0,activity.getResources().getIdentifier("search_action","id",activity.getPackageName()));
+        assertEquals(barBounds.bottom,bounds(strip).top);
+        assertEquals(V.dp(48),strip.getHeight());
+        assertEquals(bounds(strip).bottom,bounds(pager).top);
+        Rect before=assertSafe(37,bounds(strip));
+        assertEquals("Classic lists reserve no extra refresh space",0,rows().getPaddingTop());
         NestedRecyclerScrollView scroller=timeline.getView().findViewById(R.id.scroller);
-        scroller.scrollTo(0,29); settle(8); assertSafe(37,bounds(bar));
+        scroller.scrollTo(0,29); settle(8); assertSafe(37,bounds(strip));
         bar.setVisibility(View.GONE); settle(8); Rect hidden=assertSafe(37,null);
         assertTrue("Removed toolbar must release its occupied space",hidden.top<before.top);
         bar.setVisibility(View.VISIBLE); lp.height=117; bar.setLayoutParams(lp); settle(8);
@@ -235,49 +314,245 @@ public class HomeTimelineRefreshingLayoutTest{
     }
 
     @Test @Config(qualifiers="zh-rCN-w320dp-h720dp-mdpi") @GraphicsMode(GraphicsMode.Mode.NATIVE)
-    public void standaloneScrollerLargeTextAndSideSystemInsetsKeepExactPureTextVisible() throws Exception{
+    public void standaloneScrollerKeepsNativeCircleClearOfSideInsetsAtLargeFont() throws Exception{
         android.content.res.Configuration config=new android.content.res.Configuration(MastodonApp.context.getResources().getConfiguration());
         config.fontScale=1.6f; MastodonApp.context.getResources().updateConfiguration(config,MastodonApp.context.getResources().getDisplayMetrics());
         open(false); insets(18,43,26,24);
-        assertEquals("正在刷新中......",pill().getText().toString());
-        assertEquals(1.6f,pill().getResources().getConfiguration().fontScale,.001f);
+        assertEquals(1.6f,circle().getResources().getConfiguration().fontScale,.001f);
+        assertEquals(V.dp(40),refresh().getProgressCircleDiameter());
         Toolbar bar=toolbar(); ViewGroup.LayoutParams lp=bar.getLayoutParams(); lp.height=103; bar.setLayoutParams(lp); settle(8);
         assertSafe(43,bounds(bar));
         NestedRecyclerScrollView scroller=timeline.getView().findViewById(R.id.scroller);
-        scroller.scrollTo(0,71); settle(8); Rect hint=assertSafe(43,bounds(bar));
-        assertTrue(hint.left>=18 && hint.right<=width-26);
+        scroller.scrollTo(0,71); settle(8); Rect visible=assertSafe(43,bounds(bar));
+        assertTrue(visible.left>=18 && visible.right<=width-26);
         capture("home-refresh-standalone-zh-font160");
         scroller.scrollTo(0,0); settle(8); assertSafe(43,bounds(bar));
     }
 
     @Test public void attachedActualLiquidGlassBoundsReplaceClassicGeometryAndDisappearWithoutStaleOffset() throws Exception{
         open(true);
-        glass=new HomeLiquidToolbarController(activity,home::onLiquidTimelineSelected,home::onLiquidNewPosts,home::onLiquidCompose,home::onLiquidMenuItem,home::openSearch);
+        glass=new HomeLiquidToolbarController(activity,home::onLiquidTimelineSelected,home::onLiquidNewPosts,home::onLiquidCompose,home::onLiquidMenuItem);
         glass.setTimelines(List.of(new HomeToolbarTimeline(0,"Home",R.drawable.ic_fluent_home_24_regular)),0);
         glass.setComposeMenu(HomeFragment.composeMenuItems(activity)); glass.setStatusBarInset(61);
         ViewGroup host=(ViewGroup)home.getView().getParent();
         host.addView(glass.getView(),new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.MATCH_PARENT));
-        home.setLiquidToolbarController(glass);
         // Exercise the installed overlay hierarchy directly, without pretending the software test
         // window passed HomeFragment's production hardware-attachment gate.
-        toolbar().setVisibility(View.GONE); timeline.setLiquidToolbarMode(true);
+        GlobalUserPreferences.useIosLiquidNavigation=true;
+        home.setLiquidToolbarController(glass);
         insets(0,61,0,24); toolbar().setVisibility(View.GONE); settle(60);
         Rect actualGlass=new Rect(); assertTrue("Actual attached Compose glass must be measured",glass.getVisibleBoundsInWindow(actualGlass));
         assertTrue(actualGlass.bottom>61 && actualGlass.height()<glass.getView().getHeight());
         Rect beforeMove=assertSafe(61,actualGlass);
         moveWindowOrigin(410,1050); settle(8); assertWindowOrigin(410,1050);
         assertTrue(glass.getVisibleBoundsInWindow(actualGlass));
-        assertEquals("Real glass and hint remain window-relative in a floating window",beforeMove,assertSafe(61,actualGlass));
+        assertEquals("Real glass and the circle remain window-relative in a floating window",beforeMove,assertSafe(61,actualGlass));
         width=720; height=320; insets(23,31,39,19); toolbar().setVisibility(View.GONE);
         glass.setStatusBarInset(31); moveWindowOrigin(250,880); settle(60);
         assertTrue(glass.getVisibleBoundsInWindow(actualGlass)); assertSafe(31,actualGlass);
         width=320; height=720; insets(0,61,0,24); toolbar().setVisibility(View.GONE);
-        glass.setStatusBarInset(61); settle(60);
-        assertTrue(glass.getVisibleBoundsInWindow(actualGlass)); assertSafe(61,actualGlass);
-        glass.getView().setVisibility(View.GONE); settle(8); Rect released=assertSafe(61,null);
-        assertTrue("Hidden glass must not leave a stale inset",released.top<actualGlass.bottom);
+        // Leave an ample, real glass obstruction over the viewport so the disappearance
+        // case is not vacuous even if the app window is already inset.
+        glass.setStatusBarInset(85); settle(60);
+        assertTrue(glass.getVisibleBoundsInWindow(actualGlass));
+        assertTrue("Glass must extend below the viewport's unobstructed top",
+                actualGlass.bottom>Math.max(61,visibleViewportInWindow(refresh()).top));
+        Rect withGlass=assertTightClearance(61,actualGlass,false);
+        glass.getView().setVisibility(View.GONE); settle(8);
+        Rect hiddenBounds=new Rect();
+        assertFalse("Hidden controller has no visible glass",glass.getVisibleBoundsInWindow(hiddenBounds));
+        assertFalse("Neither glass nor the classic toolbar occupies the viewport",home.getVisibleHomeToolbarBoundsInWindow(hiddenBounds));
+        Rect released=assertTightClearance(61,null,false);
+        assertTrue("Removing a real obstruction moves the circle up while preserving its native gap",released.top<withGlass.top);
         glass.getView().setVisibility(View.VISIBLE); glass.setStatusBarInset(29); settle(60);
-        assertTrue(glass.getVisibleBoundsInWindow(actualGlass)); assertSafe(61,actualGlass);
+        assertTrue(glass.getVisibleBoundsInWindow(actualGlass)); assertTightClearance(61,actualGlass,true);
+        int glassPadding=rows().getPaddingTop();
+        Rect listBounds=bounds(rows()), firstBounds=bounds(rows().getChildAt(0));
+        failHead(heads().get(0),503); settle(12);
+        assertFalse(refresh().isRefreshing());
+        assertEquals(glassPadding,rows().getPaddingTop());
+        assertEquals(listBounds,bounds(rows()));
+        assertEquals(firstBounds,bounds(rows().getChildAt(0)));
+        timeline.onRefresh(); settle(20);
+        assertTightClearance(61,actualGlass,true);
+        assertEquals(glassPadding,rows().getPaddingTop());
+        assertEquals(firstBounds,bounds(rows().getChildAt(0)));
+    }
+
+    @Test public void tooShortViewportHidesOnlyTheCircleUntilItFitsAgain() throws Exception{
+        open(true);
+        assertSafe(0,bounds(toolbar()));
+        height=bounds(refresh()).top+refresh().getProgressCircleDiameter()-4;
+        settle(8);
+        assertTrue(refresh().isRefreshing());
+        assertEquals(0f,circle().getAlpha(),0f);
+        assertTrue(rows().isShown());
+        assertEquals(0,rows().getPaddingTop());
+        height=720; settle(12);
+        assertSafe(0,bounds(toolbar()));
+        assertEquals(1,heads().size());
+    }
+
+    @Test public void foregroundRevalidationUsesTheSameCircleWithoutMovingRows() throws Exception{
+        open(true);
+        callback(heads().get(0)).onSuccess(List.of(post("p_refresh_layout"))); settle(12);
+        assertFalse(refresh().isRefreshing());
+        Rect listBounds=bounds(rows()), firstBounds=bounds(rows().getChildAt(0));
+        timeline.getArguments().putBoolean("noAutoLoad",false);
+        timeline.onShown(); settle(12);
+        assertEquals("Returning to a fresh feed must not repeat the head GET",1,heads().size());
+        ShadowLooper.idleMainLooper(31,TimeUnit.SECONDS);
+        timeline.onShown(); settle(12);
+        assertEquals(2,heads().size());
+        assertTrue(refresh().isRefreshing());
+        assertEquals(listBounds,bounds(rows())); assertEquals(firstBounds,bounds(rows().getChildAt(0)));
+        failHead(heads().get(1),503); settle(12);
+        assertFalse(refresh().isRefreshing());
+        assertEquals(listBounds,bounds(rows())); assertEquals(firstBounds,bounds(rows().getChildAt(0)));
+    }
+
+    @Test public void automaticHeadKeepsTheVisiblePostAnchorWhenAuthorityPrepends() throws Exception{
+        List<Status> cached=new ArrayList<>();
+        for(int i=0;i<12;i++) cached.add(post("p_anchor_"+i));
+        var cache=session.getCacheController();
+        cache.putHomeTimelineSnapshot(cache.beginHomeTimelineSnapshot(),cached,null);
+        HomeTimelineSnapshotCacheTest.drain();
+        open(true);
+        LinearLayoutManager manager=(LinearLayoutManager)rows().getLayoutManager();
+        manager.scrollToPositionWithOffset(10,-11); settle(8);
+        int position=manager.findFirstVisibleItemPosition();
+        assertTrue(position>0);
+        var visible=timeline.getDisplayItems().get(position);
+        int top=manager.getDecoratedTop(manager.findViewByPosition(position));
+        List<Status> authority=new ArrayList<>(List.of(post("p_arrival")));
+        authority.addAll(cached);
+        callback(heads().get(0)).onSuccess(authority); settle(12);
+        assertFalse(refresh().isRefreshing());
+        assertEquals(0,rows().getPaddingTop());
+        int after=manager.findFirstVisibleItemPosition();
+        assertEquals(visible.parentID,timeline.getDisplayItems().get(after).parentID);
+        assertEquals(visible.getType(),timeline.getDisplayItems().get(after).getType());
+        assertEquals(top,manager.getDecoratedTop(manager.findViewByPosition(after)));
+        assertEquals(1,heads().size());
+    }
+
+    @Test public void nativeGestureCoalescesWithAnActiveHeadAndRestartsAfterFailure() throws Exception{
+        open(true);
+        SwipeRefreshLayout wrapper=refresh();
+        Rect before=bounds(rows().getChildAt(0));
+        GetAllTimeline first=heads().get(0);
+        pullToRefresh(wrapper); settle(20);
+        assertEquals("An active native refresh doesn't dispatch a duplicate gesture",1,heads().size());
+        assertTrue(wrapper.isRefreshing());
+        failHead(first,503); settle(20);
+        assertFalse(wrapper.isRefreshing());
+        assertEquals("The finished native scale-out clears the old indicator",View.GONE,circle().getVisibility());
+        assertEquals(before,bounds(rows().getChildAt(0)));
+        assertTrue("Native refresh remains enabled after the first failure",wrapper.isEnabled());
+        assertFalse("The pull starts at the top of the feed",wrapper.canChildScrollUp());
+        pullToRefresh(wrapper); settle(1);
+        assertTrue("SwipeRefreshLayout must accept the pull as its animation starts",wrapper.isRefreshing());
+        settle(36);
+        assertEquals("The existing SwipeRefreshLayout listener must dispatch a new head",2,heads().size());
+        assertTrue(wrapper.isRefreshing());
+        assertEquals(before,bounds(rows().getChildAt(0)));
+        callback(first).onSuccess(List.of(post("p_discard")));
+        assertTrue("Late old delivery cannot stop the current refresh",wrapper.isRefreshing());
+        callback(heads().get(1)).onSuccess(List.of(post("p_refresh_layout"))); settle(12);
+        assertFalse(wrapper.isRefreshing());
+    }
+
+    @Test public void temporaryDetachStopsTheDrawableButReattachUsesTheSamePendingHead() throws Exception{
+        open(false);
+        SwipeRefreshLayout wrapper=refresh();
+        ImageView indicator=circle();
+        View view=timeline.getView();
+        ViewGroup parent=(ViewGroup)view.getParent();
+        int index=parent.indexOfChild(view);
+        ViewGroup.LayoutParams params=view.getLayoutParams();
+        parent.removeView(view);
+        assertFalse(wrapper.isAttachedToWindow());
+        assertFalse(wrapper.isRefreshing());
+        assertEquals(View.GONE,indicator.getVisibility());
+        assertEquals(1,heads().size());
+        parent.addView(view,index,params); settle(24);
+        assertSame(indicator,circle()); assertSafe(0,bounds(toolbar()));
+        assertEquals(1,heads().size());
+        failHead(heads().get(0),503); settle(12);
+        assertFalse(wrapper.isRefreshing());
+    }
+
+    private void pullToRefresh(SwipeRefreshLayout wrapper){
+        // Start on a measured post row, not an inert gap or an overlaid action.
+        Rect start=bounds(rows().getChildAt(0));
+        Rect wrapperBounds=bounds(wrapper);
+        assertTrue("The first post intersects the refresh wrapper",start.intersect(wrapperBounds));
+        float x=start.exactCenterX()-wrapperBounds.left;
+        float y=start.exactCenterY()-wrapperBounds.top;
+        long now=SystemClock.uptimeMillis();
+        assertTrue("The real refresh hierarchy handles touch down",sendTouch(wrapper,now,0,MotionEvent.ACTION_DOWN,x,y));
+        sendTouch(wrapper,now,20,MotionEvent.ACTION_MOVE,x,y+30);
+        sendTouch(wrapper,now,60,MotionEvent.ACTION_MOVE,x,y+205);
+        sendTouch(wrapper,now,80,MotionEvent.ACTION_UP,x,y+205);
+    }
+
+    private boolean sendTouch(View view,long down,long elapsed,int action,float x,float y){
+        MotionEvent event=MotionEvent.obtain(down,down+elapsed,action,x,y,0);
+        try{ return view.dispatchTouchEvent(event); }
+        finally{ event.recycle(); }
+    }
+
+    @Test public void timelineStripHidesAndReleasesPagerSpaceOnlyWithInstalledLiquidToolbar() throws Exception{
+        open(true);
+        HomeTimelineTabStrip strip=org.robolectric.util.ReflectionHelpers.getField(home,"timelineTabs");
+        ViewPager2 pager=org.robolectric.util.ReflectionHelpers.getField(home,"pager");
+        GlobalUserPreferences.useIosLiquidNavigation=true;
+        home.setLiquidToolbarController(null);
+        assertEquals(View.VISIBLE,strip.getVisibility());
+        assertEquals(V.dp(48),((FrameLayout.LayoutParams)pager.getLayoutParams()).topMargin);
+        glass=new HomeLiquidToolbarController(activity,home::onLiquidTimelineSelected,home::onLiquidNewPosts,home::onLiquidCompose,home::onLiquidMenuItem);
+        home.setLiquidToolbarController(glass);
+        assertEquals(View.GONE,strip.getVisibility());
+        assertEquals(0,((FrameLayout.LayoutParams)pager.getLayoutParams()).topMargin);
+        home.setLiquidToolbarController(null);
+        settle(8);
+        assertEquals(View.VISIBLE,strip.getVisibility());
+        assertEquals(bounds(strip).bottom,bounds(pager).top);
+    }
+
+    @Test public void timelineStripPlusOpensEditorWithTheCurrentAccountAndDoesNotSelectATab() throws Exception{
+        open(true);
+        HomeTimelineTabStrip strip=org.robolectric.util.ReflectionHelpers.getField(home,"timelineTabs");
+        ViewPager2 pager=org.robolectric.util.ReflectionHelpers.getField(home,"pager");
+        View plus=strip.getChildAt(1);
+        assertEquals(activity.getString(R.string.sk_edit_timelines),plus.getContentDescription());
+        assertTrue(plus.performClick());
+        activity.getFragmentManager().executePendingTransactions(); settle(32);
+        EditTimelinesFragment editor=activity.getFragmentManager().getFragments().stream()
+                .filter(EditTimelinesFragment.class::isInstance).filter(f->f.isAdded()).map(EditTimelinesFragment.class::cast).findFirst().orElseThrow();
+        assertEquals(session.getID(),editor.getArguments().getString("account"));
+        assertEquals(0,pager.getCurrentItem());
+        activity.onBackPressed(); settle(32);
+        assertTrue(home.isAdded());
+        assertEquals(0,pager.getCurrentItem());
+    }
+
+    @Test public void restoresTimelineByDefinitionWhenNbwIsHidden() throws Exception{
+        session.getLocalPreferences().timelines=new ArrayList<>(List.of(TimelineDefinition.HOME_TIMELINE.copy(),
+                TimelineDefinition.NBW_TIMELINE.copy(),TimelineDefinition.FOLLOWING_TIMELINE.copy(),TimelineDefinition.ofPopular(),TimelineDefinition.ofGeo("测试省")));
+        open(true);
+        ViewPager2 pager=org.robolectric.util.ReflectionHelpers.getField(home,"pager");
+        assertEquals(4,pager.getAdapter().getItemCount());
+        Bundle legacyState=new Bundle(); legacyState.putInt("selectedTab",1);
+        home.onViewStateRestored(legacyState); settle(8);
+        assertEquals(1,pager.getCurrentItem());
+        assertTrue(home.getCurrentFragment() instanceof FollowingTimelineFragment);
+        Bundle saved=new Bundle(); home.onSaveInstanceState(saved);
+        assertEquals(2,saved.getInt("selectedTimelineId"));
+        pager.setCurrentItem(0,false); settle(8);
+        home.onViewStateRestored(saved); settle(8);
+        assertEquals(1,pager.getCurrentItem());
+        assertTrue(home.getCurrentFragment() instanceof FollowingTimelineFragment);
     }
 
     @Test public void realHomeFabFanClickOpensCreatorHostWithCurrentAccount() throws Exception{
@@ -338,15 +613,15 @@ public class HomeTimelineRefreshingLayoutTest{
         assertEquals("Keep physical origin during layout",y,screen[1]-window[1]);
     }
 
-    @Test public void nonzeroFreeformWindowOriginDoesNotHideEmbeddedHintAcrossRotationInsetsAndToolbarChanges() throws Exception{
+    @Test public void nonzeroFreeformWindowOriginDoesNotHideEmbeddedCircleAcrossRotationInsetsAndToolbarChanges() throws Exception{
         open(true);
         ViewGroup.LayoutParams lp=toolbar().getLayoutParams(); lp.height=93; toolbar().setLayoutParams(lp);
         insets(13,39,21,25);
         Rect baseline=assertSafe(39,bounds(toolbar()));
         moveWindowOrigin(430,1100); settle(8); assertWindowOrigin(430,1100);
-        assertEquals("Screen displacement must not be subtracted from window-local hint",baseline,assertSafe(39,bounds(toolbar())));
+        assertEquals("Screen displacement must not be subtracted from the window-local circle",baseline,assertSafe(39,bounds(toolbar())));
         Rect actual=new Rect(); assertTrue(home.getVisibleHomeToolbarBoundsInWindow(actual));
-        assertEquals("Parent toolbar and hint must use the same window coordinates",bounds(toolbar()),actual);
+        assertEquals("Parent toolbar and circle must use the same window coordinates",bounds(toolbar()),actual);
         width=720; height=320; insets(31,23,47,19); moveWindowOrigin(210,900); settle(8); assertWindowOrigin(210,900);
         Rect rotated=assertSafe(23,bounds(toolbar()));
         assertTrue(rotated.left>=31 && rotated.right<=width-47);
@@ -368,117 +643,51 @@ public class HomeTimelineRefreshingLayoutTest{
         assertTrue(rotated.left>=27 && rotated.right<=width-43);
     }
 
-    // The liquid-glass 320dp/fontScale1.6 raster cases (light/dark) are intentionally absent:
-    // Robolectric's bundled SkSL rejects the miuix AGSL at RuntimeShader construction ("cannot
-    // swizzle value of type 'shader'"), and its software canvas rejects RuntimeShader paints when
-    // the glass highlight is drawn ("Software rendering doesn't support RuntimeShader"), so the
-    // liquid glass blur/highlight cannot be rasterized in a unit test here. Liquid layout and
-    // geometry stay covered by attachedActualLiquidGlassBoundsReplaceClassicGeometryAndDisappear-
-    // WithoutStaleOffset in this class and by the HomeTab/liquid toolbar geometry tests; the real
-    // glass visual has to be verified on a device. These cases are removed rather than skipped or
-    // relaxed, and production code is untouched.
+    // Native raster tests use classic chrome. Robolectric's software canvas does not support
+    // the liquid toolbar's RuntimeShader; its measured geometry is tested above without rasterizing it.
     @Test @GraphicsMode(GraphicsMode.Mode.NATIVE)
-    public void attachedClassicLight320Font160UsesActualToolbarAndPureTextPill() throws Exception{ renderTopGeometry(false,false); }
+    public void attachedClassicLight320Font160UsesActualToolbarAndNativeCircle() throws Exception{ renderTopGeometry(false); }
 
     @Test @GraphicsMode(GraphicsMode.Mode.NATIVE) @Config(qualifiers="zh-rCN-w320dp-h720dp-night-mdpi")
-    public void attachedClassicDark320Font160UsesActualToolbarAndPureTextPill() throws Exception{ renderTopGeometry(true,false); }
+    public void attachedClassicDark320Font160UsesActualToolbarAndNativeCircle() throws Exception{ renderTopGeometry(true); }
 
-    private void renderTopGeometry(boolean dark, boolean liquid) throws Exception{
+    private void renderTopGeometry(boolean dark) throws Exception{
         darkTheme=dark;
         android.content.res.Configuration config=new android.content.res.Configuration(MastodonApp.context.getResources().getConfiguration());
         config.fontScale=1.6f; MastodonApp.context.getResources().updateConfiguration(config,MastodonApp.context.getResources().getDisplayMetrics());
         open(true);
-        if(liquid){
-            glass=new HomeLiquidToolbarController(activity,home::onLiquidTimelineSelected,home::onLiquidNewPosts,home::onLiquidCompose,home::onLiquidMenuItem,home::openSearch);
-            glass.setTimelines(List.of(new HomeToolbarTimeline(0,"Home",R.drawable.ic_fluent_home_24_regular)),0);
-            glass.setComposeMenu(HomeFragment.composeMenuItems(activity)); glass.setStatusBarInset(37);
-            ViewGroup host=(ViewGroup)home.getView().getParent();
-            host.addView(glass.getView(),new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.MATCH_PARENT));
-            // A real attached controller, without bypassing HomeFragment's hardware support gate.
-            GlobalUserPreferences.useIosLiquidNavigation=true;
-            home.setLiquidToolbarController(glass);
-        }
         insets(0,37,0,24); settle(64);
         Rect obstruction=new Rect();
         assertTrue(home.getVisibleHomeToolbarBoundsInWindow(obstruction));
         assertTightClearance(37,obstruction,true);
-        capture("home-top-"+(liquid?"liquid":"classic")+"-"+(dark?"dark":"light")+"-320-font160");
-        if(liquid){
-            Rect collapsed=new Rect(obstruction), overlay=bounds(glass.getView());
-            float density=activity.getResources().getDisplayMetrics().density;
-            assertTrue("Capture/touch host remains full window",overlay.height()>collapsed.height()*3);
-            tap(glass.getView(),glass.getView().getWidth()-140*density,37+32*density);
-            settle(90);
-            assertTrue(home.getVisibleHomeToolbarBoundsInWindow(obstruction));
-            assertTrue("Real five-row compose menu must expand",obstruction.height()>collapsed.height()*2);
-            assertTightClearance(37,obstruction,true);
-            capture("home-top-liquid-compose-"+(dark?"dark":"light")+"-320-font160");
-            assertTrue(glass.onBackPressed()); settle(90);
-            assertTrue(home.getVisibleHomeToolbarBoundsInWindow(obstruction)); assertTightClearance(37,obstruction,true);
-            width=720; height=320; insets(19,23,31,19); glass.setStatusBarInset(23); settle(64);
-            assertTrue(home.getVisibleHomeToolbarBoundsInWindow(obstruction)); assertTightClearance(23,obstruction,true);
-            capture("home-top-liquid-landscape-"+(dark?"dark":"light")+"-font160");
-            tap(glass.getView(),glass.getView().getWidth()-140*density,23+32*density); settle(90);
-            androidx.recyclerview.widget.RecyclerView shortRows=timeline.getView().findViewById(R.id.list);
-            assertTrue("Short expanded-menu viewport must not blank normal content",shortRows.isShown() && shortRows.getPaddingTop()<shortRows.getHeight());
-            assertEquals("Only the hint may be suppressed when the actual expanded glass leaves no text room",0f,pill().getAlpha(),0f);
-            assertTrue(glass.onBackPressed()); settle(90);
-            width=320; height=720; insets(0,37,0,24); glass.setStatusBarInset(37); settle(64);
-            assertTrue(home.getVisibleHomeToolbarBoundsInWindow(obstruction)); assertTightClearance(37,obstruction,true);
-            androidx.recyclerview.widget.RecyclerView rows=timeline.getView().findViewById(R.id.list);
-            rows.scrollBy(0,31); settle(12);
-            assertTrue(home.getVisibleHomeToolbarBoundsInWindow(obstruction)); assertTightClearance(37,obstruction,false);
-            rows.scrollToPosition(0); settle(12);
-            // Search's anchor keeps its actual 48dp capsule target; the expansion is real AppKit UI.
-            tap(glass.getView(),glass.getView().getWidth()-84*density,37+32*density);
-            settle(90); activity.getFragmentManager().executePendingTransactions(); settle(12);
-            org.joinmastodon.android.fragments.discover.SearchQueryFragment search=null;
-            for(android.app.Fragment fragment:activity.getFragmentManager().getFragments())
-                if(fragment instanceof org.joinmastodon.android.fragments.discover.SearchQueryFragment query) search=query;
-            assertNotNull("Actual glass search click must expand the search UI",search);
-            assertTrue(search.getView().isAttachedToWindow());
-            assertTrue(hasVisibleEditText(search.getView()));
-            capture("home-top-liquid-search-"+(dark?"dark":"light")+"-320-font160");
-            return;
-        }
+        capture("home-top-classic-"+(dark?"dark":"light")+"-320-font160");
         NestedRecyclerScrollView scroller=timeline.getView().findViewById(R.id.scroller);
         scroller.scrollTo(0,29); settle(12);
         assertTrue(home.getVisibleHomeToolbarBoundsInWindow(obstruction)); assertTightClearance(37,obstruction,false);
         width=720; height=320; insets(19,23,31,19); settle(12);
         assertTrue(home.getVisibleHomeToolbarBoundsInWindow(obstruction)); assertTightClearance(23,obstruction,false);
+        assertEquals("Geometry must not refresh data",1,heads().size());
     }
 
-    private void assertTightClearance(int topInset, Rect obstruction, boolean checkHeader){
-        Rect hint=assertSafe(topInset,obstruction);
-        int gap=activity.getResources().getDimensionPixelSize(R.dimen.home_refresh_text_gap);
-        View hintParent=(View)pill().getParent();
-        Rect parent=new Rect(); assertTrue(hintParent.getGlobalVisibleRect(parent));
-        int[] rootOrigin=new int[2]; hintParent.getRootView().getLocationInWindow(rootOrigin); parent.offset(rootOrigin[0],rootOrigin[1]);
-        assertEquals("No inset, TOP_SLOT or capture margin may be stacked below actual glass",Math.max(Math.max(topInset,parent.top),obstruction.bottom)+gap,hint.top);
-        androidx.recyclerview.widget.RecyclerView rows=timeline.getView().findViewById(R.id.list);
-        Rect rowBounds=bounds(rows);
-        assertEquals("Only the painted text height and two necessary gaps separate the first post",Math.max(0,hint.bottom+gap-rowBounds.top),rows.getPaddingTop());
+    private Rect assertTightClearance(int topInset, Rect obstruction, boolean checkHeader){
+        ImageView indicator=circle();
+        assertEquals("Measure the actual native circle after its scale-in",1f,indicator.getScaleY(),0.001f);
+        assertTrue("The native circle must be running",((CircularProgressDrawable)indicator.getDrawable()).isRunning());
+        Rect visible=assertSafe(topInset,obstruction);
+        SwipeRefreshLayout wrapper=refresh();
+        int clearanceTop=Math.max(topInset,visibleViewportInWindow(wrapper).top);
+        if(obstruction!=null) clearanceTop=Math.max(clearanceTop,obstruction.bottom);
+        int nativeOffset=wrapper.getProgressViewStartOffset()+wrapper.getProgressViewEndOffset();
+        assertEquals("Use the native resting offset below the real viewport, not a second toolbar slot",clearanceTop+nativeOffset,visible.top);
+        int gap=activity.getResources().getDimensionPixelSize(R.dimen.home_toolbar_content_gap);
+        int padding=obstruction!=null && home.hasVisibleLiquidToolbar() ? Math.max(0,clearanceTop+gap-bounds(rows()).top) : 0;
+        assertEquals("Only liquid glass, never the refresh circle, adds list clearance",padding,rows().getPaddingTop());
         if(checkHeader){
-            assertTrue("Cached first post is actually attached",rows.getChildCount()>0);
-            View first=((androidx.recyclerview.widget.LinearLayoutManager)rows.getLayoutManager()).findViewByPosition(0);
-            assertNotNull(first);
-            assertTrue("Refresh text cannot paint over the author's header",bounds(first).top>=hint.bottom+gap);
+            View first=((LinearLayoutManager)rows().getLayoutManager()).findViewByPosition(0);
+            assertNotNull("Cached first post is actually attached",first);
+            assertTrue("The first post doesn't reserve the height of the circle",bounds(first).top<visible.bottom);
         }
-        assertEquals("Geometry must not refresh data",1,HomeTimelineHistoryTest.OfflineRequests.sent.stream().filter(GetAllTimeline.class::isInstance).count());
-    }
-
-    private static boolean hasVisibleEditText(View view){
-        if(view instanceof android.widget.EditText text) return text.isShown() && text.getWidth()>0 && text.getHeight()>0;
-        if(view instanceof ViewGroup group) for(int i=0;i<group.getChildCount();i++) if(hasVisibleEditText(group.getChildAt(i))) return true;
-        return false;
-    }
-
-    private static void tap(View host,float x,float y){
-        long now=android.os.SystemClock.uptimeMillis();
-        android.view.MotionEvent down=android.view.MotionEvent.obtain(now,now,android.view.MotionEvent.ACTION_DOWN,x,y,0);
-        android.view.MotionEvent up=android.view.MotionEvent.obtain(now,now+90,android.view.MotionEvent.ACTION_UP,x,y,0);
-        try{ assertTrue(host.dispatchTouchEvent(down)); host.dispatchTouchEvent(up); }
-        finally{ down.recycle(); up.recycle(); }
+        return visible;
     }
 
     private void capture(String name) throws Exception{

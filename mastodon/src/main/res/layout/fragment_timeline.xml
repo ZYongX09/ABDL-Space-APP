@@ -2,7 +2,8 @@
 <me.grishka.appkit.views.RecursiveSwipeRefreshLayout xmlns:android="http://schemas.android.com/apk/res/android"
 	android:id="@+id/refresh_layout"
 	android:layout_width="match_parent"
-	android:layout_height="match_parent">
+	android:layout_height="match_parent"
+	android:saveEnabled="false">
 
 	<FrameLayout
 		android:id="@+id/content_wrap"
@@ -45,27 +46,6 @@
 				android:layout_gravity="bottom"
 				android:layout="@layout/donation_banner"/>
 		</FrameLayout>
-
-		<TextView
-			android:id="@+id/home_timeline_refreshing"
-			android:layout_width="wrap_content"
-			android:layout_height="wrap_content"
-			android:layout_gravity="center_horizontal|top"
-				android:layout_marginHorizontal="@dimen/home_refresh_text_side"
-
-			android:paddingHorizontal="12dp"
-			android:paddingVertical="6dp"
-			android:background="@drawable/round_rect"
-			android:backgroundTint="?colorM3Primary"
-			android:textColor="?colorM3OnPrimary"
-			android:textSize="12sp"
-			android:gravity="center"
-			android:clickable="false"
-			android:focusable="false"
-			android:accessibilityLiveRegion="polite"
-			android:elevation="6dp"
-			android:visibility="gone"
-			android:text="@string/home_timeline_refreshing"/>
 
 		<org.joinmastodon.android.ui.views.NewPostsButtonContainer
 			android:id="@+id/new_posts_btn_wrap"

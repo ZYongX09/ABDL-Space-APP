@@ -35,12 +35,20 @@ ABDL Space Android 客户端与网页端共用账户和社区数据，在 Mastod
 
 | 范围 | 当前源码能力 |
 | --- | --- |
-| 社区与纸尿裤评价 | 时间线、发帖与回复、转发、点赞、搜索、图片与视频附件、NSFW 标记，以及纸尿裤评分、榜单、百科和品牌筛选 |
+| 社区与纸尿裤评价 | 时间线、发帖与回复、引用、点赞、收藏、分享、搜索、图片与视频附件、NSFW 标记，以及纸尿裤评分、榜单、百科和品牌筛选 |
 | 账户与沟通 | 邮箱/密码及验证码登录、QQ 登录接入、NewBabyWorld 绑定、私信与通知、极光推送；第三方登录需匹配各平台的应用配置 |
 | 相册 | 宝宝相册列表、详情、上传和浏览、相册发帖入口、邀请链接、权限与保护设置、举报及容量/原图额度处理；属于独立业务流程，不等同于普通发帖附件 |
 | 小说 | 本地导入与阅读、私有云书库与同步、公共书城和创作编辑；分别依赖阅读模块、编辑模块及小说业务 API |
 | 安全与界面 | TensorFlow Lite 本地 NSFW 识别、举报、宝宝认证、PIN/生物识别应用锁；传统 View 页面与 Compose/miuix 页面并存，包含液态玻璃导航与兼容性处理 |
 | 应用更新 | Release 更新实现读取后端 `/api/v1/version`，提示下载并通过系统安装流程更新；生成 APK 不会自动更新该接口或官网下载页 |
+
+### 开发线（未发布）
+
+- **首页导航与刷新**：关闭液态玻璃导航时，首页工具栏下方显示可横向滑动的时间线标签，右侧固定 `+` 直达时间线编辑。两种首页模式均使用相对屏幕居中的 35dp 品牌标记；首页工具栏和「更多」菜单中的搜索入口已移除，其他页面的搜索不受影响。下拉刷新使用 Android 原生圆形指示器，刷新时保留已有内容，自动刷新尽量保留阅读位置。
+- **开屏与首屏加载**：普通冷启动到首页保留 3 秒品牌动画，由系统开屏与主窗口衔接，不等待网络结果。首页网络加载与本地快照读取并行；仅在满足账号和内容访问条件时使用最近 24 小时内符合条件的公开或不列出内容快照，并在新结果返回后更新。登录、激活和应用锁不受首页开屏计时限制。
+- **帖子操作**：帖子卡片与详情保留点赞、评论、收藏和系统分享，不再显示内联转帖按钮；引用仍可在符合权限的帖子「更多」菜单中使用。这不改变历史转帖或相册业务流程。
+- **宝宝认证**：调整全屏引导、拍摄与预览、分步上传、审核状态和证书展示。页面随应用明暗模式使用对应的固定配色，保留旧版证书版式；新版申请可不填 QQ 号。实际提交、审核和证书签发仍依赖配套后端。
+- **构建链**：升级到 Gradle 9.7.0、AGP 9.3.1、Kotlin/Compose 编译器 2.4.21 和 compile SDK 37.1，构建使用 JDK 21。保留原有界面和 Material 3 1.4.0，不引入 Expressive；min SDK、target SDK 和 JVM 目标不变。详见[构建链迁移记录](docs/android-toolchain-only.md)。
 
 ### 开发线新增人机验证（未正式发布）
 
@@ -74,8 +82,8 @@ ABDL Space Android 客户端与网页端共用账户和社区数据，在 Mastod
 | 项目 | 当前配置 |
 | --- | --- |
 | 语言与 UI | Java + Kotlin；Android View/XML、Fragment 与 Jetpack Compose、Material 3、miuix 混合使用 |
-| Android | `minSdk 26`（Android 8.0+）、`targetSdk 35`、`compileSdk 37`；应用 ID 为 `top.abdl_space.app`，源码 namespace 为 `org.joinmastodon.android` |
-| 构建工具 | Gradle Wrapper **8.11.1**、Android Gradle Plugin **8.9.1**、Kotlin/Compose 编译器插件 **2.4.10** |
+| Android | `minSdk 26`（Android 8.0+）、`targetSdk 35`、`compileSdk 37.1`；应用 ID 为 `top.abdl_space.app`，源码 namespace 为 `org.joinmastodon.android` |
+| 构建工具 | Gradle Wrapper **9.7.0**、Android Gradle Plugin **9.3.1**、Kotlin/Compose 编译器插件 **2.4.21** |
 | Java | 构建环境采用 **JDK 21**；Java 源码/目标兼容级别与 Kotlin JVM target 均为 **17**，不要混淆二者 |
 | 网络与数据 | OkHttp、Gson、Room、WorkManager、Kotlin Coroutines |
 | SDK | 百度地图、高德地图、QQ Open SDK、极光推送、TensorFlow Lite |
@@ -88,12 +96,12 @@ ABDL Space Android 客户端与网页端共用账户和社区数据，在 Mastod
 - [`novel-editor-core`](novel-editor-core/)：小说导入解析与编辑核心。
 - [`jiguang-sdk:jiguang_sdk:jiguang`](jiguang-sdk/jiguang_sdk/jiguang/)：本地极光 SDK 包装模块；其 `compileSdkVersion` 为 **30**，不代表应用最低版本为 API 21。
 
-Gradle 参数及插件版本分别见 [gradle.properties](gradle.properties)、[Wrapper 配置](gradle/wrapper/gradle-wrapper.properties)和[根构建脚本](build.gradle)。仓库当前启用了 compile SDK 检查相关兼容设置；不要将其视为 AGP 对 API 37 的官方兼容保证，升级 SDK 或插件时应成组验证。
+Gradle 参数及插件版本分别见 [gradle.properties](gradle.properties)、[Wrapper 配置](gradle/wrapper/gradle-wrapper.properties)和[根构建脚本](build.gradle)。此构建链使用 AGP 内置 Kotlin，保留 compile SDK 与 AAR 兼容性检查。构建链与 Compose 运行时分开升级。
 
 ## Android 开发环境
 
 1. 安装 Android Studio 或 Android SDK 命令行工具，以及 JDK 21。
-2. 安装 SDK Platform **37**（应用和阅读/编辑模块）与 **30**（极光模块）、Platform Tools 和 AGP 所需 Build Tools，并接受 SDK 许可。使用仓库自带 `gradlew`，无需另装系统 Gradle。
+2. 安装 SDK Platform **37.1**（应用和阅读/编辑模块）与 **30**（极光模块）、Platform Tools 和 AGP 所需 Build Tools，并接受 SDK 许可。使用仓库自带 `gradlew`，无需另装系统 Gradle。
 3. 确保可访问 Google Maven、Maven Central 和 Gradle 分发服务。地图/QQ JAR、极光依赖及地图原生库也需要完整检出，不能只复制 Java/Kotlin 源码目录。
 
 ```bash
@@ -106,7 +114,7 @@ export ANDROID_HOME="/absolute/path/to/Android/Sdk"
 export PATH="$JAVA_HOME/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
 
 sdkmanager --licenses
-sdkmanager "platform-tools" "platforms;android-37" "platforms;android-30"
+sdkmanager "platform-tools" "platforms;android-37.1" "platforms;android-30" "build-tools;36.0.0"
 ./gradlew -Dorg.gradle.java.home="$JAVA_HOME" --version
 ```
 
@@ -209,6 +217,8 @@ AAB 输出目录为 `mastodon/build/outputs/bundle/release/`。这两种打包�
 
 本地测试包含 Robolectric、MockWebServer 和 Compose 测试。Lint 当前配置为 `abortOnError false`，因此退出成功不代表没有问题，应检查生成的报告。
 
+上述未发布开发线的签名测试包已核对签名、版本、SDK、35dp 资源与 16 KiB 对齐；宝宝认证流程、开屏、阅读器设置与模块、首页时间线标签共 24 项定向单元测试分两批通过。未执行全量回归，该测试包也未完成真机验收。
+
 设备测试使用 `screenshotsUiTest`，不是默认的 Debug 测试变体。连接测试设备或启动模拟器后可执行：
 
 ```bash
@@ -229,7 +239,7 @@ AAB 输出目录为 `mastodon/build/outputs/bundle/release/`。这两种打包�
 **上述 Actions 文件已在源码中标为弃用，不能直接当作可用的发版通道。** 恢复使用前至少需要核对：
 
 1. 地图密钥、签名文件/密码和 Google Play 服务账号是否通过 CI 密钥系统正确提供；缺少地图密钥时工作流会提前失败。现有工作流仅在前置检查步骤设置地图变量，后续 Gradle/Fastlane 构建步骤也必须能获取它们。
-2. CI 的 SDK Platform 37/30、Build Tools 和 Gradle JDK 配置是否满足当前源码要求；设置 JDK action 并不能自动消除项目中固定 JDK 路径的影响。
+2. CI 的 SDK Platform 37.1/30、Build Tools 和 Gradle JDK 配置是否满足当前源码要求；设置 JDK action 并不能自动消除项目中固定 JDK 路径的影响。
 3. [fastlane/Appfile](fastlane/Appfile)仍使用上游包名 `org.joinmastodon.android`，与本应用的 `top.abdl_space.app` 不一致；需先核对目标 Play 应用及上传配置。
 4. CI 使用 [mastodon/ci_signing.gradle](mastodon/ci_signing.gradle)中的 `KEYSTORE_FILE` / `KEYSTORE_PASSWORD` 配置，不等同于本地的 `SIGNING_*`；要确认所用别名与既有正式证书一致。
 

@@ -52,19 +52,59 @@ public class ContentAccessCoordinatorTest{
 		HomeTimelineSnapshotCacheTest.field(AccountSession.class,"contentAccessCoordinator").set(session,coordinator);
 	}
 	@After public void cleanup() throws Exception{
-		HomeTimelineSnapshotCacheTest.drain(); session.deactivateNBW(); session.getCacheController().closeDatabase(); MastodonApp.context.deleteDatabase(session.getID()+".db");
+		// Deactivation can enqueue a cache purge; let it finish before closing SQLite.
+		session.deactivateNBW();
+		HomeTimelineSnapshotCacheTest.drain(); session.getCacheController().closeDatabase(); MastodonApp.context.deleteDatabase(session.getID()+".db");
 		if(previous==null) sessions.remove(session.getID()); else sessions.put(session.getID(),previous);
 		HomeTimelineSnapshotCacheTest.field(AccountSessionManager.class,"lastActiveAccountID").set(AccountSessionManager.getInstance(),previousActive); endpoints.close();
 	}
 	public static ContentAccess access(ContentAccess.State state){ ContentAccess access=new ContentAccess(); access.schemaVersion=1; access.state=state; access.actionPath=ContentAccess.ACTION_PATH; access.message="Generic server policy"; return access; }
 	private void open(){ coordinator.refresh(); probes.get(probes.size()-1).success(access(ContentAccess.State.OPEN)); assertTrue(coordinator.isOpen()); }
 
-	@Test public void unknownFailureAndRevalidationNeverAllowOfflineHistory() throws Exception{
-		assertFalse(coordinator.isOpen()); assertNull(session.getCacheController().beginHomeTimelineSnapshot());
+	@Test public void unknownFailureAndRevalidationDoNotOpenStrictCacheReads(){
+		assertFalse(ContentAccessCoordinator.canRead(session.getID()));
+		assertNotNull(session.getCacheController().beginHomeTimelineSnapshot()); // Bounded public/unlisted exception only.
 		coordinator.refresh(); assertTrue(coordinator.getSnapshot().loading); probes.get(0).failure();
-		assertEquals(ContentAccess.State.UNAVAILABLE,coordinator.getSnapshot().state); assertFalse(coordinator.isOpen());
+		assertEquals(ContentAccess.State.UNAVAILABLE,coordinator.getSnapshot().state); assertFalse(ContentAccessCoordinator.canRead(session.getID()));
 		open(); var old=coordinator.capture(); coordinator.refresh(); assertFalse(coordinator.isOpen()); assertFalse(old.canRead());
 		probes.get(probes.size()-1).failure(); assertFalse(coordinator.isOpen());
+	}
+	@Test public void foregroundHintsSharePendingAndFreshProbesButForcedRefreshStillSupersedes(){
+		coordinator.refreshIfStale(60_000);
+		long generation=coordinator.getSnapshot().generation;
+		coordinator.refreshIfStale(60_000);
+		assertEquals(1,probes.size()); assertTrue(canceled.isEmpty()); assertEquals(generation,coordinator.getSnapshot().generation);
+		probes.get(0).success(access(ContentAccess.State.OPEN));
+		coordinator.refreshIfStale(60_000);
+		assertTrue(coordinator.isOpen()); assertEquals(1,probes.size());
+		coordinator.refreshIfStale(0); // Definitely stale.
+		coordinator.refresh(); // Explicit refresh/network switch never joins.
+		assertEquals(3,probes.size()); assertEquals(List.of(1),canceled);
+		probes.get(1).success(access(ContentAccess.State.OPEN)); assertFalse(coordinator.isOpen());
+		probes.get(2).success(access(ContentAccess.State.OPEN)); assertTrue(coordinator.isOpen());
+	}
+	@Test public void foregroundHintNeverJoinsAnotherCredentialOrReusesItsFreshAllow(){
+		coordinator.refreshIfStale(60_000);
+		Token sameValue=new Token(); sameValue.accessToken=session.token.accessToken; session.token=sameValue;
+		coordinator.refreshIfStale(60_000);
+		assertEquals(2,probes.size()); assertEquals(List.of(0),canceled);
+		probes.get(0).success(access(ContentAccess.State.OPEN)); assertFalse(coordinator.isOpen());
+		probes.get(1).success(access(ContentAccess.State.OPEN)); assertTrue(coordinator.isOpen());
+		session.token.accessToken="new-credential";
+		coordinator.refreshIfStale(60_000);
+		assertEquals(3,probes.size()); assertFalse(coordinator.isOpen());
+	}
+	@Test public void queuedWarmDeliveryRetiredOnRequiredEvenAfterFreshOpen() throws Exception{
+		CacheController cache=session.getCacheController();
+		cache.putHomeTimelineSnapshot(cache.beginHomeTimelineSnapshot(),List.of(HomeTimelineSnapshotCacheTest.post("p_warm")),null);
+		HomeTimelineSnapshotCacheTest.drain();
+		cache.warmHomeTimelineSnapshot(); HomeTimelineSnapshotCacheTest.drain();
+		var received=new ArrayList<org.joinmastodon.android.api.cache.HomeTimelineSnapshot>();
+		cache.getHomeTimelineSnapshot(cache.beginHomeTimelineSnapshot(),received::add);
+		coordinator.capture().receiveHeader("v1:baby_verification_required");
+		assertNull(cache.beginHomeTimelineSnapshot()); open();
+		HomeTimelineSnapshotCacheTest.drain();
+		assertEquals(1,received.size()); assertNull(received.get(0));
 	}
 	@Test public void onlyNewestSerialGetOpensAndLateAllowCannotClearRequired(){
 		coordinator.refresh(); var oldProbe=probes.get(0); coordinator.refresh(); assertTrue(canceled.contains(0));
@@ -106,8 +146,8 @@ public class ContentAccessCoordinatorTest{
 		cache.putHomeTimelineSnapshot(lease,List.of(HomeTimelineSnapshotCacheTest.post("p_visible")),"old-cursor"); HomeTimelineSnapshotCacheTest.drain();
 		CountDownLatch entered=new CountDownLatch(1), release=new CountDownLatch(1);
 		CacheController.databaseThread.postRunnable(()->{ entered.countDown(); try{ release.await(); }catch(InterruptedException error){ Thread.currentThread().interrupt(); } },0);
-		assertTrue(entered.await(5,TimeUnit.SECONDS));
 		try{
+			assertTrue("Database worker must reach the barrier",entered.await(5,TimeUnit.SECONDS));
 			cache.putHomeTimelineSnapshot(lease,List.of(HomeTimelineSnapshotCacheTest.post("p_late")),null);
 			coordinator.capture().receiveHeader("v1:baby_verification_required"); assertFalse(cache.isHomeTimelineLeaseCurrent(lease)); assertNull(cache.beginHomeTimelineSnapshot());
 			cache.putHomeTimelineSnapshot(lease,List.of(HomeTimelineSnapshotCacheTest.post("p_resurrect")),null);

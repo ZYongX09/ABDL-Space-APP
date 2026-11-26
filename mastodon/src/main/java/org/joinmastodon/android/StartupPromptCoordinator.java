@@ -49,7 +49,7 @@ public final class StartupPromptCoordinator{
 	public void start(){
 		if(session==null || !session.activated) return;
 		if(org.joinmastodon.android.api.session.ContentAccessCoordinator.applies(session)) accessSubscription=session.getContentAccessCoordinator().observe(snapshot->{
-			if(!snapshot.isOpen()){
+			if(snapshot.withholdsContent()){
 				if(badgeCall!=null) badgeCall.cancel();
 				if(badgeSheet!=null){ badgeSheet.setOnDismissListener(null); badgeSheet.dismiss(); badgeSheet=null; showing=false; }
 				if(verificationRequest!=null) verificationRequest.cancel();

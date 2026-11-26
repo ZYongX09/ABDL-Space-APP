@@ -3,235 +3,197 @@
 	android:id="@+id/verification_requirements_page"
 	android:layout_width="match_parent"
 	android:layout_height="match_parent"
-	android:background="@color/vr_page"
+	android:background="?attr/vrPage"
 	android:orientation="vertical"
-	android:paddingStart="20dp"
-	android:paddingTop="8dp"
-	android:paddingEnd="20dp"
-	android:paddingBottom="20dp"
 	android:visibility="gone">
 
 	<FrameLayout
 		android:layout_width="match_parent"
-		android:layout_height="36dp">
+		android:layout_height="46dp"
+		android:paddingStart="12dp"
+		android:paddingEnd="12dp">
 
 		<ImageButton
 			android:id="@+id/verification_back_requirements"
 			android:layout_width="36dp"
 			android:layout_height="36dp"
-			android:layout_gravity="start|center_vertical"
+			android:layout_gravity="start|top"
+			android:layout_marginTop="5dp"
 			android:background="@android:color/transparent"
 			android:contentDescription="@string/back"
 			android:padding="8dp"
 			android:src="@drawable/ic_fluent_arrow_left_24_regular"
-			android:tint="@color/vr_text_primary"/>
+			android:tint="?attr/vrTextPrimary"/>
 
 		<TextView
+			android:id="@+id/verification_locale_pill_requirements"
 			android:layout_width="wrap_content"
 			android:layout_height="wrap_content"
-			android:layout_gravity="end|center_vertical"
+			android:layout_gravity="end|top"
+			android:layout_marginTop="12dp"
 			android:background="@drawable/vr_bg_pill"
 			android:drawableStart="@drawable/ic_vr_globe_20"
-			android:drawablePadding="6dp"
+			android:drawablePadding="5dp"
 			android:gravity="center"
-			android:minWidth="64dp"
-			android:paddingStart="12dp"
-			android:paddingTop="5dp"
-			android:paddingEnd="12dp"
-			android:paddingBottom="5dp"
+			android:minWidth="48dp"
+			android:paddingStart="9dp"
+			android:paddingTop="6dp"
+			android:paddingEnd="7dp"
+			android:paddingBottom="6dp"
 			android:text="ZH"
-			android:textColor="@color/vr_text_primary"
-			android:textSize="12sp"/>
+			android:textColor="?attr/vrTextPrimary"
+			android:textSize="11sp"/>
 	</FrameLayout>
 
 	<LinearLayout
 		android:layout_width="match_parent"
-		android:layout_height="wrap_content"
-		android:layout_marginTop="8dp"
-		android:background="@drawable/vr_bg_info"
-		android:gravity="center_vertical"
-		android:orientation="horizontal"
-		android:paddingStart="14dp"
-		android:paddingTop="11dp"
-		android:paddingEnd="14dp"
-		android:paddingBottom="11dp">
-
-		<ImageView
-			android:layout_width="16dp"
-			android:layout_height="16dp"
-			android:importantForAccessibility="no"
-			android:src="@drawable/ic_fluent_clock_24_regular"
-			android:tint="@color/vr_primary"/>
-
-		<TextView
-			android:layout_width="0dp"
-			android:layout_height="wrap_content"
-			android:layout_marginStart="8dp"
-			android:layout_weight="1"
-			android:text="@string/vr_req_remaining"
-			android:textAppearance="@style/TextAppearance.Mastodon.Verification2.Section"/>
-
-		<TextView
-			android:id="@+id/vr_req_countdown"
-			android:layout_width="wrap_content"
-			android:layout_height="wrap_content"
-			android:text="--:--"
-			android:textAppearance="@style/TextAppearance.Mastodon.Verification2.Body"
-			android:textStyle="bold"/>
-	</LinearLayout>
-
-	<TextView
-		android:layout_width="match_parent"
-		android:layout_height="wrap_content"
-		android:layout_marginTop="16dp"
-		android:text="@string/vr_req_title"
-		android:textAppearance="@style/TextAppearance.Mastodon.Verification2.Title"/>
-
-	<TextView
-		android:layout_width="match_parent"
-		android:layout_height="wrap_content"
-		android:layout_marginTop="8dp"
-		android:text="@string/vr_req_subtitle"
-		android:textAppearance="@style/TextAppearance.Mastodon.Verification2.Subtitle"/>
-
-	<LinearLayout
-		android:layout_width="match_parent"
-		android:layout_height="wrap_content"
-		android:layout_marginTop="16dp"
-		android:background="@drawable/vr_bg_info"
+		android:layout_height="0dp"
+		android:layout_weight="1"
 		android:orientation="vertical"
-		android:paddingStart="16dp"
+		android:paddingStart="17dp"
 		android:paddingTop="14dp"
-		android:paddingEnd="16dp"
-		android:paddingBottom="16dp">
-
-		<TextView
-			android:layout_width="match_parent"
-			android:layout_height="wrap_content"
-			android:text="@string/vr_req_section_wear"
-			android:textAppearance="@style/TextAppearance.Mastodon.Verification2.Section"/>
+		android:paddingEnd="17dp">
 
 		<LinearLayout
 			android:layout_width="match_parent"
 			android:layout_height="wrap_content"
-			android:layout_marginTop="10dp"
-			android:orientation="horizontal">
+			android:background="@drawable/vr_bg_info"
+			android:gravity="center_vertical"
+			android:orientation="horizontal"
+			android:paddingStart="12dp"
+			android:paddingTop="9dp"
+			android:paddingEnd="12dp"
+			android:paddingBottom="9dp">
 
-			<TextView
-				android:layout_width="20dp"
-				android:layout_height="20dp"
-				android:background="@drawable/vr_bg_step"
-				android:gravity="center"
-				android:includeFontPadding="false"
-				android:text="1"
-				android:textColor="@color/vr_step_text"
-				android:textSize="9sp"
-				android:textStyle="bold"/>
+			<ImageView
+				android:layout_width="13dp"
+				android:layout_height="13dp"
+				android:importantForAccessibility="no"
+				android:src="@drawable/ic_fluent_clock_24_regular"
+				android:tint="?attr/vrPrimary"/>
 
 			<TextView
 				android:layout_width="0dp"
 				android:layout_height="wrap_content"
-				android:layout_marginStart="10dp"
+				android:layout_marginStart="7dp"
 				android:layout_weight="1"
-				android:text="@string/vr_req_step1"
-				android:textAppearance="@style/TextAppearance.Mastodon.Verification2.Body"/>
-		</LinearLayout>
-
-		<View
-			android:layout_width="match_parent"
-			android:layout_height="1dp"
-			android:layout_marginTop="12dp"
-			android:layout_marginBottom="12dp"
-			android:background="@color/vr_border"/>
-
-		<TextView
-			android:layout_width="match_parent"
-			android:layout_height="wrap_content"
-			android:text="@string/vr_req_section_paper"
-			android:textAppearance="@style/TextAppearance.Mastodon.Verification2.Section"/>
-
-		<LinearLayout
-			android:layout_width="match_parent"
-			android:layout_height="wrap_content"
-			android:layout_marginTop="10dp"
-			android:orientation="horizontal">
+				android:text="@string/vr_req_remaining"
+				android:textColor="?attr/vrTextSecondary"
+				android:textSize="11.5sp"
+				android:fontFamily="sans-serif-medium"/>
 
 			<TextView
-				android:layout_width="20dp"
-				android:layout_height="20dp"
-				android:background="@drawable/vr_bg_step"
-				android:gravity="center"
-				android:includeFontPadding="false"
-				android:text="2"
-				android:textColor="@color/vr_step_text"
-				android:textSize="9sp"
-				android:textStyle="bold"/>
-
-			<TextView
-				android:id="@+id/vr_req_step2"
-				android:layout_width="0dp"
+				android:id="@+id/vr_req_countdown"
+				android:layout_width="wrap_content"
 				android:layout_height="wrap_content"
-				android:layout_marginStart="10dp"
-				android:layout_weight="1"
-				android:textAppearance="@style/TextAppearance.Mastodon.Verification2.Body"/>
+				android:text="--:--"
+				android:textColor="?attr/vrTextPrimary"
+				android:textSize="14sp"
+				android:fontFamily="sans-serif-medium"/>
 		</LinearLayout>
 
 		<LinearLayout
 			android:layout_width="match_parent"
 			android:layout_height="wrap_content"
-			android:layout_marginTop="10dp"
-			android:orientation="horizontal">
+			android:layout_marginTop="13dp"
+			android:orientation="vertical">
 
 			<TextView
-				android:layout_width="20dp"
-				android:layout_height="20dp"
-				android:background="@drawable/vr_bg_step"
-				android:gravity="center"
-				android:includeFontPadding="false"
-				android:text="3"
-				android:textColor="@color/vr_step_text"
-				android:textSize="9sp"
-				android:textStyle="bold"/>
-
-			<TextView
-				android:layout_width="0dp"
+				android:layout_width="match_parent"
 				android:layout_height="wrap_content"
-				android:layout_marginStart="10dp"
-				android:layout_weight="1"
-				android:text="@string/vr_req_step3"
-				android:textAppearance="@style/TextAppearance.Mastodon.Verification2.Body"/>
+				android:text="@string/vr_req_title"
+				android:textAppearance="@style/TextAppearance.Mastodon.Verification2.Title"/>
+
+			<TextView
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:layout_marginTop="7dp"
+				android:text="@string/vr_req_subtitle"
+				android:textAppearance="@style/TextAppearance.Mastodon.Verification2.Subtitle"/>
 		</LinearLayout>
 
 		<LinearLayout
 			android:layout_width="match_parent"
 			android:layout_height="wrap_content"
-			android:layout_marginTop="10dp"
-			android:layout_marginStart="30dp"
-			android:background="@drawable/vr_bg_card"
+			android:layout_marginTop="13dp"
+			android:background="@drawable/vr_bg_info_large"
 			android:orientation="vertical"
 			android:paddingStart="14dp"
-			android:paddingTop="10dp"
+			android:paddingTop="12dp"
 			android:paddingEnd="14dp"
-			android:paddingBottom="10dp">
+			android:paddingBottom="12dp">
+
+			<TextView
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:text="@string/vr_req_section_wear"
+				android:textAppearance="@style/TextAppearance.Mastodon.Verification2.Section"/>
 
 			<LinearLayout
 				android:layout_width="match_parent"
 				android:layout_height="wrap_content"
+				android:layout_marginTop="8dp"
+				android:gravity="center_vertical"
 				android:orientation="horizontal">
 
 				<TextView
-					android:layout_width="76dp"
-					android:layout_height="wrap_content"
-					android:text="@string/vr_req_user_id"
-					android:textAppearance="@style/TextAppearance.Mastodon.Verification2.Caption"/>
+					android:layout_width="17dp"
+					android:layout_height="17dp"
+					android:background="@drawable/vr_bg_step"
+					android:gravity="center"
+					android:includeFontPadding="false"
+					android:text="1"
+					android:textColor="?attr/vrStepText"
+					android:textSize="9.5sp"
+					android:textStyle="bold"/>
 
 				<TextView
-					android:id="@+id/vr_req_user_value"
 					android:layout_width="0dp"
 					android:layout_height="wrap_content"
+					android:layout_marginStart="9dp"
 					android:layout_weight="1"
-					android:textAppearance="@style/TextAppearance.Mastodon.Verification2.Body"
+					android:text="@string/vr_req_step1"
+					android:textAppearance="@style/TextAppearance.Mastodon.Verification2.Body"/>
+			</LinearLayout>
+
+			<View
+				android:layout_width="match_parent"
+				android:layout_height="1dp"
+				android:layout_marginTop="10dp"
+				android:layout_marginBottom="10dp"
+				android:background="?attr/vrInfoDivider"/>
+
+			<TextView
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:text="@string/vr_req_section_paper"
+				android:textAppearance="@style/TextAppearance.Mastodon.Verification2.Section"/>
+
+			<LinearLayout
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:layout_marginTop="8dp"
+				android:gravity="center_vertical"
+				android:orientation="horizontal">
+
+				<TextView
+					android:layout_width="17dp"
+					android:layout_height="17dp"
+					android:background="@drawable/vr_bg_step"
+					android:gravity="center"
+					android:includeFontPadding="false"
+					android:text="2"
+					android:textColor="?attr/vrStepText"
+					android:textSize="9.5sp"
 					android:textStyle="bold"/>
+
+				<TextView
+					android:id="@+id/vr_req_step2"
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					android:layout_marginStart="9dp"
+					android:layout_weight="1"
+					android:textAppearance="@style/TextAppearance.Mastodon.Verification2.Body"/>
 			</LinearLayout>
 
 			<LinearLayout
@@ -241,99 +203,183 @@
 				android:orientation="horizontal">
 
 				<TextView
-					android:layout_width="76dp"
-					android:layout_height="wrap_content"
-					android:text="@string/vr_req_random_text"
-					android:textAppearance="@style/TextAppearance.Mastodon.Verification2.Caption"/>
+					android:layout_width="17dp"
+					android:layout_height="17dp"
+					android:background="@drawable/vr_bg_step"
+					android:gravity="center"
+					android:includeFontPadding="false"
+					android:text="3"
+					android:textColor="?attr/vrStepText"
+					android:textSize="9.5sp"
+					android:textStyle="bold"/>
 
-				<TextView
-					android:id="@+id/vr_req_text_value"
+				<LinearLayout
 					android:layout_width="0dp"
 					android:layout_height="wrap_content"
+					android:layout_marginStart="9dp"
 					android:layout_weight="1"
-					android:textAppearance="@style/TextAppearance.Mastodon.Verification2.Body"
+					android:orientation="vertical">
+
+					<TextView
+						android:layout_width="match_parent"
+						android:layout_height="wrap_content"
+						android:text="@string/vr_req_step3"
+						android:textAppearance="@style/TextAppearance.Mastodon.Verification2.Body"/>
+
+					<LinearLayout
+						android:layout_width="match_parent"
+						android:layout_height="wrap_content"
+						android:layout_marginTop="8dp"
+						android:background="@drawable/vr_bg_field"
+						android:orientation="vertical"
+						android:paddingStart="12dp"
+						android:paddingTop="10dp"
+						android:paddingEnd="12dp"
+						android:paddingBottom="10dp">
+
+						<LinearLayout
+							android:layout_width="match_parent"
+							android:layout_height="wrap_content"
+							android:gravity="center_vertical"
+							android:orientation="horizontal">
+
+							<TextView
+								android:layout_width="60dp"
+								android:layout_height="wrap_content"
+								android:text="@string/vr_req_user_id"
+								android:textColor="?attr/vrTextSecondary"
+								android:textSize="11sp"/>
+
+							<TextView
+								android:id="@+id/vr_req_user_value"
+								android:layout_width="0dp"
+								android:layout_height="wrap_content"
+								android:layout_marginStart="8dp"
+								android:layout_weight="1"
+								android:textColor="?attr/vrTextPrimary"
+								android:textSize="11.5sp"
+								android:fontFamily="sans-serif-medium"/>
+						</LinearLayout>
+
+						<LinearLayout
+							android:layout_width="match_parent"
+							android:layout_height="wrap_content"
+							android:layout_marginTop="6dp"
+							android:gravity="center_vertical"
+							android:orientation="horizontal">
+
+							<TextView
+								android:layout_width="60dp"
+								android:layout_height="wrap_content"
+								android:text="@string/vr_req_random_text"
+								android:textColor="?attr/vrTextSecondary"
+								android:textSize="11sp"/>
+
+							<TextView
+								android:id="@+id/vr_req_text_value"
+								android:layout_width="0dp"
+								android:layout_height="wrap_content"
+								android:layout_marginStart="8dp"
+								android:layout_weight="1"
+								android:textColor="?attr/vrTextPrimary"
+								android:textSize="11.5sp"
+								android:fontFamily="sans-serif-medium"/>
+						</LinearLayout>
+					</LinearLayout>
+				</LinearLayout>
+			</LinearLayout>
+
+			<View
+				android:layout_width="match_parent"
+				android:layout_height="1dp"
+				android:layout_marginTop="10dp"
+				android:layout_marginBottom="10dp"
+				android:background="?attr/vrInfoDivider"/>
+
+			<TextView
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:text="@string/vr_req_section_place"
+				android:textAppearance="@style/TextAppearance.Mastodon.Verification2.Section"/>
+
+			<LinearLayout
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:layout_marginTop="8dp"
+				android:orientation="horizontal">
+
+				<TextView
+					android:layout_width="17dp"
+					android:layout_height="17dp"
+					android:background="@drawable/vr_bg_step"
+					android:gravity="center"
+					android:includeFontPadding="false"
+					android:text="4"
+					android:textColor="?attr/vrStepText"
+					android:textSize="9.5sp"
 					android:textStyle="bold"/>
+
+				<TextView
+					android:id="@+id/vr_req_step4"
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					android:layout_marginStart="9dp"
+					android:layout_weight="1"
+					android:textAppearance="@style/TextAppearance.Mastodon.Verification2.Body"/>
 			</LinearLayout>
 		</LinearLayout>
-
-		<View
-			android:layout_width="match_parent"
-			android:layout_height="1dp"
-			android:layout_marginTop="12dp"
-			android:layout_marginBottom="12dp"
-			android:background="@color/vr_border"/>
 
 		<TextView
 			android:layout_width="match_parent"
 			android:layout_height="wrap_content"
-			android:text="@string/vr_req_section_place"
+			android:layout_marginTop="13dp"
+			android:text="@string/vr_req_tips_title"
 			android:textAppearance="@style/TextAppearance.Mastodon.Verification2.Section"/>
 
 		<LinearLayout
 			android:layout_width="match_parent"
 			android:layout_height="wrap_content"
-			android:layout_marginTop="10dp"
-			android:orientation="horizontal">
+			android:layout_marginTop="6dp"
+			android:orientation="vertical">
 
 			<TextView
-				android:layout_width="20dp"
-				android:layout_height="20dp"
-				android:background="@drawable/vr_bg_step"
-				android:gravity="center"
-				android:includeFontPadding="false"
-				android:text="4"
-				android:textColor="@color/vr_step_text"
-				android:textSize="9sp"
-				android:textStyle="bold"/>
-
-			<TextView
-				android:id="@+id/vr_req_step4"
-				android:layout_width="0dp"
+				android:layout_width="match_parent"
 				android:layout_height="wrap_content"
-				android:layout_marginStart="10dp"
-				android:layout_weight="1"
-				android:textAppearance="@style/TextAppearance.Mastodon.Verification2.Body"/>
+				android:lineSpacingExtra="2dp"
+				android:text="@string/vr_req_tips"
+				android:textColor="?attr/vrTextSecondary"
+				android:textSize="11.5sp"/>
 		</LinearLayout>
-	</LinearLayout>
 
-	<TextView
-		android:layout_width="match_parent"
-		android:layout_height="wrap_content"
-		android:layout_marginTop="18dp"
-		android:text="@string/vr_req_tips_title"
-		android:textAppearance="@style/TextAppearance.Mastodon.Verification2.Section"/>
+		<Space
+			android:layout_width="match_parent"
+			android:layout_height="0dp"
+			android:layout_weight="1"
+			android:minHeight="12dp"/>
+	</LinearLayout>
 
 	<LinearLayout
 		android:layout_width="match_parent"
 		android:layout_height="wrap_content"
-		android:layout_marginTop="8dp"
-		android:orientation="vertical">
+		android:orientation="vertical"
+		android:paddingStart="16dp"
+		android:paddingTop="10dp"
+		android:paddingEnd="16dp"
+		android:paddingBottom="16dp">
+
+		<Button
+			android:id="@+id/vr_req_start"
+			style="@style/Widget.Mastodon.Verification2.PrimaryButton"
+			android:layout_width="match_parent"
+			android:layout_height="43dp"
+			android:text="@string/vr_req_start"/>
 
 		<TextView
 			android:layout_width="match_parent"
 			android:layout_height="wrap_content"
-			android:lineSpacingExtra="2dp"
-			android:text="@string/vr_req_tips"
-			android:textAppearance="@style/TextAppearance.Mastodon.Verification2.Caption"/>
+			android:layout_marginTop="8dp"
+			android:gravity="center"
+			android:text="@string/vr_footer"
+			android:textAppearance="@style/TextAppearance.Mastodon.Verification2.Footer"/>
 	</LinearLayout>
-
-	<Space
-		android:layout_width="match_parent"
-		android:layout_height="0dp"
-		android:layout_weight="1"
-		android:minHeight="16dp"/>
-
-	<Button
-		android:id="@+id/vr_req_start"
-		style="@style/Widget.Mastodon.Verification2.PrimaryButton"
-		android:layout_width="match_parent"
-		android:layout_height="52dp"
-		android:text="@string/vr_req_start"/>
-
-	<TextView
-		android:layout_width="match_parent"
-		android:layout_height="wrap_content"
-		android:layout_marginTop="12dp"
-		android:text="@string/vr_footer"
-		android:textAppearance="@style/TextAppearance.Mastodon.Verification2.Footer"/>
 </LinearLayout>

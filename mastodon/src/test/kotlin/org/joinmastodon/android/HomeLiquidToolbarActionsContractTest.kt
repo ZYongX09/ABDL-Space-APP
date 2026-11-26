@@ -10,19 +10,23 @@ class HomeLiquidToolbarActionsContractTest {
 	private val projectDir = File(requireNotNull(System.getProperty("user.dir")))
 
 	@Test
-	fun toolbarViewCarriesSearchCapsuleAndIndependentComposeButton() {
+	fun toolbarCentersSmallerLogoAndOmitsSearchWithoutMovingCompose() {
 		val view = source("src/main/kotlin/org/joinmastodon/android/ui/compose/navigation/HomeLiquidToolbarView.kt")
 		val geometry = source("src/main/kotlin/org/joinmastodon/android/ui/compose/navigation/MorphingGlassGeometry.kt")
 
-		assertTrue(view.contains("private val onSearch: Runnable"))
+		assertFalse(view.contains("onSearch"))
 		assertTrue(view.contains("data class HomeToolbarComposeMenuItem"))
 		assertTrue(view.contains("fun setComposeMenu(items: List<HomeToolbarComposeMenuItem>)"))
 		assertTrue(view.contains("HomeToolbarMenuPage.COMPOSE"))
-		assertTrue(view.contains("if(action==TrailingToolbarAction.SEARCH) onSearch.run()"))
+		assertFalse(source("src/main/res/menu/home_overflow.xml").contains("search_action"))
+		assertFalse(source("src/main/res/menu/home_custom.xml").contains("search_action"))
+		assertTrue(view.contains("painterResource(R.drawable.abdl_icon)"))
+		assertTrue(view.contains("Modifier.align(Alignment.TopCenter)"))
 		assertTrue(view.contains("COMPOSE_MENU_WIDTH_DP = 200"))
 		assertTrue(view.contains("COMPOSE_MENU_END_PADDING_DP = 40"))
 		assertTrue(view.contains("ResourceIcon(R.drawable.ic_fluent_edit_24_regular, 24, contentColor)"))
-		assertTrue(view.contains("id = R.id.home_search_btn"))
+		assertFalse(view.contains("SearchAnchorIcon"))
+		assertFalse(view.contains("id = R.id.home_search_btn"))
 		assertTrue(geometry.contains("internal enum class TrailingToolbarAction { SEARCH, MORE }"))
 		assertFalse(geometry.contains("TrailingToolbarAction.COMPOSE"))
 		assertFalse(view.contains("COMPOSE_MENU_TOP_GAP_DP"))
@@ -30,11 +34,11 @@ class HomeLiquidToolbarActionsContractTest {
 	}
 
 	@Test
-	fun homeFragmentWiresSearchAndComposeMenuWithoutFriendToolbar() {
+	fun homeFragmentWiresComposeMenuWithoutSearchOrFriendToolbar() {
 		val home = source("src/main/java/org/joinmastodon/android/fragments/HomeFragment.java")
 		val homeTab = source("src/main/java/org/joinmastodon/android/fragments/HomeTabFragment.java")
 
-		assertTrue(home.contains("homeTabFragment::openSearch"))
+		assertFalse(home.contains("homeTabFragment::openSearch"))
 		assertTrue(home.contains("new HomeToolbarComposeMenuItem(R.id.compose_post, context.getString(R.string.compose_menu_post), getNotes(MiuixIcons.INSTANCE))"))
 		assertTrue(home.contains("new HomeToolbarComposeMenuItem(R.id.compose_friend_request, context.getString(R.string.compose_menu_friend_request), getContactsBook(MiuixIcons.INSTANCE))"))
 		assertTrue(home.contains("new HomeToolbarComposeMenuItem(R.id.compose_friend_card, context.getString(R.string.compose_menu_friend_card), getContactsBook(MiuixIcons.INSTANCE), R.drawable.ic_friend_card)"))
@@ -53,7 +57,7 @@ class HomeLiquidToolbarActionsContractTest {
 		assertTrue(homeTab.contains("if(id==R.id.compose_post)"))
 		assertTrue(homeTab.contains("if(id==R.id.compose_friend_request)"))
 		assertTrue(homeTab.contains("if(id==R.id.compose_friend_card)"))
-		assertTrue(homeTab.contains("public void openSearch()"))
+		assertFalse(homeTab.contains("public void openSearch()"))
 		val composeAction = homeTab.substringAfter("public void onLiquidCompose(){").substringBefore("\n\t}")
 		assertTrue(composeAction.contains("openComposeAction(R.id.compose_post)"))
 		assertFalse(composeAction.contains("onFabClick(fab)"))
@@ -65,7 +69,6 @@ class HomeLiquidToolbarActionsContractTest {
 		assertTrue(sharedAction.contains("destination=FriendRequestCreateFragment.class"))
 		assertFalse(homeTab.contains("R.id.friend_card_feed, getString(R.string.friend_card_feed_entry)"))
 		assertFalse(homeTab.contains("FriendCardFeedFragment.class"))
-		assertTrue(homeTab.contains("Nav.go(getActivity(), FriendRequestListFragment.class, args)"))
 		assertTrue(sharedAction.contains("destination=org.joinmastodon.android.fragments.albums.AlbumUploadFragment.class"))
 		val fabAction = homeTab.substringAfter("private void onFabClick(View v){").substringBefore("\n\t}")
 		assertTrue(fabAction.contains("fanMenu.isExpanded()"))

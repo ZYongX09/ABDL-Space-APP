@@ -46,6 +46,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 import me.grishka.appkit.api.APIRequest;
 import me.grishka.appkit.api.Callback;
 import me.grishka.appkit.fragments.BaseRecyclerFragment;
@@ -141,6 +142,7 @@ public class HomeTimelineNBWStartupTest{
 	}
 	private static int exact(int size){ return View.MeasureSpec.makeMeasureSpec(size,View.MeasureSpec.EXACTLY); }
 	private RecyclerView list() throws Exception{ return (RecyclerView)field(BaseRecyclerFragment.class,"list").get(fragment); }
+	private SwipeRefreshLayout refresh(){ return fragment.getView().findViewById(org.joinmastodon.android.R.id.refresh_layout); }
 	@SuppressWarnings("unchecked") private List<Status> rows() throws Exception{ return (List<Status>)field(BaseRecyclerFragment.class,"data").get(fragment); }
 	private List<String> ids() throws Exception{ return rows().stream().map(s->s.id).toList(); }
 	private List<GetAllTimeline> heads(){ return HomeTimelineHistoryTest.OfflineRequests.sent.stream().filter(GetAllTimeline.class::isInstance).map(GetAllTimeline.class::cast).toList(); }
@@ -190,9 +192,12 @@ public class HomeTimelineNBWStartupTest{
 	}
 	@Test public void warmLocalHistorySurvivesRoutingInitializationUntilFreshAuthority() throws Exception{
 		activateCold(); seed(post("p_history")); open(); assertEquals(List.of("p_history"),ids()); GetAllTimeline old=heads().get(0);
+		assertTrue(refresh().isRefreshing());
 		discover("local_only"); success(old,List.of(post("p_late")));
 		assertEquals("Remote policy initialization must not clear already visible local history",List.of("p_history"),ids());
+		assertTrue("The replacement head keeps the native refresh active",refresh().isRefreshing());
 		assertEquals(2,heads().size()); success(heads().get(1),List.of(post("p_authority"))); assertVisible("p_authority");
+		assertFalse(refresh().isRefreshing());
 	}
 	@Test public void discoveryBeforeQueuedHistoryCallbackStillDispatchesAHead() throws Exception{
 		activateCold(); CountDownLatch occupied=new CountDownLatch(1),release=new CountDownLatch(1);
@@ -202,12 +207,13 @@ public class HomeTimelineNBWStartupTest{
 			lifecycle=Robolectric.buildActivity(HomeTimelineRefreshingLayoutTest.HostActivity.class); activity=lifecycle.get(); activity.setTheme(org.joinmastodon.android.R.style.Theme_Mastodon_Light); lifecycle.setup();
 			fragment=new HomeTimelineFragment(); Bundle args=new Bundle(); args.putString("account",session.getID()); args.putBoolean("noAutoLoad",true); fragment.setArguments(args);
 			activity.showFragment(fragment); activity.getFragmentManager().executePendingTransactions(); ShadowLooper.idleMainLooper(32,TimeUnit.MILLISECONDS); layout();
-			assertTrue(heads().isEmpty());
+			assertEquals(1,heads().size());
 			pendingDiscovery.get(0).success(NBWEndpointFixtures.endpoints("primary","startup-revision-a","local_only")); ShadowLooper.idleMainLooper();
 		}finally{ release.countDown(); }
 		settle();
-		assertEquals("A cancelled cache lease must not consume the only initial load",1,heads().size());
-		success(heads().get(0),List.of(post("p_after_cache_race"))); assertVisible("p_after_cache_race");
+		assertEquals("A retired routing epoch must replace its one already-dispatched head",2,heads().size());
+		assertTrue(HomeTimelineHistoryTest.OfflineRequests.canceled.contains(heads().get(0)));
+		success(heads().get(1),List.of(post("p_after_cache_race"))); assertVisible("p_after_cache_race");
 	}
 	@Test public void authenticatedLocalOnlyCompletionDoesNotRequireUserRefresh() throws Exception{
 		activateCold(); open(); GetAllTimeline old=heads().get(0); discover("full");
@@ -281,7 +287,9 @@ public class HomeTimelineNBWStartupTest{
 		assertEquals(2,heads().size()); GetAllTimeline recovery=heads().get(1);
 		fragment.onRefresh(); assertEquals(3,heads().size());
 		success(recovery,List.of(post("p_late_recovery"))); success(old,List.of(post("p_late_first")));
+		assertFalse("Cold startup still uses its existing loader before posts arrive",refresh().isRefreshing());
 		success(heads().get(2),List.of(post("p_manual_authority"))); assertEquals(List.of("p_manual_authority"),ids());
+		assertFalse(refresh().isRefreshing());
 		assertVisible("p_manual_authority"); assertEquals(3,heads().size());
 	}
 }

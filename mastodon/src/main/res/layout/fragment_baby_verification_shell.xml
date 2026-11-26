@@ -6,6 +6,7 @@
 	android:orientation="vertical">
 
 	<LinearLayout
+		android:id="@+id/verification_toolbar_wrap"
 		android:layout_width="match_parent"
 		android:layout_height="65dp"
 		android:background="?colorVerificationTopSurface"
@@ -15,7 +16,7 @@
 			android:id="@+id/toolbar"
 			android:layout_width="match_parent"
 			android:layout_height="64dp"
-			android:background="?colorVerificationTopSurface"
+			android:background="?colorVerificationBackground"
 			android:contentInsetStartWithNavigation="0dp"
 			android:popupTheme="?android:attr/actionBarPopupTheme"
 			android:subtitleTextAppearance="?android:attr/subtitleTextAppearance"

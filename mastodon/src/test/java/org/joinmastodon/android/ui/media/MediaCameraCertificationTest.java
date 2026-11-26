@@ -79,7 +79,7 @@ public class MediaCameraCertificationTest{
 		ActivityController<MediaCameraActivity> lifecycle=launch(intent);
 		MediaCameraActivity activity=lifecycle.get();
 		assertEquals(View.VISIBLE, activity.findViewById(R.id.camera_certification_panel).getVisibility());
-		assertEquals(intent.getStringExtra(MediaCameraContract.EXTRA_CERTIFICATION_REQUIREMENT), ((TextView)activity.findViewById(R.id.camera_certification_requirement)).getText().toString());
+		assertEquals(intent.getStringExtra(MediaCameraContract.EXTRA_CERTIFICATION_REQUIREMENT), ((TextView)activity.findViewById(R.id.camera_req_1)).getText().toString());
 		assertEquals(View.GONE, activity.findViewById(R.id.camera_gallery).getVisibility());
 		assertEquals(activity.getString(R.string.verification_camera_capture_hint), ((TextView)activity.findViewById(R.id.camera_capture_hint)).getText().toString());
 		activity.findViewById(R.id.camera_gallery).performClick();
@@ -121,7 +121,7 @@ public class MediaCameraCertificationTest{
 		MediaCameraActivity second=restored.get();
 		assertFalse(second.findViewById(R.id.camera_use).isEnabled());
 		assertFalse(second.findViewById(R.id.camera_shutter).isEnabled());
-		assertEquals(second.getString(R.string.verification_capture_expired), ((TextView)second.findViewById(R.id.camera_certification_timer)).getText().toString());
+		assertEquals("00:00", ((TextView)second.findViewById(R.id.camera_certification_timer)).getText().toString());
 		invoke(second, "useMedia"); // guard works independently of disabled UI
 		assertNotEquals(Activity.RESULT_OK, shadowOf(second).getResultCode());
 		second.finish();

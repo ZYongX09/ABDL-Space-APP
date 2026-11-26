@@ -46,13 +46,15 @@ public final class ContentAccessGate implements Application.ActivityLifecycleCal
 	private final Handler handler=new Handler(Looper.getMainLooper());
 	private final Map<Activity, Screen> screens=new WeakHashMap<>();
 	private Network network;
-	private boolean observedNetwork;
+	private boolean networkReported;
 	private ContentAccessGate(){}
 	public static void install(Application application){
 		if(instance!=null) return;
 		instance=new ContentAccessGate(); application.registerActivityLifecycleCallbacks(instance);
 		ConnectivityManager connectivity=application.getSystemService(ConnectivityManager.class);
 		if(connectivity!=null) try{
+			// Seed the existing default (including offline) so initial reporting isn't mistaken for a switch.
+			instance.network=connectivity.getActiveNetwork();
 			connectivity.registerDefaultNetworkCallback(new ConnectivityManager.NetworkCallback(){
 				@Override public void onAvailable(Network next){ instance.handler.post(()->instance.networkChanged(next)); }
 				@Override public void onLost(Network old){ instance.handler.post(()->{ if(old.equals(instance.network)) instance.networkChanged(null); }); }
@@ -60,16 +62,28 @@ public final class ContentAccessGate implements Application.ActivityLifecycleCal
 		}catch(RuntimeException ignored){ /* Foreground and explicit refresh remain fail closed. */ }
 	}
 	private void networkChanged(Network next){
-		if(observedNetwork && java.util.Objects.equals(network,next)) return;
-		network=next; observedNetwork=true;
-		refreshSelected();
+		boolean changed=!java.util.Objects.equals(network,next);
+		if(!changed && networkReported) return;
+		network=next;
+		networkReported=true;
+		refreshSelected(changed);
 	}
 	public static void accountChanged(){
-		if(instance!=null) instance.handler.post(()->{ for(Screen screen:new ArrayList<>(instance.screens.values())) screen.bind(); instance.refreshSelected(); });
+		if(instance!=null) instance.handler.post(()->{
+			// Raw URL requests (tab bar, settings rows) are cached under their URL, not an owner scope.
+			// Drop decoded media on account changes so another account can never see the previous one's bytes.
+			try{ me.grishka.appkit.imageloader.ImageCache.getInstance(org.joinmastodon.android.MastodonApp.context).clearTopLevel(); }catch(RuntimeException ignored){}
+			org.joinmastodon.android.ui.utils.ContentMediaImageDownloader.clearDiskCache();
+			for(Screen screen:new ArrayList<>(instance.screens.values())) screen.bind();
+			instance.refreshSelected(true);
+		});
 	}
-	private void refreshSelected(){
+	private void refreshSelected(boolean force){
 		AccountSession session=AccountSessionManager.getInstance().getLastActiveAccount();
-		if(ContentAccessCoordinator.applies(session)) session.getContentAccessCoordinator().refresh();
+		if(ContentAccessCoordinator.applies(session)){
+			if(force) session.getContentAccessCoordinator().refresh();
+			else session.getContentAccessCoordinator().refreshIfStale(60_000);
+		}
 	}
 	public static void openVerification(Activity activity, String accountId){
 		AccountSession session=AccountSessionManager.getInstance().tryGetAccount(accountId);
@@ -103,7 +117,7 @@ public final class ContentAccessGate implements Application.ActivityLifecycleCal
 	}
 	@Override public void onActivityResumed(Activity activity){
 		Screen screen=screens.get(activity); if(screen==null) return;
-		screen.resumed=true; screen.bind(); refreshSelected(); screen.apply();
+		screen.resumed=true; screen.bind(); refreshSelected(false); screen.apply();
 	}
 	@Override public void onActivityPaused(Activity activity){ Screen screen=screens.get(activity); if(screen!=null) screen.resumed=false; }
 	@Override public void onActivityDestroyed(Activity activity){
@@ -133,7 +147,7 @@ public final class ContentAccessGate implements Application.ActivityLifecycleCal
 		TextView message;
 		ProgressBar progress;
 		Button verify, refresh;
-		boolean resumed, applying;
+		boolean resumed, applying, withheld;
 		Screen(Activity activity){ this.activity=activity; }
 		void bind(){
 			AccountSession selected=AccountSessionManager.getInstance().getLastActiveAccount();
@@ -160,6 +174,14 @@ public final class ContentAccessGate implements Application.ActivityLifecycleCal
 				// the existing native prompt so the user can start verification.
 				if(!ContentAccessCoordinator.applies(session)) return;
 				ContentAccessCoordinator.Snapshot snapshot=session.getContentAccessCoordinator().getSnapshot();
+				if(snapshot.withholdsContent()){
+					if(!withheld){
+						withheld=true;
+						org.joinmastodon.android.ui.utils.ContentMediaImageDownloader.clearDiskCache();
+					}
+				}else{
+					withheld=false;
+				}
 				if(resumed && snapshot.state==ContentAccess.State.BABY_VERIFICATION_REQUIRED
 						&& activity instanceof MainActivity main && !AppSecurity.isLocked()){
 					main.showContentAccessPrompt();

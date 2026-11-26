@@ -37,7 +37,7 @@ class HomeLiquidToolbarMenuInteractionTest {
 		MastodonApp.context = RuntimeEnvironment.getApplication()
 		compose.setContent {
 			AndroidView(modifier = Modifier.fillMaxSize(), factory = { context ->
-				toolbar = HomeLiquidToolbarController(context, IntConsumer {}, Runnable {}, Runnable {}, IntConsumer { actions.add(it) }, Runnable {})
+				toolbar = HomeLiquidToolbarController(context, IntConsumer {}, Runnable {}, Runnable {}, IntConsumer { actions.add(it) })
 				toolbar.setComposeMenu(org.joinmastodon.android.fragments.HomeFragment.composeMenuItems(context))
 				toolbar.view
 			})

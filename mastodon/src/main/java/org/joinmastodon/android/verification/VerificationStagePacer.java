@@ -41,7 +41,7 @@ public final class VerificationStagePacer{
 		Integer next=queue.peek();
 		if(next==null){ running=false; return; }
 		long now=SystemClock.uptimeMillis();
-		long delay=shown<0 ? 0 : Math.max(0, lastShownAt+minimumMs-now);
+		long delay=shown<0 ? minimumMs : Math.max(0, lastShownAt+minimumMs-now);
 		running=true;
 		handler.postDelayed(()->{
 			if(disposed) return;

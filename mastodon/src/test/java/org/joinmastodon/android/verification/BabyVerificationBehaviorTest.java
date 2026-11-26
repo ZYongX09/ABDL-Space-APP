@@ -98,7 +98,7 @@ public class BabyVerificationBehaviorTest{
         activity.getFragmentManager().beginTransaction().add(fragment,"verification").commit();
         activity.getFragmentManager().executePendingTransactions();
         if(!(boolean)get("viewReady")) content();
-        capture=new VerificationPendingCapture(SESSION,"123456","v1","requirement",System.currentTimeMillis()/1000+600,5*1024*1024, "offline.example.test_42", 42);
+        capture=new VerificationPendingCapture(SESSION, "v1", "requirement", System.currentTimeMillis()/1000+600, 5*1024*1024, "offline.example.test_42", 42, "", "", "", "");
         capture.save(activity);
     }
     @After public void cleanup() throws Exception{
@@ -140,7 +140,7 @@ public class BabyVerificationBehaviorTest{
         rejected(result(),R.string.verification_capture_state_missing);
     }
     @Test public void actualExpiryHasDistinctMessageAndDeletesOnlyControlledRaw() throws Exception{
-        raw(); new VerificationPendingCapture(SESSION,"123456","v1","requirement",1,5*1024*1024, "offline.example.test_42", 42).save(activity);
+        raw(); new VerificationPendingCapture(SESSION, "v1", "requirement", 1, 5*1024*1024, "offline.example.test_42", 42, "", "", "", "").save(activity);
         rejected(result(),R.string.verification_capture_expired); assertFalse(capture.rawFile(activity).exists());
     }
     @Test public void sessionSlotPathAndMissingPhotoHaveDistinctSafeMessages() throws Exception{

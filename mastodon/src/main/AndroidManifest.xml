@@ -136,7 +136,7 @@
 		<activity android:name=".novel.author.NovelChapterEditorActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
 		<activity android:name=".novel.author.NovelWorkStructureActivity" android:exported="false" />
 
-		<activity android:name=".MainActivity" android:exported="false" android:configChanges="orientation|screenSize" android:windowSoftInputMode="adjustResize" android:launchMode="singleTask">
+		<activity android:name=".MainActivity" android:exported="false" android:configChanges="orientation|screenSize" android:windowSoftInputMode="adjustResize" android:launchMode="singleTask" android:theme="@style/Theme.Mastodon.SplashScreen">
 			<intent-filter android:autoVerify="true">
 				<action android:name="android.intent.action.VIEW"/>
 				<category android:name="android.intent.category.BROWSABLE"/>
@@ -183,12 +183,13 @@
 		<activity android:name=".ui.CrisisHelpActivity" android:exported="false" android:configChanges="orientation|screenSize" android:theme="@style/Theme.Mastodon.AutoLightDark"/>
 		<activity android:name=".ui.MediaCameraActivity" android:exported="false" android:screenOrientation="portrait" android:theme="@style/Theme.Mastodon.AutoLightDark"/>
 		<activity android:name=".ui.NotificationGuideActivity" android:exported="false" android:theme="@style/Theme.Mastodon.AutoLightDark"/>
-		<activity android:name=".ui.SplashActivity" android:exported="true" android:configChanges="orientation|screenSize" android:theme="@style/Theme.Mastodon.SplashScreen">
+		<!-- Keep the installed launcher component name; enter Main directly without a second window. -->
+		<activity-alias android:name=".ui.SplashActivity" android:targetActivity=".MainActivity" android:exported="true">
 			<intent-filter>
 				<action android:name="android.intent.action.MAIN"/>
 				<category android:name="android.intent.category.LAUNCHER"/>
 			</intent-filter>
-		</activity>
+		</activity-alias>
 		<activity android:name=".OAuthActivity" android:exported="true" android:configChanges="orientation|screenSize" android:launchMode="singleTask">
 			<intent-filter>
 				<action android:name="android.intent.action.VIEW"/>

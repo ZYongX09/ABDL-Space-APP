@@ -35,9 +35,14 @@ public final class HomeTimelineSnapshot{
 	public static String identity(String accountID, String accessToken){
 		try{
 			byte[] digest=MessageDigest.getInstance("SHA-256").digest((accountID+"\u0000"+accessToken).getBytes(StandardCharsets.UTF_8));
-			StringBuilder result=new StringBuilder(64);
-			for(byte value:digest) result.append(String.format(java.util.Locale.ROOT, "%02x", value & 255));
-			return result.toString();
+			char[] hex="0123456789abcdef".toCharArray();
+			char[] result=new char[digest.length*2];
+			for(int i=0;i<digest.length;i++){
+				int value=digest[i] & 255;
+				result[2*i]=hex[value >>> 4];
+				result[2*i+1]=hex[value & 15];
+			}
+			return new String(result);
 		}catch(java.security.NoSuchAlgorithmException impossible){ throw new AssertionError(impossible); }
 	}
 

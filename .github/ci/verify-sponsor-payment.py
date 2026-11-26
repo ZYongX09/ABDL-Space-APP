@@ -125,7 +125,7 @@ def run(stage):
                 for path in entries:
                     archive.add(path, arcname=path.name, recursive=False)
             save(evidence / 'gradle-resource-cache-manifest.json', {
-                'head': head, 'gradle': '8.11.1', 'agp': '8.9.1',
+                'head': head, 'gradle': '9.7.0', 'agp': '9.3.1',
                 'kind': 'Normal input-keyed Gradle build cache; not a completed APK or manual partial output overlay',
                 'entries': {path.name: digest(path) for path in entries},
                 'archive_sha256': digest(evidence / 'gradle-resource-cache.tar.gz')})

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+	<!-- Match the old 288dp vector's 8669.86 * 0.21915 / 10 artwork box, rounding down. -->
+	<dimen name="startup_handoff_logo_size">190dp</dimen>
+</resources>

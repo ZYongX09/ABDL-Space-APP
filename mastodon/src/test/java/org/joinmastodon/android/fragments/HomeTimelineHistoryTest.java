@@ -5,7 +5,7 @@ import android.graphics.Canvas;
 import android.os.Bundle;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.TextView;
+import android.widget.ImageView;
 
 import org.joinmastodon.android.CompatibilityTestApplication;
 import org.joinmastodon.android.GlobalUserPreferences;
@@ -56,6 +56,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 import me.grishka.appkit.FragmentStackActivity;
 import me.grishka.appkit.api.APIRequest;
 import me.grishka.appkit.api.Callback;
@@ -127,6 +128,7 @@ public class HomeTimelineHistoryTest{
 		cache=new ObservedCache(session.getID());
 		field(AccountSession.class,"cacheController").set(session,cache);
 		OfflineRequests.sent.clear(); OfflineRequests.canceled.clear();
+		drain();
 	}
 	@After public void cleanup() throws Exception{
 		PostTranslationCoordinator coordinator=activity==null ? null : PostTranslationCoordinator.get(activity,session.getID()); if(coordinator!=null) coordinator.dispose();
@@ -144,8 +146,8 @@ public class HomeTimelineHistoryTest{
 	private void seed(Status... posts) throws Exception{
 		CacheController.HomeTimelineLease lease=cache.beginHomeTimelineSnapshot();
 		assertNotNull("Seed lease must be available for the current account",lease);
-		Object identity=field(CacheController.HomeTimelineLease.class,"identity").get(lease);
-		String encoded=org.joinmastodon.android.api.cache.HomeTimelineSnapshot.encode(List.of(posts),"cached-opaque-cursor",(String)identity,System.currentTimeMillis(),false);
+		String identity=org.joinmastodon.android.api.cache.HomeTimelineSnapshot.identity(session.getID(),session.token.accessToken);
+		String encoded=org.joinmastodon.android.api.cache.HomeTimelineSnapshot.encode(List.of(posts),"cached-opaque-cursor",identity,System.currentTimeMillis(),false);
 		assertNotNull("Fixture posts must be cache-encodable: "+(posts.length==0?"none":snapshotFields(posts[0])),encoded);
 		assertTrue("Lease must be current before the write",cache.isHomeTimelineLeaseCurrent(lease));
 		cache.putHomeTimelineSnapshot(lease,List.of(posts),"cached-opaque-cursor"); drain();
@@ -170,7 +172,7 @@ public class HomeTimelineHistoryTest{
 	private List<String> ids() throws Exception{ return rows().stream().map(s->s.id).toList(); }
 	private String diagnostic() throws Exception{
 		String state="requests="+requests().size()+",rows="+ids()+",preloaded="+preloaded().size()
-				+",pill="+(pill()==null?-1:pill().getVisibility())+",headInFlight="+field(HomeTimelineFragment.class,"homeHeadInFlight").getBoolean(fragment)
+				+",refreshing="+(refresh()!=null && refresh().isRefreshing())+",headInFlight="+field(HomeTimelineFragment.class,"homeHeadInFlight").getBoolean(fragment)
 				+",historyAttempted="+field(HomeTimelineFragment.class,"homeHistoryAttempted").getBoolean(fragment)
 				+",showingHistory="+field(HomeTimelineFragment.class,"showingHomeHistory").getBoolean(fragment)
 				+",lease="+(field(HomeTimelineFragment.class,"homeLease").get(fragment)!=null)
@@ -180,7 +182,8 @@ public class HomeTimelineHistoryTest{
 		return state;
 	}
 	private RecyclerView list() throws Exception{ return (RecyclerView)field(BaseRecyclerFragment.class,"list").get(fragment); }
-	private TextView pill(){ return fragment.getView().findViewById(R.id.home_timeline_refreshing); }
+	private SwipeRefreshLayout refresh(){ return fragment.getView().findViewById(R.id.refresh_layout); }
+	private ImageView circle(){ return HomeTimelineRefreshingLayoutTest.nativeCircle(refresh()); }
 	private List<GetAllTimeline> requests(){ return OfflineRequests.sent.stream().filter(GetAllTimeline.class::isInstance).map(GetAllTimeline.class::cast).toList(); }
 	private <T> long count(Class<T> type){ return OfflineRequests.sent.stream().filter(type::isInstance).count(); }
 	@SuppressWarnings("unchecked") private void success(MastodonAPIRequest<?> request,Object value) throws Exception{ ((Callback<Object>)field(APIRequest.class,"callback").get(request)).onSuccess(value); ShadowLooper.idleMainLooper(); layout(); }
@@ -208,20 +211,20 @@ public class HomeTimelineHistoryTest{
 				org.joinmastodon.android.api.cache.HomeTimelineSnapshot.decode(encoded,identity,now,false));
 	}
 
-	@Test public void historyAppearsWithoutSpinnerWithIndependentPureTextAndNoOldCursorPaging() throws Exception{
+	@Test public void historyAppearsWithNativeRefreshAndNoOldCursorPaging() throws Exception{
 		seed(post("p_history"),post("c_history")); open();
 		assertEquals(diagnostic(),List.of("p_history","c_history"),ids()); assertEquals(diagnostic(),1,requests().size());
 		assertEquals("A real database callback must hydrate the head",1,((ObservedCache)cache).callbacks);
 		assertEquals(List.of("p_history","c_history"),((ObservedCache)cache).lastSnapshotIds);
-		assertEquals(TextView.class,pill().getClass()); assertEquals("Refreshing…",pill().getText().toString()); assertEquals(View.VISIBLE,pill().getVisibility());
-		assertFalse(pill().isClickable()); assertFalse(pill().isFocusable()); for(var drawable:pill().getCompoundDrawables()) assertNull(drawable);
+		assertTrue(refresh().isRefreshing()); assertTrue(circle().isShown());
+		assertFalse(circle().isClickable()); assertFalse(circle().isFocusable());
 		assertEquals(View.GONE,fragment.getView().findViewById(me.grishka.appkit.R.id.loading).getVisibility());
-		fragment.setLiquidToolbarMode(true); assertEquals(View.VISIBLE,pill().getVisibility());
+		fragment.setLiquidToolbarMode(true); assertTrue(refresh().isRefreshing());
 		fragment.onScrolledToLastItem(); fragment.loadData(2,20); assertEquals(1,requests().size()); assertFalse(requests().get(0).getURL().toString().contains("max_id="));
 	}
 	@Test public void authorityReplacesDataAndPreloaderExactlyOnceAndUsesOnlyServerCursor() throws Exception{
 		seed(post("p_old")); open(); preloaded().add(post("p_stale_preload")); GetAllTimeline request=requests().get(0); cursor(request,"server-opaque+/next");
-		success(request,List.of(post("p_fresh"),post("c_fresh"))); assertEquals(List.of("p_fresh","c_fresh"),ids()); assertTrue(preloaded().isEmpty()); assertEquals(View.GONE,pill().getVisibility());
+		success(request,List.of(post("p_fresh"),post("c_fresh"))); assertEquals(List.of("p_fresh","c_fresh"),ids()); assertTrue(preloaded().isEmpty()); assertFalse(refresh().isRefreshing());
 		success(request,List.of(post("p_duplicate_callback"))); assertEquals(List.of("p_fresh","c_fresh"),ids());
 		fragment.loadData(2,20); assertTrue(requests().get(1).getURL().toString().contains("max_id=server-opaque"));
 	}
@@ -229,31 +232,37 @@ public class HomeTimelineHistoryTest{
 		seed(post("p_old")); open(); success(requests().get(0),List.of()); drain(); assertTrue(rows().isEmpty()); assertTrue(preloaded().isEmpty()); assertTrue(fragment.shouldAutomaticallyTranslateVisibleContent());
 		var result=new java.util.concurrent.atomic.AtomicReference<org.joinmastodon.android.api.cache.HomeTimelineSnapshot>(); cache.getHomeTimelineSnapshot(cache.beginHomeTimelineSnapshot(),result::set); drain(); assertNull(result.get());
 	}
-	@Test public void networkFailureKeepsHistoryButStopsHintAndStillDeniesAutoNetwork() throws Exception{
+	@Test public void networkFailureKeepsHistoryButStopsNativeRefreshAndStillDeniesAutoNetwork() throws Exception{
 		Status parent=post("p_old"); parent.quote=new Quote(); parent.quote.state=Quote.State.ACCEPTED; parent.quote.quotedStatus=post("p_quote"); parent.quote.quotedStatus.quote=new Quote(); parent.quote.quotedStatus.quote.quotedStatusId="p_missing"; parent.quote.quotedStatus.quote.state=Quote.State.ACCEPTED;
 		seed(parent); open(); assertEquals(0,count(GetStatusesByIDs.class)); failure(requests().get(0),503);
-		assertEquals(List.of("p_old"),ids()); assertEquals(View.GONE,pill().getVisibility()); assertFalse(fragment.shouldAutomaticallyTranslateVisibleContent()); assertFalse(fragment.shouldFetchMissingNestedQuotes());
+		assertEquals(List.of("p_old"),ids()); assertFalse(refresh().isRefreshing()); assertFalse(fragment.shouldAutomaticallyTranslateVisibleContent()); assertFalse(fragment.shouldFetchMissingNestedQuotes());
 		fragment.onScrolledToLastItem(); fragment.loadData(1,20); assertEquals(1,requests().size());
 		invoke(HomeTimelineFragment.class,"loadNewPosts"); assertEquals(1,requests().size());
 	}
 	@Test public void authorizationErrorsClearHistoryAndUseExistingAuthorizationErrorUi() throws Exception{
-		seed(post("p_old")); open(); failure(requests().get(0),403); drain(); assertTrue(rows().isEmpty()); assertTrue(fragment.doReauthOnErrorRetry); assertEquals(View.GONE,pill().getVisibility()); assertFalse(fragment.loaded);
+		seed(post("p_old")); open(); failure(requests().get(0),403); drain(); assertTrue(rows().isEmpty()); assertTrue(fragment.doReauthOnErrorRetry); assertFalse(refresh().isRefreshing()); assertFalse(fragment.loaded);
 	}
 	@Test public void refreshInvalidatesPendingSnapshotReadAndOldResponseCannotBackfill() throws Exception{
-		seed(post("p_old")); open(); GetAllTimeline old=requests().get(0); fragment.onRefresh(); GetAllTimeline fresh=requests().get(1);
-		success(fresh,List.of(post("p_new"))); success(old,List.of(post("p_late"))); assertEquals(List.of("p_new"),ids()); assertEquals(2,requests().size());
+		seed(post("p_old")); open(); GetAllTimeline old=requests().get(0);
+		ImageView nativeCircle=circle(); var animation=nativeCircle.getAnimation();
+		fragment.onRefresh(); GetAllTimeline fresh=requests().get(1);
+		assertTrue(OfflineRequests.canceled.contains(old));
+		assertTrue(refresh().isRefreshing()); assertSame(animation,nativeCircle.getAnimation());
+		success(old,List.of(post("p_late"))); assertEquals(List.of("p_old"),ids()); assertTrue(refresh().isRefreshing());
+		success(fresh,List.of(post("p_new"))); assertEquals(List.of("p_new"),ids()); assertEquals(2,requests().size()); assertFalse(refresh().isRefreshing());
 	}
 	@Test public void cacheReadCallbackAfterFastRefreshCannotOverwriteAuthority() throws Exception{
 		seed(post("p_old")); CountDownLatch occupied=new CountDownLatch(1),release=new CountDownLatch(1);
-		CacheController.databaseThread.postRunnable(()->{ occupied.countDown(); try{ release.await(); }catch(InterruptedException e){ Thread.currentThread().interrupt(); } },0); assertTrue(occupied.await(5,TimeUnit.SECONDS));
+		CacheController.databaseThread.postRunnable(()->{ occupied.countDown(); try{ release.await(); }catch(InterruptedException e){ Thread.currentThread().interrupt(); } },0);
 		try{
+			assertTrue("Database worker must reach the barrier",occupied.await(5,TimeUnit.SECONDS));
 			lifecycle=Robolectric.buildActivity(HostActivity.class); activity=lifecycle.get(); activity.setTheme(theme); lifecycle.setup();
 			fragment=new HomeTimelineFragment(); Bundle args=new Bundle(); args.putString("account",session.getID()); fragment.setArguments(args); activity.showFragment(fragment); activity.getFragmentManager().executePendingTransactions();
 			ShadowLooper.idleMainLooper(32,TimeUnit.MILLISECONDS); layout();
-			assertTrue("Initial request waits for its bounded history read",requests().isEmpty());
-			fragment.onRefresh();
-			assertEquals(1,requests().size());
-			success(requests().get(0),List.of(post("p_fast")));
+			assertEquals("The authoritative GET must start while the SQLite worker is held",1,requests().size());
+			assertTrue(ids().isEmpty());
+			((Callback<Object>)field(APIRequest.class,"callback").get(requests().get(0))).onSuccess(List.of(post("p_fast")));
+			ShadowLooper.idleMainLooper();
 			assertEquals(List.of("p_fast"),ids());
 		}finally{ release.countDown(); }
 		settle(); assertEquals("A late cache read cannot overwrite the authoritative head",List.of("p_fast"),ids()); assertEquals(1,requests().size());
@@ -263,13 +272,15 @@ public class HomeTimelineHistoryTest{
 		field(AccountSessionManager.class,"lastActiveAccountID").set(AccountSessionManager.getInstance(),"another-account"); success(old,List.of(post("p_late"))); assertTrue(rows().isEmpty());
 		field(AccountSessionManager.class,"lastActiveAccountID").set(AccountSessionManager.getInstance(),session.getID()); fragment.onRefresh(); old=requests().get(1);
 		sessions.remove(session.getID()); cache.closeDatabase(); MastodonApp.context.deleteDatabase(session.getID()+".db"); success(old,List.of(post("p_after_logout"))); drain();
-		assertFalse(MastodonApp.context.getDatabasePath(session.getID()+".db").exists()); assertEquals(View.GONE,pill().getVisibility());
+		assertFalse(MastodonApp.context.getDatabasePath(session.getID()+".db").exists()); assertFalse(refresh().isRefreshing());
 	}
-	@Test public void cancelDestroyAndReentryStopHintAndLateCallbacksAreSafe() throws Exception{
-		seed(post("p_old")); open(); GetAllTimeline old=requests().get(0); fragment.cancelLoading(); assertEquals(View.GONE,pill().getVisibility()); assertFalse(fragment.shouldAutomaticallyTranslateVisibleContent());
+	@Test public void cancelDestroyAndReentryStopNativeRefreshAndRejectLateCallbacks() throws Exception{
+		seed(post("p_old")); open(); GetAllTimeline old=requests().get(0); fragment.cancelLoading(); assertFalse(refresh().isRefreshing()); assertFalse(fragment.shouldAutomaticallyTranslateVisibleContent());
 		fragment.onRefresh(); assertEquals(2,requests().size()); success(old,List.of(post("p_late"))); assertEquals(List.of("p_old"),ids());
+		SwipeRefreshLayout widget=refresh(); ImageView indicator=circle(); assertTrue(widget.isRefreshing());
 		GetAllTimeline inflight=requests().get(1); lifecycle.pause().stop().destroy(); lifecycle=null; success(inflight,List.of(post("p_after_destroy"))); assertTrue(OfflineRequests.canceled.contains(inflight));
-		open(); assertEquals(3,requests().size()); assertEquals(List.of("p_old"),ids()); assertEquals(View.VISIBLE,pill().getVisibility());
+		assertFalse(widget.isRefreshing()); assertEquals(View.GONE,indicator.getVisibility());
+		open(); assertEquals(3,requests().size()); assertEquals(List.of("p_old"),ids()); assertTrue(refresh().isRefreshing());
 	}
 	@Test public void visibleHistoryDoesNotSendAutomaticAiEvenWithCapabilityEnabled() throws Exception{
 		seed(post("p_old")); open();
@@ -289,7 +300,7 @@ public class HomeTimelineHistoryTest{
 		android.content.res.Configuration configuration=new android.content.res.Configuration(MastodonApp.context.getResources().getConfiguration()); configuration.fontScale=1.3f;
 		MastodonApp.context.getResources().updateConfiguration(configuration,MastodonApp.context.getResources().getDisplayMetrics());
 		seed(post("p_fictional_walk"),post("c_fictional_book")); open();
-		assertEquals(dark ? "正在刷新中......" : "Refreshing…",pill().getText().toString()); assertEquals(View.VISIBLE,pill().getVisibility()); assertFalse(rows().isEmpty());
+		assertTrue(refresh().isRefreshing()); assertTrue(circle().isShown()); assertFalse(rows().isEmpty());
 		String directory=System.getProperty("homeHistoryRenderDir"); if(directory!=null){
 			File output=new File(directory,dark ? "home-history-dark-zh-320-large.png" : "home-history-light-en-320-large.png"); assertTrue(output.getParentFile().isDirectory() || output.getParentFile().mkdirs());
 			View root=fragment.getView(); Bitmap bitmap=Bitmap.createBitmap(Math.max(320,root.getWidth()),Math.max(720,root.getHeight()),Bitmap.Config.ARGB_8888); root.draw(new Canvas(bitmap));

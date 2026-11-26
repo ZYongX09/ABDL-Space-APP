@@ -1,4 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-	<string name="home_timeline_refreshing">Refreshing…</string>
+	<dimen name="startup_handoff_logo_size">80dp</dimen>
 </resources>

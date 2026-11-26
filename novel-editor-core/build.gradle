@@ -4,7 +4,10 @@ plugins {
 
 android {
 	namespace 'org.joinmastodon.noveleditor'
-	compileSdk 37
+	compileSdk {
+		version = release(37) { minorApiLevel = 1 }
+	}
+	enableKotlin = false
 
 	defaultConfig {
 		minSdk 26

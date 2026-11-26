@@ -3,212 +3,229 @@
 	android:id="@+id/verification_form_card"
 	android:layout_width="match_parent"
 	android:layout_height="match_parent"
-	android:background="@color/vr_page"
-	android:orientation="vertical"
-	android:paddingStart="20dp"
-	android:paddingTop="8dp"
-	android:paddingEnd="20dp"
-	android:paddingBottom="20dp">
+	android:background="?attr/vrPage"
+	android:orientation="vertical">
 
+	<!-- Design: back at x=12, locale pill at x=260 of a 321dp-wide frame. -->
 	<FrameLayout
 		android:layout_width="match_parent"
-		android:layout_height="36dp">
+		android:layout_height="46dp"
+		android:paddingStart="12dp"
+		android:paddingEnd="12dp">
 
 		<ImageButton
 			android:id="@+id/verification_back_intro"
 			android:layout_width="36dp"
 			android:layout_height="36dp"
-			android:layout_gravity="start|center_vertical"
+			android:layout_gravity="start|top"
+			android:layout_marginTop="5dp"
 			android:background="@android:color/transparent"
 			android:contentDescription="@string/back"
 			android:padding="8dp"
 			android:src="@drawable/ic_fluent_arrow_left_24_regular"
-			android:tint="@color/vr_text_primary"/>
+			android:tint="?attr/vrTextPrimary"/>
 
 		<TextView
 			android:id="@+id/verification_locale_pill"
 			android:layout_width="wrap_content"
 			android:layout_height="wrap_content"
-			android:layout_gravity="end|center_vertical"
+			android:layout_gravity="end|top"
+			android:layout_marginTop="12dp"
 			android:background="@drawable/vr_bg_pill"
 			android:drawableStart="@drawable/ic_vr_globe_20"
-			android:drawablePadding="6dp"
+			android:drawablePadding="5dp"
 			android:gravity="center"
-			android:minWidth="64dp"
-			android:paddingStart="12dp"
-			android:paddingTop="5dp"
-			android:paddingEnd="12dp"
-			android:paddingBottom="5dp"
+			android:minWidth="48dp"
+			android:paddingStart="9dp"
+			android:paddingTop="6dp"
+			android:paddingEnd="7dp"
+			android:paddingBottom="6dp"
 			android:text="ZH"
-			android:textColor="@color/vr_text_primary"
-			android:textSize="12sp"/>
+			android:textColor="?attr/vrTextPrimary"
+			android:textSize="11sp"/>
 	</FrameLayout>
 
-	<ImageView
-		android:id="@+id/verification_hero_icon"
-		android:layout_width="56dp"
-		android:layout_height="56dp"
-		android:layout_gravity="center_horizontal"
-		android:layout_marginTop="18dp"
-		android:importantForAccessibility="no"
-		android:src="@drawable/abdl_icon_hero"/>
-
-	<TextView
-		android:id="@+id/verification_hero_title"
-		android:layout_width="match_parent"
-		android:layout_height="wrap_content"
-		android:layout_marginTop="10dp"
-		android:gravity="center"
-		android:text="@string/vr_intro_title"
-		android:textAppearance="@style/TextAppearance.Mastodon.Verification2.Title"/>
-
-	<TextView
-		android:layout_width="match_parent"
-		android:layout_height="wrap_content"
-		android:layout_marginTop="8dp"
-		android:gravity="center"
-		android:text="@string/vr_intro_subtitle"
-		android:textAppearance="@style/TextAppearance.Mastodon.Verification2.Subtitle"/>
-
 	<LinearLayout
-		android:layout_width="match_parent"
-		android:layout_height="wrap_content"
-		android:layout_marginTop="24dp"
-		android:background="@drawable/vr_bg_tile"
-		android:gravity="center_vertical"
-		android:orientation="horizontal"
-		android:paddingStart="14dp"
-		android:paddingTop="14dp"
-		android:paddingEnd="16dp"
-		android:paddingBottom="14dp">
-
-		<FrameLayout
-			android:layout_width="40dp"
-			android:layout_height="40dp"
-			android:background="@drawable/vr_bg_icon_tile">
-
-			<ImageView
-				android:layout_width="20dp"
-				android:layout_height="20dp"
-				android:layout_gravity="center"
-				android:importantForAccessibility="no"
-				android:src="@drawable/ic_fluent_camera_24_regular"
-				android:tint="@color/vr_text_primary"/>
-		</FrameLayout>
-
-		<LinearLayout
-			android:layout_width="0dp"
-			android:layout_height="wrap_content"
-			android:layout_marginStart="12dp"
-			android:layout_weight="1"
-			android:orientation="vertical">
-
-			<TextView
-				android:layout_width="match_parent"
-				android:layout_height="wrap_content"
-				android:text="@string/vr_intro_tile_title"
-				android:textAppearance="@style/TextAppearance.Mastodon.Verification2.Body"
-				android:textStyle="bold"/>
-
-			<TextView
-				android:layout_width="match_parent"
-				android:layout_height="wrap_content"
-				android:layout_marginTop="3dp"
-				android:text="@string/vr_intro_tile_body"
-				android:textAppearance="@style/TextAppearance.Mastodon.Verification2.Caption"/>
-		</LinearLayout>
-	</LinearLayout>
-
-	<LinearLayout
-		android:layout_width="match_parent"
-		android:layout_height="wrap_content"
-		android:layout_marginTop="16dp"
-		android:background="@drawable/vr_bg_info"
-		android:orientation="horizontal"
-		android:paddingStart="14dp"
-		android:paddingTop="13dp"
-		android:paddingEnd="14dp"
-		android:paddingBottom="13dp">
-
-		<ImageView
-			android:layout_width="16dp"
-			android:layout_height="16dp"
-			android:layout_marginTop="1dp"
-			android:importantForAccessibility="no"
-			android:src="@drawable/ic_fluent_shield_checkmark_24_regular"
-			android:tint="@color/vr_primary"/>
-
-		<LinearLayout
-			android:layout_width="0dp"
-			android:layout_height="wrap_content"
-			android:layout_marginStart="10dp"
-			android:layout_weight="1"
-			android:orientation="vertical">
-
-			<TextView
-				android:layout_width="match_parent"
-				android:layout_height="wrap_content"
-				android:text="@string/vr_intro_info_line1"
-				android:textAppearance="@style/TextAppearance.Mastodon.Verification2.Body"/>
-
-			<TextView
-				android:layout_width="match_parent"
-				android:layout_height="wrap_content"
-				android:layout_marginTop="4dp"
-				android:text="@string/vr_intro_info_line2"
-				android:textAppearance="@style/TextAppearance.Mastodon.Verification2.Body"/>
-		</LinearLayout>
-	</LinearLayout>
-
-	<TextView
-		android:id="@+id/verification_quota_title"
-		android:layout_width="match_parent"
-		android:layout_height="wrap_content"
-		android:visibility="gone"/>
-
-	<TextView
-		android:id="@+id/verification_quota_value"
-		android:layout_width="match_parent"
-		android:layout_height="wrap_content"
-		android:visibility="gone"/>
-
-	<Space
 		android:layout_width="match_parent"
 		android:layout_height="0dp"
 		android:layout_weight="1"
-		android:minHeight="24dp"/>
+		android:orientation="vertical"
+		android:paddingStart="16dp"
+		android:paddingEnd="16dp">
 
-	<TextView
-		android:id="@+id/verification_form_note"
+		<ImageView
+			android:id="@+id/verification_hero_icon"
+			android:layout_width="45dp"
+			android:layout_height="45dp"
+			android:layout_gravity="center_horizontal"
+			android:layout_marginTop="3dp"
+			android:importantForAccessibility="no"
+			android:src="@drawable/abdl_icon_hero"/>
+
+		<TextView
+			android:id="@+id/verification_hero_title"
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:layout_marginTop="8dp"
+			android:gravity="center"
+			android:text="@string/vr_intro_title"
+			android:textAppearance="@style/TextAppearance.Mastodon.Verification2.Title"/>
+
+		<TextView
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:layout_marginTop="6dp"
+			android:gravity="center"
+			android:text="@string/vr_intro_subtitle"
+			android:textAppearance="@style/TextAppearance.Mastodon.Verification2.Subtitle"/>
+
+		<!-- The design has no card around this row: icon chip + two text lines on the page. -->
+		<LinearLayout
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:layout_marginTop="20dp"
+			android:gravity="center_vertical"
+			android:orientation="horizontal"
+			android:paddingTop="8dp"
+			android:paddingBottom="8dp">
+
+			<FrameLayout
+				android:layout_width="26dp"
+				android:layout_height="26dp"
+				android:background="@drawable/vr_bg_icon_tile">
+
+				<ImageView
+					android:layout_width="15dp"
+					android:layout_height="15dp"
+					android:layout_gravity="center"
+					android:importantForAccessibility="no"
+					android:src="@drawable/ic_fluent_camera_24_regular"
+					android:tint="?attr/vrTextPrimary"/>
+			</FrameLayout>
+
+			<LinearLayout
+				android:layout_width="0dp"
+				android:layout_height="wrap_content"
+				android:layout_marginStart="11dp"
+				android:layout_weight="1"
+				android:orientation="vertical">
+
+				<TextView
+					android:layout_width="match_parent"
+					android:layout_height="wrap_content"
+					android:text="@string/vr_intro_tile_title"
+					android:textColor="?attr/vrTextPrimary"
+					android:textSize="12sp"
+					android:fontFamily="sans-serif-medium"/>
+
+				<TextView
+					android:layout_width="match_parent"
+					android:layout_height="wrap_content"
+					android:text="@string/vr_intro_tile_body"
+					android:textColor="?attr/vrTextSecondary"
+					android:textSize="11sp"/>
+			</LinearLayout>
+		</LinearLayout>
+
+		<LinearLayout
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:layout_marginTop="30dp"
+			android:background="@drawable/vr_bg_info"
+			android:orientation="horizontal"
+			android:paddingStart="12dp"
+			android:paddingTop="11dp"
+			android:paddingEnd="12dp"
+			android:paddingBottom="11dp">
+
+			<ImageView
+				android:layout_width="15dp"
+				android:layout_height="15dp"
+				android:layout_marginTop="1dp"
+				android:importantForAccessibility="no"
+				android:src="@drawable/ic_fluent_shield_checkmark_24_regular"
+				android:tint="?attr/vrPrimary"/>
+
+			<LinearLayout
+				android:layout_width="0dp"
+				android:layout_height="wrap_content"
+				android:layout_marginStart="8dp"
+				android:layout_weight="1"
+				android:orientation="vertical">
+
+				<TextView
+					android:layout_width="match_parent"
+					android:layout_height="wrap_content"
+					android:text="@string/vr_intro_info_line1"
+					android:textColor="?attr/vrTextPrimary"
+					android:textSize="11sp"/>
+
+				<TextView
+					android:layout_width="match_parent"
+					android:layout_height="wrap_content"
+					android:layout_marginTop="4dp"
+					android:text="@string/vr_intro_info_line2"
+					android:textColor="?attr/vrTextPrimary"
+					android:textSize="11sp"/>
+			</LinearLayout>
+		</LinearLayout>
+
+		<TextView
+			android:id="@+id/verification_quota_title"
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:visibility="gone"/>
+
+		<TextView
+			android:id="@+id/verification_quota_value"
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:visibility="gone"/>
+	</LinearLayout>
+
+	<LinearLayout
 		android:layout_width="match_parent"
 		android:layout_height="wrap_content"
-		android:layout_marginBottom="10dp"
-		android:gravity="center"
-		android:textAppearance="@style/TextAppearance.Mastodon.Verification2.Caption"
-		android:visibility="gone"/>
+		android:orientation="vertical"
+		android:paddingStart="16dp"
+		android:paddingTop="10dp"
+		android:paddingEnd="16dp"
+		android:paddingBottom="16dp">
 
-	<Button
-		android:id="@+id/verification_start_button"
-		style="@style/Widget.Mastodon.Verification2.PrimaryButton"
-		android:layout_width="match_parent"
-		android:layout_height="52dp"
-		android:enabled="false"
-		android:text="@string/vr_continue"/>
+		<TextView
+			android:id="@+id/verification_form_note"
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:layout_marginBottom="10dp"
+			android:gravity="center"
+			android:textAppearance="@style/TextAppearance.Mastodon.Verification2.Caption"
+			android:visibility="gone"/>
 
-	<TextView
-		android:layout_width="match_parent"
-		android:layout_height="wrap_content"
-		android:layout_marginTop="12dp"
-		android:gravity="center"
-		android:lineSpacingExtra="2dp"
-		android:text="@string/vr_legal"
-		android:textAppearance="@style/TextAppearance.Mastodon.Verification2.Caption"
-		android:textColor="@color/vr_text_muted"/>
+		<Button
+			android:id="@+id/verification_start_button"
+			style="@style/Widget.Mastodon.Verification2.PrimaryButton"
+			android:layout_width="match_parent"
+			android:layout_height="43dp"
+			android:enabled="false"
+			android:text="@string/vr_continue"/>
 
-	<TextView
-		android:layout_width="match_parent"
-		android:layout_height="wrap_content"
-		android:layout_marginTop="10dp"
-		android:text="@string/vr_footer"
-		android:textAppearance="@style/TextAppearance.Mastodon.Verification2.Footer"/>
+		<TextView
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:layout_marginTop="8dp"
+			android:gravity="center"
+			android:lineSpacingExtra="2dp"
+			android:text="@string/vr_legal"
+			android:textAppearance="@style/TextAppearance.Mastodon.Verification2.Caption"
+			android:textColor="?attr/vrTextMuted"
+			android:textSize="10sp"/>
+
+		<TextView
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:layout_marginTop="8dp"
+			android:gravity="center"
+			android:text="@string/vr_footer"
+			android:textAppearance="@style/TextAppearance.Mastodon.Verification2.Footer"/>
+	</LinearLayout>
 </LinearLayout>

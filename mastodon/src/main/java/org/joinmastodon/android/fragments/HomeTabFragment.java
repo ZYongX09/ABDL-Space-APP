@@ -2,10 +2,6 @@ package org.joinmastodon.android.fragments;
 
 import static org.joinmastodon.android.GlobalUserPreferences.reduceMotion;
 
-import android.animation.Animator;
-import android.animation.AnimatorListenerAdapter;
-import android.animation.AnimatorSet;
-import android.animation.ObjectAnimator;
 import android.animation.ValueAnimator;
 import android.annotation.SuppressLint;
 import android.app.Activity;
@@ -28,15 +24,12 @@ import android.view.SubMenu;
 import android.view.WindowInsets;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.ViewParent;
 import android.view.ViewTreeObserver;
 import android.view.animation.DecelerateInterpolator;
-import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.PopupMenu;
-import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.Toolbar;
 
@@ -51,15 +44,15 @@ import org.joinmastodon.android.GlobalUserPreferences;
 import org.joinmastodon.android.MainActivity;
 import org.joinmastodon.android.R;
 import org.joinmastodon.android.api.requests.announcements.GetAnnouncements;
-import org.joinmastodon.android.api.requests.lists.GetLists;
 import org.joinmastodon.android.api.requests.tags.GetFollowedTags;
+import org.joinmastodon.android.api.session.AccountSession;
 import org.joinmastodon.android.api.session.AccountSessionManager;
+import org.joinmastodon.android.api.session.ContentAccessCoordinator;
 import org.joinmastodon.android.events.HashtagUpdatedEvent;
 import org.joinmastodon.android.events.ListCreatedEvent;
 import org.joinmastodon.android.events.ListDeletedEvent;
 import org.joinmastodon.android.events.ListUpdatedEvent;
 import org.joinmastodon.android.events.SelfUpdateStateChangedEvent;
-import org.joinmastodon.android.fragments.discover.SearchQueryFragment;
 import org.joinmastodon.android.fragments.friendcards.MyFriendCardsFragment;
 import org.joinmastodon.android.fragments.settings.SettingsMainFragment;
 import org.joinmastodon.android.googleservices.barcodescanner.Barcode;
@@ -72,7 +65,6 @@ import org.joinmastodon.android.model.StatusPrivacy;
 import org.joinmastodon.android.model.TimelineDefinition;
 import org.joinmastodon.android.model.viewmodel.ListItem;
 import org.joinmastodon.android.novel.app.NovelAppActivity;
-import org.joinmastodon.android.ui.ExtendedPopupMenu;
 import org.joinmastodon.android.ui.SimpleViewHolder;
 import org.joinmastodon.android.ui.compose.navigation.ComposeFanMenuController;
 import org.joinmastodon.android.ui.compose.navigation.HomeLiquidToolbarController;
@@ -80,6 +72,7 @@ import org.joinmastodon.android.ui.compose.navigation.HomeToolbarMenuItem;
 import org.joinmastodon.android.ui.compose.navigation.HomeToolbarTimeline;
 import org.joinmastodon.android.ui.utils.LocationUtils;
 import org.joinmastodon.android.ui.utils.UiUtils;
+import org.joinmastodon.android.ui.views.HomeTimelineTabStrip;
 import org.joinmastodon.android.updater.GithubSelfUpdater;
 import org.joinmastodon.android.utils.ElevationOnScrollListener;
 import org.joinmastodon.android.utils.ProvidesAssistContent;
@@ -99,7 +92,6 @@ import me.grishka.appkit.Nav;
 import me.grishka.appkit.api.Callback;
 import me.grishka.appkit.api.ErrorResponse;
 import me.grishka.appkit.fragments.BaseRecyclerFragment;
-import me.grishka.appkit.utils.CubicBezierInterpolator;
 import me.grishka.appkit.utils.V;
 import me.grishka.appkit.views.FragmentRootLinearLayout;
 
@@ -109,20 +101,14 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 
 	private String accountID;
 	private MenuItem announcements, announcementsAction, settings, settingsAction;
-	//	private ImageView toolbarLogo;
-	private Button toolbarShowNewPostsBtn;
-	private boolean newPostsBtnShown;
-	private AnimatorSet currentNewPostsAnim;
+	private ImageView toolbarLogo;
+	private View.OnLayoutChangeListener toolbarLogoCenter;
 	private ViewPager2 pager;
-	private View switcher;
-	private FrameLayout toolbarFrame;
+	private ViewPager2.OnPageChangeCallback pagerCallback;
+	private HomeTimelineTabStrip timelineTabs;
 	private View toolbarGeometryRoot;
 	private final ViewTreeObserver.OnPreDrawListener toolbarGeometry=this::updateTimelineTopGeometry;
 	private int liquidNavBottomInset;
-	private ImageView timelineIcon;
-	private ImageView collapsedChevron;
-	private TextView timelineTitle;
-	private PopupMenu switcherPopup;
 	private final Map<Integer, FollowList> listItems = new HashMap<>();
 	private final Map<Integer, Hashtag> hashtagsItems = new HashMap<>();
 	private List<TimelineDefinition> timelinesList;
@@ -136,6 +122,12 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 	private boolean nbwTimelineVisible(){ return AccountSessionManager.get(accountID).getNBWForumOptionsRepository().getSnapshot().canRead(); }
 	private void updateNBWVisiblePages(){
 		if(pager==null || pager.getAdapter()==null) return;
+		RecyclerView pages=(RecyclerView)pager.getChildAt(0);
+		if(pages.isComputingLayout()){
+			ViewPager2 currentPager=pager;
+			currentPager.post(()->{ if(pager==currentPager) updateNBWVisiblePages(); });
+			return;
+		}
 		int selected=currentTimelineIndex();
 		ArrayList<Integer> next=new ArrayList<>();
 		for(int i=0;i<timelines.length;i++) if(timelines[i].getType()!=TimelineDefinition.TimelineType.NBW || nbwTimelineVisible()) next.add(i);
@@ -143,16 +135,15 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		visibleTimelineIndices.clear(); visibleTimelineIndices.addAll(next);
 		pager.getAdapter().notifyDataSetChanged();
 		pager.setCurrentItem(Math.max(0, visibleTimelineIndices.indexOf(selected)), false);
-		updateSwitcherMenu(); updateSwitcherIcon(currentTimelineIndex()); updateLiquidToolbarState();
+		if(timelineTabs!=null) buildTimelineTabs();
+		updateLiquidToolbarState();
 	}
 	private Fragment[] fragments;
 	private FrameLayout[] tabViews;
 	private TimelineDefinition[] timelines;
-	private final Map<Integer, TimelineDefinition> timelinesByMenuItem = new HashMap<>();
 	private SubMenu hashtagsMenu, listsMenu;
 	private PopupMenu overflowPopup;
-	private View overflowActionView = null;
-	private ImageButton searchActionView = null;
+	private View overflowActionView;
 	private boolean announcementsBadged, settingsBadged;
 	private ImageButton fab;
 	private int fabBottomInset;
@@ -213,7 +204,7 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 					if(province!=null){
 						// 省份刚缓存，重建 Activity 以加载同城时间线
 						new android.os.Handler(android.os.Looper.getMainLooper()).post(()->{
-							if(getActivity()!=null) getActivity().recreate();
+							if(getActivity()!=null && !getActivity().isFinishing()) getActivity().recreate();
 						});
 					}
 				});
@@ -264,7 +255,7 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 	}
 
 	private void returnToBeginningOfPager() {
-		pager.setCurrentItem(0);
+		if(pager!=null) pager.setCurrentItem(0, !reduceMotion && ValueAnimator.areAnimatorsEnabled());
 	}
 
 	@Override
@@ -306,13 +297,20 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		fanMenu.getView().setTranslationZ(V.dp(1));
 		view.addView(fanMenu.getView(), new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 		pager = new ViewPager2(getContext());
-		toolbarFrame = (FrameLayout) LayoutInflater.from(getContext()).inflate(R.layout.home_toolbar, getToolbar(), false);
+		toolbarLogo=(ImageView)inflater.inflate(R.layout.home_toolbar, getToolbar(), false);
 
 		Bundle args = new Bundle();
 		args.putString("account", accountID);
 		args.putBoolean("__is_tab", true);
 		args.putBoolean("__disable_fab", true);
 		args.putBoolean("onlyPosts", true);
+		// Fragment containers must be attached to the activity hierarchy so that
+		// findFragmentById can resolve them, but they must not be direct children of `view`:
+		// ViewPager2's onCreateViewHolder removes each tabView from its parent while the
+		// surrounding FrameLayout is laying out, which corrupts the parent's child list.
+		FrameLayout tabHost=new FrameLayout(getContext());
+		tabHost.setVisibility(View.GONE);
+		view.addView(tabHost, new FrameLayout.LayoutParams(0,0));
 		FragmentTransaction transaction = null;
 		visibleTimelineIndices.clear();
 		for (int i = 0; i < count; i++) {
@@ -341,13 +339,19 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 			tabView.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 			tabView.setVisibility(View.GONE);
 			tabView.setId(containerId);
-			view.addView(tabView);
+			tabHost.addView(tabView);
 			tabViews[i] = tabView;
 		}
 		if(transaction!=null)
 			transaction.commit();
 
-		view.addView(pager, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+		int tabsHeight=V.dp(HomeTimelineTabStrip.HEIGHT_DP);
+		FrameLayout.LayoutParams pagerParams=new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+		pagerParams.topMargin=tabsHeight;
+		view.addView(pager, pagerParams);
+
+		timelineTabs=new HomeTimelineTabStrip(getContext(), this::navigateTo, this::openTimelineEditor);
+		view.addView(timelineTabs, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, tabsHeight));
 
 		overflowActionView = UiUtils.makeOverflowActionView(getContext());
 		overflowPopup = new PopupMenu(getContext(), overflowActionView);
@@ -355,8 +359,6 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		overflowActionView.setOnClickListener(l -> overflowPopup.show());
 		overflowActionView.setOnTouchListener(overflowPopup.getDragToOpenListener());
 
-		// 非液态模式：搜索按钮紧邻更多按钮（液态模式由玻璃工具栏接管）
-		searchActionView = makeSearchActionView();
 		setFabBottomInset(0);
 
 		return rootView;
@@ -369,89 +371,42 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		toolbarGeometryRoot=view;
 		view.getViewTreeObserver().addOnPreDrawListener(toolbarGeometry);
 
-		timelineIcon = toolbarFrame.findViewById(R.id.timeline_icon);
-		timelineTitle = toolbarFrame.findViewById(R.id.timeline_title);
-		collapsedChevron = toolbarFrame.findViewById(R.id.collapsed_chevron);
-		switcher = toolbarFrame.findViewById(R.id.switcher_btn);
-		switcherPopup = new PopupMenu(getContext(), switcher);
-		switcherPopup.setOnMenuItemClickListener(this::onSwitcherItemSelected);
-		UiUtils.enablePopupMenuIcons(getContext(), switcherPopup);
-		switcher.setOnClickListener(v->switcherPopup.show());
-		switcher.setOnTouchListener(switcherPopup.getDragToOpenListener());
-		updateSwitcherMenu();
-
 		UiUtils.reduceSwipeSensitivity(pager);
 		pager.setUserInputEnabled(!GlobalUserPreferences.disableSwipe);
 		pager.setAdapter(new HomePagerAdapter());
-		nbwSubscription=AccountSessionManager.get(accountID).getNBWForumOptionsRepository().observe(snapshot->{
-			if(getActivity()!=null) getActivity().runOnUiThread(this::updateNBWVisiblePages);
-		});
-		pager.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
+		buildTimelineTabs();
+		pagerCallback=new ViewPager2.OnPageChangeCallback(){
+			@Override
+			public void onPageScrolled(int position, float positionOffset, int positionOffsetPixels){
+				timelineTabs.setScrollPosition(position+positionOffset);
+			}
+
 			@Override
 			public void onPageSelected(int position){
 				if(position>=visibleTimelineIndices.size()) return;
 				int index=visibleTimelineIndices.get(position);
+				timelineTabs.setSelectedPage(position, !reduceMotion);
 				if(position!=0) {
 					addBackCallback(returnToBeginningOfPager);
 				} else {
 					removeBackCallback(returnToBeginningOfPager);
 				}
 
-				if (!reduceMotion) {
-					// setting this here because page transformer appears to fire too late so the
-					// animation can appear bumpy, especially when navigating to a further-away tab
-					switcher.setScaleY(0.85f);
-					switcher.setScaleX(0.85f);
-					switcher.setAlpha(0.65f);
-				}
-				updateSwitcherIcon(index);
-				if (!timelines[index].equals(TimelineDefinition.HOME_TIMELINE)) hideNewPostsButton();
+				showFab();
+				updateLiquidToolbarState();
 				if (fragments[index] instanceof BaseRecyclerFragment<?> page){
 					if(!page.loaded && !page.isDataLoading()) page.loadData();
 				}
 			}
+		};
+		pager.registerOnPageChangeCallback(pagerCallback);
+		nbwSubscription=AccountSessionManager.get(accountID).getNBWForumOptionsRepository().observe(snapshot->{
+			if(getActivity()!=null) getActivity().runOnUiThread(this::updateNBWVisiblePages);
 		});
-
-		if (!reduceMotion) {
-			pager.setPageTransformer((v, pos) -> {
-				if (reduceMotion || tabViews[currentTimelineIndex()] != v) return;
-				float scaleFactor = Math.max(0.85f, 1 - Math.abs(pos) * 0.06f);
-				switcher.setScaleY(scaleFactor);
-				switcher.setScaleX(scaleFactor);
-				switcher.setAlpha(Math.max(0.65f, 1 - Math.abs(pos)));
-			});
-		}
 
 		updateToolbarLogo();
 		updateLiquidToolbarMode();
 		updateLiquidToolbarState();
-
-		ViewTreeObserver vto = getToolbar().getViewTreeObserver();
-		if (vto.isAlive()) {
-			vto.addOnGlobalLayoutListener(()->{
-				Toolbar t=getToolbar();
-				if(t==null) return;
-				int toolbarWidth=t.getWidth();
-				if(toolbarWidth==0) return;
-
-				int toolbarFrameWidth=toolbarFrame.getWidth();
-				int actionsWidth=toolbarWidth-toolbarFrameWidth;
-				// margin (4) + padding (12) + icon (24) + margin (8) + chevron (16) + padding (12)
-				int switcherWidth=V.dp(76);
-				FrameLayout parent=((FrameLayout) toolbarShowNewPostsBtn.getParent());
-				if(actionsWidth==parent.getPaddingStart()) return;
-				int paddingMax=Math.max(actionsWidth, switcherWidth);
-				int paddingEnd=(Math.max(0, switcherWidth-actionsWidth));
-
-				// toolbar frame goes from screen edge to beginning of right-aligned option buttons.
-				// centering button by applying the same space on the left
-				parent.setPaddingRelative(paddingMax, 0, paddingEnd, 0);
-				toolbarShowNewPostsBtn.setMaxWidth(toolbarWidth-paddingMax*2);
-
-				switcher.setPivotX(V.dp(28)); // padding + half of icon
-				switcher.setPivotY(switcher.getHeight() / 2f);
-			});
-		}
 
 		elevationOnScrollListener = new ElevationOnScrollListener((FragmentRootLinearLayout) view, getToolbar());
 
@@ -459,34 +414,41 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 			updateUpdateState(GithubSelfUpdater.getInstance().getState());
 		}
 
-		new GetLists().setCallback(new Callback<>() {
+		view.postDelayed(()->loadMenuMetadata(view), 600);
+	}
+
+	private void loadMenuMetadata(View view){
+		if(getView()!=view) return;
+		AccountSession session=AccountSessionManager.getInstance().tryGetAccount(accountID);
+		if(session==null || !accountID.equals(AccountSessionManager.getInstance().getLastActiveAccountID())) return;
+		session.getCacheController().getLists(new Callback<>() {
 			@Override
 			public void onSuccess(List<FollowList> lists) {
-				updateList(lists, listItems);
+				if(getView()==view && ContentAccessCoordinator.canRead(accountID)) updateList(lists, listItems);
 			}
 
 			@Override
 			public void onError(ErrorResponse error) {
-				error.showToast(getContext());
+				android.util.Log.w("HomeTab", "lists metadata failed: "+error);
 			}
-		}).exec(accountID);
+		});
 
 		new GetFollowedTags(null, 200).setCallback(new Callback<>() {
 			@Override
 			public void onSuccess(HeaderPaginationList<Hashtag> hashtags) {
-				updateList(hashtags, hashtagsItems);
+				if(getView()==view && ContentAccessCoordinator.allowsContent(accountID)) updateList(hashtags, hashtagsItems);
 			}
 
 			@Override
 			public void onError(ErrorResponse error) {
-				error.showToast(getContext());
+				android.util.Log.w("HomeTab", "followed tags metadata failed: "+error);
 			}
 		}).exec(accountID);
 
 		new GetAnnouncements(false).setCallback(new Callback<>() {
 			@Override
 			public void onSuccess(List<Announcement> result) {
-				if(getActivity()==null) return;
+				if(getView()!=view || !accountID.equals(AccountSessionManager.getInstance().getLastActiveAccountID())) return;
 				if (result.stream().anyMatch(a -> !a.read)) {
 					announcementsBadged = true;
 					if(announcements!=null)
@@ -499,26 +461,13 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 
 			@Override
 			public void onError(ErrorResponse error) {
-				error.showToast(getActivity());
+				android.util.Log.w("HomeTab", "announcements metadata failed: "+error);
 			}
 		}).exec(accountID);
 	}
 
 	public ElevationOnScrollListener getElevationOnScrollListener() {
 		return elevationOnScrollListener;
-	}
-
-	/**
-	 * 非液态模式：更多按钮左侧的独立搜索按钮，带 {@link R.id#home_search_btn} 锚点
-	 * 供 SearchQueryFragment 展开动画定位。
-	 */
-	private ImageButton makeSearchActionView(){
-		ImageButton searchBtn=new ImageButton(getContext(), null, 0, R.style.Widget_Mastodon_ActionButton_Overflow);
-		searchBtn.setId(R.id.home_search_btn);
-		searchBtn.setImageResource(R.drawable.ic_fluent_search_24_regular);
-		searchBtn.setContentDescription(getString(R.string.search_hint));
-		searchBtn.setOnClickListener(v->openSearch());
-		return searchBtn;
 	}
 
 	public void setFabBottomInset(int insetPx){
@@ -530,23 +479,6 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		}
 		if(fanMenu!=null)
 			fanMenu.setBottomInset(insetPx);
-	}
-
-	public void openSearch(){
-		// 当前时间线为交友宇宙时，搜索按钮切换为交友宇宙搜索
-		if(timelines!=null && pager!=null){
-			int idx=pager.getCurrentItem();
-			if(idx>=0 && idx<timelines.length && timelines[idx].getType()==TimelineDefinition.TimelineType.FRIEND_UNIVERSE){
-				Bundle args=new Bundle();
-				args.putString("account", accountID);
-				args.putBoolean("searchMode", true);
-				Nav.go(getActivity(), FriendRequestListFragment.class, args);
-				return;
-			}
-		}
-		Bundle args=new Bundle();
-		args.putString("account", accountID);
-		Nav.go(getActivity(), SearchQueryFragment.class, args);
 	}
 
 	private void openQrScanner(){
@@ -652,38 +584,41 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 				});
 	}
 
-	public void updateToolbarLogo(){
-		Toolbar toolbar = getToolbar();
-		ViewParent parentView = toolbarFrame.getParent();
-		if (parentView == toolbar) return;
-		if (parentView instanceof Toolbar parentToolbar) parentToolbar.removeView(toolbarFrame);
-		toolbar.addView(toolbarFrame, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+	private void updateToolbarLogo(){
+		Toolbar toolbar=getToolbar();
+		if(toolbarLogo.getParent()==toolbar) return;
+		detachToolbarLogoCenter();
+		if(toolbarLogo.getParent() instanceof ViewGroup previous) previous.removeView(toolbarLogo);
+		// Toolbar centers custom children within its consumed content insets. Correct using
+		// the child's real layout position so menu items and system insets cannot shift the mark.
+		int size=getResources().getDimensionPixelSize(R.dimen.home_brand_logo_size);
+		toolbar.addView(toolbarLogo, new Toolbar.LayoutParams(size,size,android.view.Gravity.CENTER));
+		View.OnLayoutChangeListener center=(v,l,t,r,b,oldL,oldT,oldR,oldB)->centerToolbarLogo();
+		toolbarLogo.addOnLayoutChangeListener(center);
+		toolbar.addOnLayoutChangeListener(center);
+		toolbarLogoCenter=center;
+		centerToolbarLogo();
 		toolbar.setOnClickListener(v->scrollToTop());
 		toolbar.setNavigationContentDescription(R.string.back);
-		toolbar.setContentInsetsAbsolute(0, toolbar.getContentInsetRight());
+	}
 
-		updateSwitcherIcon(currentTimelineIndex());
+	private void detachToolbarLogoCenter(){
+		if(toolbarLogo==null || toolbarLogoCenter==null) return;
+		toolbarLogo.removeOnLayoutChangeListener(toolbarLogoCenter);
+		if(toolbarLogo.getParent() instanceof View parent) parent.removeOnLayoutChangeListener(toolbarLogoCenter);
+		toolbarLogoCenter=null;
+	}
 
-		toolbarShowNewPostsBtn=toolbarFrame.findViewById(R.id.show_new_posts_btn);
-		toolbarShowNewPostsBtn.setCompoundDrawableTintList(toolbarShowNewPostsBtn.getTextColors());
-		if(Build.VERSION.SDK_INT<Build.VERSION_CODES.N) UiUtils.fixCompoundDrawableTintOnAndroid6(toolbarShowNewPostsBtn);
-		toolbarShowNewPostsBtn.setOnClickListener(this::onNewPostsBtnClick);
-
-		if(newPostsBtnShown){
-			toolbarShowNewPostsBtn.setVisibility(View.VISIBLE);
-			collapsedChevron.setVisibility(View.VISIBLE);
-			collapsedChevron.setAlpha(1f);
-			timelineTitle.setVisibility(View.GONE);
-			timelineTitle.setAlpha(0f);
-		}else{
-			toolbarShowNewPostsBtn.setVisibility(View.INVISIBLE);
-			toolbarShowNewPostsBtn.setAlpha(0f);
-			collapsedChevron.setVisibility(View.GONE);
-			collapsedChevron.setAlpha(0f);
-			toolbarShowNewPostsBtn.setScaleX(.8f);
-			toolbarShowNewPostsBtn.setScaleY(.8f);
-			timelineTitle.setVisibility(View.VISIBLE);
-		}
+	private void centerToolbarLogo(){
+		if(toolbarLogo==null || !(toolbarLogo.getParent() instanceof Toolbar toolbar) || !toolbar.isAttachedToWindow()) return;
+		View window=toolbar.getRootView();
+		int[] xy=new int[2];
+		window.getLocationInWindow(xy);
+		float windowCenter=xy[0]+window.getWidth()*.5f;
+		toolbar.getLocationInWindow(xy);
+		// The source SVG's ink center is at 50.55% x, 49.60% y of its artboard.
+		toolbarLogo.setTranslationX(windowCenter-xy[0]-toolbarLogo.getLeft()-toolbarLogo.getWidth()*.5055f);
+		toolbarLogo.setTranslationY(toolbarLogo.getHeight()*.004f);
 	}
 
 	private void updateOverflowMenu() {
@@ -730,6 +665,14 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 			toolbar.setVisibility(liquid ? View.GONE : View.VISIBLE);
 		if(fab!=null)
 			fab.setVisibility(liquid ? View.GONE : View.VISIBLE);
+		if(timelineTabs!=null) timelineTabs.setVisibility(liquid ? View.GONE : View.VISIBLE);
+		if(pager!=null && pager.getLayoutParams() instanceof FrameLayout.LayoutParams pagerParams){
+			int topMargin=liquid ? 0 : V.dp(HomeTimelineTabStrip.HEIGHT_DP);
+			if(pagerParams.topMargin!=topMargin){
+				pagerParams.topMargin=topMargin;
+				pager.setLayoutParams(pagerParams);
+			}
+		}
 		if(fragments!=null){
 			for(Fragment fragment:fragments){
 				if(fragment instanceof BaseStatusListFragment<?> statusListFragment){
@@ -747,12 +690,12 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 
 	/** Only the measured glass can occlude a liquid timeline. Its ancestor may already consume
 	 * all or part of the status bar, so subtract the list's real window origin instead of adding
-	 * an inset, TOP_SLOT or capture margin. HomeTimeline also reserves its live refresh pill. */
+	 * an inset, TOP_SLOT or capture margin. The native refresh indicator positions itself separately. */
 	private boolean updateTimelineTopGeometry(){
 		if(fragments==null) return true;
 		android.graphics.Rect glass=new android.graphics.Rect();
 		boolean liquid=liquidToolbarController!=null && liquidToolbarController.getVisibleBoundsInWindow(glass);
-		int gap=getResources().getDimensionPixelSize(R.dimen.home_refresh_text_gap);
+		int gap=getResources().getDimensionPixelSize(R.dimen.home_toolbar_content_gap);
 		for(Fragment fragment:fragments){
 			if(fragment instanceof HomeTimelineFragment || fragment.getView()==null) continue;
 			RecyclerView list=findTimelineRecycler(fragment.getView());
@@ -795,7 +738,7 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		return liquidToolbarController!=null && liquidToolbarController.getVisibleBoundsInWindow(new android.graphics.Rect());
 	}
 
-	/** Window geometry for the home refresh text; never use the full-screen glass host's height. */
+	/** Window geometry for the refresh indicator; never use the full-screen glass host's height. */
 	public boolean getVisibleHomeToolbarBoundsInWindow(android.graphics.Rect out){
 		out.setEmpty();
 		Toolbar toolbar=getToolbar();
@@ -825,7 +768,7 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 				toolbarTimelines.add(new HomeToolbarTimeline(i, timeline.getTitle(getContext()), timeline.getIcon().iconRes));
 		}
 		liquidToolbarController.setTimelines(toolbarTimelines, currentTimelineIndex());
-		liquidToolbarController.setShowNewPosts(newPostsBtnShown);
+		liquidToolbarController.setShowNewPosts(getCurrentFragment() instanceof HomeTimelineFragment home && home.hasNewPosts());
 		liquidToolbarController.setReminderState(announcementsBadged, settingsBadged);
 		ArrayList<HomeToolbarMenuItem> root=new ArrayList<>();
 		root.add(new HomeToolbarMenuItem(R.id.settings, getString(R.string.settings), R.drawable.ic_fluent_settings_24_regular));
@@ -851,8 +794,12 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 	}
 
 	public void onLiquidNewPosts(){
-		if(toolbarShowNewPostsBtn!=null)
-			onNewPostsBtnClick(toolbarShowNewPostsBtn);
+		if(getCurrentFragment() instanceof HomeTimelineFragment home) home.scrollToNewPosts();
+	}
+
+	void onHomeNewPostsChanged(){
+		if(liquidToolbarController!=null)
+			liquidToolbarController.setShowNewPosts(getCurrentFragment() instanceof HomeTimelineFragment home && home.hasNewPosts());
 	}
 
 	/** Shared by the home fan, fallback sheet and liquid compose menu. */
@@ -907,7 +854,6 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		inflater.inflate(R.menu.home_custom, menu);
 
 		menu.findItem(R.id.overflow).setActionView(overflowActionView);
-		menu.findItem(R.id.search_action).setActionView(searchActionView);
 		announcementsAction = menu.findItem(R.id.announcements_action);
 		settingsAction = menu.findItem(R.id.settings_action);
 		updateOverflowMenu();
@@ -920,55 +866,37 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		updateLiquidToolbarState();
 	}
 
-	private void updateSwitcherMenu() {
-		Menu switcherMenu = switcherPopup.getMenu();
-		switcherMenu.clear();
-		timelinesByMenuItem.clear();
-
-		for (TimelineDefinition tl : timelines) {
-			if(tl.getType()==TimelineDefinition.TimelineType.NBW && !nbwTimelineVisible()) continue;
-			int menuItemId = View.generateViewId();
-			timelinesByMenuItem.put(menuItemId, tl);
-			MenuItem item = switcherMenu.add(0, menuItemId, 0, tl.getTitle(getContext()));
-			item.setIcon(tl.getIcon().iconRes);
-		}
-
-		UiUtils.enablePopupMenuIcons(getContext(), switcherPopup);
-	}
-
-	private boolean onSwitcherItemSelected(MenuItem item) {
-		int id = item.getItemId();
-
-		Bundle args = new Bundle();
-		args.putString("account", accountID);
-
-		if (id == R.id.menu_back) {
-			switcher.post(() -> switcherPopup.show());
-			return true;
-		}
-
-		TimelineDefinition tl = timelinesByMenuItem.get(id);
-		if (tl != null) {
-			for (int i = 0; i < timelines.length; i++) {
-				if (timelines[i] == tl) {
-					navigateTo(i);
-					return true;
-				}
+	private void buildTimelineTabs(){
+		List<HomeTimelineTabStrip.Tab> tabs=new ArrayList<>(visibleTimelineIndices.size());
+		for(int index:visibleTimelineIndices){
+			TimelineDefinition definition=timelines[index];
+			TimelineDefinition.Icon icon=definition.getExplicitIcon();
+			if(icon==null){
+				icon=switch(definition.getType()){
+					case LIST, HASHTAG, NBW, CUSTOM_LOCAL_TIMELINE -> definition.getDefaultIcon();
+					default -> null;
+				};
 			}
+			tabs.add(new HomeTimelineTabStrip.Tab(index, definition.getTitle(getContext()), icon==null ? 0 : icon.iconRes,
+					icon!=TimelineDefinition.Icon.NBW && icon!=TimelineDefinition.Icon.GNOME, definition.getExplicitIcon()!=null));
 		}
-
-		return false;
+		timelineTabs.setTabs(tabs, pager.getCurrentItem());
 	}
 
 	private void navigateTo(int i) {
-		navigateTo(i, !reduceMotion);
+		navigateTo(i, !reduceMotion && ValueAnimator.areAnimatorsEnabled());
 	}
 
 	private void navigateTo(int i, boolean smooth) {
 		int visible=visibleTimelineIndices.indexOf(i);
 		if(visible<0) return;
 		pager.setCurrentItem(visible, smooth);
-		updateSwitcherIcon(i);
+	}
+
+	private void openTimelineEditor(){
+		Bundle args=new Bundle();
+		args.putString("account", accountID);
+		Nav.go(getActivity(), EditTimelinesFragment.class, args);
 	}
 
 	@Override
@@ -997,17 +925,6 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		if (elevationOnScrollListener != null) elevationOnScrollListener.setViews(getToolbar());
 	}
 
-	private void updateSwitcherIcon(int i) {
-		timelineIcon.setImageResource(timelines[i].getIcon().iconRes);
-		timelineTitle.setText(timelines[i].getTitle(getContext()));
-		showFab();
-		updateLiquidToolbarState();
-		if (elevationOnScrollListener != null && getCurrentFragment() instanceof IsOnTop f) {
-			// FIXME: make this work again
-//			elevationOnScrollListener.handleScroll(getContext(), f.isOnTop());
-		}
-	}
-
 	@Override
 	public boolean onOptionsItemSelected(MenuItem item){
 		Bundle args=new Bundle();
@@ -1019,8 +936,6 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		if (item.getItemId() == R.id.menu_back) {
 			getToolbar().post(() -> overflowPopup.show());
 			return true;
-		} else if (id == R.id.search_action) {
-			openSearch();
 		} else if (id == R.id.scan_qr) {
 			openQrScanner();
 		} else if (id == R.id.settings || id == R.id.settings_action) {
@@ -1028,7 +943,7 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 		} else if (id == R.id.announcements || id == R.id.announcements_action) {
 			Nav.goForResult(getActivity(), AnnouncementsFragment.class, args, ANNOUNCEMENTS_RESULT, this);
 		} else if (id == R.id.edit_timelines) {
-			Nav.go(getActivity(), EditTimelinesFragment.class, args);
+			openTimelineEditor();
 		} else if (id == R.id.novel) {
 			startActivity(NovelAppActivity.intent(getActivity(), accountID));
 		} else if ((list = listItems.get(id)) != null) {
@@ -1045,89 +960,15 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 
 	@Override
 	public void scrollToTop(){
-		if (((IsOnTop) fragments[currentTimelineIndex()]).isOnTop() &&
-				GlobalUserPreferences.doubleTapToSwipe && !newPostsBtnShown) {
-			int nextPage = (pager.getCurrentItem() + 1) % visibleTimelineIndices.size();
+		Fragment current=getCurrentFragment();
+		if(current instanceof HomeTimelineFragment home && home.hasNewPosts()){
+			home.scrollToNewPosts();
+		}else if(current instanceof IsOnTop onTop && onTop.isOnTop() && pager!=null
+				&& GlobalUserPreferences.doubleTapToSwipe && !visibleTimelineIndices.isEmpty()){
+			int nextPage=(pager.getCurrentItem()+1)%visibleTimelineIndices.size();
 			navigateTo(visibleTimelineIndices.get(nextPage));
-			return;
-		}
-		((ScrollableToTop) fragments[currentTimelineIndex()]).scrollToTop();
-	}
-
-	public void hideNewPostsButton(){
-		if(!newPostsBtnShown)
-			return;
-		newPostsBtnShown=false;
-		updateLiquidToolbarState();
-		if(currentNewPostsAnim!=null){
-			currentNewPostsAnim.cancel();
-		}
-		timelineTitle.setVisibility(View.VISIBLE);
-		AnimatorSet set=new AnimatorSet();
-		set.playTogether(
-				ObjectAnimator.ofFloat(timelineTitle, View.ALPHA, 1f),
-				ObjectAnimator.ofFloat(timelineTitle, View.SCALE_X, 1f),
-				ObjectAnimator.ofFloat(timelineTitle, View.SCALE_Y, 1f),
-				ObjectAnimator.ofFloat(toolbarShowNewPostsBtn, View.ALPHA, 0f),
-				ObjectAnimator.ofFloat(toolbarShowNewPostsBtn, View.SCALE_X, .8f),
-				ObjectAnimator.ofFloat(toolbarShowNewPostsBtn, View.SCALE_Y, .8f),
-				ObjectAnimator.ofFloat(collapsedChevron, View.ALPHA, 0f)
-		);
-		set.setDuration(reduceMotion ? 0 : 300);
-		set.setInterpolator(CubicBezierInterpolator.DEFAULT);
-		set.addListener(new AnimatorListenerAdapter(){
-			@Override
-			public void onAnimationEnd(Animator animation){
-				toolbarShowNewPostsBtn.setVisibility(View.INVISIBLE);
-				collapsedChevron.setVisibility(View.GONE);
-				currentNewPostsAnim=null;
-			}
-		});
-		currentNewPostsAnim=set;
-		set.start();
-	}
-
-	public void showNewPostsButton(){
-		if(newPostsBtnShown || pager == null || !timelines[currentTimelineIndex()].equals(TimelineDefinition.HOME_TIMELINE))
-			return;
-		newPostsBtnShown=true;
-		updateLiquidToolbarState();
-		if(currentNewPostsAnim!=null){
-			currentNewPostsAnim.cancel();
-		}
-		toolbarShowNewPostsBtn.setVisibility(View.VISIBLE);
-		collapsedChevron.setVisibility(View.VISIBLE);
-		AnimatorSet set=new AnimatorSet();
-		set.playTogether(
-				ObjectAnimator.ofFloat(timelineTitle, View.ALPHA, 0f),
-				ObjectAnimator.ofFloat(timelineTitle, View.SCALE_X, .8f),
-				ObjectAnimator.ofFloat(timelineTitle, View.SCALE_Y, .8f),
-				ObjectAnimator.ofFloat(toolbarShowNewPostsBtn, View.ALPHA, 1f),
-				ObjectAnimator.ofFloat(toolbarShowNewPostsBtn, View.SCALE_X, 1f),
-				ObjectAnimator.ofFloat(toolbarShowNewPostsBtn, View.SCALE_Y, 1f),
-				ObjectAnimator.ofFloat(collapsedChevron, View.ALPHA, 1f)
-		);
-		set.setDuration(reduceMotion ? 0 : 300);
-		set.setInterpolator(CubicBezierInterpolator.DEFAULT);
-		set.addListener(new AnimatorListenerAdapter(){
-			@Override
-			public void onAnimationEnd(Animator animation){
-				timelineTitle.setVisibility(View.GONE);
-				currentNewPostsAnim=null;
-			}
-		});
-		currentNewPostsAnim=set;
-		set.start();
-	}
-
-	public boolean isNewPostsBtnShown() {
-		return newPostsBtnShown;
-	}
-
-	private void onNewPostsBtnClick(View view) {
-		if(newPostsBtnShown){
-			scrollToTop();
-			hideNewPostsButton();
+		}else if(current instanceof ScrollableToTop scrollable){
+			scrollable.scrollToTop();
 		}
 	}
 
@@ -1171,6 +1012,11 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 	@Override
 	public void onDestroyView(){
 		if(nbwSubscription!=null){ nbwSubscription.cancel(); nbwSubscription=null; }
+		if(pager!=null && pagerCallback!=null) pager.unregisterOnPageChangeCallback(pagerCallback);
+		pagerCallback=null;
+		pager=null;
+		timelineTabs=null;
+		removeBackCallback(returnToBeginningOfPager);
 		liquidToolbarController=null;
 		if(toolbarGeometryRoot!=null && toolbarGeometryRoot.getViewTreeObserver().isAlive())
 			toolbarGeometryRoot.getViewTreeObserver().removeOnPreDrawListener(toolbarGeometry);
@@ -1184,10 +1030,8 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 			overflowPopup.dismiss();
 			overflowPopup = null;
 		}
-		if (switcherPopup != null) {
-			switcherPopup.dismiss();
-			switcherPopup = null;
-		}
+		detachToolbarLogoCenter();
+		toolbarLogo=null;
 		if(GithubSelfUpdater.isSupported()){
 			E.unregister(this);
 		}
@@ -1204,15 +1048,22 @@ public class HomeTabFragment extends MastodonToolbarFragment implements Scrollab
 	@Override
 	public void onViewStateRestored(Bundle savedInstanceState) {
 		super.onViewStateRestored(savedInstanceState);
-		if (savedInstanceState == null || count==0) return;
-		int selectedTab=Math.max(0, Math.min(savedInstanceState.getInt("selectedTab"), count-1));
-		navigateTo(selectedTab, false);
+		if(savedInstanceState==null || visibleTimelineIndices.isEmpty()) return;
+		int definition=savedInstanceState.getInt("selectedTimelineId", -1);
+		if(definition<0){
+			int position=Math.max(0, Math.min(savedInstanceState.getInt("selectedTab"), visibleTimelineIndices.size()-1));
+			definition=visibleTimelineIndices.get(position);
+		}
+		if(!visibleTimelineIndices.contains(definition)) definition=visibleTimelineIndices.get(0);
+		navigateTo(definition, false);
+		timelineTabs.setSelectedPage(pager.getCurrentItem(), false);
+		timelineTabs.setScrollPosition(pager.getCurrentItem());
 	}
 
 	@Override
 	public void onSaveInstanceState(Bundle outState) {
 		super.onSaveInstanceState(outState);
-		outState.putInt("selectedTab", pager.getCurrentItem());
+		if(pager!=null && !visibleTimelineIndices.isEmpty()) outState.putInt("selectedTimelineId", currentTimelineIndex());
 	}
 
 	@Subscribe

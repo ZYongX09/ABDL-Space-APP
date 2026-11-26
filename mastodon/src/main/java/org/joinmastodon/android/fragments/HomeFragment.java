@@ -422,6 +422,14 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 		}
 	}
 
+	/** Local readiness only: the active pane and navigation have a measured frame. */
+	public boolean hasStartupContentFrame(){
+		Fragment selected=fragmentForTab(currentTab);
+		View pane=selected==null ? null : selected.getView();
+		return pane!=null && pane.isShown() && pane.getWidth()>0 && pane.getHeight()>0
+				&& navigationHost!=null && navigationHost.getWidth()>0;
+	}
+
 	public void setCurrentTab(@IdRes int tab){
 		tab=normalizeTab(tab);
 		if(tab==currentTab)
@@ -552,7 +560,6 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 						markSetupGuideDoneIfPossible(version, setupDoneKey);
 					}, 2000);
 				}).show();
-				LocationUtils.fetchProvinceFromIP(getActivity(), null);
 				return;
 			}catch(Exception ignored){}
 		}
@@ -879,8 +886,7 @@ public class HomeFragment extends AppKitFragment implements AssistContentProvide
 				homeTabFragment::onLiquidTimelineSelected,
 				homeTabFragment::onLiquidNewPosts,
 				homeTabFragment::onLiquidCompose,
-				homeTabFragment::onLiquidMenuItem,
-				homeTabFragment::openSearch
+				homeTabFragment::onLiquidMenuItem
 		);
 
 		liquidToolbarController.setComposeMenu(composeMenuItems(getActivity()));

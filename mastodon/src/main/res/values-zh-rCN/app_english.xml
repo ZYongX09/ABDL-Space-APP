@@ -982,6 +982,9 @@
 	<string name="vr_up_subtitle">请不要关闭此页面</string>
 	<string name="vr_up_step1">照片已处理完成</string>
 	<string name="vr_up_step2">照片已上传完成</string>
+	<string name="vr_up_step1_active">正在处理照片</string>
+	<string name="vr_up_step2_active">正在上传照片</string>
+	<string name="vr_up_step3_done">校验完成</string>
 	<string name="vr_up_step3">正在校验信息</string>
 	<string name="vr_submitted_title">照片已提交审核</string>
 	<string name="vr_submitted_subtitle">审核预计将在24小时内完成</string>
@@ -1060,6 +1063,8 @@
 	<string name="vr_cam_step3_fmt">%1$s，并拍下同时包含完整穿着的纸尿裤和纸条的照片</string>
 	<string name="vr_cam_meta_fmt">ID %1$s · %2$s</string>
 	<string name="vr_cam_remaining">认证剩余时间</string>
+	<string name="vr_cam_collapse">收起认证要求</string>
+	<string name="vr_cam_expand">展开认证要求</string>
 	<string name="vr_cam_preview_title">使用这张照片？</string>
 	<string name="vr_cam_retake">重拍</string>
 	<string name="vr_cam_use">使用这张照片</string>

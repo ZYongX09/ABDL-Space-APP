@@ -43,7 +43,7 @@ import okio.BufferedSink;
 /** Cancellable and resumable authorize/PUT/complete state machine for private verification evidence. */
 public final class VerificationUploader{
 	private static final MediaType JPEG=MediaType.get("image/jpeg");
-	private static final int MAX_VERIFY_ATTEMPTS=6, MAX_REAUTHORIZE_ATTEMPTS=2;
+	private static final int MAX_VERIFY_ATTEMPTS=12, MAX_REAUTHORIZE_ATTEMPTS=2;
 	private static final ExecutorService UPLOAD_EXECUTOR=Executors.newCachedThreadPool(r->{
 		Thread thread=new Thread(r, "VerificationUpload");
 		thread.setDaemon(true);
@@ -292,6 +292,8 @@ public final class VerificationUploader{
 				checkCanceled();
 				// A lost PUT response is ambiguous. Completing is the only safe idempotent probe.
 			}
+			// COS just acknowledged the PUT; a short pause avoids a first-probe HEAD miss.
+			try{ sleeper.sleep(250); }catch(InterruptedException error){ Thread.currentThread().interrupt(); checkCanceled(); }
 		}
 		return completeOrReauthorize(applicationId, image, authorization.evidenceId, reauthorizeAttempt);
 	}
@@ -307,7 +309,10 @@ public final class VerificationUploader{
 				if(!evidenceId.equals(result.id) || (image!=null && result.verifiedSize!=image.size())) throw new ObjectValidationException("照片校验结果与本地文件不匹配");
 				return result;
 			}catch(TransportException error){
-				if("evidence_verifying".equals(error.code) && attempt+1<MAX_VERIFY_ATTEMPTS){
+				// The backend may still be finishing its own COS check, or a transient COS/Worker error
+				// may have surfaced. Keep polling instead of making the user press retry.
+				if((("evidence_verifying".equals(error.code)) || error.status==0 || error.status>=500)
+						&& attempt+1<MAX_VERIFY_ATTEMPTS){
 					sleepBackoff(attempt);
 					continue;
 				}

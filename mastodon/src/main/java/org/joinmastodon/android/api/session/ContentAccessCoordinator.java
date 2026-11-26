@@ -30,6 +30,9 @@ public final class ContentAccessCoordinator{
 		public final boolean loading;
 		Snapshot(ContentAccess.State state, long generation, boolean loading){ this.state=state; this.generation=generation; this.loading=loading; }
 		public boolean isOpen(){ return state==ContentAccess.State.OPEN && !loading; }
+		/** Only a confirmed requirement withholds content. Unknown/unavailable/loading are not decisions;
+		 * the server remains authoritative for every protected read. */
+		public boolean withholdsContent(){ return state==ContentAccess.State.BABY_VERIFICATION_REQUIRED; }
 	}
 	/** Captured at dispatch, never reconstructed from whichever account is active at response time. */
 	public static final class Owner{
@@ -37,18 +40,21 @@ public final class ContentAccessCoordinator{
 		private final AccountSession session;
 		private final Token token;
 		private final String value;
-		private final long generation;
-		private Owner(ContentAccessCoordinator owner){ coordinator=owner; session=owner.session; token=session.token; value=token==null ? null : token.accessToken; generation=owner.generation; }
+		private final long generation, mediaGeneration;
+		private Owner(ContentAccessCoordinator owner){
+			coordinator=owner; session=owner.session; token=session.token; value=token==null ? null : token.accessToken;
+			generation=owner.generation; mediaGeneration=owner.mediaGeneration;
+		}
 		public boolean isCurrent(){ return coordinator.current(this); }
 		public boolean sameIdentity(){ return session==coordinator.session && token==session.token && Objects.equals(value, token==null ? null : token.accessToken) && coordinator.identityCurrent(); }
 		public boolean canRead(){ return isCurrent() && coordinator.getSnapshot().isOpen(); }
-		/** Only a confirmed "verification required" blocks dispatch. Unknown/unavailable states let the
-		 * server answer authoritatively (it withholds content itself), so a probe outage no longer turns
-		 * every startup request into a synthetic 503 toast. Local cache reads stay strict via canRead(). */
-		/** Only a confirmed requirement blocks dispatch. Identity/generation changes (session refresh,
-		 * account switch during splash) must not fabricate 503s; the server enforces content itself. */
+		/** Media dispatch and already-fetched media views only stop on a confirmed requirement; the
+		 * server still authorizes every byte, so an in-flight probe must not blank avatars or photos. */
+		public boolean canFetchMedia(){ return mediaGeneration==coordinator.mediaGeneration && sameIdentity() && canDispatch(); }
+		/** A confirmed requirement blocks content; an inconclusive probe is not a server verdict. */
 		public boolean canDispatch(){ return coordinator.getSnapshot().state!=ContentAccess.State.BABY_VERIFICATION_REQUIRED; }
-		public String mediaScope(){ return coordinator.mediaScope+"-"+generation; }
+		public String mediaDiskScope(){ return coordinator.mediaDiskScope; }
+		public String mediaMemoryScope(){ return mediaDiskScope()+"-"+coordinator.mediaScope+"-"+mediaGeneration; }
 		/** An open header is never authority to clear a gate. Only the latest GET can do that. */
 		public void receiveHeader(String header){ coordinator.dispatch.accept(()->coordinator.applyHeader(this, header)); }
 	}
@@ -61,7 +67,9 @@ public final class ContentAccessCoordinator{
 	private final Set<Consumer<Snapshot>> observers=new HashSet<>();
 	private Token token;
 	private String tokenValue;
-	private volatile long generation=1;
+	private volatile String mediaDiskScope;
+	private volatile long generation=1, mediaGeneration=1;
+	private volatile long lastProbeAt;
 	private volatile ContentAccess.State state;
 	private volatile boolean loading;
 	private Cancelable pending;
@@ -77,6 +85,12 @@ public final class ContentAccessCoordinator{
 	public static boolean canRead(String accountId){
 		AccountSession session=AccountSessionManager.getInstance().tryGetAccount(accountId);
 		return session!=null && (!applies(session) || session.getContentAccessCoordinator().isOpen());
+	}
+	/** Request dispatch and already-authorized UI only stop on a confirmed requirement. Unknown and
+	 * unavailable are not verdicts; the server answers each protected request authoritatively. */
+	public static boolean allowsContent(String accountId){
+		AccountSession session=AccountSessionManager.getInstance().tryGetAccount(accountId);
+		return session!=null && (!applies(session) || !session.getContentAccessCoordinator().getSnapshot().withholdsContent());
 	}
 	/** First-party API is content by default; only account/utility operations bypass the content gate. */
 	public static boolean isProtectedRoute(Uri uri){ return isProtectedRoute(uri,"GET"); }
@@ -113,6 +127,10 @@ public final class ContentAccessCoordinator{
 	public ContentAccessCoordinator(AccountSession session, Transport transport, Consumer<Runnable> dispatch){
 		this.session=session; accountId=session.getID(); this.transport=transport; this.dispatch=dispatch;
 		token=session.token; tokenValue=token==null ? null : token.accessToken;
+		mediaDiskScope=digestForMedia(tokenValue);
+	}
+	private String digestForMedia(String credential){
+		return org.joinmastodon.android.api.cache.HomeTimelineSnapshot.identity(accountId, credential);
 	}
 	private boolean identityCurrent(){
 		return AccountSessionManager.getInstance().tryGetAccount(accountId)==session
@@ -130,15 +148,22 @@ public final class ContentAccessCoordinator{
 	private void emit(){ Snapshot snapshot=getSnapshot(); for(Consumer<Snapshot> observer:new ArrayList<>(observers)) observer.accept(snapshot); }
 	private void cancelPending(){ Cancelable request=pending; pending=null; if(request!=null) request.cancel(); }
 
-	/** Called on initial entry, foreground, account/credential changes, network switches and explicit refresh. */
+	/** Force a new probe for an account/credential change, network switch, or explicit refresh. */
 	public void refresh(){
 		cancelPending();
-		token=session.token; tokenValue=token==null ? null : token.accessToken;
+		Token nextToken=session.token;
+		String nextValue=nextToken==null ? null : nextToken.accessToken;
+		if(token!=nextToken || !Objects.equals(tokenValue, nextValue)){
+			mediaDiskScope=digestForMedia(nextValue);
+			mediaGeneration++;
+		}
+		token=nextToken; tokenValue=nextValue;
 		generation++;
 		// A known requirement may remain visible during revalidation; never retain an allow.
 		if(state!=ContentAccess.State.BABY_VERIFICATION_REQUIRED) state=null;
 		loading=true;
-		session.getCacheController().invalidateContentAccess();
+		// Revalidation is not revocation: dropping local timelines here wiped the home/notifications
+		// cache on every resume and forced a full network reload (and avatar rebind) each time.
 		emit();
 		if(!identityCurrent()){ loading=false; emit(); return; }
 		Owner owner=new Owner(this);
@@ -152,8 +177,13 @@ public final class ContentAccessCoordinator{
 		if(!current(owner) || !loading) return;
 		pending=null; loading=false;
 		try{ if(access!=null) access.postprocess(); }catch(Exception invalid){ access=null; }
+		ContentAccess.State previous=state;
 		state=access==null ? (state==ContentAccess.State.BABY_VERIFICATION_REQUIRED ? state : ContentAccess.State.UNAVAILABLE) : access.state;
 		if(state==ContentAccess.State.OPEN) requiredPromptClaimed=false;
+		lastProbeAt=android.os.SystemClock.elapsedRealtime();
+		// Only a confirmed requirement revokes locally cached content.
+		if(state==ContentAccess.State.BABY_VERIFICATION_REQUIRED && previous!=ContentAccess.State.BABY_VERIFICATION_REQUIRED)
+			retireOwnedMediaAndContent();
 		emit();
 	}
 	private void applyHeader(Owner owner, String header){
@@ -165,15 +195,28 @@ public final class ContentAccessCoordinator{
 		};
 		if(next==null) return;
 		cancelPending(); generation++; loading=false;
+		ContentAccess.State previous=state;
 		if(state!=ContentAccess.State.BABY_VERIFICATION_REQUIRED || next==ContentAccess.State.BABY_VERIFICATION_REQUIRED) state=next;
-		session.getCacheController().invalidateContentAccess();
+		// An unavailable probe is not a revocation; the server still answers each request.
+		if(next==ContentAccess.State.BABY_VERIFICATION_REQUIRED && previous!=ContentAccess.State.BABY_VERIFICATION_REQUIRED)
+			retireOwnedMediaAndContent();
 		emit();
+	}
+	/** Initial/foreground hints share a pending probe or a fresh allow for the same credential. */
+	public void refreshIfStale(long maxAgeMs){
+		if(identityCurrent() && (loading || state==ContentAccess.State.OPEN
+				&& android.os.SystemClock.elapsedRealtime()-lastProbeAt<maxAgeMs)) return;
+		refresh();
+	}
+	private void retireOwnedMediaAndContent(){
+		mediaGeneration++;
+		session.getCacheController().invalidateContentAccess();
 	}
 	/** Invalidate an old selected-account epoch, including an A -> B -> A switch. */
 	public void deactivate(){
 		cancelPending(); generation++; loading=false;
 		if(state!=ContentAccess.State.BABY_VERIFICATION_REQUIRED) state=null;
-		session.getCacheController().invalidateContentAccess(); emit();
+		retireOwnedMediaAndContent(); emit();
 	}
 	/** One forced generic prompt per required episode, not per retry or Activity recreation. */
 	public boolean claimRequiredPrompt(){

@@ -5,6 +5,9 @@ import android.app.Application;
 import android.content.Context;
 import android.content.res.Configuration;
 import android.app.ActivityManager;
+import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.Process;
 import android.util.Log;
 import android.webkit.WebView;
@@ -28,6 +31,9 @@ public class MastodonApp extends Application{
 
 	@SuppressLint("StaticFieldLeak") // it's not a leak
 	public static Context context;
+	private final Handler startupHandler=new Handler(Looper.getMainLooper());
+	private final Runnable startupFallback=()->scheduleDeferredStartupWork(false);
+	private boolean mainProcess, deferredWorkScheduled;
 
 	@Override
 	protected void attachBaseContext(Context base){
@@ -47,13 +53,38 @@ public class MastodonApp extends Application{
 		V.setApplicationContext(context);
 		ImageCache.Parameters params=new ImageCache.Parameters();
 		params.diskCacheSize=100*1024*1024;
-		params.maxMemoryCacheSize=Integer.MAX_VALUE;
+		params.maxMemoryCacheSize=64*1024*1024;
 		ImageCache.setParams(params);
 		ImageCache.registerDownloader(new org.joinmastodon.android.ui.utils.NBWAvatarImageDownloader(ImageCache.getInstance(context), context));
 		ImageCache.registerDownloader(0,new org.joinmastodon.android.ui.utils.ContentMediaImageDownloader());
 		NetworkUtils.setUserAgent("MastodonAndroid/"+BuildConfig.VERSION_NAME);
 		UiUtils.updateLocalizedDateFormatters(context);
 
+		GlobalUserPreferences.load();
+		mainProcess=isMainProcess(getPackageName(), processName);
+		if(mainProcess){
+			org.joinmastodon.android.security.AppSecurity.install(this);
+			ContentAccessGate.install(this);
+			// A receiver/service may start the process without any Activity to report a frame.
+			startupHandler.postDelayed(startupFallback, 6500);
+		}else startupHandler.postDelayed(this::initPush,1200);
+	}
+
+	void scheduleDeferredStartupWork(boolean firstFrame){
+		if(!mainProcess || deferredWorkScheduled) return;
+		deferredWorkScheduled=true;
+		startupHandler.removeCallbacks(startupFallback);
+		startupHandler.postDelayed(this::initPush,firstFrame ? 350 : 0);
+		startupHandler.postDelayed(()->{
+			NovelAccountCleanupWorker.enqueuePending(context);
+			for(AccountSession session:AccountSessionManager.getInstance().getLoggedInAccounts()){
+				NovelUploadWorker.enqueuePending(context,session.getID());
+				NovelSyncWorker.enqueue(context,session.getID());
+			}
+		},firstFrame ? 1100 : 750);
+	}
+
+	private void initPush(){
 		// 初始化极光推送
 		JPushInterface.setDebugMode(BuildConfig.DEBUG);
 		JCollectionAuth.setAuth(this, true);
@@ -76,21 +107,10 @@ public class MastodonApp extends Application{
 			Log.e(TAG, "Failed to create JPush HIGH channel", e);
 		}
 		Log.i(TAG, "JPush initialized");
-
 		try{
 			PushSubscriptionManager.tryRegisterFCM();
 		}catch(Throwable t){
-			// 快捷方式发布失败不影响正常功能（SplashActivity 改变了 LAUNCHER 入口）
-		}
-		GlobalUserPreferences.load();
-		if(isMainProcess(getPackageName(), processName)){
-			org.joinmastodon.android.security.AppSecurity.install(this);
-			ContentAccessGate.install(this);
-			NovelAccountCleanupWorker.enqueuePending(context);
-			for(AccountSession session:AccountSessionManager.getInstance().getLoggedInAccounts()){
-				NovelUploadWorker.enqueuePending(context, session.getID());
-				NovelSyncWorker.enqueue(context, session.getID());
-			}
+			// Token registration can retry later without blocking the home screen.
 		}
 	}
 
@@ -99,6 +119,7 @@ public class MastodonApp extends Application{
 	}
 
 	private String getCurrentProcessName(){
+		if(Build.VERSION.SDK_INT>=28) return Application.getProcessName();
 		ActivityManager manager=getSystemService(ActivityManager.class);
 		if(manager==null)
 			return null;

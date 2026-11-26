@@ -10,12 +10,17 @@ import android.net.Uri;
 import android.os.BadParcelableException;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.SystemClock;
 import android.util.Log;
 import android.widget.Toast;
 
 import android.view.GestureDetector;
 import android.view.MotionEvent;
+import android.view.View;
 import android.view.ViewConfiguration;
+import android.view.ViewGroup;
+import android.view.ViewTreeObserver;
+import android.widget.FrameLayout;
 
 import org.joinmastodon.android.api.MastodonAPIController;
 import org.joinmastodon.android.api.ObjectValidationException;
@@ -24,6 +29,7 @@ import org.joinmastodon.android.api.requests.search.GetSearchResults;
 import org.joinmastodon.android.api.requests.accounts.GetAccountByID;
 import org.joinmastodon.android.api.session.AccountSession;
 import org.joinmastodon.android.api.session.AccountSessionManager;
+import org.joinmastodon.android.api.session.ContentAccessCoordinator;
 import org.joinmastodon.android.chat.ChatController;
 import org.joinmastodon.android.chat.ChatEvents;
 import org.joinmastodon.android.chat.ChatRealtimeClient;
@@ -45,6 +51,9 @@ import org.joinmastodon.android.model.ServiceNotice;
 import org.joinmastodon.android.model.SearchResults;
 import org.joinmastodon.android.model.verification.VerificationLink;
 import org.joinmastodon.android.fragments.settings.BabyVerificationResultFragment;
+import org.joinmastodon.android.security.AppSecurity;
+import org.joinmastodon.android.startup.StartupLogoView;
+import org.joinmastodon.android.startup.StartupWarmup;
 import org.joinmastodon.android.ui.M3AlertDialogBuilder;
 import org.joinmastodon.android.ui.utils.UiUtils;
 import org.joinmastodon.android.updater.GithubSelfUpdater;
@@ -71,7 +80,7 @@ import org.joinmastodon.android.ui.compose.ComposeLifecycleHelperKt;
 import org.joinmastodon.android.ui.utils.LocationUtils;
 import androidx.core.app.ActivityCompat;
 
-public class MainActivity extends FragmentStackActivity implements LifecycleOwner, ViewModelStoreOwner, SavedStateRegistryOwner {
+public class MainActivity extends FragmentStackActivity implements LifecycleOwner, ViewModelStoreOwner, SavedStateRegistryOwner, StartupLogoView.SurfaceOwner {
 	private static final String TAG="MainActivity";
 	public static final String EXTRA_OPEN_SOURCE_LICENSES="open_source_licenses";
 	private final LifecycleRegistry lifecycleRegistry=new LifecycleRegistry(this);
@@ -92,6 +101,14 @@ public class MainActivity extends FragmentStackActivity implements LifecycleOwne
 	/** 服务公告弹窗引用，防止重复弹出 */
 	private android.app.AlertDialog serviceNoticeDialog;
 	private StartupPromptCoordinator startupPromptCoordinator;
+	private long startupLogoEpoch;
+	private View startupLogo;
+	private ViewGroup startupLogoHost;
+	private boolean startupReady, launchPermissionPending, startupUsesPlatform, startupInterruptedByLock;
+	private ViewTreeObserver startupObserver;
+	private final Runnable deferredLaunchWork=this::runDeferredLaunchWork;
+	private final ViewTreeObserver.OnPreDrawListener startupDestination=this::checkStartupDestination;
+	private final Runnable startupLogoWakeup=()->getWindow().getDecorView().invalidate();
 
 	@Override
 	public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults){
@@ -125,10 +142,17 @@ public class MainActivity extends FragmentStackActivity implements LifecycleOwne
 	protected void onCreate(@Nullable Bundle savedInstanceState){
 		savedStateController.performRestore(savedInstanceState);
 		lifecycleRegistry.setCurrentState(Lifecycle.State.CREATED);
+		if(consumeLauncherIntent(getIntent()) && savedInstanceState==null){
+			startupLogoEpoch=StartupLogoView.coldEpoch();
+			startupUsesPlatform=Build.VERSION.SDK_INT>=31 && startupLogoEpoch>0
+					&& !GlobalUserPreferences.reduceMotion && android.animation.ValueAnimator.areAnimatorsEnabled();
+			if(startupUsesPlatform) getSplashScreen().setOnExitAnimationListener(this::finishPlatformSplash);
+		}
 
 		AccountSession session=getCurrentSession();
 		UiUtils.setUserPreferredTheme(this, /* MOSHIDON: this is for per account user themes */ session);
 		super.onCreate(savedInstanceState);
+		if(startupLogoEpoch>0) prepareStartupHandoff();
 
 		ComposeLifecycleHelperKt.installComposeLifecycle(this);
 
@@ -151,31 +175,12 @@ public class MainActivity extends FragmentStackActivity implements LifecycleOwne
 			}
 		});
 
-		org.joinmastodon.android.security.AppSecurity.runAfterUnlock(this, ()->{
-			if(savedInstanceState==null){
-				restartHomeFragment();
-				connectChatWebSocket();
-				refreshChatConversations();
-			}
-			if(getIntent().getBooleanExtra(EXTRA_OPEN_SOURCE_LICENSES, false)){
-				openSourceLicenses(getIntent());
-			}
+		AppSecurity.runAfterUnlock(this, ()->{
+			if(savedInstanceState==null) restartHomeFragment();
+			if(getIntent().getBooleanExtra(EXTRA_OPEN_SOURCE_LICENSES, false)) openSourceLicenses(getIntent());
+			if(startupLogoEpoch==0) onFirstDestinationDraw();
+			else startupLogoWakeup.run();
 		});
-
-		// 冷启动提示统一串行：服务公告、认证驳回、新徽章。
-		if(savedInstanceState==null){
-			org.joinmastodon.android.security.AppSecurity.runAfterUnlock(this, ()->{
-				startupPromptCoordinator=new StartupPromptCoordinator(this);
-				startupPromptCoordinator.start();
-			});
-		}
-		bindChatAccessObserver();
-
-		// 位置权限引导序列已迁移到 HomeFragment.onShown 的 showSetupGuideSequence
-		// 此处仅保留无权限时的 IP 属地兜底（不阻塞 UI，不弹 sheet）
-		if(savedInstanceState==null && !LocationUtils.hasLocationPermission(this)){
-			LocationUtils.fetchProvinceFromIP(this, null);
-		}
 
 		if(BuildConfig.BUILD_TYPE.startsWith("appcenter")){
 			// Call the appcenter SDK wrapper through reflection because it is only present in beta builds
@@ -198,7 +203,122 @@ public class MainActivity extends FragmentStackActivity implements LifecycleOwne
 		// }
 	}
 
+	/** Preserve the previous router's behavior: the public alias only opens the app, never forwards extras. */
+	static boolean consumeLauncherIntent(Intent intent){
+		if(intent.getComponent()==null || !StartupLogoView.LAUNCHER_ALIAS.equals(intent.getComponent().getClassName())) return false;
+		intent.replaceExtras((Bundle)null);
+		intent.setDataAndType(null,null);
+		intent.setClipData(null);
+		intent.setAction(Intent.ACTION_MAIN);
+		return true;
+	}
+
+	@Override
+	public View createStartupLogo(){
+		return startupLogoEpoch>0 && !startupReady && !startupUsesPlatform ? new StartupLogoView(this, startupLogoEpoch) : null;
+	}
+
+	@Override
+	public void onStartupLockOpening(){
+		startupInterruptedByLock=true;
+		if(startupLogoEpoch>0) startupLogoWakeup.run();
+	}
+
+	private void prepareStartupHandoff(){
+		View decor=getWindow().getDecorView();
+		if(!startupUsesPlatform) installFallbackLogo(startupLogoEpoch);
+		startupObserver=decor.getViewTreeObserver();
+		startupObserver.addOnPreDrawListener(startupDestination);
+		decor.postDelayed(startupLogoWakeup, Math.max(0,startupLogoEpoch+StartupLogoView.MIN_DURATION_MS-SystemClock.uptimeMillis()));
+	}
+
+	private void installFallbackLogo(long pulseEpoch){
+		if(startupLogo!=null) return;
+		// AppKit clears its inner fragment host. This sibling survives and is below the lock shield.
+		startupLogoHost=findViewById(android.R.id.content);
+		startupLogo=new StartupLogoView(this, pulseEpoch);
+		startupLogoHost.addView(startupLogo, new FrameLayout.LayoutParams(-1,-1));
+	}
+
+	private boolean checkStartupDestination(){
+		if(isFinishing() || isDestroyed()) return true;
+		Fragment top=getTopmostFragment();
+		View view=top==null ? null : top.getView();
+		boolean ready=!AppSecurity.isLocked() && view!=null && view.isShown() && view.getWidth()>0 && view.getHeight()>0
+				&& view.getAlpha()>0f && (!(top instanceof HomeFragment home) || home.hasStartupContentFrame());
+		boolean ordinaryHome=!startupInterruptedByLock && top instanceof HomeFragment
+				&& ContentAccessCoordinator.allowsContent(AccountSessionManager.getInstance().getLastActiveAccountID());
+		if(StartupLogoView.mayReveal(SystemClock.uptimeMillis(), startupLogoEpoch, ready, ordinaryHome)){
+			removeStartupLogo();
+			onFirstDestinationDraw();
+			if(BuildConfig.DEBUG) Log.d(TAG, "Startup destination ready");
+			return true;
+		}
+		// Keep the same system-rendered AVD until a usable layout is available. Never wait for HTTP.
+		return !startupUsesPlatform || startupInterruptedByLock;
+	}
+
+	@androidx.annotation.RequiresApi(31)
+	private void finishPlatformSplash(android.window.SplashScreenView splash){
+		if(startupReady || isFinishing() || isDestroyed()){
+			splash.remove();
+			return;
+		}
+		// OEMs can deliver the view before our gate releases. Continue from the platform phase
+		// rather than the process launch timestamp. Normal starts never need this fallback.
+		startupUsesPlatform=false;
+		java.time.Instant started=splash.getIconAnimationStart();
+		long phase=started==null ? 0 : StartupLogoView.pulseEpoch(started.toEpochMilli(),System.currentTimeMillis(),SystemClock.uptimeMillis());
+		installFallbackLogo(phase);
+		View decor=getWindow().getDecorView();
+		if(decor.isHardwareAccelerated()) decor.getViewTreeObserver().registerFrameCommitCallback(splash::remove);
+		else decor.postOnAnimation(splash::remove);
+		decor.invalidate();
+	}
+
+	private void removeStartupLogo(){
+		View decor=getWindow().getDecorView();
+		if(startupObserver!=null && startupObserver.isAlive()) startupObserver.removeOnPreDrawListener(startupDestination);
+		else if(startupObserver!=null && decor.getViewTreeObserver().isAlive()) decor.getViewTreeObserver().removeOnPreDrawListener(startupDestination);
+		startupObserver=null;
+		decor.removeCallbacks(startupLogoWakeup);
+		if(startupLogoHost!=null && startupLogo!=null) startupLogoHost.removeView(startupLogo);
+		startupLogo=null;
+		startupLogoHost=null;
+		startupLogoEpoch=0;
+		startupUsesPlatform=false;
+	}
+
+	private void onFirstDestinationDraw(){
+		if(startupReady) return;
+		startupReady=true;
+		if(getApplication() instanceof MastodonApp app) app.scheduleDeferredStartupWork(true);
+		getWindow().getDecorView().postOnAnimation(deferredLaunchWork);
+	}
+
+	private void runDeferredLaunchWork(){
+		if(isDestroyed() || isFinishing() || !lifecycleRegistry.getCurrentState().isAtLeast(Lifecycle.State.RESUMED)) return;
+		AppSecurity.runAfterUnlock(this, ()->{
+			if(isDestroyed() || isFinishing() || !lifecycleRegistry.getCurrentState().isAtLeast(Lifecycle.State.RESUMED)) return;
+			if(startupPromptCoordinator==null){
+				startupPromptCoordinator=new StartupPromptCoordinator(this);
+				startupPromptCoordinator.start();
+			}
+			AccountSession session=getCurrentSession();
+			if(session!=chatAccessSession) bindChatAccessObserver();
+			if(session!=null && !ContentAccessCoordinator.applies(session) && chatWsClient==null){
+				connectChatWebSocket();
+				refreshChatConversations();
+			}
+			if(launchPermissionPending && getTopmostFragment() instanceof HomeFragment){
+				launchPermissionPending=false;
+				maybeRequestNotificationsPermission();
+			}
+		});
+	}
+
 	public void showContentAccessPrompt(){
+		if(startupLogoEpoch>0) startupLogoWakeup.run();
 		if(startupPromptCoordinator==null){ startupPromptCoordinator=new StartupPromptCoordinator(this); startupPromptCoordinator.start(); }
 		startupPromptCoordinator.showContentAccessPrompt();
 	}
@@ -362,8 +482,9 @@ public class MainActivity extends FragmentStackActivity implements LifecycleOwne
 	@Override
 	protected void onNewIntent(Intent intent){
 		super.onNewIntent(intent);
+		if(consumeLauncherIntent(intent)) return; // Warm launcher taps just bring the existing task forward.
 		setIntent(intent);
-		org.joinmastodon.android.security.AppSecurity.runAfterUnlock(this, ()->processNavigationIntent(intent));
+		AppSecurity.runAfterUnlock(this, ()->processNavigationIntent(intent));
 	}
 
 	private void processNavigationIntent(Intent intent){
@@ -661,10 +782,14 @@ public class MainActivity extends FragmentStackActivity implements LifecycleOwne
 		org.joinmastodon.android.api.session.NBWEndpointsRepository.getInstance().enterForeground(this);
 		AccountSession nbwSession=AccountSessionManager.getInstance().getLastActiveAccount();
 		if(nbwSession!=null) nbwSession.getNBWForumOptionsRepository().activate();
-		if(nbwSession!=chatAccessSession) bindChatAccessObserver();
-		org.joinmastodon.android.security.AppSecurity.runAfterUnlock(this, ()->{
-			if(chatWsClient!=null && org.joinmastodon.android.api.session.ContentAccessCoordinator.canRead(nbwSession==null ? null : nbwSession.getID())) chatWsClient.reconnect();
-		});
+		if(startupReady){
+			if(nbwSession!=chatAccessSession) bindChatAccessObserver();
+			getWindow().getDecorView().removeCallbacks(deferredLaunchWork);
+			getWindow().getDecorView().postOnAnimation(deferredLaunchWork);
+			AppSecurity.runAfterUnlock(this, ()->{
+				if(chatWsClient!=null && ContentAccessCoordinator.canRead(nbwSession==null ? null : nbwSession.getID())) chatWsClient.reconnect();
+			});
+		}
 	}
 
 	@Override
@@ -677,6 +802,8 @@ public class MainActivity extends FragmentStackActivity implements LifecycleOwne
 
 	@Override
 	protected void onDestroy(){
+		getWindow().getDecorView().removeCallbacks(deferredLaunchWork);
+		removeStartupLogo();
 		super.onDestroy();
 		lifecycleRegistry.setCurrentState(Lifecycle.State.DESTROYED);
 		if(chatAccessSubscription!=null){
@@ -801,6 +928,7 @@ public class MainActivity extends FragmentStackActivity implements LifecycleOwne
 				session=AccountSessionManager.getInstance().getLastActiveAccount();
 			}
 			session.getNBWForumOptionsRepository().activate();
+			if(session.activated && startupLogoEpoch>0) StartupWarmup.start(this);
 			args.putString("account", session.getID());
 			Fragment fragment=session.activated ? new HomeFragment() : new AccountActivationFragment();
 			fragment.setArguments(args);
@@ -822,8 +950,10 @@ public class MainActivity extends FragmentStackActivity implements LifecycleOwne
 				openContentAccessSettings(intent);
 			}else if(Intent.ACTION_VIEW.equals(intent.getAction())){
 				handleURL(intent.getData(), null);
-			}else{
+			}else if(startupReady){
 				maybeRequestNotificationsPermission();
+			}else{
+				launchPermissionPending=true;
 			}
 		}
 	}

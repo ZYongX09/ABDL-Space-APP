@@ -5,6 +5,8 @@
 	<color name="vr_card">#17171D</color>
 	<color name="vr_tile">#1A1A20</color>
 	<color name="vr_info">#182031</color>
+	<color name="vr_info_divider">#2C3444</color>
+	<color name="vr_field">#141A26</color>
 	<color name="vr_border">#2C2C36</color>
 	<color name="vr_text_primary">#F2F2F5</color>
 	<color name="vr_text_secondary">#9A9AA6</color>
