@@ -74,8 +74,8 @@ ABDL Space Android 客户端与网页端共用账户和社区数据，在 Mastod
 | 项目 | 当前配置 |
 | --- | --- |
 | 语言与 UI | Java + Kotlin；Android View/XML、Fragment 与 Jetpack Compose、Material 3、miuix 混合使用 |
-| Android | `minSdk 26`（Android 8.0+）、`targetSdk 35`、`compileSdk 37`；应用 ID 为 `top.abdl_space.app`，源码 namespace 为 `org.joinmastodon.android` |
-| 构建工具 | Gradle Wrapper **8.11.1**、Android Gradle Plugin **8.9.1**、Kotlin/Compose 编译器插件 **2.4.10** |
+| Android | `minSdk 26`（Android 8.0+）、`targetSdk 35`、`compileSdk 37.1`；应用 ID 为 `top.abdl_space.app`，源码 namespace 为 `org.joinmastodon.android` |
+| 构建工具 | Gradle Wrapper **9.7.0**、Android Gradle Plugin **9.3.1**、Kotlin/Compose 编译器插件 **2.4.21** |
 | Java | 构建环境采用 **JDK 21**；Java 源码/目标兼容级别与 Kotlin JVM target 均为 **17**，不要混淆二者 |
 | 网络与数据 | OkHttp、Gson、Room、WorkManager、Kotlin Coroutines |
 | SDK | 百度地图、高德地图、QQ Open SDK、极光推送、TensorFlow Lite |
@@ -88,12 +88,12 @@ ABDL Space Android 客户端与网页端共用账户和社区数据，在 Mastod
 - [`novel-editor-core`](novel-editor-core/)：小说导入解析与编辑核心。
 - [`jiguang-sdk:jiguang_sdk:jiguang`](jiguang-sdk/jiguang_sdk/jiguang/)：本地极光 SDK 包装模块；其 `compileSdkVersion` 为 **30**，不代表应用最低版本为 API 21。
 
-Gradle 参数及插件版本分别见 [gradle.properties](gradle.properties)、[Wrapper 配置](gradle/wrapper/gradle-wrapper.properties)和[根构建脚本](build.gradle)。仓库当前启用了 compile SDK 检查相关兼容设置；不要将其视为 AGP 对 API 37 的官方兼容保证，升级 SDK 或插件时应成组验证。
+Gradle 参数及插件版本分别见 [gradle.properties](gradle.properties)、[Wrapper 配置](gradle/wrapper/gradle-wrapper.properties)和[根构建脚本](build.gradle)。此构建链使用 AGP 内置 Kotlin，保留 compile SDK 与 AAR 兼容性检查。构建链与 Compose 运行时分开升级。
 
 ## Android 开发环境
 
 1. 安装 Android Studio 或 Android SDK 命令行工具，以及 JDK 21。
-2. 安装 SDK Platform **37**（应用和阅读/编辑模块）与 **30**（极光模块）、Platform Tools 和 AGP 所需 Build Tools，并接受 SDK 许可。使用仓库自带 `gradlew`，无需另装系统 Gradle。
+2. 安装 SDK Platform **37.1**（应用和阅读/编辑模块）与 **30**（极光模块）、Platform Tools 和 AGP 所需 Build Tools，并接受 SDK 许可。使用仓库自带 `gradlew`，无需另装系统 Gradle。
 3. 确保可访问 Google Maven、Maven Central 和 Gradle 分发服务。地图/QQ JAR、极光依赖及地图原生库也需要完整检出，不能只复制 Java/Kotlin 源码目录。
 
 ```bash
@@ -106,7 +106,7 @@ export ANDROID_HOME="/absolute/path/to/Android/Sdk"
 export PATH="$JAVA_HOME/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
 
 sdkmanager --licenses
-sdkmanager "platform-tools" "platforms;android-37" "platforms;android-30"
+sdkmanager "platform-tools" "platforms;android-37.1" "platforms;android-30" "build-tools;36.0.0"
 ./gradlew -Dorg.gradle.java.home="$JAVA_HOME" --version
 ```
 

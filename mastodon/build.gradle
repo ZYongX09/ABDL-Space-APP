@@ -1,7 +1,5 @@
 plugins {
 	id 'com.android.application'
-	id 'com.google.android.libraries.mapsplatform.secrets-gradle-plugin'
-	id 'org.jetbrains.kotlin.android'
 	id 'org.jetbrains.kotlin.plugin.compose'
 }
 
@@ -67,14 +65,14 @@ if (!System.getenv('BAIDU_MAP_ANDROID_AK') && !System.getenv('AMAP_ANDROID_KEY')
 	logger.lifecycle("Map credentials loaded from ${mapCredentialsFile()}")
 
 android {
-		androidResources {
+	androidResources {
 		generateLocaleConfig = true
-	}
-	aaptOptions {
-		noCompress "tflite"
+		noCompress += 'tflite'
 	}
 
-	compileSdk 37
+	compileSdk {
+		version = release(37) { minorApiLevel = 1 }
+	}
 	defaultConfig {
 		manifestPlaceholders = [oAuthScheme:"abdl-space"]
 		applicationId "top.abdl_space.app"
@@ -146,7 +144,7 @@ android {
 			signingConfig signingConfigs.release
 			minifyEnabled false
 			shrinkResources false
-			proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+			proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
 		}
 		sandboxRelease {
 			initWith release
@@ -228,26 +226,13 @@ android {
 		sourceCompatibility JavaVersion.VERSION_17
 		targetCompatibility JavaVersion.VERSION_17
 	}
-	kotlinOptions {
-		jvmTarget = '17'
+	sourceSets {
+		named('githubRelease') { setRoot 'src/github' }
+		named('githubDebug') { setRoot 'src/github' }
 	}
-	sourceSets{
-//		appcenterPrivateBeta{
-//			setRoot "src/appcenter"
-//		}
-//		appcenterPublicBeta{
-//			setRoot "src/appcenter"
-//		}
-		githubRelease{
-			setRoot "src/github"
-		}
-		githubDebug{
-			setRoot "src/github"
-		}
-	}
-	lintOptions{
-		checkReleaseBuilds false
-		abortOnError false
+	lint {
+		checkReleaseBuilds = false
+		abortOnError = false
 	}
 	buildFeatures{
 		aidl true
@@ -265,10 +250,6 @@ android {
 			// Gson reflects into java.time.Instant on Status; JDK 17+ blocks that unless opened.
 			jvmArgs '--add-opens=java.base/java.time=ALL-UNNAMED'
 		}
-	}
-	secrets {
-		propertiesFileName = "/dev/null"
-		defaultPropertiesFileName = "/dev/null"
 	}
 	packaging {
 		jniLibs {
