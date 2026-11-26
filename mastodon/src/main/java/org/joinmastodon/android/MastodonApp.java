@@ -5,6 +5,9 @@ import android.app.Application;
 import android.content.Context;
 import android.content.res.Configuration;
 import android.app.ActivityManager;
+import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.Process;
 import android.util.Log;
 import android.webkit.WebView;
@@ -28,6 +31,9 @@ public class MastodonApp extends Application{
 
 	@SuppressLint("StaticFieldLeak") // it's not a leak
 	public static Context context;
+	private final Handler startupHandler=new Handler(Looper.getMainLooper());
+	private final Runnable startupFallback=()->scheduleDeferredStartupWork(false);
+	private boolean mainProcess, deferredWorkScheduled;
 
 	@Override
 	protected void attachBaseContext(Context base){
@@ -47,29 +53,35 @@ public class MastodonApp extends Application{
 		V.setApplicationContext(context);
 		ImageCache.Parameters params=new ImageCache.Parameters();
 		params.diskCacheSize=100*1024*1024;
-		params.maxMemoryCacheSize=Integer.MAX_VALUE;
+		params.maxMemoryCacheSize=64*1024*1024;
 		ImageCache.setParams(params);
 		ImageCache.registerDownloader(new org.joinmastodon.android.ui.utils.NBWAvatarImageDownloader(ImageCache.getInstance(context), context));
 		ImageCache.registerDownloader(0,new org.joinmastodon.android.ui.utils.ContentMediaImageDownloader());
 		NetworkUtils.setUserAgent("MastodonAndroid/"+BuildConfig.VERSION_NAME);
 		UiUtils.updateLocalizedDateFormatters(context);
 
-		// Push SDKs are cold-start heavy and are not needed for the first frame. Initialise them
-		// after the launcher UI has had a chance to draw.
-		new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(this::initPush, 1200);
 		GlobalUserPreferences.load();
-		if(isMainProcess(getPackageName(), processName)){
+		mainProcess=isMainProcess(getPackageName(), processName);
+		if(mainProcess){
 			org.joinmastodon.android.security.AppSecurity.install(this);
 			ContentAccessGate.install(this);
-			// WorkManager/account enumeration is not needed before the first frame.
-			new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(()->{
-				NovelAccountCleanupWorker.enqueuePending(context);
-				for(AccountSession session:AccountSessionManager.getInstance().getLoggedInAccounts()){
-					NovelUploadWorker.enqueuePending(context, session.getID());
-					NovelSyncWorker.enqueue(context, session.getID());
-				}
-			}, 2000);
-		}
+			// A receiver/service may start the process without any Activity to report a frame.
+			startupHandler.postDelayed(startupFallback, 6500);
+		}else startupHandler.postDelayed(this::initPush,1200);
+	}
+
+	void scheduleDeferredStartupWork(boolean firstFrame){
+		if(!mainProcess || deferredWorkScheduled) return;
+		deferredWorkScheduled=true;
+		startupHandler.removeCallbacks(startupFallback);
+		startupHandler.postDelayed(this::initPush,firstFrame ? 350 : 0);
+		startupHandler.postDelayed(()->{
+			NovelAccountCleanupWorker.enqueuePending(context);
+			for(AccountSession session:AccountSessionManager.getInstance().getLoggedInAccounts()){
+				NovelUploadWorker.enqueuePending(context,session.getID());
+				NovelSyncWorker.enqueue(context,session.getID());
+			}
+		},firstFrame ? 1100 : 750);
 	}
 
 	private void initPush(){
@@ -98,7 +110,7 @@ public class MastodonApp extends Application{
 		try{
 			PushSubscriptionManager.tryRegisterFCM();
 		}catch(Throwable t){
-			// 快捷方式发布失败不影响正常功能（SplashActivity 改变了 LAUNCHER 入口）
+			// Token registration can retry later without blocking the home screen.
 		}
 	}
 
@@ -107,6 +119,7 @@ public class MastodonApp extends Application{
 	}
 
 	private String getCurrentProcessName(){
+		if(Build.VERSION.SDK_INT>=28) return Application.getProcessName();
 		ActivityManager manager=getSystemService(ActivityManager.class);
 		if(manager==null)
 			return null;

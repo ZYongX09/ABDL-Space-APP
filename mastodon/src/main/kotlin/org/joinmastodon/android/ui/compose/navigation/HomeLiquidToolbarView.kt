@@ -22,6 +22,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -54,8 +55,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.LayoutCoordinates
@@ -63,8 +66,11 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.compose.ui.res.dimensionResource
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.text.font.FontWeight
@@ -127,7 +133,6 @@ class HomeLiquidToolbarController(
 	private val onNewPosts: Runnable,
 	private val onCompose: Runnable,
 	private val onMenuItem: IntConsumer,
-	private val onSearch: Runnable,
 ) {
 	private val backdrop = ViewBitmapBackdrop()
 	private var statusBarInsetState by mutableIntStateOf(0)
@@ -142,7 +147,6 @@ class HomeLiquidToolbarController(
 	private var menuPageState by mutableStateOf(HomeToolbarMenuPage.NONE)
 	private var pendingMenuPageState by mutableStateOf(HomeToolbarMenuPage.NONE)
 	private var highlightedMenuIndexState by mutableStateOf<Int?>(null)
-	private var pendingTrailingAction: TrailingToolbarAction = TrailingToolbarAction.MORE
 	private var menuOpenListener: Consumer<Boolean>? = null
 	private var contentTouchTarget: View? = null
 	private var outsideGestureDown: MotionEvent? = null
@@ -400,8 +404,11 @@ private fun isMenuVisible(): Boolean = menuPageState!=HomeToolbarMenuPage.NONE |
 				style = androidx.compose.ui.text.TextStyle(fontSize = visualSpec.titleTextSp.sp, fontWeight = FontWeight.Medium),
 			).size.width.toDp().value
 		}
+		val brandSize = dimensionResource(R.dimen.home_brand_logo_size)
+		val viewportWidth = LocalConfiguration.current.screenWidthDp.dp
+		val leadingMaxWidth = (viewportWidth / 2 - brandSize / 2 - 16.dp).coerceAtLeast(80.dp)
 		val leadingClosedWidth by androidx.compose.animation.core.animateDpAsState(
-			targetValue = homeToolbarCollapsedWidthDp(measuredLeadingWidth).dp,
+			targetValue = homeToolbarCollapsedWidthDp(measuredLeadingWidth).dp.coerceAtMost(leadingMaxWidth),
 			animationSpec = spring(dampingRatio = motionSpec.dampingRatio, stiffness = motionSpec.stiffness),
 			label = "leadingToolbarWidth",
 		)
@@ -428,6 +435,17 @@ private fun isMenuVisible(): Boolean = menuPageState!=HomeToolbarMenuPage.NONE |
 				.fillMaxSize()
 				.onGloballyPositioned { backdrop.updateOriginInWindow(it.positionInWindow()) },
 		) {
+			if(!menuVisible) Image(
+				painter = painterResource(R.drawable.abdl_icon),
+				contentDescription = null,
+				modifier = Modifier.align(Alignment.TopCenter)
+					.padding(top = topInset + ToolbarMenuGeometry.TOP_OFFSET_DP.dp + (48.dp - brandSize) / 2)
+					.size(brandSize)
+					.drawWithContent {
+						// Center the ink, not the whitespace in the original SVG artboard.
+						translate(-size.width * .0055f, size.height * .004f) { this@drawWithContent.drawContent() }
+					},
+			)
 			Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = scrimAlpha)))
 			val leadingExpanded = menuPageState==HomeToolbarMenuPage.TIMELINES
 			MorphingGlassContainer(
@@ -464,7 +482,7 @@ private fun isMenuVisible(): Boolean = menuPageState!=HomeToolbarMenuPage.NONE |
 						maxLines = 1,
 						overflow = TextOverflow.Ellipsis,
 					)
-					if(!showNewPostsState) {
+						if(!showNewPostsState) {
 						Spacer(Modifier.width(6.dp))
 						ResourceIcon(R.drawable.ic_fluent_chevron_down_16_filled, 18, contentColor)
 					}
@@ -475,12 +493,12 @@ private fun isMenuVisible(): Boolean = menuPageState!=HomeToolbarMenuPage.NONE |
 				},
 			)
 
-val trailingExpanded = menuPageState==HomeToolbarMenuPage.ROOT || menuPageState==HomeToolbarMenuPage.LISTS || menuPageState==HomeToolbarMenuPage.HASHTAGS
+			val trailingExpanded = menuPageState==HomeToolbarMenuPage.ROOT || menuPageState==HomeToolbarMenuPage.LISTS || menuPageState==HomeToolbarMenuPage.HASHTAGS
 			val trailingRows = if(menuPageState==HomeToolbarMenuPage.COMPOSE) composeMenuState.size else menuItems.size + if(menuPageState==HomeToolbarMenuPage.LISTS || menuPageState==HomeToolbarMenuPage.HASHTAGS) 1 else 0
 			val trailingHasBack = menuPageState==HomeToolbarMenuPage.LISTS || menuPageState==HomeToolbarMenuPage.HASHTAGS
 			MorphingGlassContainer(
 				expanded = trailingExpanded,
-				closedWidth = 96.dp,
+				closedWidth = 48.dp,
 				closedHeight = 48.dp,
 				expandedWidth = 248.dp,
 				expandedHeight = ToolbarMenuGeometry.heightDp(trailingRows).dp,
@@ -488,12 +506,9 @@ val trailingExpanded = menuPageState==HomeToolbarMenuPage.ROOT || menuPageState=
 				anchorFractionX = 1f,
 				selectionItemCount = trailingRows,
 				enableDragSelection = shouldInstallToolbarDragRecognizer(isLeading = false),
-				shouldExpandFromClosed = { position, size -> pendingTrailingAction = trailingToolbarAction(position.x, size.width.toFloat()); pendingTrailingAction==TrailingToolbarAction.MORE },
+				shouldExpandFromClosed = { _, _ -> true },
 				onExpansionRequested = { requestMenu(HomeToolbarMenuPage.ROOT) },
-				onClosedTap = { position, size ->
-					val action=trailingToolbarAction(position.x, size.width.toFloat())
-					if(action==TrailingToolbarAction.SEARCH) onSearch.run() else requestMenu(HomeToolbarMenuPage.ROOT)
-				},
+				onClosedTap = { _, _ -> requestMenu(HomeToolbarMenuPage.ROOT) },
 				modifier = Modifier.zIndex(toolbarGlassZIndex(trailingExpanded)).align(Alignment.TopEnd).padding(top = topInset + ToolbarMenuGeometry.TOP_OFFSET_DP.dp, end = 12.dp),
 				onExpansionStarted = {},
 				onExpansionFinished = { open -> if(!open && menuPageState==HomeToolbarMenuPage.NONE) menuOpenListener?.accept(false) },
@@ -508,12 +523,9 @@ val trailingExpanded = menuPageState==HomeToolbarMenuPage.ROOT || menuPageState=
 				onBoundsChanged = { _, _ -> },
 				onLayoutCoordinates = { glassCoordinates[1] = it },
 				closedContent = {
-					Row(Modifier.height(48.dp), verticalAlignment = Alignment.CenterVertically) {
-					SearchAnchorIcon()
 					Box {
 						ToolbarIcon(R.drawable.ic_fluent_more_vertical_24_regular)
 						if(remindersState.overflowBadged) Box(Modifier.align(Alignment.TopEnd).size(7.dp).background(Color.Red, CircleShape))
-					}
 					}
 				},
 				expandedContent = { MenuContent(menuPageState, highlightedMenuIndexState) },
@@ -709,29 +721,6 @@ val trailingExpanded = menuPageState==HomeToolbarMenuPage.ROOT || menuPageState=
 			update = { imageView ->
 				imageView.setImageResource(icon)
 				imageView.imageTintList = ColorStateList.valueOf(tint.toArgb())
-			},
-		)
-	}
-
-/**
-	 * 搜索按钮锚点（玻璃胶囊左半部分）。SearchQueryFragment 的展开动画通过
-	 * 这个 id 从按钮位置放大到全屏。
-	 */
-		@Composable
-	private fun SearchAnchorIcon() {
-		val tint = MiuixTheme.colorScheme.onSurface.toArgb()
-		AndroidView(
-			modifier = Modifier.size(48.dp).padding(12.dp),
-			factory = { context -> ImageView(context).apply {
-				id = R.id.home_search_btn
-				scaleType = ImageView.ScaleType.CENTER_INSIDE
-				isClickable = false
-				isFocusable = false
-				isEnabled = false
-			} },
-			update = { imageView ->
-				imageView.setImageResource(R.drawable.ic_fluent_search_24_regular)
-				imageView.imageTintList = ColorStateList.valueOf(tint)
 			},
 		)
 	}

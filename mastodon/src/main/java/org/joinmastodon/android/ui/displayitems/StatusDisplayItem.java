@@ -182,8 +182,11 @@ public abstract class StatusDisplayItem{
 				items.add(header=new CheckableHeaderStatusDisplayItem(parentID, statusForContent.account, statusForContent.createdAt, callbacks, context, accountID, statusForContent, null));
 			else if((flags &FLAG_IS_QUOTE)!=0)
 				items.add(header=new CompactHeaderStatusDisplayItem(parentID, statusForContent.account, statusForContent.createdAt, callbacks, context, accountID, statusForContent));
-			else
-				items.add(header=new HeaderStatusDisplayItem(parentID, statusForContent.account, statusForContent.createdAt, callbacks, context, accountID, statusForContent, null));
+			else{
+				HeaderStatusDisplayItem postHeader=new HeaderStatusDisplayItem(parentID, statusForContent.account, statusForContent.createdAt, callbacks, context, accountID, statusForContent, null);
+				postHeader.hasInlineActions=(flags & FLAG_NO_FOOTER)==0;
+				items.add(header=postHeader);
+			}
 		}
 
 		// Must precede filters/CW, translation, media, quotes and every extension body path.

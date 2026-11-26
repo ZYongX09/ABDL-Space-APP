@@ -24,6 +24,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.joinmastodon.android.R
 import org.joinmastodon.android.security.ui.lock.LockActivity
+import org.joinmastodon.android.startup.StartupLogoView
 import org.joinmastodon.android.ui.utils.UiUtils
 
 class AppGatekeeper(
@@ -132,6 +133,7 @@ class AppGatekeeper(
 			}
 			if (status == AuthenticationStatus.Expired) {
 				installShield(activity)
+				(activity as? StartupLogoView.SurfaceOwner)?.onStartupLockOpening()
 				launchLock(activity)
 				return@launch
 			}
@@ -172,6 +174,9 @@ class AppGatekeeper(
 			isClickable = true
 			isFocusable = true
 			filterTouchesWhenObscured = true
+			(activity as? StartupLogoView.SurfaceOwner)?.createStartupLogo()?.let { logo ->
+				addView(logo, FrameLayout.LayoutParams(-1, -1))
+			}
 		}
 		decor.addView(shield, ViewGroup.LayoutParams(-1, -1))
 	}

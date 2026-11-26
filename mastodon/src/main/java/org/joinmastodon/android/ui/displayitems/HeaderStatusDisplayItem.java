@@ -39,6 +39,8 @@ import org.joinmastodon.android.fragments.ProfileFragment;
 import org.joinmastodon.android.fragments.report.ReportReasonChoiceFragment;
 import org.joinmastodon.android.model.Account;
 import org.joinmastodon.android.model.Attachment;
+import org.joinmastodon.android.model.Instance;
+import org.joinmastodon.android.model.QuoteApproval;
 import org.joinmastodon.android.model.Relationship;
 import org.joinmastodon.android.model.Status;
 import org.joinmastodon.android.model.StatusPrivacy;
@@ -74,6 +76,7 @@ public class HeaderStatusDisplayItem extends StatusDisplayItem{
 	public final Status status;
 	private boolean hasVisibilityToggle;
 	boolean needBottomPadding;
+	boolean hasInlineActions;
 	private String extraText;
 
 	public HeaderStatusDisplayItem(String parentID, Account user, Instant createdAt, Callbacks callbacks, Context context, String accountID, Status status, String extraText){
@@ -222,6 +225,8 @@ public class HeaderStatusDisplayItem extends StatusDisplayItem{
 					AccountSessionManager.getInstance().getAccount(item.accountID).getStatusInteractionController().setBookmarked(item.status, !item.status.bookmarked, item.context);
 				}else if(id==R.id.share){
 					UiUtils.openSystemShareSheet(activity, item.status);
+				}else if(id==R.id.quote_post){
+					openQuoteComposer(activity);
 				}else if(id==R.id.translate){
 					item.callbacks.togglePostTranslation(item.status, item.parentID);
 				}else if(id==R.id.add_to_list){
@@ -401,6 +406,37 @@ public class HeaderStatusDisplayItem extends StatusDisplayItem{
 			optionsMenu.show();
 		}
 
+		private boolean canOpenQuoteComposer(boolean isOwnPost){
+			Status status=item.status;
+			return item.hasInlineActions && status!=null && !status.preview && status.id!=null && !status.id.startsWith("nbw_")
+					&& (status.visibility==StatusPrivacy.PUBLIC || status.visibility==StatusPrivacy.UNLISTED
+							|| (status.visibility==StatusPrivacy.PRIVATE && isOwnPost));
+		}
+
+		private void openQuoteComposer(Activity activity){
+			Status status=item.status;
+			boolean isOwnPost=AccountSessionManager.getInstance().isSelf(item.accountID, item.user);
+			if(!canOpenQuoteComposer(isOwnPost)) return;
+
+			Instance instance=AccountSessionManager.get(item.accountID).getInstanceInfo();
+			Bundle args=new Bundle();
+			args.putString("account", item.accountID);
+			QuoteApproval.CurrentUserPolicy policy=status.quoteApproval==null ? null : status.quoteApproval.currentUser;
+			if(instance.isAkkoma() || instance.isIceshrimp() || (instance.supportsQuotePostAuthoring()
+					&& (policy==QuoteApproval.CurrentUserPolicy.AUTOMATIC || policy==QuoteApproval.CurrentUserPolicy.MANUAL))){
+				args.putParcelable("quote", Parcels.wrap(status));
+			}else{
+				// Keep the old Post about this link-only fallback; it is not a native quote.
+				if(TextUtils.isEmpty(status.url)) return;
+				StringBuilder text=new StringBuilder("\n\n");
+				if(!isOwnPost) text.append('@').append(status.account.acct).append(' ');
+				text.append(status.url);
+				args.putString("prefilledText", text.toString());
+				args.putInt("selectionStart", 0);
+			}
+			Nav.go(activity, ComposeFragment.class, args);
+		}
+
 		private void updateOptionsMenu(){
 			if(item.context==null)
 				return;
@@ -408,6 +444,8 @@ public class HeaderStatusDisplayItem extends StatusDisplayItem{
 			Relationship relationship=item.callbacks.getRelationship(account.id);
 			Menu menu=optionsMenu.getMenu();
 			boolean isOwnPost=AccountSessionManager.getInstance().isSelf(item.accountID, account);
+			// Quote composition was previously reached from the repost control.
+			menu.findItem(R.id.quote_post).setVisible(canOpenQuoteComposer(isOwnPost));
 			boolean canTranslate=item.status!=null && item.callbacks.supportsPostTranslation()
 					&& org.joinmastodon.android.translation.PostTranslationSupport.eligible(item.status,
 							org.joinmastodon.android.translation.PostTranslationSupport.target(item.context));

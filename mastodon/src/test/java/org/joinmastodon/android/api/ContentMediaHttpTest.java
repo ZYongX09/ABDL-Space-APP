@@ -85,6 +85,26 @@ public class ContentMediaHttpTest{
 		try{ downloader.getDrawable(request(),true,null); fail("Redirects must fail closed"); }catch(IOException expected){}
 		assertEquals(1,server.getRequestCount()); assertEquals(0,foreign.getRequestCount());
 	}
+	@Test public void cachedHistoryLoadsPrivateDiskAndNeverDownloadsAMiss() throws Exception{
+		ImageLoaderRequest source=request();
+		assertNotNull(source);
+		ImageLoaderRequest cached=ContentMediaImageDownloader.cacheOnly(source,session);
+		assertNotNull(cached);
+		assertNotEquals(source.getDiskCacheKey(),cached.getDiskCacheKey());
+		assertNull(downloader.getDrawable(cached,true,null));
+		assertEquals(0,server.getRequestCount());
+		server.enqueue(image());
+		assertNotNull(downloader.getDrawable(source,true,null));
+		assertNotNull(downloader.getDrawable(cached,true,null));
+		assertEquals(1,server.getRequestCount());
+		coordinator.deactivate();
+		assertFalse(ContentMediaImageDownloader.accepts(source));
+		assertFalse(ContentMediaImageDownloader.accepts(cached));
+		coordinator.refresh();
+		assertFalse(ContentMediaImageDownloader.accepts(cached));
+		assertEquals(1,server.getRequestCount());
+	}
+
 	@Test public void replacedCredentialOrRequiredPolicyInvalidatesMediaAndMemoryScope() throws Exception{
 		ImageLoaderRequest old=request(); Token replacement=new Token(); replacement.accessToken=session.token.accessToken; session.token=replacement;
 		assertFalse(ContentMediaImageDownloader.accepts(old));

@@ -1,93 +1,24 @@
 package org.joinmastodon.android.startup;
 
 import android.content.Context;
-import android.os.Handler;
-import android.os.Looper;
-import android.os.SystemClock;
 
-import org.joinmastodon.android.api.cache.HomeTimelineSnapshot;
 import org.joinmastodon.android.api.session.AccountSession;
 import org.joinmastodon.android.api.session.AccountSessionManager;
 import org.joinmastodon.android.api.session.ContentAccessCoordinator;
-import org.joinmastodon.android.model.Account;
-import org.joinmastodon.android.model.Attachment;
-import org.joinmastodon.android.model.Status;
-import org.joinmastodon.android.ui.utils.ContentMediaImageDownloader;
+import org.joinmastodon.android.security.AppSecurity;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import me.grishka.appkit.imageloader.requests.UrlImageLoaderRequest;
-import me.grishka.appkit.utils.V;
-
-/** Runs inside the 3s brand splash: account/session, access probe, home snapshot and first images. */
+/** Optional one-shot startup work, after the app-local lock has allowed entry. */
 public final class StartupWarmup{
-	private static final long MAX_WAIT_MS=2800, RETRY_MS=80;
-	private static final AtomicBoolean STARTED=new AtomicBoolean(), SNAPSHOT_DONE=new AtomicBoolean();
-	private static volatile HomeTimelineSnapshot warmSnapshot;
-	private static volatile String warmAccountID;
-	private static final Handler MAIN=new Handler(Looper.getMainLooper());
+	private static final AtomicBoolean STARTED=new AtomicBoolean();
 	private StartupWarmup(){}
 
 	public static void start(Context context){
-		if(!STARTED.compareAndSet(false,true)) return;
-		long deadline=SystemClock.uptimeMillis()+MAX_WAIT_MS;
-		waitForSession(deadline);
-	}
-
-	private static void waitForSession(long deadline){
+		if(AppSecurity.isLocked() || !STARTED.compareAndSet(false,true)) return;
 		AccountSession session=AccountSessionManager.getInstance().getLastActiveAccount();
-		if(session==null){
-			if(SystemClock.uptimeMillis()<deadline) MAIN.postDelayed(()->waitForSession(deadline),RETRY_MS);
-			return;
-		}
-		android.util.Log.i("StartupWarmup","session ready "+session.getID());
-		if(ContentAccessCoordinator.applies(session)) session.getContentAccessCoordinator().refresh();
-		// Local cache is readable while the access probe is in flight; only a confirmed
-		// requirement withholds it. This is what makes the cached head available at splash exit.
-		loadSnapshot(session);
-	}
-
-	private static void loadSnapshot(AccountSession session){
-		if(!SNAPSHOT_DONE.compareAndSet(false,true)) return;
-		var cache=session.getCacheController();
-		var lease=cache.beginHomeTimelineSnapshot();
-		if(lease==null){ SNAPSHOT_DONE.set(false); return; }
-		cache.getHomeTimelineSnapshot(lease, snapshot->{
-			if(snapshot==null){ SNAPSHOT_DONE.set(false); return; }
-			warmSnapshot=snapshot;
-			warmAccountID=session.getID();
-			android.util.Log.i("StartupWarmup","snapshot posts "+snapshot.posts.size());
-			prefetch(snapshot);
-		});
-	}
-
-	/** Hand-off the warmed head exactly once so the first home frame does not wait for a lease. */
-	public static HomeTimelineSnapshot takeSnapshot(String accountID){
-		HomeTimelineSnapshot snapshot=warmSnapshot;
-		if(snapshot==null || warmAccountID==null || !warmAccountID.equals(accountID)) return null;
-		warmSnapshot=null;
-		return snapshot;
-	}
-
-	private static void prefetch(HomeTimelineSnapshot snapshot){
-		int count=0;
-		for(Status status:snapshot.posts){
-			if(count>=12) break;
-			Account account=status.account;
-			if(account==null) continue;
-			String avatar=account.avatarStatic==null || account.avatarStatic.isBlank() ? account.avatar : account.avatarStatic;
-			if(avatar!=null && !avatar.isBlank()){
-				ContentMediaImageDownloader.prefetch(new UrlImageLoaderRequest(avatar, V.dp(50), V.dp(50)));
-				count++;
-			}
-			if(status.mediaAttachments!=null){
-				for(Attachment attachment:status.mediaAttachments){
-					if(count>=12) break;
-					if(attachment.previewUrl==null || attachment.previewUrl.isBlank()) continue;
-					ContentMediaImageDownloader.prefetch(new UrlImageLoaderRequest(attachment.previewUrl, V.dp(320), V.dp(320)));
-					count++;
-				}
-			}
-		}
+		if(session==null) return;
+		if(ContentAccessCoordinator.applies(session)) session.getContentAccessCoordinator().refreshIfStale(60_000);
+		session.getCacheController().warmHomeTimelineSnapshot();
 	}
 }

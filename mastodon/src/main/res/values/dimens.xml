@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 	<dimen name="scroll_to_top_delta">300dp</dimen>
+	<dimen name="home_toolbar_content_gap">8dp</dimen>
+	<dimen name="home_brand_logo_size">35dp</dimen>
 </resources>

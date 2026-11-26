@@ -226,6 +226,11 @@ public class TimelineDefinition {
 		return icon == null ? getDefaultIcon() : icon;
 	}
 
+	@Nullable
+	public Icon getExplicitIcon(){
+		return icon;
+	}
+
 	public void setIcon(@Nullable Icon icon) {
 		this.icon = icon;
 	}

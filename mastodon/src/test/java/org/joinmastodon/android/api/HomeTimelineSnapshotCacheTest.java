@@ -98,6 +98,9 @@ public class HomeTimelineSnapshotCacheTest{
 	private void raw(String value) throws Exception{
 		// Open through the real helper first so this also tests the existing misc schema.
 		read(cache);
+		rawWithoutRead(value);
+	}
+	private void rawWithoutRead(String value){
 		try(SQLiteDatabase database=SQLiteDatabase.openDatabase(MastodonApp.context.getDatabasePath(session.getID()+".db").getPath(),null,SQLiteDatabase.OPEN_READWRITE)){
 			ContentValues row=new ContentValues(); row.put("key",HomeTimelineSnapshot.KEY); row.put("value",value);
 			database.insertWithOnConflict("misc",null,row,SQLiteDatabase.CONFLICT_REPLACE);
@@ -114,6 +117,65 @@ public class HomeTimelineSnapshotCacheTest{
 		cache.putHomeTimelineSnapshot(cache.beginHomeTimelineSnapshot(),List.of(post("c_9"),post("p_2")),"opaque+/cursor=not-a-status-id"); drain(); cache.closeDatabase();
 		HomeTimelineSnapshot result=read(cache); assertNotNull(result);
 		assertEquals(List.of("c_9","p_2"),result.posts.stream().map(s->s.id).toList()); assertEquals("opaque+/cursor=not-a-status-id",result.nextMaxID);
+	}
+	@Test public void warmupAndTwoJoiningRequestsReadOnceWithoutWinningTheWriteLease() throws Exception{
+		cache.putHomeTimelineSnapshot(cache.beginHomeTimelineSnapshot(),List.of(post("p_warm")),null); drain();
+		CountDownLatch entered=new CountDownLatch(1), release=new CountDownLatch(1);
+		CacheController.databaseThread.postRunnable(()->{ entered.countDown(); try{ release.await(); }catch(InterruptedException e){ Thread.currentThread().interrupt(); } },0);
+		assertTrue(entered.await(5,TimeUnit.SECONDS));
+		var origin=cache.beginHomeTimelineSnapshot();
+		var results=new ArrayList<HomeTimelineSnapshot>();
+		try{
+			cache.warmHomeTimelineSnapshot();
+			assertTrue(cache.isHomeTimelineLeaseCurrent(origin));
+			CacheController.databaseThread.postRunnable(()->{
+				try(SQLiteDatabase database=SQLiteDatabase.openDatabase(MastodonApp.context.getDatabasePath(session.getID()+".db").getPath(),null,SQLiteDatabase.OPEN_READWRITE)){
+					database.delete("misc","`key`=?",new String[]{HomeTimelineSnapshot.KEY});
+				}
+			},0);
+			cache.getHomeTimelineSnapshot(origin,results::add);
+			cache.getHomeTimelineSnapshot(cache.beginHomeTimelineSnapshot(),results::add);
+		}finally{ release.countDown(); }
+		drain();
+		assertEquals(2,results.size()); assertNull(results.get(0));
+		assertNotNull(results.get(1)); assertEquals("p_warm",results.get(1).posts.get(0).id);
+		assertNull(read(cache)); // No process-lifetime copy is left once handed off.
+	}
+	@Test public void completedWarmupIsReusedButNotAfterTokenObjectChanges() throws Exception{
+		cache.putHomeTimelineSnapshot(cache.beginHomeTimelineSnapshot(),List.of(post("p_warm")),null); drain();
+		cache.warmHomeTimelineSnapshot(); drain();
+		rawWithoutRead(null);
+		assertEquals("p_warm",read(cache).posts.get(0).id);
+		assertNull(read(cache));
+		cache.putHomeTimelineSnapshot(cache.beginHomeTimelineSnapshot(),List.of(post("p_old_owner")),null); drain();
+		cache.warmHomeTimelineSnapshot(); drain();
+		rawWithoutRead(null);
+		Token replacement=new Token(); replacement.accessToken=session.token.accessToken; session.token=replacement;
+		assertNull(read(cache));
+	}
+	@Test public void queuedWarmDeliveryCannotCrossSelectedAccountOrSwitchBack() throws Exception{
+		cache.putHomeTimelineSnapshot(cache.beginHomeTimelineSnapshot(),List.of(post("p_warm")),null); drain();
+		cache.warmHomeTimelineSnapshot(); drain();
+		var received=new ArrayList<HomeTimelineSnapshot>();
+		cache.getHomeTimelineSnapshot(cache.beginHomeTimelineSnapshot(),received::add);
+		var manager=AccountSessionManager.getInstance();
+		var selected=field(AccountSessionManager.class,"lastActiveAccountID");
+		// Mirror the production switch epoch without starting the other account's transport.
+		session.deactivateNBW();
+		selected.set(manager,add("home-cache.offline.example.test","home-cache-away").getID());
+		assertNull(read(cache));
+		selected.set(manager,session.getID()); drain();
+		assertEquals(1,received.size()); assertNull(received.get(0)); assertNull(read(cache));
+	}
+	@Test public void queuedWarmDeliveryIsRejectedAfterCacheOrRoutingInvalidation() throws Exception{
+		for(Runnable invalidate:List.<Runnable>of(cache::invalidateHomeTimelineSnapshot,session.getNBWForumOptionsRepository()::deactivate)){
+			cache.putHomeTimelineSnapshot(cache.beginHomeTimelineSnapshot(),List.of(post("p_warm")),null); drain();
+			cache.warmHomeTimelineSnapshot(); drain();
+			var received=new ArrayList<HomeTimelineSnapshot>();
+			cache.getHomeTimelineSnapshot(cache.beginHomeTimelineSnapshot(),received::add);
+			invalidate.run(); drain();
+			assertEquals(1,received.size()); assertNull(received.get(0));
+		}
 	}
 	@Test public void filteringIsRecursiveAndNeverPersistsPrivateDirectAdsOrPaidProjection() throws Exception{
 		Status privatePost=post("p_private"); privatePost.visibility=StatusPrivacy.PRIVATE;

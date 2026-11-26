@@ -6,6 +6,7 @@
 		<item name="colorM3Surface">@color/splash_bg</item>
 		<item name="android:windowSplashScreenBackground">@color/splash_bg</item>
 		<item name="android:windowSplashScreenAnimatedIcon">@drawable/system_splash</item>
+		<item name="android:windowSplashScreenAnimationDuration">10000</item>
 		<item name="android:windowSplashScreenIconBackgroundColor">@null</item>
 		<item name="android:windowSplashScreenBehavior" tools:ignore="NewApi">icon_preferred</item>
 		<item name="android:statusBarColor">@color/splash_bg</item>

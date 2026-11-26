@@ -83,7 +83,6 @@ import org.joinmastodon.android.fragments.sponsors.SponsorCenterFragment;
 import org.joinmastodon.android.sponsors.SponsorOriginalGate;
 import org.joinmastodon.android.model.Attachment;
 import org.joinmastodon.android.model.Status;
-import org.joinmastodon.android.model.StatusPrivacy;
 import org.joinmastodon.android.ui.M3AlertDialogBuilder;
 import org.joinmastodon.android.ui.Snackbar;
 import org.joinmastodon.android.ui.drawables.VideoPlayerSeekBarThumbDrawable;
@@ -211,8 +210,8 @@ public class PhotoViewer implements ZoomPanView.Listener{
 	};
 	private View bottomBar;
 	private View postActions;
-	private View replyBtn, boostBtn, favoriteBtn, shareBtn, bookmarkBtn;
-	private TextView replyText, boostText, favoriteText;
+	private View replyBtn, favoriteBtn, shareBtn, bookmarkBtn;
+	private TextView replyText, favoriteText;
 	private boolean uiVisible=true;
 	private AudioManager.OnAudioFocusChangeListener audioFocusListener=this::onAudioFocusChanged;
 	private Runnable uiAutoHider=()->{
@@ -382,12 +381,10 @@ public class PhotoViewer implements ZoomPanView.Listener{
 		postActions=uiOverlay.findViewById(R.id.post_actions);
 		
 		replyBtn=uiOverlay.findViewById(R.id.reply_btn);
-		boostBtn=uiOverlay.findViewById(R.id.boost_btn);
 		favoriteBtn=uiOverlay.findViewById(R.id.favorite_btn);
 		bookmarkBtn=uiOverlay.findViewById(R.id.bookmark_btn);
 		shareBtn=uiOverlay.findViewById(R.id.share_btn);
 		replyText=uiOverlay.findViewById(R.id.reply);
-		boostText=uiOverlay.findViewById(R.id.boost);
 		favoriteText=uiOverlay.findViewById(R.id.favorite);
 		
 		uiOverlay.setAlpha(0f);
@@ -419,7 +416,6 @@ public class PhotoViewer implements ZoomPanView.Listener{
 			updatePostActions();
 
 			replyBtn.setOnClickListener(this::onPostActionClick);
-			boostBtn.setOnClickListener(this::onPostActionClick);
 			favoriteBtn.setOnClickListener(this::onPostActionClick);
 			bookmarkBtn.setOnClickListener(this::onPostActionClick);
 			shareBtn.setOnClickListener(this::onPostActionClick);
@@ -564,7 +560,6 @@ public class PhotoViewer implements ZoomPanView.Listener{
 	private void configureAlbumControls(){
 		bottomBar.setVisibility(View.VISIBLE);
 		bottomBar.setPadding(0, V.dp(8), 0, V.dp(12));
-		boostBtn.setVisibility(View.GONE);
 		bookmarkBtn.setVisibility(View.GONE);
 		shareBtn.setVisibility(View.GONE);
 		replyBtn.setFocusable(true);
@@ -1532,23 +1527,10 @@ public class PhotoViewer implements ZoomPanView.Listener{
 	
 	private void updatePostActions(){
 		bindActionButton(replyText, status.repliesCount);
-		bindActionButton(boostText, status.reblogsCount);
 		bindActionButton(favoriteText, status.favouritesCount);
-		boostBtn.setSelected(status.reblogged);
 		favoriteBtn.setSelected(status.favourited);
 		bookmarkBtn.setSelected(status.bookmarked);
 		bookmarkBtn.setContentDescription(activity.getString(status.bookmarked ? R.string.remove_bookmark : R.string.add_bookmark));
-		boolean isOwn=status.account.id.equals(AccountSessionManager.getInstance().getAccount(accountID).self.id);
-		boostBtn.setEnabled(status.visibility==StatusPrivacy.PUBLIC || status.visibility==StatusPrivacy.UNLISTED
-				|| (status.visibility==StatusPrivacy.PRIVATE && isOwn));
-		boostBtn.setAlpha(boostBtn.isEnabled() ? 1 : 0.5f);
-		Drawable d=activity.getResources().getDrawable(switch(status.visibility){
-			case PUBLIC, UNLISTED, LOCAL -> R.drawable.ic_boost;
-			case PRIVATE -> isOwn ? R.drawable.ic_boost_private : R.drawable.ic_boost_disabled_24px;
-			case DIRECT -> R.drawable.ic_boost_disabled_24px;
-		}, activity.getTheme());
-		d.setBounds(0, 0, V.dp(20), V.dp(20));
-		boostText.setCompoundDrawablesRelative(d, null, null, null);
 	}
 
 	private void bindActionButton(TextView btn, long count){
@@ -1563,11 +1545,7 @@ public class PhotoViewer implements ZoomPanView.Listener{
 
 	private void onPostActionClick(View view){
 		int id=view.getId();
-		if(id==R.id.boost_btn){
-			if(status!=null){
-				AccountSessionManager.get(accountID).getStatusInteractionController().setReblogged(status, !status.reblogged, StatusPrivacy.PUBLIC, r->{});
-			}
-		}else if(id==R.id.favorite_btn){
+		if(id==R.id.favorite_btn){
 			if(status!=null){
 				AccountSessionManager.get(accountID).getStatusInteractionController().setFavorited(status, !status.favourited, r->{}, activity);
 			}

@@ -34,20 +34,16 @@ import okhttp3.Response;
 /** Only authenticated first-party media, with owner-scoped memory keys and a private disk cache. */
 public final class ContentMediaImageDownloader extends ImageDownloader{
 	private static final int MAX_BYTES=20*1024*1024, MAX_PIXELS=32*1024*1024;
+	private static final java.util.concurrent.atomic.AtomicLong diskGeneration=new java.util.concurrent.atomic.AtomicLong();
+	private static volatile long clearedDiskGeneration;
 	private static final long DISK_MAX_BYTES=256L*1024*1024, DISK_MAX_ENTRY=4L*1024*1024;
 	private static final Object DISK_LOCK=new Object();
-	private static final java.util.concurrent.ExecutorService PREFETCH=java.util.concurrent.Executors.newFixedThreadPool(2,r->{
-		Thread t=new Thread(r,"ContentMediaPrefetch");
-		t.setDaemon(true);
-		return t;
-	});
-	private static final java.util.Set<String> PREFETCHING=java.util.concurrent.ConcurrentHashMap.newKeySet();
-	private static final class PrefetchHolder{
-		static final ContentMediaImageDownloader INSTANCE=new ContentMediaImageDownloader();
-	}
-	/** Avatars/emoji are small but get evicted from the shared LRU by large post media; keep a
-	 * bounded side cache so scrolling an avatar back into view never refetches it. */
-	private static final android.util.LruCache<String,Drawable> smallImages=new android.util.LruCache<>(1024);
+	// Small images get their own byte budget so a scroll through large media does not evict every avatar.
+	private static final android.util.LruCache<String,Drawable> smallImages=new android.util.LruCache<>(8*1024*1024){
+		@Override protected int sizeOf(String key, Drawable image){
+			return image instanceof BitmapDrawable bitmap ? bitmap.getBitmap().getAllocationByteCount() : 4096;
+		}
+	};
 	private final OkHttpClient client;
 	public ContentMediaImageDownloader(){ this(MastodonAPIController.getHttpClient()); }
 	public ContentMediaImageDownloader(OkHttpClient client){ this.client=client.newBuilder().cache(null).followRedirects(false).followSslRedirects(false).build(); }
@@ -63,7 +59,10 @@ public final class ContentMediaImageDownloader extends ImageDownloader{
 		ContentAccessCoordinator.Owner owner=session.getContentAccessCoordinator().capture();
 		return owner!=null && owner.canFetchMedia() ? new ScopedRequest(original,url.uri,session,owner) : null;
 	}
-	public static boolean accepts(ImageLoaderRequest request){ return !(request instanceof ScopedRequest scoped) || scoped.current(); }
+	public static boolean accepts(ImageLoaderRequest request){
+		if(request instanceof CachedImageRequest cached) return cached.current();
+		return !(request instanceof ScopedRequest scoped) || scoped.current();
+	}
 	public static Drawable peekSmall(android.graphics.drawable.Drawable ignored, ImageLoaderRequest original){
 		ImageLoaderRequest request=scoped(original);
 		if(request instanceof ScopedRequest scoped && scoped.isSmall()) return smallImages.get(scoped.getMemoryCacheKey());
@@ -71,40 +70,41 @@ public final class ContentMediaImageDownloader extends ImageDownloader{
 	}
 	private static boolean isSmall(int width, int height){ return width>0 && height>0 && width<=256 && height<=256; }
 	@Override public boolean needsDiskCache(){ return false; }
-	@Override public boolean canHandleRequest(ImageLoaderRequest request){ return request instanceof UrlImageLoaderRequest url && isMedia(url.uri); }
+	@Override public boolean canHandleRequest(ImageLoaderRequest request){
+		return request instanceof CachedImageRequest || request instanceof UrlImageLoaderRequest url && isMedia(url.uri);
+	}
 
-	/** Warm disk/network for offscreen list images without touching the UI thread. */
-	public static void prefetch(ImageLoaderRequest request){
-		if(!(request instanceof ScopedRequest scoped) || !scoped.current()) return;
-		String key=scoped.getMemoryCacheKey();
-		if(!PREFETCHING.add(key)) return;
-		PREFETCH.execute(()->{
-			try{
-				if(scoped.current() && readDisk(scoped)==null) PrefetchHolder.INSTANCE.getDrawable(scoped,false,null);
-			}catch(IOException|RuntimeException ignored){
-			}finally{
-				PREFETCHING.remove(key);
-			}
-		});
+	/** Cached timeline rows do not authorize a fetch of their stored media URLs. */
+	public static ImageLoaderRequest cacheOnly(ImageLoaderRequest request, AccountSession session){
+		if(request==null || session==null) return null;
+		ImageLoaderRequest source=scoped(request);
+		if(source==null) return null;
+		CachedImageRequest cached=new CachedImageRequest(source, session);
+		return cached.current() ? cached : null;
 	}
 
 	/** Drop the private media cache when the account identity changes. */
 	public static void clearDiskCache(){
+		long retired=diskGeneration.incrementAndGet();
+		smallImages.evictAll();
 		new Thread(()->{
-			File dir=diskDir();
-			if(dir!=null) deleteTree(dir);
+			synchronized(DISK_LOCK){
+				if(clearedDiskGeneration>=retired) return;
+				File dir=new File(MastodonApp.context.getCacheDir(), "content-media");
+				if(dir.exists()) deleteTree(dir);
+				clearedDiskGeneration=diskGeneration.get();
+			}
 		}, "ContentMediaCacheClear").start();
 	}
 
 	@Override public Drawable getDrawable(ImageLoaderRequest request, boolean decode, ImageCache.ImageDownloadInfo info) throws IOException{
-		// Callers may hand us an unwrapped URL request (avatars, settings rows). Bind it to the current
-		// account/owner here instead of rejecting it, so authenticated bytes never enter the global cache.
-		if(!(request instanceof ScopedRequest)){
-			ImageLoaderRequest wrapped=scoped(request);
-			if(!(wrapped instanceof ScopedRequest scopedRequest) || !scopedRequest.current()) throw new IOException("Content media owner unavailable");
-			return getDrawable(scopedRequest,decode,info);
+		if(request instanceof CachedImageRequest cached) return readCacheOnly(cached, decode);
+		// Legacy image widgets still use raw URLs; bind their wire read to the current credential.
+		if(!(request instanceof ScopedRequest scoped)){
+			ImageLoaderRequest bound=scoped(request);
+			if(!(bound instanceof ScopedRequest)) throw new IOException("Content media owner unavailable");
+			return getDrawable(bound,decode,info);
 		}
-		ScopedRequest scoped=(ScopedRequest)request;
 		if(!scoped.current()) throw new IOException("Content media owner unavailable");
 		byte[] cached=readDisk(scoped);
 		if(cached!=null){
@@ -132,6 +132,26 @@ public final class ContentMediaImageDownloader extends ImageDownloader{
 		}finally{ if(info!=null) info.httpCall=null; }
 	}
 
+	private Drawable readCacheOnly(CachedImageRequest cached, boolean decode) throws IOException{
+		if(!cached.current()) throw new IOException("Cached media owner unavailable");
+		ImageCache cache=ImageCache.getInstance(MastodonApp.context);
+		Drawable drawable=cache.getFromTop(cached.original);
+		if(drawable==null){
+			if(cached.original instanceof ScopedRequest scoped){
+				if(scoped.isSmall()) drawable=smallImages.get(scoped.getMemoryCacheKey());
+				if(drawable==null){
+					byte[] bytes=readDisk(scoped);
+					if(bytes!=null) drawable=decode(bytes, scoped, decode);
+				}
+			}else{
+				File file=cache.getFile(cached.original);
+				if(file!=null && decode) drawable=cache.decodeImage(file, null, cached.original);
+			}
+		}
+		if(!cached.current()) throw new IOException("Cached media owner changed");
+		return drawable;
+	}
+
 	private Drawable decode(byte[] bytes, ScopedRequest scoped, boolean decode) throws IOException{
 		if(!decode) return null;
 		BitmapFactory.Options options=new BitmapFactory.Options(); options.inJustDecodeBounds=true; BitmapFactory.decodeByteArray(bytes,0,bytes.length,options);
@@ -155,9 +175,10 @@ public final class ContentMediaImageDownloader extends ImageDownloader{
 	}
 
 	private static byte[] readDisk(ScopedRequest request){
+		if(clearedDiskGeneration!=diskGeneration.get() || !request.current()) return null;
 		File dir=diskDir();
 		if(dir==null) return null;
-		File file=new File(dir,request.getDiskCacheKey());
+		File file=new File(dir,request.diskKey);
 		if(!file.isFile() || file.length()<=0 || file.length()>DISK_MAX_ENTRY) return null;
 		try(FileInputStream input=new FileInputStream(file)){
 			byte[] data=new byte[(int)file.length()];
@@ -177,7 +198,7 @@ public final class ContentMediaImageDownloader extends ImageDownloader{
 		if(bytes==null || bytes.length<=0 || bytes.length>DISK_MAX_ENTRY) return;
 		File dir=diskDir();
 		if(dir==null) return;
-		String key=request.getDiskCacheKey();
+		String key=request.diskKey;
 		File target=new File(dir,key);
 		File temp=new File(dir,key+".tmp-"+Thread.currentThread().getId());
 		try(FileOutputStream output=new FileOutputStream(temp)){
@@ -187,6 +208,7 @@ public final class ContentMediaImageDownloader extends ImageDownloader{
 			return;
 		}
 		synchronized(DISK_LOCK){
+			if(clearedDiskGeneration!=diskGeneration.get() || !request.current()){ temp.delete(); return; }
 			if(target.exists() && !target.delete()){ temp.delete(); return; }
 			if(!temp.renameTo(target)){ temp.delete(); return; }
 			trimLocked(dir);
@@ -195,7 +217,7 @@ public final class ContentMediaImageDownloader extends ImageDownloader{
 
 	private static void deleteDisk(ScopedRequest request){
 		File dir=diskDir();
-		if(dir!=null) new File(dir,request.getDiskCacheKey()).delete();
+		if(dir!=null) new File(dir,request.diskKey).delete();
 	}
 
 	private static void trimLocked(File dir){
@@ -218,22 +240,52 @@ public final class ContentMediaImageDownloader extends ImageDownloader{
 		file.delete();
 	}
 
+	private static final class CachedImageRequest extends ImageLoaderRequest{
+		final ImageLoaderRequest original;
+		final AccountSession session;
+		final org.joinmastodon.android.model.Token token;
+		final ContentAccessCoordinator.Owner owner;
+		final String tokenValue, key, dispatchKey;
+		CachedImageRequest(ImageLoaderRequest original, AccountSession session){
+			super(original.desiredConfig, original.desiredMaxWidth, original.desiredMaxHeight, original.processingSteps);
+			this.original=original;
+			this.session=session;
+			token=session.token;
+			tokenValue=token==null ? null : token.accessToken;
+			owner=ContentAccessCoordinator.applies(session) ? session.getContentAccessCoordinator().capture() : null;
+			String scope=owner==null ? org.joinmastodon.android.api.cache.HomeTimelineSnapshot.identity(session.getID(), tokenValue) : owner.mediaMemoryScope();
+			key=original.getMemoryCacheKey()+"/offline-"+scope;
+			dispatchKey=okio.ByteString.encodeUtf8(key).sha256().hex();
+		}
+		boolean current(){
+			return token!=null && session.token==token && Objects.equals(tokenValue, token.accessToken)
+					&& AccountSessionManager.getInstance().getLastActiveAccount()==session
+					&& (!ContentAccessCoordinator.applies(session) || owner!=null && owner.canFetchMedia()) && NBWImageRequests.accepts(original);
+		}
+		@Override public String getMemoryCacheKey(){ return key; }
+		@Override public String getDiskCacheKey(){ return dispatchKey; }
+		@Override public boolean sourcesEqual(ImageLoaderRequest other){ return other instanceof CachedImageRequest cached && key.equals(cached.key) && original.sourcesEqual(cached.original); }
+		@Override public boolean equals(Object other){ return other instanceof CachedImageRequest cached && key.equals(cached.key); }
+		@Override public int hashCode(){ return key.hashCode(); }
+	}
+
 	private static final class ScopedRequest extends UrlImageLoaderRequest{
 		final ContentAccessCoordinator.Owner owner;
 		final AccountSession session;
 		final org.joinmastodon.android.model.Token token;
-		final String tokenValue, scope;
+		final String tokenValue, scope, diskKey, dispatchKey;
 		ScopedRequest(ImageLoaderRequest original,Uri uri,AccountSession session,ContentAccessCoordinator.Owner owner){
 			super(original.desiredConfig,original.desiredMaxWidth,original.desiredMaxHeight,original.processingSteps,uri);
 			this.session=session; this.owner=owner; token=session.token; tokenValue=token.accessToken;
-			// Stable per account credential so the disk cache survives process restarts without ever
-			// mixing accounts or exposing the token itself.
-			scope=owner.mediaScope();
+			// Stable disk bytes, but a separate in-process epoch prevents reusing retired callbacks or drawables.
+			scope=owner.mediaMemoryScope();
+			diskKey=okio.ByteString.encodeUtf8(super.getMemoryCacheKey()+"/content-"+owner.mediaDiskScope()).sha256().hex();
+			dispatchKey=okio.ByteString.encodeUtf8(getMemoryCacheKey()).sha256().hex();
 		}
 		boolean current(){ return owner.canFetchMedia() && session.token==token && Objects.equals(tokenValue,token.accessToken); }
 		boolean isSmall(){ return ContentMediaImageDownloader.isSmall(desiredMaxWidth,desiredMaxHeight); }
 		@Override public String getMemoryCacheKey(){ return super.getMemoryCacheKey()+"/content-"+scope; }
-		@Override public String getDiskCacheKey(){ return okio.ByteString.encodeUtf8(getMemoryCacheKey()).md5().hex(); }
+		@Override public String getDiskCacheKey(){ return dispatchKey; }
 		@Override public boolean equals(Object other){ return other instanceof ScopedRequest value && scope.equals(value.scope) && super.equals(other); }
 		@Override public int hashCode(){ return Objects.hash(super.hashCode(),scope); }
 		@Override public boolean sourcesEqual(ImageLoaderRequest other){ return other instanceof ScopedRequest value && scope.equals(value.scope) && super.sourcesEqual(other); }

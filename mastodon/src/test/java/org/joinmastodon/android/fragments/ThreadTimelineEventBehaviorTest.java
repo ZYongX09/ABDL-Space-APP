@@ -3,6 +3,7 @@ package org.joinmastodon.android.fragments;
 import static org.junit.Assert.*;
 
 import android.app.Fragment;
+import android.content.Intent;
 import android.graphics.Rect;
 import android.os.Bundle;
 import android.view.View;
@@ -55,6 +56,8 @@ import org.robolectric.annotation.Implementation;
 import org.robolectric.annotation.Implements;
 import org.robolectric.annotation.LooperMode;
 import org.robolectric.annotation.RealObject;
+import org.robolectric.shadow.api.Shadow;
+import org.robolectric.shadows.ShadowActivity;
 import org.robolectric.shadows.ShadowChoreographer;
 import org.robolectric.shadows.ShadowLooper;
 import org.robolectric.shadows.ShadowToast;
@@ -226,6 +229,58 @@ public class ThreadTimelineEventBehaviorTest{
 		// Deliver the genuine callback even after cancellation to exercise the late-response guard.
 		success(pending, context(List.of(), List.of(status("c_late", "p_root")))); created(status("c_event_late", "p_root"));
 		assertTrue(threadIDs().isEmpty());
+	}
+
+	@Test public void mainPostDetailRendersFourInlineActionsAndSharesContentWithoutHidingHistory() throws Exception{
+		Status wrapper=status("p_boost_root", null), content=status("p_content", null);
+		wrapper.reblog=content;
+		content.reblogsCount=17;
+		launchThread(wrapper);
+
+		RecyclerView list=(RecyclerView)field(thread.getClass(), "list").get(thread);
+		int position=-1;
+		for(int i=0;i<thread.displayItems.size();i++){
+			if(thread.displayItems.get(i) instanceof FooterStatusDisplayItem footer && wrapper.id.equals(footer.parentID)){
+				assertEquals(-1, position);
+				assertTrue(footer.fullWidth && footer.hideCounts);
+				assertEquals(content.id, footer.status.id);
+				position=i+thread.getMainAdapterOffset();
+			}
+		}
+		assertTrue(position>=0);
+		((LinearLayoutManager)list.getLayoutManager()).scrollToPositionWithOffset(position-1, 0);
+		lifecycle.get().getWindow().getDecorView().requestLayout(); idle();
+		RecyclerView.ViewHolder holder=list.findViewHolderForAdapterPosition(position);
+		assertTrue(holder instanceof FooterStatusDisplayItem.Holder);
+		ViewGroup row=(ViewGroup)holder.itemView;
+		assertVisibleInList(list, row);
+		List<Integer> actions=new ArrayList<>();
+		for(int i=0;i<row.getChildCount();i++){
+			View view=row.getChildAt(i);
+			if(view.getVisibility()==View.VISIBLE && view.isClickable()) actions.add(view.getId());
+		}
+		assertEquals(List.of(R.id.favorite_btn, R.id.reply_btn, R.id.bookmark_btn, R.id.share_btn), actions);
+		for(int id:new int[]{R.id.favorite, R.id.reply, R.id.bookmark})
+			assertEquals("", ((TextView)row.findViewById(id)).getText().toString());
+
+		RecyclerView.ViewHolder metadata=list.findViewHolderForAdapterPosition(position-1);
+		assertNotNull(metadata);
+		TextView reblogs=metadata.itemView.findViewById(R.id.reblogs);
+		assertNotNull(reblogs);
+		assertEquals(thread.getResources().getQuantityString(R.plurals.x_reblogs, 17, 17L), reblogs.getText().toString());
+		assertTrue(reblogs.isClickable());
+		int requests=LocalRequests.sent.size();
+		View share=row.findViewById(R.id.share_btn);
+		assertVisibleInList(list, share);
+		assertEquals(thread.getString(R.string.button_share), share.getContentDescription());
+		assertTrue(share.isEnabled() && share.performClick());
+		Intent chooser=Shadow.<ShadowActivity>extract(lifecycle.get()).getNextStartedActivity();
+		assertNotNull(chooser);
+		assertEquals(Intent.ACTION_CHOOSER, chooser.getAction());
+		Intent send=chooser.getParcelableExtra(Intent.EXTRA_INTENT);
+		assertNotNull(send);
+		assertEquals(content.url, send.getStringExtra(Intent.EXTRA_TEXT));
+		assertEquals(requests, LocalRequests.sent.size());
 	}
 
 	@Test public void realListEventListenerUpdatesVisibleAndPreloadedContentNotReblogShells() throws Exception{

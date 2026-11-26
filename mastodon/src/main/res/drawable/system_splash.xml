@@ -4,7 +4,7 @@
   官方规范：无底色模式 icon drawable 画布须为 288dp，图形内容须落在中心 192dp 圆内，
   超出部分会被系统圆形遮罩截断。此处画布 288dp，abdl_icon（原 viewport 8669.86）
   经 scale=1900/8669.86≈0.21915 缩放为 190dp 并平移居中，留出安全余量。
-  alpha 呼吸循环让冷启动第一帧即为动态画面。
+  以画布中心为轴缩放，峰值不超过旧版图形尺寸。
 -->
 <animated-vector xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:aapt="http://schemas.android.com/aapt">
@@ -14,7 +14,7 @@
             android:height="288dp"
             android:viewportWidth="2880"
             android:viewportHeight="2880">
-            <group android:name="splash_icon_group">
+            <group android:name="splash_icon_group" android:pivotX="1440" android:pivotY="1440">
                 <group
                     android:translateX="490"
                     android:translateY="490"
@@ -40,14 +40,5 @@
             </group>
         </vector>
     </aapt:attr>
-    <target android:name="splash_icon_group">
-        <objectAnimator
-            android:duration="900"
-            android:propertyName="alpha"
-            android:repeatCount="infinite"
-            android:repeatMode="reverse"
-            android:valueFrom="0.55"
-            android:valueTo="1.0"
-            android:valueType="floatType" />
-    </target>
+    <target android:name="splash_icon_group" android:animation="@animator/startup_logo_pulse" />
 </animated-vector>
